@@ -1,0 +1,24 @@
+#summary Goals of Dang
+
+= Introduction =
+
+dang is not a well-specified language at the moment, but we wanted to write down some guiding principles.
+
+
+= Details =
+
+Important goals:
+  * *embeddable*
+  * *extensible*
+    * coroutines/continuations
+  * *expressive*
+  * *fast*
+  * *safe*
+
+Less important goals:
+  * *simple*
+  * *small*
+
+Someday:
+  * *good library*
+  * *thread support*
