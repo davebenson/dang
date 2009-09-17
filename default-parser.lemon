@@ -1,0 +1,1494 @@
+%include{
+
+#include <string.h>
+#include "dang.h"
+
+static DangExpr *
+new_bareword (const char *str)
+{
+  return dang_expr_new_bareword (str);
+}
+
+static DangExpr *
+expr_new_function (const char *name,
+                   unsigned n_params,
+		   DangExpr **params)
+{
+  return dang_expr_new_function (name, n_params, params);
+}
+
+static DangExpr *
+expr_new_function_no_args (const char *name)
+{
+  return dang_expr_new_function (name, 0, NULL);
+}
+
+
+static DangExpr *
+expr_new_function_take_1 (const char *name,
+			  DangExpr *a)
+{
+  DangExpr *rv = expr_new_function (name, 1, &a);
+  dang_expr_unref (a);
+  return rv;
+}
+
+static DangExpr *
+expr_new_function_take_2 (const char *name,
+			  DangExpr *a,
+			  DangExpr *b)
+{
+  DangExpr *arr[2] = {a,b};
+  DangExpr *rv = expr_new_function (name, 2, arr);
+  dang_expr_unref (a);
+  dang_expr_unref (b);
+  return rv;
+}
+
+static DangExpr *
+expr_new_function_take_3 (const char *name,
+			  DangExpr *a,
+			  DangExpr *b,
+			  DangExpr *c)
+{
+  DangExpr *arr[3] = {a,b,c};
+  DangExpr *rv = expr_new_function (name, 3, arr);
+  dang_expr_unref (a);
+  dang_expr_unref (b);
+  dang_expr_unref (c);
+  return rv;
+}
+
+static DangExpr *
+expr_new_function_take_4 (const char *name,
+			  DangExpr *a,
+			  DangExpr *b,
+			  DangExpr *c,
+			  DangExpr *d)
+{
+  DangExpr *arr[4] = {a,b,c,d};
+  DangExpr *rv = expr_new_function (name, 4, arr);
+  dang_expr_unref (a);
+  dang_expr_unref (b);
+  dang_expr_unref (c);
+  dang_expr_unref (d);
+  return rv;
+}
+
+static DangExpr *
+expr_new_function_take_5 (const char *name,
+			  DangExpr *a,
+			  DangExpr *b,
+			  DangExpr *c,
+			  DangExpr *d,
+			  DangExpr *e)
+{
+  DangExpr *arr[5] = {a,b,c,d,e};
+  DangExpr *rv = expr_new_function (name, 5, arr);
+  dang_expr_unref (a);
+  dang_expr_unref (b);
+  dang_expr_unref (c);
+  dang_expr_unref (d);
+  dang_expr_unref (e);
+  return rv;
+}
+
+static DangExpr *
+expr_new_invoke_take_1 (const char *name,
+			  DangExpr *a)
+{
+  return expr_new_function_take_2 ("$invoke", dang_expr_new_bareword (name), a);
+}
+
+static DangExpr *
+expr_new_invoke_take_2 (const char *name,
+			  DangExpr *a,
+			  DangExpr *b)
+{
+  return expr_new_function_take_3 ("$invoke", dang_expr_new_bareword (name), a, b);
+}
+
+static DangValueType *
+get_type_from_expr (DangExpr *expr)
+{
+  DangValueType *type;
+  dang_assert (expr->type == DANG_EXPR_TYPE_VALUE);
+  dang_assert (expr->value.type == dang_value_type_type ());
+  type = * (DangValueType **) expr->value.value;
+  dang_expr_unref (expr);
+  return type;
+}
+
+static void
+get_expr_pos_from_token (DangExpr *dst,
+                         DangToken *src)
+{
+  if (src->any.code_position.filename)
+    dang_expr_set_pos (dst, &src->any.code_position);
+}
+
+static void
+get_expr_pos_from_expr  (DangExpr *dst,
+                         DangExpr *src)
+{
+  if (src->any.code_position.filename)
+    dang_expr_set_pos (dst, &src->any.code_position);
+}
+
+static DangExpr *
+expr_bareword_from_token (DangToken *token)
+{
+  DangExpr *rv;
+  if (token->type == DANG_TOKEN_TYPE_BAREWORD)
+    rv = dang_expr_new_bareword (token->v_bareword.name);
+  else
+    dang_die ("expr_bareword_from_token: no string");
+  get_expr_pos_from_token (rv, token);
+  return rv;
+}
+static DangExpr *
+make_argument (DangToken *dir,		/* or NULL (for IN) */
+               DangExpr *type,
+	       DangToken *name)
+{
+  DangExpr *tmp[3];
+  DangExpr *rv;
+  const char *dir_str = dir ? dir->v_bareword.name : "in";
+  dang_assert (dir == NULL  || dir->type == DANG_TOKEN_TYPE_BAREWORD);
+  if (dir)
+    tmp[0] = expr_bareword_from_token (dir);
+  else
+    {
+      tmp[0] = new_bareword (dir_str);
+      get_expr_pos_from_expr (tmp[0], type);
+    }
+  tmp[1] = type;
+  tmp[2] = expr_bareword_from_token (name);
+  rv = dang_expr_new_function ("$argument", 3, tmp);
+  get_expr_pos_from_expr (rv, tmp[0]);
+  dang_expr_unref (tmp[0]);
+  dang_expr_unref (tmp[1]);
+  dang_expr_unref (tmp[2]);
+  return rv;
+}
+
+static DangExpr *
+construct_if_then_else__take (DangExpr *cond, DangExpr *body, DangExpr *else_body)
+{
+  DangExpr *rv;
+  if (dang_expr_is_function (else_body, "$if"))
+    {
+      DangExpr **arr = dang_new (DangExpr *, else_body->function.n_args + 2);
+      arr[0] = cond;
+      arr[1] = body;
+      memcpy (arr + 2, else_body->function.args,
+              sizeof (DangExpr *) * else_body->function.n_args);
+      rv = expr_new_function ("$if", else_body->function.n_args + 2, arr);
+      dang_free (arr);
+    }
+  else
+    {
+      DangExpr *arr[3] = { cond, body, else_body };
+      rv = expr_new_function ("$if", 3, arr);
+    }
+  dang_expr_unref (cond);
+  dang_expr_unref (body);
+  dang_expr_unref (else_body);
+  return rv;
+}
+static void
+set_parse_error (DangParserDefault *def,
+                 DangError         *error)
+{
+  dang_warning ("set_parse_error: %s", error->message);
+  dang_array_append (&def->errors, 1, &error);
+}
+#define SET_PARSE_ERROR(error) set_parse_error(parser, error)
+
+static void free_expr_array (DangArray *array)
+{
+  DangExpr **exprs = array->data;
+  unsigned i;
+  for (i = 0; i < array->len; i++)
+    dang_expr_unref (exprs[i]);
+  dang_array_clear (array);
+}
+
+/* For implementing += -= /= *= %= */
+static DangExpr *
+make_assign_op_expr (const char *name,
+			  DangExpr *a,	/* takes ownership */
+			  DangExpr *b)	/* takes ownership */
+{
+  DangExpr *args[3];
+  DangExpr *rv;
+  args[0] = dang_expr_new_bareword (name);
+  get_expr_pos_from_expr (args[0], a);
+  args[1] = dang_expr_new_function ("$out_param", 1, &a);
+  get_expr_pos_from_expr (args[1], a);
+  args[2] = b;
+  rv = dang_expr_new_function ("$invoke", 3, args);
+  get_expr_pos_from_expr (rv, a);
+  dang_expr_unref (args[0]);
+  dang_expr_unref (args[1]);
+  dang_expr_unref (a);
+  dang_expr_unref (b);
+  return rv;
+}
+
+typedef struct _ParserScopedLabel ParserScopedLabel;
+struct _ParserScopedLabel
+{
+  const char *label;
+  DangToken *token;
+};
+
+}	/* end of 'include' directive */
+
+%start_symbol toplevel
+
+%name DangDefaultParser_
+%token_prefix {DANG_DEFAULTPARSER_TOKEN_}
+%token_destructor { if ($$) dang_token_unref ($$); }
+%extra_argument {DangParserDefault *parser}
+
+%destructor statement { dang_expr_unref ($$); }
+%destructor grouped_statement { dang_expr_unref ($$); }
+%destructor expr_statement { dang_expr_unref ($$); }
+%destructor for_statement { dang_expr_unref ($$); }
+%destructor while_statement { dang_expr_unref ($$); }
+%destructor do_while_statement { dang_expr_unref ($$); }
+%destructor try_statement { dang_expr_unref ($$); }
+%destructor return_statement { dang_expr_unref ($$); }
+%destructor goto_statement { dang_expr_unref ($$); }
+%destructor label { dang_expr_unref ($$); }
+%destructor expr { dang_expr_unref ($$); }
+%destructor opt_expr { dang_expr_unref ($$); }
+%destructor new_expr { dang_expr_unref ($$); }
+%destructor literal_expr { dang_expr_unref ($$); }
+%destructor invoke_expr { dang_expr_unref ($$); }
+%destructor argument_list { free_expr_array (&$$); }
+%destructor vector_expr { dang_expr_unref ($$); }
+%destructor array_index_expr { dang_expr_unref ($$); }
+%destructor nonempty_argument_list { free_expr_array (&$$); }
+%destructor argument { dang_expr_unref ($$); }
+%destructor argument_decl { dang_expr_unref ($$); }
+%destructor argument_decl_list { free_expr_array (&$$); }
+%destructor opt_rv_type { dang_expr_unref ($$); }
+%destructor type { dang_expr_unref ($$); }
+%destructor statement_list { free_expr_array (&$$); }
+%destructor raw_expr_list { free_expr_array (&$$); }
+%destructor interpolated_string_expr { dang_expr_unref ($$); }
+%destructor toplevel_statement { dang_expr_unref ($$); }
+%destructor non_hanging_statement { dang_expr_unref ($$); }
+%destructor non_hanging_if_statement { dang_expr_unref ($$); }
+%destructor non_hanging_for_statement { dang_expr_unref ($$); }
+%destructor non_hanging_while_statement { dang_expr_unref ($$); }
+%destructor simple_type { dang_expr_unref ($$); }
+//%destructor jump_scoped_label_statement { dang_expr_unref ($$); }
+//%destructor scoped_label { dang_token_unref ($$.token); }
+%destructor member { dang_expr_unref ($$); }
+%destructor member_declarations { free_expr_array (&$$); }
+%destructor case_declarations { free_expr_array (&$$); }
+%destructor case_declaration { dang_expr_unref ($$); }
+%destructor structure_declaration { dang_expr_unref ($$); }
+%destructor union_declaration { dang_expr_unref ($$); }
+%destructor object_declaration { dang_expr_unref ($$); }
+%destructor object_element { dang_expr_unref ($$); }
+%destructor opt_name { dang_expr_unref ($$); }
+%destructor object_elements { free_expr_array (&$$); }
+%destructor method_body { dang_expr_unref ($$); }
+%destructor m_flag { dang_expr_unref ($$); }
+%destructor m_flags { free_expr_array (&$$); }
+%destructor limited_expression { dang_expr_unref ($$); }
+%destructor raw_expr { dang_expr_unref ($$); }
+%destructor parenthesized_expression { dang_expr_unref ($$); }
+%destructor function_type_arg_list_params { dang_array_clear (&$$); }
+%destructor nonempty_function_type_arg_list_params { dang_array_clear (&$$); }
+%destructor untyped_function { dang_expr_unref ($$); }
+%destructor untyped_function_body { dang_expr_unref ($$); }
+%destructor naked_var_list { free_expr_array (&$$); }
+%destructor closure_expr { dang_expr_unref ($$); }
+%destructor struct_create_expr { dang_expr_unref ($$); }
+%destructor struct_create_arg { dang_expr_unref ($$); }
+%destructor struct_create_arg_list { free_expr_array (&$$); }
+%destructor function_body { dang_expr_unref ($$); }
+%destructor nonempty_struct_create_arg_list { free_expr_array (&$$); }
+%destructor enum_declaration { dang_expr_unref ($$); }
+%destructor enum_values { free_expr_array (&$$); }
+%destructor enum_value { dang_expr_unref ($$); }
+%destructor module_list { free_expr_array (&$$); }
+%destructor as_clause { if ($$) dang_expr_unref ($$); }
+%destructor bareword_list { free_expr_array (&$$); }
+%destructor opt_import_list { if ($$) dang_expr_unref ($$); }
+%destructor tree_expr { dang_expr_unref ($$); }
+%destructor tree_node_expr_list { free_expr_array (&$$); }
+%destructor tree_node { dang_expr_unref ($$); }
+
+
+%token_type {DangToken *}
+%type statement {DangExpr *}
+%type grouped_statement {DangExpr *}
+%type expr_statement {DangExpr *}
+%type for_statement {DangExpr *}
+%type while_statement {DangExpr *}
+%type do_while_statement {DangExpr *}
+%type try_statement {DangExpr *}
+%type return_statement {DangExpr *}
+%type goto_statement {DangExpr *}
+%type label {DangExpr *}
+%type expr {DangExpr *}
+%type invoke_expr {DangExpr *}
+%type literal_expr {DangExpr *}
+%type vector_expr {DangExpr *}
+%type raw_expr_list {DangArray}
+%type map_expr {DangExpr *}
+%type opt_expr {DangExpr *}
+%type new_expr {DangExpr *}
+%type interpolated_string_expr {DangExpr *}
+%type array_index_expr {DangExpr *}
+%type argument {DangExpr *}
+%type argument_list {DangArray}			/* of DangExpr* */
+%type nonempty_argument_list {DangArray}	/* of DangExpr* */
+%type argument_decl {DangExpr *}
+%type argument_decl_list {DangArray}		/* of DangExpr* */
+%type nonempty_argument_decl_list {DangArray}	/* of DangExpr* */
+%type opt_rv_type {DangExpr *}
+%type type {DangExpr *}
+%type simple_type {DangExpr *}
+%type statement_list {DangArray}		/* of DangExpr* */
+%type function_declaration {DangExpr *}
+%type catch_blocks {DangArray}			/* of DangExpr* */
+%type catch_block {DangExpr *}
+%type toplevel_statement {DangExpr *}
+%type if_statement {DangExpr *}
+%type non_hanging_statement {DangExpr *}
+%type non_hanging_if_statement {DangExpr *}
+%type non_hanging_for_statement {DangExpr *}
+%type non_hanging_while_statement {DangExpr *}
+%type jump_scoped_label_statement {DangExpr *}
+%type member {DangExpr*}
+%type member_declarations {DangArray}
+%type case_declarations {DangArray}
+%type case_declaration {DangExpr *}
+%type structure_declaration {DangExpr*}
+%type union_declaration {DangExpr*}
+%type limited_expression {DangExpr *}
+%type raw_expr {DangExpr *}
+%type parenthesized_expression {DangExpr *}
+%type opt_return_type {DangValueType *}
+%type function_type_from_args {DangValueType *}
+%type function_type_arg_list_params {DangArray}	/* of DangFunctionParam */
+%type nonempty_function_type_arg_list_params {DangArray}/* of DangFunctionParam */
+%type function_type_arg_list_param {DangFunctionParam}
+%type function_body {DangExpr *}
+%type untyped_function {DangExpr *}
+%type untyped_function_body {DangExpr *}
+%type naked_var_list {DangArray}		/* of DangExpr* */
+%type closure_expr {DangExpr *}
+%type object_declaration {DangExpr *}
+%type object_element {DangExpr *}
+%type opt_name {DangExpr *}
+%type method_body {DangExpr *}
+%type struct_create_expr {DangExpr *}
+%type union_create_expr {DangExpr *}
+%type struct_create_arg {DangExpr *}
+%type struct_create_arg_list {DangArray}
+%type nonempty_struct_create_arg_list {DangArray}
+%type enum_declaration {DangExpr *}
+%type enum_values {DangArray}
+%type enum_value {DangExpr *}
+%type module_list {DangArray}
+%type as_clause {DangExpr *}
+%type bareword_list {DangArray}
+%type opt_import_list {DangExpr *}
+%type tree_expr {DangExpr *}
+%type tree_node_expr_list {DangArray}
+%type tree_node {DangExpr *}
+
+%type object_elements {DangArray}
+%type m_flags {DangArray}
+%type m_flag {DangExpr *}
+
+//%type scoped_label {ParserScopedLabelInfo}
+
+
+%left CATCH.
+%left CLOSURE.
+%right OP_ASSIGN OP_PLUS_ASSIGN OP_MINUS_ASSIGN OP_TIMES_ASSIGN
+       OP_MOD_ASSIGN OP_DIVIDE_ASSIGN OP_CONCAT_ASSIGN
+       OP_BITWISE_OR_ASSIGN OP_BITWISE_AND_ASSIGN OP_BITWISE_XOR_ASSIGN
+       OP_LEFT_SHIFT_ASSIGN OP_RIGHT_SHIFT_ASSIGN
+       OP_LOGICAL_OR_ASSIGN OP_LOGICAL_AND_ASSIGN.
+%right OP_QUESTION_MARK COLON.
+%left OP_LOGICAL_OR.
+%left OP_LOGICAL_AND.
+%left OP_LT OP_LTEQ OP_GT OP_GTEQ OP_EQUAL OP_CMP OP_NOT_EQUAL.
+%left OP_LEFT_SHIFT OP_RIGHT_SHIFT.
+// BITWISE_AND is really AMPERSAND, but we give it here since we use it as a precedence level.
+%left OP_BITWISE_OR OP_BITWISE_XOR OP_BITWISE_AND AMPERSAND.
+%left OP_CONCAT.
+%left OP_PLUS OP_MINUS.
+%left OP_TIMES OP_DIVIDE OP_MOD.
+%left CAST.
+%left FCTCALL.
+%left LBRACKET.
+%left OP_NEGATE OP_NOT.
+%left OP_PLUSPLUS OP_MINUSMINUS OP_BITWISE_COMPLEMENT.
+
+%syntax_error {
+  if (TOKEN != NULL) {
+    char *token_str = dang_token_make_string (TOKEN, TRUE);
+    SET_PARSE_ERROR(dang_error_new ("syntax error: %s", token_str));
+    dang_free (token_str);
+  } else if (parser->last_token != NULL && parser->last_token->any.code_position.filename != NULL)
+    {
+      SET_PARSE_ERROR(dang_error_new ("syntax error near %s:%u",
+                                     parser->last_token->any.code_position.filename->str,
+                                     parser->last_token->any.code_position.line));
+    }
+  else
+    {
+      SET_PARSE_ERROR(dang_error_new ("syntax error occurred... somewhere"));
+    }
+}
+  
+
+
+limited_expression(RV) ::= BAREWORD(BW).
+        { RV = dang_expr_new_bareword (BW->v_bareword.name);
+          get_expr_pos_from_token (RV, BW);
+	  dang_token_unref (BW); }
+limited_expression(RV) ::= limited_expression(A) DOT BAREWORD(B).
+        { 
+	  RV = expr_new_function_take_2 ("$operator_dot", A, dang_expr_new_bareword (B->v_bareword.name));
+          get_expr_pos_from_expr (RV, A);
+	  dang_token_unref (B); }
+limited_expression(A) ::= parenthesized_expression(B).
+	{ A = B; }
+invoke_expr(RV) ::= limited_expression(BW) LPAREN argument_list(ARGS) RPAREN. [FCTCALL]
+        { dang_array_insert (&ARGS, 1, &BW, 0);
+	  RV = dang_expr_new_function ("$invoke",
+	                               ARGS.len, (DangExpr **) ARGS.data);
+          free_expr_array (&ARGS);
+          get_expr_pos_from_expr (RV, BW);
+	  }
+expr(RV) ::= invoke_expr(A).
+	{ RV = A; }
+parenthesized_expression(RV) ::= LPAREN expr(A) RPAREN.
+	{ RV = A;
+	  RV->any.had_parentheses = 1; }
+expr(A) ::= limited_expression(B).
+	{ A = B; }
+literal_expr(RV) ::= LITERAL(V).
+  	{ RV = dang_expr_new_value (V->v_literal.type, V->v_literal.value);
+          get_expr_pos_from_token (RV, V);
+	  dang_token_unref (V); }
+expr(RV) ::= literal_expr(V).
+  	{ RV = V; }
+literal_expr(RV) ::= TRUE(V).
+	{ char c = 1;
+	  RV = dang_expr_new_value (dang_value_type_boolean (), &c);
+	  get_expr_pos_from_token (RV, V);
+	  dang_token_unref (V); }
+literal_expr(RV) ::= FALSE(V).
+	{ char c = 0;
+	  RV = dang_expr_new_value (dang_value_type_boolean (), &c);
+	  get_expr_pos_from_token (RV, V);
+	  dang_token_unref (V); }
+
+
+
+interpolated_string_expr(RV) ::= INTERPOLATED_STRING(IS).
+        { unsigned n_pieces = IS->v_interpolated_string.n_pieces;
+	  DangTokenInterpolatedPiece *pieces = IS->v_interpolated_string.pieces;
+	  DangExpr **args = dang_new (DangExpr *, n_pieces);
+	  dang_boolean got_error = FALSE;
+	  unsigned i;
+	  for (i = 0; !got_error && i < n_pieces; i++)
+	    switch (pieces[i].type)
+	      {
+	      case DANG_TOKEN_INTERPOLATED_PIECE_STRING:
+		{
+		  DangString *lit = dang_string_new (pieces[i].info.string);
+		  args[i] = dang_expr_new_value (dang_value_type_string (), &lit);
+		  dang_string_unref (lit);
+		  dang_expr_set_pos (args[i], &pieces[i].code_position);
+		  break;
+		}
+	      case DANG_TOKEN_INTERPOLATED_PIECE_TOKENS:
+	        {
+		  DangParseOptions options = DANG_PARSE_OPTIONS_INIT;
+		  DangParser *par;
+		  DangError *error = NULL;
+		  unsigned n_tokens = pieces[i].info.tokens.n;
+		  DangToken **tokens = pieces[i].info.tokens.array;
+		  unsigned t;
+		  options.mode = DANG_PARSE_MODE_EXPR;
+		  options.imports = parser->base.imports;
+		  par = dang_parser_create (&options, &error);
+		  if (par == NULL)
+		    {
+		      SET_PARSE_ERROR (error);
+		      return;
+		    }
+
+		  dang_assert (par != NULL);
+		  for (t = 0; t < n_tokens; t++)
+		    if (!dang_parser_parse (par, dang_token_ref (tokens[t]), &error))
+                      break;
+                  if (t < n_tokens
+		   || !dang_parser_end_parse (par, &error))
+		    {
+		      SET_PARSE_ERROR (error);
+		    }
+		  else if (dang_parser_get_n_results (par) != 1)
+		    {
+		      error = dang_error_new ("expression parser should never succeed with any other than exactly one token (got %u)", dang_parser_get_n_results (par));
+		      SET_PARSE_ERROR (error);
+		    }
+		  else
+		    {
+		      args[i] = dang_parser_pop_expr (par);
+		    }
+		  dang_parser_destroy (par);
+		  break;
+		}
+	      default:
+	        dang_assert_not_reached ();
+	      }
+	  if (got_error)
+	    {
+	      RV = NULL;
+	    }
+	  else
+	    {
+	      RV = expr_new_function ("$interpolated_string",
+					   n_pieces, args);
+	      for (i = 0; i < n_pieces; i++)
+		dang_expr_unref (args[i]);
+	    }
+	  dang_free (args);
+	  dang_token_unref (IS);
+	}
+expr(A) ::= interpolated_string_expr(RV).
+	{ A = RV; }
+
+/* Operators  */
+expr(A) ::= expr(B) OP_ASSIGN expr(C).
+	{ A = expr_new_function_take_2 ("$assign", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_PLUS expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_add", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_MINUS expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_subtract", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_TIMES expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_multiply", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_DIVIDE expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_divide", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_MOD expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_mod", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_BITWISE_OR expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_bitwise_or", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_BITWISE_XOR expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_bitwise_xor", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) AMPERSAND expr(C). [OP_BITWISE_AND]
+	{ A = expr_new_invoke_take_2 ("operator_bitwise_and", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_LEFT_SHIFT expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_left_shift", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_RIGHT_SHIFT expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_right_shift", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= OP_NOT(p) expr(B).
+	{ A = expr_new_invoke_take_1 ("operator_not", B);
+	  get_expr_pos_from_token (A, p);
+	  dang_token_unref (p); }
+expr(A) ::= OP_MINUS(p) expr(B). [OP_NEGATE]
+	{ A = expr_new_invoke_take_1 ("operator_negate", B);
+	  get_expr_pos_from_token (A, p);
+	  dang_token_unref (p); }
+expr(A) ::= OP_BITWISE_COMPLEMENT(p) expr(B).
+	{ A = expr_new_invoke_take_1 ("operator_bitwise_complement", B);
+	  get_expr_pos_from_token (A, p);
+	  dang_token_unref (p); }
+expr(A) ::= OP_PLUSPLUS(p) expr(B).
+	{ A = expr_new_invoke_take_1 ("operator_preincrement",
+					expr_new_function_take_1 ("$out_param", B));
+          get_expr_pos_from_token (A, p);
+	  dang_token_unref (p); }
+expr(A) ::= expr(B) OP_PLUSPLUS.
+	{ A = expr_new_invoke_take_1 ("operator_postincrement",
+					expr_new_function_take_1 ("$out_param", B));
+          get_expr_pos_from_expr (A, B); }
+expr(A) ::= OP_MINUSMINUS(p) expr(B).
+	{ A = expr_new_invoke_take_1 ("operator_predecrement",
+					expr_new_function_take_1 ("$out_param", B));
+          get_expr_pos_from_token (A, p);
+	  dang_token_unref (p); }
+expr(A) ::= expr(B) OP_MINUSMINUS.
+	{ A = expr_new_invoke_take_1 ("operator_postdecrement",
+					expr_new_function_take_1 ("$out_param", B));
+          get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_CONCAT expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_concat", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_LT expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_lessthan", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_LTEQ expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_lesseq", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_GT expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_greaterthan", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_GTEQ expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_greatereq", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_EQUAL expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_equal", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_CMP expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_cmp", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_NOT_EQUAL expr(C).
+	{ A = expr_new_invoke_take_2 ("operator_notequal", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_LOGICAL_OR expr(C).
+	{ A = expr_new_function_take_2 ("$operator_logical_or", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_LOGICAL_AND expr(C).
+	{ A = expr_new_function_take_2 ("$operator_logical_and", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_LOGICAL_OR_ASSIGN expr(C).
+	{ A = expr_new_function_take_2 ("$operator_assign_logical_or", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_LOGICAL_AND_ASSIGN expr(C).
+	{ A = expr_new_function_take_2 ("$operator_assign_logical_and", B, C);
+	  get_expr_pos_from_expr (A, B); }
+expr(A) ::= expr(B) OP_PLUS_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_add", B, C); }
+expr(A) ::= expr(B) OP_MINUS_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_subtract", B, C); }
+expr(A) ::= expr(B) OP_TIMES_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_multiply", B, C); }
+expr(A) ::= expr(B) OP_DIVIDE_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_divide", B, C); }
+expr(A) ::= expr(B) OP_MOD_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_mod", B, C); }
+expr(A) ::= expr(B) OP_CONCAT_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_concat", B, C); }
+expr(A) ::= expr(B) OP_BITWISE_OR_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_bitwise_or", B, C); }
+expr(A) ::= expr(B) OP_BITWISE_AND_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_bitwise_and", B, C); }
+expr(A) ::= expr(B) OP_BITWISE_XOR_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_bitwise_xor", B, C); }
+expr(A) ::= expr(B) OP_LEFT_SHIFT_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_left_shift", B, C); }
+expr(A) ::= expr(B) OP_RIGHT_SHIFT_ASSIGN expr(C).
+	{ A = make_assign_op_expr ("operator_assign_right_shift", B, C); }
+
+expr(A) ::= expr(B) OP_QUESTION_MARK expr(C) COLON expr(D).
+	{ /* TODO:  $cond(A,B,$cond(C,D,E)) => $cond(A,B,C,D,E). */
+	  A = expr_new_function_take_3 ("$cond", B, C, D);
+	  get_expr_pos_from_expr (A, B); }
+
+array_index_expr(A) ::= expr(B) LBRACKET argument_list(ARGS) RBRACKET.
+	{ dang_array_insert (&ARGS, 1, &B, 0);
+	  A = expr_new_function ("$operator_index", ARGS.len, ARGS.data);
+	  get_expr_pos_from_expr (A, B);
+	  free_expr_array (&ARGS);
+	}
+expr(A) ::= array_index_expr(B).
+	{ A = B; }
+
+try_statement(STMT) ::= TRY(p) grouped_statement(BODY) catch_blocks(BLOCKS).
+	{ dang_array_insert (&BLOCKS, 1, &BODY, 0);
+	  STMT = expr_new_function ("$catch", BLOCKS.len, BLOCKS.data);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p);
+	  free_expr_array (&BLOCKS); }
+
+catch_blocks(RV) ::= catch_block(A).
+	{ DANG_ARRAY_INIT (&RV, DangExpr*);
+	  dang_array_append (&RV, 1, &A); }
+catch_blocks(RV) ::= catch_blocks(A) catch_block(B).
+	{ RV = A;
+	  dang_array_append (&RV, 1, &B); }
+
+catch_block(C) ::= CATCH(p) LPAREN type(T) BAREWORD(varname) RPAREN grouped_statement(BODY).
+	{ C = expr_new_function_take_3 ("$catch_block", T,
+	                                expr_bareword_from_token (varname),
+					BODY);
+	  get_expr_pos_from_token (C, p);
+	  dang_token_unref (varname);
+	  dang_token_unref (p); }
+
+argument_list(ARGS) ::= .
+        { dang_array_init (&ARGS, sizeof (DangExpr *)); }
+argument_list(ARGS) ::= nonempty_argument_list(A).
+        { ARGS = A; }
+
+nonempty_argument_list(A) ::= argument(B).
+        { dang_array_init (&A, sizeof (DangExpr *));
+          dang_array_append (&A, 1, &B); }
+nonempty_argument_list(A) ::= nonempty_argument_list(B) COMMA argument(C).
+        { A = B;
+          dang_array_append (&A, 1, &C); }
+
+argument(A) ::= expr(B).
+	{ A = B; }
+argument(A) ::= AMPERSAND(p) expr(B).
+	{ A = expr_new_function_take_1 ("$out_param", B);
+	  get_expr_pos_from_token (A, p);
+	  dang_token_unref (p); }
+argument(A) ::= untyped_function(B).
+	{ A = B; }
+
+untyped_function(RV) ::= FUNCTION(p) naked_var_list(A) ARROW untyped_function_body(B).
+	{ DangExpr *params = expr_new_function ("$parameters", A.len, A.data);
+	  free_expr_array (&A);
+	  RV = expr_new_function_take_2 ("$untyped_function", params, B);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p); }
+untyped_function_body(A) ::= expr(B).
+	{ A = B; }
+untyped_function_body(A) ::= grouped_statement(B).
+	{ A = B; }
+
+naked_var_list(RV) ::= .
+	{ DANG_ARRAY_INIT (&RV, DangExpr*); }
+naked_var_list(RV) ::= naked_var_list(A) BAREWORD(B).
+	{ DangExpr *b;
+	  b = expr_bareword_from_token (B);
+	  RV = A;
+	  dang_array_append (&RV, 1, &b);
+	  dang_token_unref (B); }
+
+expr_statement(STMT) ::= expr(A) SEMICOLON.
+	{ STMT = A; }
+grouped_statement(STMT) ::= LBRACE(pos) statement_list(LIST) RBRACE.
+	{ STMT = expr_new_function ("$statement_list", LIST.len, LIST.data);
+	  get_expr_pos_from_token (STMT, pos);
+	  free_expr_array (&LIST);
+	  dang_token_unref (pos); }
+
+statement(STMT) ::= grouped_statement(A).
+	{ STMT = A; }
+statement(STMT) ::= expr_statement(A).
+	{ STMT = A; }
+statement(STMT) ::= for_statement(A).
+	{ STMT = A; }
+statement(STMT) ::= try_statement(A).
+	{ STMT = A; }
+statement(STMT) ::= return_statement(A).
+	{ STMT = A; }
+statement(STMT) ::= if_statement(A).
+	{ STMT = A; }
+statement(STMT) ::= jump_scoped_label_statement(A).
+	{ STMT = A; }
+statement(STMT) ::= do_while_statement(A).
+	{ STMT = A; }
+statement(STMT) ::= while_statement(A).
+	{ STMT = A; }
+statement(STMT) ::= goto_statement(A).
+	{ STMT = A; }
+
+non_hanging_statement(STMT) ::= return_statement(IN).
+	{ STMT = IN; }
+non_hanging_statement(STMT) ::= grouped_statement(IN).
+	{ STMT = IN; }
+non_hanging_statement(STMT) ::= expr_statement(IN).
+	{ STMT = IN; }
+non_hanging_statement(STMT) ::= non_hanging_if_statement(IN).
+	{ STMT = IN; }
+non_hanging_statement(STMT) ::= non_hanging_for_statement(IN).
+	{ STMT = IN; }
+non_hanging_statement(STMT) ::= do_while_statement(IN).
+	{ STMT = IN; }
+non_hanging_statement(STMT) ::= non_hanging_while_statement(IN).
+	{ STMT = IN; }
+non_hanging_statement(STMT) ::= jump_scoped_label_statement(A).
+	{ STMT = A; }
+
+return_statement(STMT) ::= RETURN SEMICOLON.
+	{ STMT = expr_new_function ("$return", 0, NULL); }
+return_statement(STMT) ::= RETURN(r) expr(E) SEMICOLON.
+	{ STMT = expr_new_function_take_1 ("$return", E);
+	  get_expr_pos_from_token (STMT, r);
+	  dang_token_unref (r); }
+
+goto_statement(STMT) ::= GOTO(p) BAREWORD(LAB) SEMICOLON.
+	{ STMT = expr_new_function_take_1 ("$goto",
+	                            expr_bareword_from_token (LAB));
+          get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p);
+	  dang_token_unref (LAB);
+	}
+label(LAB) ::= BAREWORD(L) COLON.
+	{ LAB = expr_new_function_take_1 ("$label",
+	                            expr_bareword_from_token (L));
+          get_expr_pos_from_token (LAB, L);
+	  dang_token_unref (L);
+	}
+
+	                                    
+/* Variable declarations and assignments */
+expr(RV) ::= type(TYPE) BAREWORD(VARNAME).
+	{ RV = expr_new_function_take_2 ("$var_decl", TYPE, expr_bareword_from_token (VARNAME));
+	  get_expr_pos_from_expr (RV, TYPE);
+	  dang_token_unref (VARNAME); }
+expr(RV) ::= VAR(v) type(TYPE) BAREWORD(VARNAME).
+	{ RV = expr_new_function_take_2 ("$var_decl", TYPE, expr_bareword_from_token (VARNAME));
+	  get_expr_pos_from_token (RV, v);
+	  dang_token_unref (VARNAME);
+	  dang_token_unref (v); }
+expr(RV) ::= VAR(v) BAREWORD(VARNAME).
+	{ RV = expr_new_function_take_1 ("$var_decl", expr_bareword_from_token (VARNAME));
+	  get_expr_pos_from_token (RV, v);
+	  dang_token_unref (v);
+	  dang_token_unref (VARNAME); }
+expr(RV) ::= LPAREN(p) type(T) RPAREN expr(A). [CAST]
+	{ RV = expr_new_function_take_2 ("$cast", T, A);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p); }
+closure_expr(RV) ::= FUNCTION(p) LPAREN argument_decl_list(ARGS) opt_rv_type(RVTYPE) RPAREN expr(A). [CLOSURE]
+	{ RV = expr_new_function_take_3 ("$closure",
+	                                 RVTYPE,
+	                                 expr_new_function ("$arguments",
+				                            ARGS.len,
+				                            ARGS.data),
+                                         A);
+          free_expr_array (&ARGS);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p);
+	}
+closure_expr(RV) ::= FUNCTION(p) LPAREN argument_decl_list(ARGS) opt_rv_type(RVTYPE) RPAREN grouped_statement(A). [CLOSURE]
+	{ RV = expr_new_function_take_3 ("$closure",
+	                                 RVTYPE,
+	                                 expr_new_function ("$arguments",
+				                            ARGS.len,
+				                            ARGS.data),
+                                         A);
+          free_expr_array (&ARGS);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p);
+	}
+expr(RV) ::= closure_expr(A).
+	{ RV = A; }
+
+statement_list(RV) ::= .
+	{ dang_array_init (&RV, sizeof (DangExpr *)); }
+statement_list(RV) ::= statement_list(A) statement(B).
+	{ RV = A;
+	  dang_array_append (&RV, 1, &B); }
+statement_list(RV) ::= statement_list(A) label(B).
+	{ RV = A;
+	  dang_array_append (&RV, 1, &B); }
+
+for_statement(STMT) ::= FOR(p) LPAREN opt_expr(INIT) SEMICOLON opt_expr(COND) SEMICOLON opt_expr(ADV) RPAREN statement(BODY).
+	{ STMT = expr_new_function_take_4 ("$for", INIT, COND, ADV, BODY);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+non_hanging_for_statement(STMT) ::= FOR(p) LPAREN opt_expr(INIT) SEMICOLON opt_expr(COND) SEMICOLON opt_expr(ADV) RPAREN non_hanging_statement(BODY).
+	{ STMT = expr_new_function_take_4 ("$for", INIT, COND, ADV, BODY);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+opt_expr(E) ::= expr(A).
+	{ E = A; }
+opt_expr(E) ::= .
+	{ E = dang_expr_new_bareword ("$void"); }
+
+do_while_statement(STMT) ::= DO(p) grouped_statement(S) WHILE LPAREN expr(E) RPAREN SEMICOLON.
+	{ STMT = expr_new_function_take_2 ("$do_while", S, E);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+non_hanging_while_statement(STMT) ::= WHILE(p) LPAREN expr(E) RPAREN non_hanging_statement(S).
+	{ STMT = expr_new_function_take_2 ("$while", E, S);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+while_statement(STMT) ::= WHILE(p) LPAREN expr(E) RPAREN statement(S).
+	{ STMT = expr_new_function_take_2 ("$while", E, S);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+
+jump_scoped_label_statement(STMT) ::= BREAK(p) literal_expr(L) SEMICOLON.
+	{ STMT = expr_new_function_take_1 ("$break", L);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+jump_scoped_label_statement(STMT) ::= BREAK(p) SEMICOLON.
+	{ STMT = expr_new_function_no_args ("$break");
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+jump_scoped_label_statement(STMT) ::= CONTINUE(p) literal_expr(L) SEMICOLON.
+	{ STMT = expr_new_function_take_1 ("$continue", L);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+jump_scoped_label_statement(STMT) ::= CONTINUE(p) SEMICOLON.
+	{ STMT = expr_new_function_no_args ("$continue");
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+jump_scoped_label_statement(STMT) ::= REDO(p) literal_expr(L) SEMICOLON.
+	{ STMT = expr_new_function_take_1 ("$redo", L);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+jump_scoped_label_statement(STMT) ::= REDO(p) SEMICOLON.
+	{ STMT = expr_new_function_no_args ("$redo");
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+
+
+if_statement(STMT) ::= IF(p) LPAREN expr(COND) RPAREN non_hanging_statement(BODY).
+	{ STMT = expr_new_function_take_2 ("$if", COND, BODY);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+if_statement(STMT) ::= IF(p) LPAREN expr(COND) RPAREN non_hanging_statement(BODY) ELSE statement(ELSEBODY).
+	{ STMT = construct_if_then_else__take (COND, BODY, ELSEBODY);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+
+non_hanging_if_statement(STMT) ::= IF(p) LPAREN expr(COND) RPAREN non_hanging_statement(BODY) ELSE non_hanging_statement(ELSEBODY).
+	{ STMT = construct_if_then_else__take (COND, BODY, ELSEBODY);
+	  get_expr_pos_from_token (STMT, p);
+	  dang_token_unref (p); }
+	  
+function_declaration(RV) ::= FUNCTION BAREWORD(NAME) LPAREN(argpos) argument_decl_list(ARGS) opt_rv_type(RVTYPE) RPAREN function_body(BODY).
+	{ DangExpr *args[4]; unsigned i;
+	  args[0] = expr_bareword_from_token (NAME);
+	  args[1] = RVTYPE;
+	  args[2] = expr_new_function ("$arguments",
+				       ARGS.len,
+				       ARGS.data);
+	  get_expr_pos_from_token (args[2], argpos);
+	  args[3] = BODY;
+	  RV = expr_new_function ("$define_function", 4, args);
+	  for (i = 0; i < 4; i++)
+	    dang_expr_unref (args[i]);
+	  dang_token_unref (NAME);
+	  dang_token_unref (argpos);
+	  free_expr_array (&ARGS);
+	}
+
+function_body(RV) ::= statement(A).
+	{ RV = A; }
+function_body(RV) ::= untyped_function(A) SEMICOLON.
+	{ RV = A; }
+
+argument_decl_list(ARGS) ::= .
+	{ dang_array_init (&ARGS, sizeof (DangExpr *)); }
+argument_decl_list(ARGS) ::= VOID.
+	{ dang_array_init (&ARGS, sizeof (DangExpr *)); }
+argument_decl_list(ARGS) ::= nonempty_argument_decl_list(A).
+	{ ARGS = A; }
+nonempty_argument_decl_list(ARGS) ::= argument_decl(DECL).
+	{ dang_array_init (&ARGS, sizeof (DangExpr *));
+	  dang_array_append (&ARGS, 1, &DECL); }
+nonempty_argument_decl_list(ARGS) ::= nonempty_argument_decl_list(A) COMMA argument_decl(B).
+	{ ARGS = A; dang_array_append (&ARGS, 1, &B); }
+
+argument_decl(DECL) ::= type(TYPE) BAREWORD(name).
+	{ DECL = make_argument (NULL, TYPE, name);
+	  dang_token_unref (name); }
+argument_decl(DECL) ::= IN(inpos) type(TYPE) BAREWORD(name).
+	{ DECL = make_argument (inpos, TYPE, name);
+	  dang_token_unref (inpos);
+	  dang_token_unref (name); }
+argument_decl(DECL) ::= OUT(outpos) type(TYPE) BAREWORD(name).
+	{ DECL = make_argument (outpos, TYPE, name);
+	  dang_token_unref (outpos);
+	  dang_token_unref (name); }
+argument_decl(DECL) ::= INOUT(inoutpos) type(TYPE) BAREWORD(name).
+	{ DECL = make_argument (inoutpos, TYPE, name);
+	  dang_token_unref (inoutpos);
+	  dang_token_unref (name); }
+
+opt_rv_type(RV) ::= COLON type(RVTYPE).
+	{ RV = RVTYPE; }
+opt_rv_type(RV) ::= .
+	{ DangValueType *t = dang_value_type_void ();
+	  RV = dang_expr_new_value (dang_value_type_type (), &t); }
+
+simple_type(RV) ::= TYPE_TOKEN(A).
+	{ dang_assert (A->type == DANG_TOKEN_TYPE_LITERAL);
+	  dang_assert (A->v_literal.type == dang_value_type_type ());
+	  RV = dang_expr_new_value (dang_value_type_type (),
+	                            A->v_literal.value);
+	  get_expr_pos_from_token (RV, A);
+	  dang_token_unref (A); }
+type(RV) ::= PERCENT_PERCENT(p) BAREWORD(B).
+	{ DangValueType *type = dang_value_type_template_param (B->v_bareword.name);
+	  RV = dang_expr_new_value (dang_value_type_type (), &type);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p);
+	  dang_token_unref (B);
+	}
+type(RV) ::= simple_type(A).
+	{ RV = A; }
+type(RV) ::= TENSOR(p) LANGLE type(A) COMMA LITERAL(N) RANGLE.
+	{ DangValueType *elt_type = get_type_from_expr (A);  /* unref's A */
+	  DangValueType *type;
+	  unsigned rank;
+	  if (N->v_literal.type != dang_value_type_int32 ()
+	   && N->v_literal.type != dang_value_type_uint32 ())
+	   {
+	     SET_PARSE_ERROR (dang_error_new ("second argument to $tensor must be an int32"));
+	   }
+
+	  rank = *(uint32_t*)(N->v_literal.value);
+          type = dang_value_type_tensor (elt_type, rank);
+	  RV = dang_expr_new_value (dang_value_type_type (), &type);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p);
+	  dang_token_unref (N); }
+type(RV) ::= VECTOR(p) LANGLE type(A) RANGLE.
+	{ DangValueType *elt_type = get_type_from_expr (A);  /* unref's A */
+	  DangValueType *type = dang_value_type_tensor (elt_type, 1);
+	  RV = dang_expr_new_value (dang_value_type_type (), &type);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p); }
+type(RV) ::= MATRIX(p) LANGLE type(A) RANGLE.
+	{ DangValueType *elt_type = get_type_from_expr (A);  /* unref's A */
+	  DangValueType *type = dang_value_type_tensor (elt_type, 2);
+	  RV = dang_expr_new_value (dang_value_type_type (), &type);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p); }
+type(RV) ::= FUNCTION(p) LANGLE function_type_from_args(L) RANGLE.
+	{ RV = dang_expr_new_value (dang_value_type_type (), &L);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p); }
+type(RV) ::= TREE(p) LANGLE type(KEY) COMMA type(VALUE) RANGLE.
+	{ DangValueType *k = get_type_from_expr (KEY);
+	  DangValueType *v = get_type_from_expr (VALUE);
+	  DangValueType *tree_type = dang_value_type_tree (k,v);
+	  RV = dang_expr_new_value (dang_value_type_type (), &tree_type);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p); }
+
+function_type_from_args(RV) ::= function_type_arg_list_params(A) opt_return_type(B).
+	{ DangSignature *sig;
+	  sig = dang_signature_new (B == dang_value_type_void () ? NULL : B,
+	                            A.len, A.data);
+          RV = dang_value_type_function (sig); 
+	  dang_signature_unref (sig);
+	  dang_array_clear (&A);
+	}
+function_type_arg_list_params(RV) ::= .
+	{ dang_array_init (&RV, sizeof (DangFunctionParam)); }
+function_type_arg_list_params(RV) ::= nonempty_function_type_arg_list_params(A).
+	{ RV = A; }
+nonempty_function_type_arg_list_params(RV) ::= function_type_arg_list_param(B).
+	{ dang_array_init (&RV, sizeof (DangFunctionParam));
+	  dang_array_append (&RV, 1, &B); }
+nonempty_function_type_arg_list_params(RV) ::= nonempty_function_type_arg_list_params(A) COMMA function_type_arg_list_param(B).
+	{ RV = A;
+	  dang_array_append (&RV, 1, &B); }
+function_type_arg_list_param(RV) ::= IN type(T).
+	{ RV.dir = DANG_FUNCTION_PARAM_IN;
+	  RV.name = NULL;
+	  RV.type = get_type_from_expr (T);
+	}
+function_type_arg_list_param(RV) ::= OUT type(T).
+	{ RV.dir = DANG_FUNCTION_PARAM_OUT;
+	  RV.name = NULL;
+	  RV.type = get_type_from_expr (T); }
+function_type_arg_list_param(RV) ::= INOUT type(T).
+	{ RV.dir = DANG_FUNCTION_PARAM_INOUT;
+	  RV.name = NULL;
+	  RV.type = get_type_from_expr (T); }
+function_type_arg_list_param(RV) ::= type(T).
+	{ RV.dir = DANG_FUNCTION_PARAM_IN;
+	  RV.name = NULL;
+	  RV.type = get_type_from_expr (T);
+	  }
+
+opt_return_type(RV) ::= .
+	{ RV = NULL; }
+opt_return_type(RV) ::= COLON type(T).
+	{ RV = get_type_from_expr (T); }
+
+structure_declaration(B) ::= STRUCT(p) BAREWORD(b) LBRACE member_declarations(MEMBERS) RBRACE.
+	{
+	  DangExpr *name = expr_bareword_from_token (b);
+	  DangExpr *sub = expr_new_function ("$members", MEMBERS.len, MEMBERS.data);
+	  free_expr_array (&MEMBERS);
+	  B = expr_new_function_take_2 ("$define_struct", name, sub);
+	  get_expr_pos_from_token (B, p);
+	  get_expr_pos_from_token (sub, p);
+	  dang_token_unref (p);
+	  dang_token_unref (b);
+	}
+member_declarations(RV) ::= .
+	{ DANG_ARRAY_INIT (&RV, DangExpr*); }
+member_declarations(RV) ::= member_declarations(A) member(B).
+	{ RV = A; dang_array_append (&RV, 1, &B); }
+
+member(X) ::= type(T) BAREWORD(N) SEMICOLON.
+	{ X = expr_new_function_take_2 ("$member", T, expr_bareword_from_token (N));
+	  dang_token_unref (N);
+	  get_expr_pos_from_expr (X, T); }
+member(X) ::= type(T) BAREWORD(N) OP_ASSIGN literal_expr(V) SEMICOLON.
+	{ X = expr_new_function_take_3 ("$member", T, expr_bareword_from_token (N), V);
+	  dang_token_unref (N);
+	  get_expr_pos_from_expr (X, T); }
+
+union_declaration(B) ::= UNION(p) BAREWORD(b) LBRACE case_declarations(CASES) RBRACE.
+	{
+	  DangExpr *name = expr_bareword_from_token (b);
+	  DangExpr *sub = expr_new_function ("$union_cases", CASES.len, CASES.data);
+	  free_expr_array (&CASES);
+	  B = expr_new_function_take_2 ("$define_union", name, sub);
+	  get_expr_pos_from_token (B, p);
+	  get_expr_pos_from_token (sub, p);
+	  dang_token_unref (p);
+	  dang_token_unref (b);
+	}
+case_declarations(RV) ::= case_declaration(B).
+	{ dang_array_init (&RV, sizeof (DangExpr *));
+	  dang_array_append (&RV, 1, &B); }
+case_declarations(RV) ::= case_declarations(A) case_declaration(B).
+	{ RV = A;
+	  dang_array_append (&RV, 1, &B); }
+
+case_declaration(RV) ::= BAREWORD(A) COLON LBRACE(p) member_declarations(MEMS) RBRACE.
+	{ DangExpr *mems = dang_expr_new_function ("$members", MEMS.len, MEMS.data);
+	  DangExpr *tag = expr_bareword_from_token (A);
+	  get_expr_pos_from_token (mems, p);
+	  RV = expr_new_function_take_2 ("$union_case", tag, mems);
+	  get_expr_pos_from_token (RV, A);
+	  free_expr_array (&MEMS);
+	  dang_token_unref (p);
+	  dang_token_unref (A); }
+case_declaration(RV) ::= BAREWORD(A) COLON member(MEM).
+	{ DangExpr *mems = expr_new_function_take_1 ("$members", MEM);
+	  DangExpr *tag = expr_bareword_from_token (A);
+	  get_expr_pos_from_expr (mems, MEM);
+	  RV = expr_new_function_take_2 ("$union_case", tag, mems);
+	  get_expr_pos_from_token (RV, A);
+	  dang_token_unref (A); }
+case_declaration(RV) ::= BAREWORD(A) SEMICOLON.
+	{ DangExpr *mems = dang_expr_new_function ("$members", 0, NULL);
+	  DangExpr *tag = expr_bareword_from_token (A);
+	  get_expr_pos_from_token (mems, A);
+	  RV = expr_new_function_take_2 ("$union_case", tag, mems);
+	  get_expr_pos_from_token (RV, A);
+	  dang_token_unref (A); }
+
+
+object_declaration(RV) ::= OBJECT(p) BAREWORD(NAME) opt_return_type(T) LBRACE object_elements(OE) RBRACE.
+	{ RV = expr_new_function_take_3 ("$define_object",
+	                                 expr_bareword_from_token (NAME),
+					 dang_expr_new_value (dang_value_type_type (), &T),
+                        expr_new_function ("$object_elements",
+			                   OE.len, OE.data));
+          free_expr_array (&OE);
+          get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p);
+	  dang_token_unref (NAME);
+	}
+object_elements(RV) ::= .
+	{ DANG_ARRAY_INIT (&RV, DangExpr*); }
+object_elements(RV) ::= object_elements(A) object_element(B).
+	{ RV = A; dang_array_append (&RV, 1, &B); }
+object_element(OE) ::= m_flags(flags) METHOD BAREWORD(NAME) LPAREN argument_decl_list(ARGS) opt_rv_type(RVTYPE) RPAREN method_body(BODY).
+	{ OE = expr_new_function_take_5 ("$object_method",
+	                                 expr_new_function ("$method_flags", flags.len, flags.data),
+					 expr_bareword_from_token (NAME),
+					 RVTYPE,
+					 expr_new_function ("$arguments",
+				                            ARGS.len,
+				                            ARGS.data),
+                                         BODY);
+          free_expr_array (&ARGS);
+          free_expr_array (&flags);
+          dang_token_unref (NAME);
+        }
+method_body(A) ::= expr(B).
+	{ A = B; }
+method_body(A) ::= grouped_statement(B).
+	{ A = B; }
+method_body(A) ::= SEMICOLON(p).
+	{ A = dang_expr_new_bareword ("$void");
+	  get_expr_pos_from_token (A, p);
+	  dang_token_unref (p);
+	}
+object_element(OE) ::= NEW(p) opt_name(ON) LPAREN argument_decl_list(ARGS) RPAREN grouped_statement(BODY).
+	{ DangExpr *args = expr_new_function ("$arguments", ARGS.len, ARGS.data);
+	  OE = expr_new_function_take_3 ("$object_constructor", ON, args, BODY);
+	  free_expr_array (&ARGS);
+	  get_expr_pos_from_token (OE, p);
+	  dang_token_unref (p);
+	}
+opt_name(RV) ::= .
+	{ RV = dang_expr_new_bareword ("$void"); }
+opt_name(RV) ::= BAREWORD(A).
+	{ RV = expr_bareword_from_token (A);
+	  dang_token_unref (A); }
+
+enum_declaration(RV) ::= ENUM(p) BAREWORD(NAME) LBRACE enum_values(VALS) RBRACE.
+	{ DangExpr *b = expr_bareword_from_token (NAME);
+	  DangExpr *v = dang_expr_new_function ("$enum_values", VALS.len, VALS.data);
+	  RV = expr_new_function_take_2 ("$define_enum", b, v);
+	  get_expr_pos_from_token (RV, p);
+	  free_expr_array (&VALS);
+	  dang_token_unref (p);
+	  dang_token_unref (NAME);
+	}
+enum_values(RV) ::= .
+	{ DANG_ARRAY_INIT (&RV, DangExpr*); }
+enum_values(RV) ::= enum_values(A) enum_value(B).
+	{ RV = A; dang_array_append (&RV, 1, &B); }
+enum_value(A) ::= BAREWORD(b) OP_ASSIGN literal_expr(e).
+	{ DangExpr *bb = expr_bareword_from_token (b);
+	  A = expr_new_function_take_2 ("$enum_value", bb, e);
+	  get_expr_pos_from_token (A, b);
+	  dang_token_unref (b);
+	}
+enum_value(A) ::= BAREWORD(b).
+	{ DangExpr *bb = expr_bareword_from_token (b);
+	  A = expr_new_function_take_1 ("$enum_value", bb);
+	  get_expr_pos_from_token (A, b);
+	  dang_token_unref (b);
+	}
+
+expr(RV) ::= type(T) DOT BAREWORD(B).
+	{ RV = expr_new_function_take_2 ("$type_dot", T, expr_bareword_from_token (B));
+	  get_expr_pos_from_expr (RV, T);
+	  dang_token_unref (B); }
+
+expr(A) ::= vector_expr(B).
+	{ A = B; }
+vector_expr(RV) ::= LBRACKET(p) raw_expr_list(LIST) RBRACKET.
+	{ RV = expr_new_function ("$tensor", LIST.len, LIST.data);
+	  free_expr_array (&LIST);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p);
+        }
+raw_expr_list(LIST) ::= .
+	{ DANG_ARRAY_INIT (&LIST, DangExpr*); }
+raw_expr_list(LIST) ::= raw_expr_list(A) raw_expr(B).
+	{ LIST = A; dang_array_append (&LIST, 1, &B); }
+raw_expr(A) ::= limited_expression(B).
+	{ A = B; }
+raw_expr(A) ::= literal_expr(B).
+	{ A = B; }
+raw_expr(A) ::= vector_expr(B).
+	{ A = B; }
+raw_expr(A) ::= interpolated_string_expr(B).
+	{ A = B; }
+
+expr(A) ::= tree_expr(B).
+	{ A = B; }
+tree_expr(A) ::= TREE(p) LBRACKET tree_node_expr_list(ARGS) RBRACKET.
+	{ A = dang_expr_new_function ("$tree",
+	                              ARGS.len, (DangExpr **) ARGS.data);
+          free_expr_array (&ARGS);
+	  get_expr_pos_from_token (A, p);
+	  dang_token_unref (p); }
+tree_node_expr_list(LIST) ::= tree_node(A).
+	{ DANG_ARRAY_INIT (&LIST, DangExpr*);
+	  dang_array_append (&LIST, 1, &A); }
+tree_node_expr_list(LIST) ::= tree_node_expr_list(A) COMMA tree_node(B).
+	{ LIST = A; dang_array_append (&LIST, 1, &B); }
+tree_node(RV) ::= expr(K) ARROW expr(V).
+	{ RV = expr_new_function_take_2 ("$tree_entry", K, V);
+	  get_expr_pos_from_expr (RV, K); }
+
+
+new_expr(RV) ::= NEW(p) simple_type(T) opt_name(NAME) LPAREN argument_list(ARGS) RPAREN.
+        { DangExpr *n;
+	  if (strcmp (NAME->bareword.name, "$void") == 0)
+	    {
+	      n = expr_new_function_take_1 ("$operator_new", T);
+	      dang_expr_unref (NAME);
+	    }
+	  else
+	    n = expr_new_function_take_2 ("$operator_new", T, NAME);
+	  get_expr_pos_from_token (n, p);
+	  dang_array_insert (&ARGS, 1, &n, 0);
+	  RV = dang_expr_new_function ("$invoke",
+	                               ARGS.len, (DangExpr **) ARGS.data);
+          free_expr_array (&ARGS);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p);
+	}
+expr(RV) ::= new_expr(A).
+	{ RV = A; }
+
+struct_create_expr(RV) ::= TYPE_TOKEN(T) LPAREN(p) struct_create_arg_list(LIST) RPAREN.
+	{ DangExpr *t = dang_expr_new_value (dang_value_type_type (), T->v_literal.value);
+	  DangExpr *b = expr_new_function ("$create_struct_arg_list",
+	                                   LIST.len, LIST.data);
+          get_expr_pos_from_token (t, T);
+	  get_expr_pos_from_token (b, p);
+	  RV = expr_new_function_take_2 ("$create_struct", t, b);
+          get_expr_pos_from_token (RV, T);
+	  dang_token_unref (T);
+	  dang_token_unref (p);
+	  free_expr_array (&LIST);
+        }
+union_create_expr(RV) ::= TYPE_TOKEN(T) LPAREN(p) BAREWORD(tag) COLON struct_create_arg_list(LIST) RPAREN.
+	{ DangExpr *t = dang_expr_new_value (dang_value_type_type (), T->v_literal.value);
+	  DangExpr *tg = expr_bareword_from_token (tag);
+	  DangExpr *b = expr_new_function ("$create_struct_arg_list",
+	                                   LIST.len, LIST.data);
+          get_expr_pos_from_token (t, T);
+	  get_expr_pos_from_token (b, p);
+	  RV = expr_new_function_take_3 ("$create_union", t, tg, b);
+          get_expr_pos_from_token (RV, T);
+	  dang_token_unref (T);
+	  dang_token_unref (p);
+	  dang_token_unref (tag);
+	  free_expr_array (&LIST);
+        }
+struct_create_arg(RV) ::= expr(A).
+	{ RV = A; }
+struct_create_arg(RV) ::= BAREWORD(A) ARROW expr(B).
+	{ RV = expr_new_function_take_2 ("$named_param",
+	                          expr_bareword_from_token (A),
+				  B);
+          get_expr_pos_from_token (RV, A);
+	  dang_token_unref (A); }
+struct_create_arg_list(LIST) ::= .
+	{ DANG_ARRAY_INIT (&LIST, DangExpr*); }
+struct_create_arg_list(A) ::= nonempty_struct_create_arg_list(B).
+	{ A = B; }
+nonempty_struct_create_arg_list(LIST) ::= struct_create_arg(B).
+	{ DANG_ARRAY_INIT (&LIST, DangExpr*);
+	  dang_array_append (&LIST, 1, &B); }
+nonempty_struct_create_arg_list(LIST) ::= nonempty_struct_create_arg_list(A) COMMA struct_create_arg(B).
+	{ LIST = A;
+	  dang_array_append (&LIST, 1, &B); }
+expr(RV) ::= struct_create_expr(A).
+	{ RV = A; }
+expr(RV) ::= union_create_expr(A).
+	{ RV = A; }
+
+
+object_element(OE) ::= m_flags(flags) type(T) BAREWORD(NAME) SEMICOLON.
+	{ OE = expr_new_function_take_3 ("$object_member",
+	                                 expr_new_function ("$member_flags",
+					             flags.len, flags.data),
+                                         T, expr_bareword_from_token (NAME));
+          free_expr_array (&flags);
+	  dang_token_unref (NAME); }
+m_flags(A) ::= .
+	{ DANG_ARRAY_INIT (&A, DangExpr*); }
+m_flags(RV) ::= m_flags(A) m_flag(B).
+	{ RV = A;
+	  dang_array_append (&RV, 1, &B); }
+m_flag(A) ::= PRIVATE(B).
+	{ A = expr_bareword_from_token (B);
+	  dang_token_unref (B); }
+m_flag(A) ::= PROTECTED(B).
+	{ A = expr_bareword_from_token (B);
+	  dang_token_unref (B); }
+m_flag(A) ::= PUBLIC(B).
+	{ A = expr_bareword_from_token (B);
+	  dang_token_unref (B); }
+m_flag(A) ::= READONLY(B).
+	{ A = expr_bareword_from_token (B);
+	  dang_token_unref (B); }
+m_flag(A) ::= ABSTRACT(B).
+	{ A = expr_bareword_from_token (B);
+	  dang_token_unref (B); }
+m_flag(A) ::= FINAL(B).
+	{ A = expr_bareword_from_token (B);
+	  dang_token_unref (B); }
+m_flag(A) ::= MUTABLE(B).
+	{ A = expr_bareword_from_token (B);
+	  dang_token_unref (B); }
+m_flag(A) ::= STATIC(B).
+	{ A = expr_bareword_from_token (B);
+	  dang_token_unref (B); }
+
+module_list(RV) ::= BAREWORD(B).
+	{ DangExpr *tmp;
+	  DANG_ARRAY_INIT (&RV, DangExpr*);
+	  tmp = expr_bareword_from_token (B);
+	  dang_token_unref (B);
+	  dang_array_append (&RV, 1, &tmp); }
+module_list(RV) ::= module_list(A) DOT BAREWORD(B).
+	{ DangExpr *tmp;
+	  RV = A;
+	  tmp = expr_bareword_from_token (B);
+	  dang_token_unref (B);
+	  dang_array_append (&RV, 1, &tmp); }
+
+
+toplevel_statement(RV) ::= MODULE(p) module_list(B) SEMICOLON.
+	{ RV = expr_new_function ("$module", B.len, B.data);
+	  free_expr_array (&B);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p); }
+as_clause(Q) ::= .
+	{ Q = NULL; }
+as_clause(Q) ::= AS BAREWORD(B).
+	{ Q = expr_bareword_from_token (B);
+	  dang_token_unref (B); }
+opt_import_list(I) ::= .
+	{ I = NULL; }
+bareword_list(RV) ::= .
+	{ dang_array_init (&RV, sizeof (DangExpr *)); }
+bareword_list(RV) ::= bareword_list(A) BAREWORD(B).
+	{ RV = A;
+	  DangExpr *b = expr_bareword_from_token (B);
+	  dang_array_append (&RV, 1, &b); }
+opt_import_list(I) ::= LPAREN(p) bareword_list(B) RPAREN.
+	{ I = expr_new_function ("$include", B.len, B.data);
+	  get_expr_pos_from_token (I, p);
+	  dang_token_unref (p); }
+opt_import_list(I) ::= LPAREN(p) OP_NOT bareword_list(B) RPAREN.
+	{ I = expr_new_function ("$exclude", B.len, B.data);
+	  get_expr_pos_from_token (I, p);
+	  dang_token_unref (p); }
+toplevel_statement(RV) ::= IMPORT(p) module_list(B) opt_import_list(I) as_clause(Q) SEMICOLON.
+	{ DangExpr *i = I ? I : expr_new_function_no_args ("$exclude");
+	  DangExpr *mod = expr_new_function ("$module_name", B.len, B.data);
+	  if (Q == NULL)
+	    RV = expr_new_function_take_2 ("$import", i, mod);
+	  else
+	    RV = expr_new_function_take_3 ("$import", i, mod, Q);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p);
+	}
+toplevel_statement(RV) ::= USE(p) module_list(LIST) SEMICOLON.
+	{ RV = expr_new_function ("$use", LIST.len, LIST.data);
+	  free_expr_array (&LIST);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p); }
+
+toplevel_statement(A) ::= function_declaration(B).
+	{ A = B; }
+toplevel_statement(A) ::= structure_declaration(B).
+	{ A = B; }
+toplevel_statement(A) ::= object_declaration(B).
+	{ A = B; }
+toplevel_statement(A) ::= enum_declaration(B).
+	{ A = B; }
+toplevel_statement(A) ::= union_declaration(B).
+	{ A = B; }
+toplevel_statement(A) ::= statement(B).
+	{ A = B; }
+toplevel_statement_list ::= .
+	{ }
+toplevel_statement_list ::= toplevel_statement_list toplevel_statement(B).
+	{ if (B) dang_parser_take_expr (&parser->base, B); }
+
+toplevel_expr ::= expr(A).
+	{ dang_parser_take_expr (&parser->base, A); }
+toplevel_type ::= type(A).
+	{ dang_parser_take_expr (&parser->base, A); }
+
+toplevel ::= TOPLEVEL_STATEMENT_LIST toplevel_statement_list.
+toplevel ::= TOPLEVEL_EXPR toplevel_expr.
+toplevel ::= TOPLEVEL_TYPE toplevel_type.
+

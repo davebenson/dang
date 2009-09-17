@@ -1,0 +1,2 @@
+
+#define DANG_VALUE_TYPE_MAGIC   24908943

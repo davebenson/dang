@@ -1,0 +1,10 @@
+
+
+[<tree>  "foo" => "bar",
+         "yahhho" => "wazzup" ]
+
+
+tree["foo"=>"bar", "yahhho"=>"wazzup"];
+tree["foo"->"bar", "yahhho"->"wazzup"];
+
+tensor[...]   ====  [...]
