@@ -1,0 +1,163 @@
+_ built-in compare and hash functions
+_ ability to set mutable methods
+  _ tests
+_ BUG:
+  >>>> int i;
+  [int32] = 0
+  >>>> i=42;
+  [int32] = 0
+
+_ cast to same type should be a no-op
+_ cast of function-family to exact function type
+  should have the expected consequences
+_ singleton function-families should be treated as functions.
+  (??? or not due to forward compatibility)
+
+_ Restructure insns to a list
+  _ Q: how to deal with variable liveness?
+
+_ DangValueType:: index methods
+  X Added DangValueIndexInfo
+  X use DangValueIndexInfo methods from operator_index (just get/set; no get_ptr i guess)
+  X move current impl of operator_index
+  _ future: analyze situations when get_ptr can be used
+     
+_ Tree
+  X indexing
+  X index insn is only for tensors right now
+  X instantiation (inline)
+  _ instantiation (from pair of vectors)
+  _ parsing the type
+  _ misc methods (keys, values, map)
+  _ foreach
+  _ implement compare,hash,equal for all types
+
+// MAYBE this should be gotten rid of and cleaned into
+// a larger optimization project
+_ Clean up aliasing stuff to disallow
+   X  u.x += foo(&u);
+   X  u.x += foo(&u.x);
+  but perhaps permit
+      u.x += foo(&u.y);
+  X implement dang_compile_result_add_lock(result, builder, ..., &error);
+  X mmf-bareword.c: call dang_compile_result_add_lock()
+  _ handle $operator_dot($operator_dot(...), bareword)... 
+    for simple structures specially
+  _ inspect all ...result_init_pointer() calls to see if they wish to lock
+  X dang_compile_result_clear clears locks
+  _ dang_are_locks_definitely_ok()
+    -- if returns FALSE, a stack-copy must be made
+    _ implement using trivial recursive approach (hunting down barewords)
+    _ use from mf-assign:  if the assignment would cause
+      a locking conflict, copy the RHS
+  things to verify:
+  _ globals?
+
+_ can map be made to crash?
+      global g = new_tensor(100U, function i -> i);
+      map(g, function h -> {g=[]; return 1;} );
+
+_ tree, hashtable, maybe list?
+
+_ case statement (as general as possible...)
+
+_ module system
+  X "use modulename;"  would be a toplevel statement
+  X "import modulename as bareword;" - "module modulename;"
+    _ support list of names, with optional '!' to mean invert.
+      X done in parser and in dang-run-file.c
+      _ implement in dang_imports_lookup()
+         (figure out the exact list of places that need checking are)
+        _ use bsearch or radix+bsearch
+    _ restructure as metafunction
+  X "module name;"  -- create and use module as definition ns
+    _ should "import" module... unless "!" given
+
+_ native (C) function interface
+
+Tests:
+_ static
+_ try on machine without gsl, readline (or provide flags)
+
+Inferring untyped functions...
+_ on the RHS of an assignment where the LHS's type is known
+_ in a return statement when the ret-type is known
+
+unending todo items:
+- improve code coverage (see utils/get-coverage)
+- ensure ./run-tests --valgrind exits cleanly
+
+escaped-literals:
+_ \regex /.../
+  _ match(regex, string)
+  _ apply(regex, string, function)
+
+Functions:
+_ some gsl support
+  _ det
+  _ invert
+
+_ BUG: parsing 100000000000000000000 works.
+
+_ modify dang_function_call_nonyielding_v() to use alloca()
+  for the thread and for the stack-frame
+
+Document:
+_ tensor/vector construction nuances
+_ templates
+
+
+FUTURE STUFF:
+
+_ parser description
+
+_ semantic description from the DangExpr onward
+
+_ cleanup up so that all DangStepRun's are named step__*() with
+  the debug-name registered as simply "*".
+_ cleanup so Flags (and maybe Result) are const when appropriate
+_ cleanup: should it be args,rv or rv,args to (e.g.) SimpleCFunc,
+  call nonyielding, etc.
+_ cleanup: use DANG_CP_{FORMAT,ARGS} to make changes to CodePosition easier
+_ cleanup: have dang_signature_new() map dang_value_type_void() to NULL
+_ cleanup: compound type uniformity.
+  _ make define-struct, enum, union object all handled more
+    uniformly.  probably at annotate-time; maybe before.
+  _ dang_value_type_new_enum() returns an error;
+    dang_value_type_new_struct() does not.  which is right?
+  _ mf-define_union's parse_union_case should share
+    with mf-define_struct.
+
+/* TODO: share code with parse_member if mf-define_struct.
+   Generally, all these types should be handled more uniformly. */
+
+
+_ flattenably functions -- in particular concat on vectors
+  would be nice flattened
+
+_ Should UntypedFunctions really be FunctionFamilies?
+
+// optimizations
+_ minimize copies (important for tensors).
+  _ do not copy expensive types 'inout' or 'in' parameters.
+    The 'in' parameter copy can only be suppressed if the object
+    is not aliased as another inout parameter.
+_ Constant folding phase -- maybe just during annotations?
+  _ just deal with constants, tensor() and create_struct() for now
+  _ pure functions
+    _ easy to add from C
+    _ handling dang functions
+      _ no aliasing of output or in/out params with eachother or input params;
+        this should probably be the general calling convention rule
+_ program analysis
+  _ Compilation as a sequence of transformations...
+    X Include annotations in DangExprBase.
+    _ First annotate the expressions which variable liveness and type data,
+      and function resolutions.
+      (Typical probably is "variable becomes live here and remains live
+      through siblings".)
+  _ determine when containers are unchanged over the course
+    of some computations so that
+      (1) bound-tests / union-type-guards do not need to be repeated
+      (2) rather than return a new local var, we can get return an alias to
+          the union/array element (the latter would require an "unsafe pointer" type.

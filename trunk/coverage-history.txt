@@ -1,0 +1,49 @@
+Tue Mar 3 02:48:00 PST 2009: Executed 8252 lines of 11458 (72.01%).
+Wed Mar 4 10:33:32 PST 2009: Executed 8688 lines of 11820 (73.50%).
+Wed Mar 4 10:47:33 PST 2009: Executed 8720 lines of 11817 (73.79%).
+Wed Mar 4 10:53:57 PST 2009: Executed 8756 lines of 11817 (74.09%).
+Wed Mar 4 13:30:36 PST 2009: Executed 8835 lines of 11846 (74.58%).
+Wed Mar 4 15:00:19 PST 2009: Executed 8858 lines of 11844 (74.78%).
+Wed Mar 4 15:35:36 PST 2009: Executed 8949 lines of 11889 (75.27%).
+Wed Mar 4 16:36:27 PST 2009: Executed 8965 lines of 11889 (75.40%).
+Wed Mar 4 20:28:21 PST 2009: Executed 9073 lines of 11965 (75.82%).
+Wed Mar 4 21:42:02 PST 2009: Executed 9092 lines of 11965 (75.98%).
+Wed Mar 4 21:53:42 PST 2009: Executed 9126 lines of 11961 (76.29%).
+Wed Mar 4 22:03:06 PST 2009: Executed 9179 lines of 11960 (76.74%).
+Wed Mar 4 23:01:12 PST 2009: Executed 9221 lines of 11983 (76.95%).
+Thu Mar 5 06:44:45 PST 2009: Executed 9244 lines of 12014 (76.94%).
+[added templates]
+Fri Mar 6 06:37:17 PST 2009: Executed 9408 lines of 12365 (76.08%).
+Fri Mar 6 15:19:03 PST 2009: Executed 9444 lines of 12406 (76.12%).
+Fri Mar 6 17:11:28 PST 2009: Executed 9516 lines of 12407 (76.69%).
+Fri Mar 6 17:26:58 PST 2009: Executed 9581 lines of 12407 (77.22%).
+[$return() unification]
+Fri Mar 6 18:24:44 PST 2009: Executed 9573 lines of 12383 (77.30%).
+[added create_struct and struct equality tests]
+Mon Mar 9 07:37:45 PDT 2009: Executed 9784 lines of 12650 (77.34%).
+[added goto]
+Mon Mar 9 09:22:02 PDT 2009: Executed 9843 lines of 12686 (77.58%).
+Mon Mar 9 10:46:06 PDT 2009: Executed 9918 lines of 12760 (77.72%).
+Mon Mar 9 10:56:36 PDT 2009: Executed 10036 lines of 12760 (78.65%).
+Mon Mar 9 11:48:26 PDT 2009: Executed 10088 lines of 12729 (79.25%).
+Mon Mar 9 12:17:04 PDT 2009: Executed 10127 lines of 12718 (79.62%).
+Mon Mar 9 12:28:06 PDT 2009: Executed 10176 lines of 12718 (80.01%).
+Mon Mar 9 12:42:26 PDT 2009: Executed 10196 lines of 12718 (80.16%).
+Mon Mar 9 14:18:31 PDT 2009: Executed 10194 lines of 12718 (80.15%).
+Tue Mar 10 12:04:06 PDT 2009: Executed 10416 lines of 12911 (80.67%).
+Tue Mar 10 22:52:56 PDT 2009: Executed 10416 lines of 12912 (80.66%).
+Tue Mar 10 22:54:00 PDT 2009: Executed 10416 lines of 12912 (80.66%).
+Wed Mar 11 10:27:27 PDT 2009: Executed 10455 lines of 12958 (80.68%).
+Thu Mar 12 09:45:03 PDT 2009: Executed 10612 lines of 13094 (81.04%).
+Thu Mar 12 12:06:39 PDT 2009: Executed 10661 lines of 13113 (81.30%).
+Thu Mar 12 12:12:22 PDT 2009: Executed 10679 lines of 13113 (81.43%).
+Thu Mar 12 12:31:35 PDT 2009: Executed 10675 lines of 13102 (81.47%).
+Thu Mar 12 12:55:03 PDT 2009: Executed 10720 lines of 13104 (81.80%).
+Thu Mar 12 13:18:51 PDT 2009: Executed 10808 lines of 13104 (82.47%).
+Thu Mar 12 16:55:45 PDT 2009: Executed 10920 lines of 13104 (83.33%).
+[added enum/union]
+Tue Mar 17 15:42:49 PDT 2009: Executed 11399 lines of 13863 (82.22%).
+Wed Mar 18 07:02:15 PDT 2009: Executed 11456 lines of 13922 (82.28%).
+[insn rewrite]
+Wed Mar 25 08:15:51 PDT 2009: Executed 10957 lines of 13269 (82.57%).
+Sun Mar 29 07:43:54 PDT 2009: Executed 10990 lines of 13413 (81.93%).

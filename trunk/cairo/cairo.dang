@@ -1,0 +1,27 @@
+
+
+{
+  var c = dang.add_foreign_object("cairo.Cairo",
+                                  "cairo_reference",
+				  "cairo_destroy");
+  var s = dang.add_foreign_object("cairo.Surface",
+                                  "...",
+				  "...");
+  var p = dang.add_foreign_object("cairo.Pattern",
+                                  "...",
+				  "...");
+  dang.register_constructor(c, "cairo_create", null, [dang.InputParameter(s)]);
+  dang.register_method(c, "cairo_save", "save", []);
+  dang.register_method(c, "cairo_restore", "restore", []);
+  dang.register_method(c, "cairo_push_group", "push_group", []);
+  dang.register_method(c, "cairo_pop_group", "pop_group", p, []);
+
+  dang.register_constructor(s, "cairo_pdf_surface_create", "pdf", [dang.InputParameter(dang.string.type, "filename")
+                                                                   dang.InputParameter(dang.double.type, "width_in_points"),
+                                                                   dang.InputParameter(dang.double.type, "height_in_points"));
+
+}
+
+
+
+/// var c = new cairo.Cairo(new cairo.Surface pdf("test.pdf", 8. * 72., 11. * 72.);

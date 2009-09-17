@@ -1,0 +1,174 @@
+#! /bin/sh
+
+verbose=0
+silent=0
+valgrind=0
+debug_all=0
+
+RUNTEST_DANG_OPTIONS=""
+
+while test "x$1" != x; do
+  case "$1" in
+    -v | --verbose) verbose=1 ;;
+    -s | --silent) silent=1 ;;
+    --debug-all) debug_all=1 ;;
+    --valgrind) valgrind=1 ;;
+    *) 
+      echo "usage:  run-tests [-v|-s]" 1>&2
+      echo 1>&2
+      echo "  -v | --verbose      Print filenames of tests." 1>&2
+      echo "  -s | --silent       Be quiet." 1>&2
+      echo "  --valgrind          Run valgrind on each test."
+      exit 1
+      ;;
+  esac
+  shift
+done
+      
+if test "$silent" = 1 ; then
+  start_test () { :; }
+  end_test () { :; }
+  running_test () { :; }
+else
+  start_test () { echo -n "$1... " ; }
+  end_test () { echo " done." ; }
+
+  if test "$verbose" = 0 ; then
+    running_test () { echo -n '.' ; }
+  else
+    running_test () { echo -n "[$1]" ; }
+  fi
+fi
+
+if test "$valgrind" = 1; then
+  vgdir="vg-output-$$"
+  echo "Using $vgdir for valgrind output..." 1>&2
+  mkdir -p "$vgdir"
+fi
+
+run_test () {
+  f="$1"
+  running_test "$f"
+  if test "$valgrind" = 1; then
+    b=`basename $f`
+    pre="valgrind --show-reachable=yes --leak-check=full --leak-resolution=high --log-file=$vgdir/$b"
+  else
+    pre=""
+  fi
+  options="$RUNTEST_DANG_OPTIONS $DANG_OPTIONS"
+  if test "$debug_all" = 1 ; then
+    options="$options --debug-all"
+  fi
+  if test -r "$f.output" ; then
+    $pre ./dang $options $f > "$f.output.$$"
+    cmp "$f.output" "$f.output.$$"
+    rm "$f.output.$$"
+  else
+    $pre ./dang $f
+  fi
+}
+set -e
+
+# --- Tests intended to exit with an uncaught exception ---
+start_test "Running failure tests"
+for f in tests/fail*.dang ; do
+  running_test "$f"
+  set +e
+  ./dang --quiet-exceptions $f
+  exit_status=$?
+  set -e
+
+  if test $exit_status != 1; then
+    echo "expected exit-status==1, got $exit_status ($f)" 1>&2
+    exit 1
+  fi
+done
+end_test
+
+# --- Tests intended to exit with a parse error ---
+start_test "Running parse-error tests"
+for f in tests/parse-error*.dang ; do
+  running_test "$f"
+  set +e
+  ./dang $f >& /dev/null
+  exit_status=$?
+  set -e
+
+  if test $exit_status != 1; then
+    echo "expected exit-status==1, got $exit_status" 1>&2
+    exit 1
+  fi
+done
+end_test
+
+# --- Tests of the interactive system ---
+start_test "Running interactive tests"
+for f in tests/interactive*.dang ; do
+  running_test "$f"
+  ./dang -i < "$f" > "$f".output.$$
+  cmp "$f.output" "$f.output.$$"
+  rm "$f.output.$$"
+done
+end_test
+
+
+# --- Tests intended to exit cleanly ---
+run_test_set () {
+  name="$1"
+  basename="$2"
+  if test -z "$basename" ; then
+    basename="$name"
+    name="$basename tests"
+  fi
+  start_test "Running $name"
+  for f in tests/$basename-[0-9]*.dang ; do
+    run_test "$f"
+  done
+  end_test
+}
+
+run_test_set math
+run_test_set string
+run_test_set "function-definition tests" "func"
+run_test_set "for-loop tests" "for"
+run_test_set "exception-handling tests" "exceptions"
+run_test_set cast
+run_test_set if
+run_test_set "string-interpolation tests" interpolation
+run_test_set tensor
+run_test_set "do-while loop tests" "do-while"
+run_test_set "while loop tests" "while"
+run_test_set goto
+run_test_set "global variable tests" "global"
+run_test_set "structure tests" struct
+run_test_set "untyped function tests" "untyped-func"
+run_test_set "string-interpolation tests" "interpolation"
+run_test_set file
+run_test_set object
+run_test_set template
+run_test_set enum
+run_test_set union
+RUNTEST_DANG_OPTIONS="-Itests/module-path"
+run_test_set module
+RUNTEST_DANG_OPTIONS=""
+
+if test "$valgrind" = 1; then
+  echo -n "Checking valgrind output... "
+  got_error=0
+  for z in $vgdir/* ; do
+    error=0
+    grep -q "All heap blocks were freed" $z || error=1
+    grep -q " 0 errors" $z || error=1
+    if test $error = 1 ; then
+      echo "*** valgrind reports problems ... see $z" 1>&2
+      got_error=1
+    else
+      echo -n .
+    fi
+  done
+  if test "$got_error" = 1 ; then
+    exit 1
+  fi
+  #rm -rf "$vgdir"
+  echo " done."
+fi

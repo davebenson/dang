@@ -1,0 +1,56 @@
+#! /bin/sh
+
+set -e
+d=gcov.$$
+echo "output in $d/"
+mkdir $d
+make clean  >& $d/make-clean.log
+make EXTRA_CFLAGS="-fprofile-arcs -ftest-coverage" EXTRA_LDFLAGS="-fprofile-arcs -ftest-coverage" >& $d/make.log
+./run-tests >& $d/run-tests.log
+./run-tests -v --debug-all >& $d/run-tests--debug-all.log 2>&1
+for a in *.c ; do
+  echo --- $a --- >> $d/gcov.output
+  gcov $a >> $d/gcov.output 2>&1
+done
+mv *.c.gcov $d
+rm *.gcda *.gcno
+make clean >& /dev/null
+
+perl -e 'my $total = 0; my $executed = 0;
+while (<STDIN>) { if (/Lines executed:\s*(\d*\.\d\d)% of (\d+)/) {
+  my $percent = $1; my $lines = $2;
+  $total += $lines;
+  $executed += $lines * $percent / 100;
+} }
+$executed = int($executed);
+$percent = sprintf("%.02f", int(10000 * $executed / $total)  / 100);
+print "Executed $executed lines of $total ($percent%).\n"' < $d/gcov.output > $d/summary.output
+
+perl -e 'my $total = 0; my $executed = 0;
+sub pad($$) { $_[0] . (" " x ($_[1] - length($_[0]))) }
+sub rpad($$) { (" " x ($_[1] - length($_[0]))) . $_[0]  }
+while (<STDIN>) { if (/--- (.*) ---/) {
+  my $fname = $1;
+  scalar(<STDIN>);
+  if (scalar(<STDIN>) =~ /Lines executed:\s*(\d*\.\d\d)% of (\d+)/) {
+  my $percent = $1; my $lines = $2;
+  $total += $lines;
+  $executed = int($lines * $percent / 100);
+  print join(" ",
+            rpad($percent, 7),
+            rpad($executed, 4),
+            rpad($lines-$executed, 4),
+            rpad($lines, 4),
+            $fname) . "\n"
+} } }
+' < $d/gcov.output | sort -n > $d/file-summary.output
+
+
+cat $d/summary.output
+
+echo `date`: `cat $d/summary.output` >> coverage-history.txt
+
+echo '[backgrounding make]' 1>&2
+
+make > /dev/null 2>&1 &
+

@@ -1,0 +1,39 @@
+
+{
+  var w = new gtk.window();
+  w.add(l = new gtk.label("hi mom"));
+  w.show_all();
+}
+
+gtk.main();
+
+module Cell;
+
+struct CellSizeRequest
+{
+  uint width;
+};
+
+object Cell
+{
+  abstract get_rect(CellSizeRequest size_req : matrix<char>);
+};
+
+
+object FlowCell
+{
+  FlowCell(vector<Cell> cells) {
+    this.elements = flatten(map(cells,
+                  function cell -> type_case (cell)
+		                      (
+				      FlowCell c -> c.elements,
+				      c          -> [c]
+				      )));
+  }
+  vector<Cell> elements;
+};
+
+flatten(vector<vector<a>> v : vector<a>).
+
+
+

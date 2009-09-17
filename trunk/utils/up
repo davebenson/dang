@@ -1,0 +1,4 @@
+#! /bin/sh
+
+
+scp $* daveb.decreation.com:/www/daveb.decreation.com/dang
