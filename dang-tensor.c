@@ -29,47 +29,19 @@ tensor_init_assign (DangValueType   *type,
                     void            *dst,
                     const void      *src)
 {
-  DangTensor *dst_tensor = (DangTensor *) dst;
-  DangTensor *src_tensor = (DangTensor *) src;
-  DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
-  DangValueType *elt_type = ttype->element_type;
-  unsigned elt_size = elt_type->sizeof_instance;
-  unsigned i;
-  unsigned elt_count = src_tensor->sizes[0];
-  dst_tensor->sizes[0] = src_tensor->sizes[0];
-  for (i = 1; i < ttype->rank; i++)
-    {
-      elt_count *= src_tensor->sizes[i];
-      dst_tensor->sizes[i] = src_tensor->sizes[i];
-    }
-  if (ttype->element_type->init_assign)
-    {
-      char *dst_data = dst_tensor->data = dang_malloc (elt_count * elt_size);
-      char *src_data = src_tensor->data;
-      DangValueType *elt_type = ttype->element_type;
-      for (i = 0; i < elt_count; i++)
-        {
-          elt_type->init_assign (elt_type, dst_data, src_data);
-          src_data += elt_size;
-          dst_data += elt_size;
-        }
-    }
-  else
-    {
-      dst_tensor->data = dang_memdup (src_tensor->data, elt_count * elt_size);
-    }
-  if (ttype->rank == 1)
-    {
-      DangVector *vec = (DangVector *) dst_tensor;
-      vec->alloced = vec->len;
-    }
+  DangTensor **p_dst_tensor = (DangTensor **) dst;
+  DangTensor *src_tensor = * (DangTensor **) src;
+  src_tensor->ref_count += 1;
+  *p_dst_tensor = src_tensor;
 }
 static void
 tensor_destruct (DangValueType *type,
                  void          *data)
 {
-  DangTensor *tensor = data;
+  DangTensor *tensor = * (DangTensor **) data;
   DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
+  if (--(tensor->ref_count) > 0)
+    return;
   if (ttype->element_type->destruct != NULL)
     {
       DangValueType *etype = ttype->element_type;
@@ -84,6 +56,7 @@ tensor_destruct (DangValueType *type,
         }
     }
   dang_free (tensor->data);
+  dang_free (tensor);
 }
 
 static void
@@ -130,7 +103,7 @@ tensor_to_string (DangValueType *type,
                   const void    *value)
 {
   DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
-  const DangTensor *tensor = value;
+  const DangTensor *tensor = * (const DangTensor *const *) value;
   const unsigned *sizes = tensor->sizes;
   const void *elements = tensor->data;
   DangStringBuffer buf = DANG_STRING_BUFFER_INIT;
