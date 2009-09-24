@@ -33,6 +33,8 @@ struct _DangTensor
 {
   void *data;
 
+  unsigned ref_count;
+
   /* the actual length of this array is the rank of the tensor */
   unsigned sizes[1];
 };
@@ -43,6 +45,7 @@ typedef struct _DangMatrix DangMatrix;
 struct _DangMatrix
 {
   void *data;
+  unsigned ref_count;
   unsigned n_rows, n_cols;
 };
 
@@ -50,11 +53,9 @@ typedef struct _DangVector DangVector;
 struct _DangVector
 {
   void *data;
+  unsigned ref_count;
   unsigned len;
-  unsigned alloced;             /* different than higher rank tensors!!! */
 };
 
 #define DANG_TENSOR_SIZEOF(rank)                                              \
-( ((rank)==1) ? sizeof(DangVector)                                            \
-              : DANG_ALIGN((sizeof(DangTensor) + ((rank)-1)*sizeof(unsigned)),\
-                           DANG_ALIGNOF_POINTER) )
+(DANG_ALIGN((sizeof(DangTensor) + ((rank)-1)*sizeof(unsigned)), DANG_ALIGNOF_POINTER) )
