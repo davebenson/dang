@@ -4125,6 +4125,7 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tensor)
   char *tensor_data_at;
   unsigned *indices;
   DangTensor *literal;
+  DangTensor **p_literal;
 
   if (flags->must_be_lvalue)
     {
@@ -4156,7 +4157,10 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tensor)
   dang_insn_init (&insn, DANG_INSN_TYPE_ASSIGN);
   insn.assign.source.location = DANG_INSN_LOCATION_LITERAL;
   literal = dang_malloc (DANG_TENSOR_SIZEOF (rank));
-  insn.assign.source.value = literal;
+  literal->ref_count = 1;
+  p_literal = dang_new (DangTensor *, 1);
+  *p_literal = literal;
+  insn.assign.source.value = p_literal;
   insn.assign.source.type = tensor_type;
   insn.assign.target.location = DANG_INSN_LOCATION_STACK;
   insn.assign.target.var = tensor_var_id;
@@ -4169,8 +4173,6 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tensor)
   for (i = 0; i < tensor_sizes->rank; i++)
     indices[i] = 0;
   memcpy (literal->sizes, tensor_sizes->sizes, rank * sizeof (unsigned));
-  if (rank == 1)
-    ((DangVector*)literal)->alloced = literal->sizes[0];
   literal->data = dang_malloc (elt_size * total_tensor_size);
   tensor_data_at = literal->data;
   for (;;)
