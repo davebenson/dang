@@ -1,0 +1,3 @@
+// PURPOSE: verify that a vector must be type-homogeneous
+
+[1 "A"];

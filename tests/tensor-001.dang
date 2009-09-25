@@ -1,0 +1,23 @@
+// PURPOSE: test new_tensor
+
+{
+  system.println("${new_tensor(10U, 10U, function i j -> i * j)}");
+}
+
+
+{
+  var failed = false;
+  try { new_tensor(10U, function q -> "${10U / (5U - q)}"); } catch (error e) { failed = true; }
+  assert (failed);
+}
+
+
+function foo(uint i, uint j : string)
+{
+  return "${i}Q${j}";
+}
+
+{
+  var t = new_tensor(3U, 2U, foo);
+  assert(t == [["0Q0" "0Q1"] ["1Q0" "1Q1"] ["2Q0" "2Q1"]]);
+}

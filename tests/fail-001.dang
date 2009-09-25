@@ -1,0 +1,2 @@
+// PURPOSE: verify that abort really cause the program to exit.
+system.abort("hi");

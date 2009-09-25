@@ -1,0 +1,11 @@
+// PURPOSE: ensure protected members cannot be accessed from the outside
+
+object X {
+  new() { }
+  protected int x;
+}
+
+{
+  X x = new X();
+  x.x = 1;		// not allowed, protected
+}

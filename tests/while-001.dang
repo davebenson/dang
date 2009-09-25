@@ -1,0 +1,10 @@
+// PURPOSE: test while-loop
+
+var x = 3;
+var i = 0;
+while (x < 10)
+{
+  i++;
+  x++;
+}
+assert (i == 7);

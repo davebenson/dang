@@ -1,0 +1,4 @@
+// PURPOSE: test split
+
+assert(split(":", "a:b:C:d:e") == ["a" "b" "C" "d" "e"]);
+assert(split("", "abCde") == ["a" "b" "C" "d" "e"]);

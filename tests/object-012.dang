@@ -1,0 +1,18 @@
+// PURPOSE: test that we can read readonly members
+
+object X 
+{
+  new () { }
+  new (int x) { this.x = x; }
+
+  public method set_x(int x) { this.x = x; }
+  readonly int x;
+}
+
+
+{
+  X x = new X(42);
+  assert(x.x == 42);
+  x.set_x(666);
+  assert(x.x == 666);
+}

@@ -1,0 +1,3 @@
+// PURPOSE: test empty for-loop update
+
+{ uint i = 1U; for ( ; i != 64U; ) { system.println("$i"); i = i * 2U; } }

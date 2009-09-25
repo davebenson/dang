@@ -1,0 +1,7 @@
+// PURPOSE: test join and concat
+
+
+assert(join(":", ["a" "bqqq" "c"]) == "a:bqqq:c");
+assert(join(":", ["" "bq" ""]) == ":bq:");
+
+assert(concat(["a" "BBB" "CCCCCCC"]) == "aBBBCCCCCCC");

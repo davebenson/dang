@@ -1,0 +1,20 @@
+// PURPOSE: test reshape
+
+var A = new_tensor(3U,8U, function x -> 1);
+assert(dims(A) == [3U 8U]);
+assert(dims(reshape(A, 2, 12)) == [2U 12U]);
+assert(dims(reshape(A, 2, 3, 4)) == [2U 3U 4U]);
+
+var failed = false;
+try { reshape(A, 5, 5); } catch (error e) { failed = true; }
+assert(failed);
+
+failed = false;
+try { reshape(A, 4, 6); } catch (error e) { failed = true; }
+assert(!failed);
+
+{
+var Q = new_tensor(10U, 10U, function x y -> (int)(10U * x + y));
+var Y = new_tensor(100U, function x -> (int)x);
+assert(reshape(Q, 100U) == Y);
+}

@@ -31,7 +31,9 @@ tensor_init_assign (DangValueType   *type,
 {
   DangTensor **p_dst_tensor = (DangTensor **) dst;
   DangTensor *src_tensor = * (DangTensor **) src;
-  src_tensor->ref_count += 1;
+  DANG_UNUSED (type);
+  if (src_tensor)
+    src_tensor->ref_count += 1;
   *p_dst_tensor = src_tensor;
 }
 static void
@@ -40,6 +42,8 @@ tensor_destruct (DangValueType *type,
 {
   DangTensor *tensor = * (DangTensor **) data;
   DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
+  if (tensor == NULL)
+    return;
   if (--(tensor->ref_count) > 0)
     return;
   if (ttype->element_type->destruct != NULL)
@@ -104,11 +108,22 @@ tensor_to_string (DangValueType *type,
 {
   DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
   const DangTensor *tensor = * (const DangTensor *const *) value;
-  const unsigned *sizes = tensor->sizes;
-  const void *elements = tensor->data;
-  DangStringBuffer buf = DANG_STRING_BUFFER_INIT;
-  append_tensor_to_string (ttype->element_type, ttype->rank, sizes, &elements, &buf);
-  return buf.str;
+  if (tensor == NULL)
+    {
+      char *rv = dang_malloc (ttype->rank * 2 + 1);
+      memset (rv, '[', ttype->rank);
+      memset (rv + ttype->rank, ']', ttype->rank);
+      rv[ttype->rank * 2] = 0;
+      return rv;
+    }
+  else
+    {
+      const unsigned *sizes = tensor->sizes;
+      const void *elements = tensor->data;
+      DangStringBuffer buf = DANG_STRING_BUFFER_INIT;
+      append_tensor_to_string (ttype->element_type, ttype->rank, sizes, &elements, &buf);
+      return buf.str;
+    }
 }
 
 static void
@@ -122,19 +137,17 @@ oob_error (DangError **error,
 }
 
 static dang_boolean
-index_get_ptr__tensor (DangValueIndexInfo *index_info,
-                       void          *container,
-                       const void   **indices,
-                       void         **rv_ptr_out,
-                       dang_boolean   may_create,
-                       DangError    **error)
+index_get_ptr_tensor (DangValueIndexInfo *index_info,
+                      void          *container,
+                      const void   **indices,
+                      void         **rv_ptr_out,
+                      DangError    **error)
 {
   DangTensor *tensor = container;
   DangValueTypeTensor *ttype = (DangValueTypeTensor *) index_info->owner;
   unsigned rank = ttype->rank;
   uint32_t ind = * (uint32_t*)(indices[0]);
   unsigned overall_ind, i;
-  DANG_UNUSED (may_create);
   if (ind >= tensor->sizes[0])
     {
       oob_error (error, 0, tensor->sizes[0], ind);
@@ -165,7 +178,8 @@ index_get__tensor   (DangValueIndexInfo *ii,
 {
   DangValueType *elt_type = ((DangValueTypeTensor*)ii->owner)->element_type;
   void *ptr;
-  if (!index_get_ptr__tensor (ii, container, indices, &ptr, may_create, error))
+  DANG_UNUSED (may_create);
+  if (!index_get_ptr_tensor (ii, container, indices, &ptr, error))
     return FALSE;
   if (elt_type->init_assign)
     elt_type->init_assign (elt_type, rv_out, ptr);
@@ -184,7 +198,8 @@ index_set__tensor   (DangValueIndexInfo *ii,
 {
   DangValueType *elt_type = ((DangValueTypeTensor*)ii->owner)->element_type;
   void *ptr;
-  if (!index_get_ptr__tensor (ii, container, indices, &ptr, may_create, error))
+  DANG_UNUSED (may_create);
+  if (!index_get_ptr_tensor (ii, container, indices, &ptr, error))
     return FALSE;
   if (elt_type->assign)
     elt_type->assign (elt_type, ptr, element_value);
@@ -227,7 +242,7 @@ dang_value_type_tensor (DangValueType *element_type,
   out->base_type.ref_count = 0;
   out->base_type.full_name = dang_strdup_printf ("tensor<%s,%u>", element_type->full_name, rank);
 
-  out->base_type.sizeof_instance = DANG_TENSOR_SIZEOF (rank);
+  out->base_type.sizeof_instance = DANG_SIZEOF_POINTER;
   out->base_type.alignof_instance = DANG_ALIGNOF_POINTER;
   
   out->base_type.init_assign = tensor_init_assign;
@@ -258,7 +273,6 @@ dang_value_type_tensor (DangValueType *element_type,
   out->index_infos[0].element_type = element_type;
   out->index_infos[0].get = index_get__tensor;
   out->index_infos[0].set = index_set__tensor;
-  out->index_infos[0].get_ptr = index_get_ptr__tensor;
   out->index_infos[0].element_type = element_type;
   out->index_infos[1].next = NULL;
   out->index_infos[1].owner = &out->base_type;
@@ -266,7 +280,6 @@ dang_value_type_tensor (DangValueType *element_type,
   out->index_infos[1].element_type = element_type;
   out->index_infos[1].get = index_get__tensor;
   out->index_infos[1].set = index_set__tensor;
-  out->index_infos[1].get_ptr = index_get_ptr__tensor;
   out->index_infos[1].element_type = element_type;
 
   GSK_RBTREE_INSERT (GET_TENSOR_TREE (), out, conflict);
@@ -636,7 +649,6 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_tensor_dims)
   rv->len = rank;
   arr = dang_new (uint32_t, rank);
   rv->data = arr;
-  rv->alloced = rank;
   for (i = 0; i < rank; i++)
     arr[i] = in->sizes[i];
   return TRUE;
@@ -1020,11 +1032,12 @@ do_new_tensor (void      **args,
   unsigned *dims = dang_newa (unsigned, ntd->rank);
   unsigned *indices = dang_newa (unsigned, ntd->rank);
   void **callee_args = dang_newa (void *, ntd->rank);
-  DangTensor *tensor = rv_out;
+  DangTensor *tensor = dang_malloc (DANG_TENSOR_SIZEOF (ntd->rank));
   unsigned i;
   unsigned total_elements = 1;
   char *data, *data_at;
   DangFunction *func;
+  tensor->ref_count = 1;
   for (i = 0; i < ntd->rank; i++)
     {
       indices[i] = 0;
@@ -1037,6 +1050,7 @@ do_new_tensor (void      **args,
   if (func == NULL)
     {
       dang_set_error (error, "null-pointer exception");
+      dang_free (tensor);
       return FALSE;
     }
   if (ntd->elt_type->init_assign)
@@ -1062,6 +1076,7 @@ do_new_tensor (void      **args,
             }
           dang_free (data);
           memset (tensor, 0, DANG_TENSOR_SIZEOF (ntd->rank));
+          dang_free (tensor);
           return FALSE;
         }
 
@@ -1078,11 +1093,7 @@ do_new_tensor (void      **args,
 done:
 
   tensor->data = data;
-  if (ntd->rank == 1)
-    {
-      DangVector *vector = (DangVector*) tensor;
-      vector->alloced = vector->len;
-    }
+  *(DangTensor**)rv_out = tensor;
   return TRUE;
 }
 
@@ -1269,7 +1280,6 @@ do_grep_vector (void      **args,
 
   rv->len = new_len;
   rv->data = dang_malloc (elt_size * new_len);
-  rv->alloced = new_len;
   bitvec_at = bitvec;
   char *output_at = rv->data;
   input_at = vector->data;
@@ -1432,11 +1442,6 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_elementwise_op)
   c->data = dang_malloc (total_elements * fi->op_info->type->sizeof_instance);
   for (i = 0; i < rank; i++)
     c->sizes[i] = a->sizes[i];
-  if (rank == 1)
-    {
-      DangVector *v = (DangVector *) c;
-      v->alloced = v->len;
-    }
   fi->op_info->op (a->data, b->data, c->data, total_elements);
   return TRUE;
 
@@ -1641,11 +1646,6 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_scalar_multiply)
     {
       total_size *= a->sizes[i];
       out->sizes[i] = a->sizes[i];
-    }
-  if (i == 1)
-    {
-      DangVector *vector = (DangVector *) out;
-      vector->alloced = vector->len;
     }
   out->data = dang_malloc (total_size * smi->elt_size);
   smi->op (a->data, scalar, out->data, total_size);
@@ -1863,8 +1863,8 @@ DEFINE_ALL_STATISTICS(double, double)
 
 static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__memcpy4)
 {
-  DangMatrix *in = args[0];
-  DangMatrix *out = rv_out;
+  DangMatrix *in = * (DangMatrix **) args[0];
+  DangMatrix *out;
   unsigned src_rows = in->n_rows;
   unsigned src_cols = in->n_cols;
   int jump_back;
@@ -1873,6 +1873,8 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__memcpy4)
   unsigned i, j;
   DANG_UNUSED (func_data);
   DANG_UNUSED (error);
+  out = dang_new (DangMatrix, 1);
+  out->ref_count = 1;
   out->n_cols = src_rows;
   out->n_rows = src_cols;
   out->data = dst = dang_new (uint32_t, src_rows * src_cols);
@@ -1886,12 +1888,13 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__memcpy4)
         }
       dst -= jump_back;
     }
+  * (DangMatrix **) rv_out = out;
   return TRUE;
 }
 static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__memcpy8)
 {
-  DangMatrix *in = args[0];
-  DangMatrix *out = rv_out;
+  DangMatrix *in = * (DangMatrix **) args[0];
+  DangMatrix *out;
   unsigned src_rows = in->n_rows;
   unsigned src_cols = in->n_cols;
   int jump_back;
@@ -1900,6 +1903,8 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__memcpy8)
   unsigned i, j;
   DANG_UNUSED (func_data);
   DANG_UNUSED (error);
+  out = dang_new (DangMatrix, 1);
+  out->ref_count = 1;
   out->n_cols = src_rows;
   out->n_rows = src_cols;
   out->data = dst = dang_new (uint64_t, src_rows * src_cols);
@@ -1913,12 +1918,13 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__memcpy8)
         }
       dst -= jump_back;
     }
+  * (DangMatrix **) rv_out = out;
   return TRUE;
 }
 static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__memcpy)
 {
-  DangMatrix *in = args[0];
-  DangMatrix *out = rv_out;
+  DangMatrix *in = * (DangMatrix **) args[0];
+  DangMatrix *out;
   unsigned src_rows = in->n_rows;
   unsigned src_cols = in->n_cols;
   int step_forward, jump_back;
@@ -1927,6 +1933,8 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__memcpy)
   unsigned i, j;
   unsigned elt_size = (unsigned) func_data;
   DANG_UNUSED (error);
+  out = dang_new (DangMatrix, 1);
+  out->ref_count = 1;
   out->n_cols = src_rows;
   out->n_rows = src_cols;
   out->data = dst = dang_malloc (src_rows * src_cols * elt_size);
@@ -1942,12 +1950,13 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__memcpy)
         }
       dst -= jump_back;
     }
+  * (DangMatrix **) rv_out = out;
   return TRUE;
 }
 static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__virtual)
 {
-  DangMatrix *in = args[0];
-  DangMatrix *out = rv_out;
+  DangMatrix *in = *(DangMatrix**)args[0];
+  DangMatrix *out;
   unsigned src_rows = in->n_rows;
   unsigned src_cols = in->n_cols;
   int step_forward, jump_back;
@@ -1957,6 +1966,8 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__virtual)
   DangValueType *elt_type = func_data;
   unsigned elt_size = elt_type->sizeof_instance;
   DANG_UNUSED (error);
+  out = dang_new (DangMatrix, 1);
+  out->ref_count = 1;
   out->n_cols = src_rows;
   out->n_rows = src_cols;
   out->data = dst = dang_malloc (src_rows * src_cols * elt_size);
@@ -1972,6 +1983,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_transpose__virtual)
         }
       dst -= jump_back;
     }
+  * (DangMatrix **) rv_out = out;
   return TRUE;
 }
 
@@ -2025,8 +2037,8 @@ try_sig__matrix_transpose  (DangMatchQuery *query,
 
 static DANG_SIMPLE_C_FUNC_DECLARE (do_diag_vector_to_matrix)
 {
-  DangVector *a = args[0];
-  DangMatrix *b = rv_out;
+  DangVector *a = *(DangVector**) args[0];
+  DangMatrix *b;
   const char *src;
   char *dst;
   DangValueType *elt_type = func_data;
@@ -2034,6 +2046,8 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_diag_vector_to_matrix)
   unsigned dst_jump = elt_size * (a->len + 1);
   unsigned i;
   DANG_UNUSED (error);
+  b = dang_new (DangMatrix, 1);
+  b->ref_count = 1;
   b->n_rows = b->n_cols = a->len;
   b->data = dang_malloc0 (a->len * a->len * elt_size);
   src = a->data;
@@ -2056,12 +2070,13 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_diag_vector_to_matrix)
           src += elt_size;
         }
     }
+  * (DangMatrix **) rv_out = b;
   return TRUE;
 }
 static DANG_SIMPLE_C_FUNC_DECLARE (do_diag_matrix_to_vector)
 {
-  const DangMatrix *a = args[0];
-  DangVector *b = rv_out;
+  const DangMatrix *a = *(DangMatrix**) args[0];
+  DangVector *b;
   const char *src;
   char *dst;
   DangValueType *elt_type = func_data;
@@ -2074,6 +2089,8 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_diag_matrix_to_vector)
                       a->n_rows, a->n_cols);
       return FALSE;
     }
+  b = dang_new (DangVector, 1);
+  b->ref_count = 1;
   b->len = a->n_rows;
   b->data = dang_malloc (a->n_rows * elt_size);
   src = a->data;
@@ -2096,6 +2113,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_diag_matrix_to_vector)
           dst += elt_size;
         }
     }
+  * (DangVector **) rv_out = b;
   return TRUE;
 }
 
@@ -2167,16 +2185,19 @@ init_assign_loop (DangValueType *type,
       src = (char*)src + size;
     }
 }
+
 static DANG_SIMPLE_C_FUNC_DECLARE (do_concat_element_vector)
 {
   const void *a = args[0];
-  DangVector *b = args[1];
-  DangVector *rv = rv_out;
+  DangVector *b = * (DangVector**) args[1];
+  DangVector *rv;
   ConcatInfo *ci = func_data;
   DangValueType *type = ci->element_type;
   unsigned elt_size = type->sizeof_instance;
   DANG_UNUSED (error);
-  rv->len = rv->alloced = b->len + 1;
+  rv = dang_new (DangVector, 1);
+  rv->ref_count = 1;
+  rv->len = b->len + 1;
   rv->data = dang_malloc (rv->len * elt_size);
   if (type->init_assign == NULL)
     {
@@ -2188,18 +2209,21 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_concat_element_vector)
       type->init_assign (type, rv->data, a);
       init_assign_loop (type, (char*)rv->data + elt_size, b->data, b->len);
     }
+  * (DangVector **) rv_out = rv;
   return TRUE;
 }
 static DANG_SIMPLE_C_FUNC_DECLARE (do_concat_vector_element)
 {
-  DangVector *a = args[0];
+  DangVector *a = * (DangVector**) args[0];
   const void *b = args[1];
   DangVector *rv = rv_out;
   ConcatInfo *ci = func_data;
   DangValueType *type = ci->element_type;
   unsigned elt_size = type->sizeof_instance;
   DANG_UNUSED (error);
-  rv->len = rv->alloced = a->len + 1;
+  rv = dang_new (DangVector, 1);
+  rv->ref_count = 1;
+  rv->len = a->len + 1;
   rv->data = dang_malloc (rv->len * elt_size);
   if (type->init_assign == NULL)
     {
@@ -2211,13 +2235,14 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_concat_vector_element)
       init_assign_loop (type, (char*)rv->data + elt_size, a->data, a->len);
       type->init_assign (type, (char*)rv->data + elt_size * a->len, b);
     }
+  * (DangVector **) rv_out = rv;
   return TRUE;
 }
 static DANG_SIMPLE_C_FUNC_DECLARE (do_concat_tensor_tensor)
 {
   DangTensor *a = args[0];
   DangTensor *b = args[1];
-  DangTensor *rv = rv_out;
+  DangTensor *rv;
   ConcatInfo *ci = func_data;
   DangValueType *type = ci->element_type;
   unsigned elt_size = type->sizeof_instance;
@@ -2232,6 +2257,8 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_concat_tensor_tensor)
           return FALSE;
         }
     }
+  rv = dang_malloc (DANG_TENSOR_SIZEOF (ci->a_rank));
+  rv->ref_count = 1;
   rv->sizes[0] = a->sizes[0] + b->sizes[0];
   for (i = 1; i < ci->a_rank; i++)
     rv->sizes[i] = a->sizes[i];
@@ -2248,8 +2275,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_concat_tensor_tensor)
       memcpy ((char*)rv->data + elt_size * subsize * a->sizes[0],
               b->data, elt_size * subsize * b->sizes[0]);
     }
-  if (ci->a_rank == 1)
-    ((DangVector*)rv)->alloced = rv->sizes[0];
+  * (DangTensor **) rv_out = rv;
   return TRUE;
 }
 static DANG_SIMPLE_C_FUNC_DECLARE (do_concat_matrix_vector)
@@ -2278,12 +2304,12 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_concat_vector_matrix)
   ConcatInfo new_ci;
   a = dang_alloca (sizeof (DangTensor) + sizeof(unsigned) * ci->a_rank);
   a->sizes[0] = 1;
-  a->data = ((DangTensor*)args[0])->data;
+  a->data = (*(DangTensor**)args[0])->data;
   memcpy (a->sizes + 1, ((DangTensor*)args[0])->sizes,
           (ci->a_rank) * sizeof(unsigned));
 
   /* Chain to general case */
-  new_args[0] = a;
+  new_args[0] = &a;
   new_args[1] = args[1];
   new_ci.element_type = ci->element_type;
   new_ci.a_rank = ci->a_rank + 1;
@@ -2395,8 +2421,8 @@ success:
 /* Concatenate a vector of vectors into one. */
 static DANG_SIMPLE_C_FUNC_DECLARE (concat_array_of_tensors)
 {
-  DangVector *in = args[0];
-  DangTensor *out = rv_out;
+  DangVector *in = * (DangVector **) args[0];
+  DangTensor *out;
   ConcatInfo *ci = func_data;
   unsigned rank = ci->a_rank;
   unsigned major_length_total;
@@ -2406,9 +2432,13 @@ static DANG_SIMPLE_C_FUNC_DECLARE (concat_array_of_tensors)
   unsigned elt_size;
   unsigned i, d;
   unsigned n_nonmajor_elts;
+  out = dang_malloc (inner_size);
+  out->ref_count = 1;
+  *(DangTensor **) rv_out = out;
   if (in->len == 0)
     {
-      memset (out, 0, inner_size);
+      for (i = 0; i < rank; i++)
+        out->sizes[i] = 0;
       return TRUE;
     }
   major_length_total = last->sizes[0];
@@ -2420,6 +2450,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE (concat_array_of_tensors)
           {
             dang_set_error (error, "size mismatch in dimension #%u to argument #%u of concat() (size %u v %u)",
                             d+1, i+1, last->sizes[d], sub->sizes[d]);
+            dang_free (out);
             return FALSE;
           }
       last = sub;
@@ -2458,11 +2489,10 @@ static DANG_SIMPLE_C_FUNC_DECLARE (concat_array_of_tensors)
           sub = (DangTensor*)((char*)sub + inner_size);
         }
     }
-  if (rank == 1)
-    ((DangVector*)out)->alloced = out->sizes[0];
   return TRUE;
 }
 
+#if 0
 /* ---- operator_assign_concat (<>=) --- */
 
 static DANG_SIMPLE_C_FUNC_DECLARE (do_vector_append_element)
@@ -2686,6 +2716,7 @@ success:
   dang_signature_unref (sig);
   return rv;
 }
+#endif
 
 static DangFunction *
 try_sig__concat_array_of_tensors  (DangMatchQuery *query,
@@ -2723,20 +2754,22 @@ try_sig__concat_array_of_tensors  (DangMatchQuery *query,
 
 static DANG_SIMPLE_C_FUNC_DECLARE (do_matrix_rows)
 {
-  DangVector *out = rv_out;
+  DangVector *out;
   DangVector *rows;
-  DangMatrix *in = args[0];
+  DangMatrix *in = *(DangMatrix**) args[0];
   const char *src_at = in->data;
   unsigned i, j;
   DangValueType *elt_type = func_data;
   unsigned elt_size = elt_type->sizeof_instance;
   DANG_UNUSED (error);
-  out->len = out->alloced = in->n_rows;
+  out = dang_new (DangVector, 1);
+  out->ref_count = 1;
+  out->len = in->n_rows;
   out->data = rows = dang_new (DangVector, in->n_rows);
   for (i = 0; i < in->n_rows; i++)
     {
       char *dst_at;
-      rows[i].len = rows[i].alloced = in->n_cols;
+      rows[i].len = in->n_cols;
       rows[i].data = dst_at = dang_malloc (elt_size * in->n_cols);
       if (elt_type->init_assign)
         {
@@ -2757,25 +2790,28 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_matrix_rows)
             }
         }
     }
+  * (DangVector **) rv_out = out;
   return TRUE;
 }
 
 static DANG_SIMPLE_C_FUNC_DECLARE (do_matrix_cols)
 {
-  DangVector *out = rv_out;
+  DangVector *out;
   DangVector *cols;
-  DangMatrix *in = args[0];
+  DangMatrix *in = *(DangMatrix**) args[0];
   const char *src_at = in->data;
   unsigned i, j;
   DangValueType *elt_type = func_data;
   unsigned elt_size = elt_type->sizeof_instance;
   DANG_UNUSED (error);
   unsigned dst_offset = 0;
-  out->len = out->alloced = in->n_cols;
+  out = dang_new (DangVector, 1);
+  out->ref_count = 1;
+  out->len = in->n_cols;
   out->data = cols = dang_new (DangVector, in->n_cols);
   for (i = 0; i < in->n_cols; i++)
     {
-      cols[i].len = cols[i].alloced = in->n_rows;
+      cols[i].len = in->n_rows;
       cols[i].data = dang_malloc (elt_size * in->n_rows);
     }
   for (i = 0; i < in->n_rows; i++)
@@ -2798,6 +2834,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_matrix_cols)
         }
       dst_offset += elt_size;
     }
+  * (DangVector **) rv_out = out;
   return TRUE;
 }
 
@@ -2868,8 +2905,6 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_reshape)
 
   for (i = 0; i < ri->output_rank; i++)
     out->sizes[i] = * (uint32_t *) args[i+1];
-  if (i == 1)
-    ((DangVector*)out)->alloced = out->sizes[0];
   elt_size = ri->element_type->sizeof_instance;
   out->data = dang_malloc (elt_size * output_n_elements);
   if (ri->element_type->init_assign)
@@ -3188,8 +3223,8 @@ _dang_tensor_init (DangNamespace *the_ns)
   add_variadic_c_family (the_ns, "tensor_concat", "concat",
                          try_sig__concat_array_of_tensors);
 
-  add_variadic_c_family (the_ns, "tensor_operator_assign_concat", "operator_assign_concat",
-                         try_sig__operator_assign_concat);
+  //add_variadic_c_family (the_ns, "tensor_operator_assign_concat", "operator_assign_concat",
+                         //try_sig__operator_assign_concat);
 }
 
 //  if (!dang_namespace_add_metafunction (the_ns, "$tensor_map",

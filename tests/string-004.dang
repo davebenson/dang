@@ -1,0 +1,32 @@
+// PURPOSE: test utf8 handling for higher chars.
+
+
+{
+  var s = "\242";
+  assert(n_chars(s) == 1U);
+  assert(n_bytes(s) == 2U);
+  var b = (vector<char>) s;
+  assert(length(b) == 1U);
+  assert((int)b[0] == 0xa2);
+  assert((vector<utiny>)s == [((utiny) 0xc2) ((utiny) 0xA2)]);
+}
+
+{
+  var s = (string) [((utiny)0xe2) ((utiny)0x82) ((utiny)0xac)];
+  assert(n_chars(s) == 1U);
+  assert(n_bytes(s) == 3U);
+  var b = (vector<char>) s;
+  assert(length(b) == 1U);
+  assert((int)b[0] == 0x20ac);
+}
+
+{
+  var by = [((utiny)0xf4) ((utiny)0x8a) ((utiny)0xaf) ((utiny)0x8d)];
+  var s = (string) by;
+  assert(n_chars(s) == 1U);
+  assert(n_bytes(s) == 4U);
+  var b = (vector<char>) s;
+  assert(length(b) == 1U);
+  assert((int)b[0] == 0x10abcd);
+  assert((vector<utiny>) s == by);
+}

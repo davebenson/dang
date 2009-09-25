@@ -1,0 +1,20 @@
+// PURPOSE: string-handling basics
+
+assert("ab" == "a" + "b");
+assert("a" < "b");
+assert("b" > "a");
+assert("a" == "a");
+assert("a" <= "a");
+assert("a" <= "b");
+assert("b" >= "a");
+assert("b" >= "b");
+assert(("a" <=> "b") == -1);
+assert(("a" <=> "a") == 0);
+assert(("b" <=> "a") == 1);
+
+assert(length("") == 0U);
+assert(length("42") == 2U);
+assert(length("abcd") == 4U);
+assert(length("abcdefghijklmnopqrstuvwxyz") == 26U);
+
+assert("\101" == "A");

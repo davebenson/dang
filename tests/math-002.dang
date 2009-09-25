@@ -1,0 +1,35 @@
+// PURPOSE: test negation, booleans
+
+int x = 3;
+int y = -3;
+assert(x == -y);
+assert(y == -x);
+assert(-x == y);
+assert(-y == x);
+
+var b = false;
+//system.println("$b");
+//system.println("${b ? 0 : 1}");
+
+assert ((b ? 0 : 1) == 1);
+assert ((false ? 0 : 1) == 1);
+assert ((true ? 1 : 0) == 1);
+assert (true);
+assert (!false);
+assert (! !true);
+assert (! ! !false);
+assert (false == !true);
+assert (!false == true);
+assert (false != true);
+assert (false == false);
+assert (true == true);
+
+assert ((false && false) == false);
+assert ((true && false) == false);
+assert ((false && true) == false);
+assert ((true && true) == true);
+
+assert ((false || false) == false);
+assert ((true || false) == true);
+assert ((false || true) == true);
+assert ((true || true) == true);

@@ -1,0 +1,14 @@
+// PURPOSE: test for-loop, assignable return-value.
+
+function repeat(string s, uint count : string)
+{
+  var rv = "";
+  for (uint i = 0U; i < count; i++)
+    rv = rv + s;
+  return_value = rv;
+}
+
+assert(repeat("x", 1U) == "x");
+assert(repeat("x", 4U) == "xxxx");
+assert(repeat("xyz", 3U) == "xyzxyzxyz");
+assert(repeat(repeat("xyz", 3U), 3U) == repeat("xyz", 9U));

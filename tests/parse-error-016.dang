@@ -1,0 +1,10 @@
+// PURPOSE: length of %%A doesn't match the return-type.
+
+
+function foo(%%A a : %%A)
+{
+  return length(a);
+}
+
+
+foo([1 2 3]);

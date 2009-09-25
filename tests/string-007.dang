@@ -1,0 +1,21 @@
+// PURPOSE: test utf8 literals (using globals, turned up a different bug.)
+
+
+var a = "¢";
+var b = "€";
+var c = "􊯍";
+assert(n_chars(a) == 1U);
+assert(n_chars(b) == 1U);
+assert(n_chars(c) == 1U);
+assert(n_bytes(a) == 2U);
+assert(n_bytes(b) == 3U);
+assert(n_bytes(c) == 4U);
+var arr_a = (vector<char>) a;
+var arr_b = (vector<char>) b;
+var arr_c = (vector<char>) c;
+assert(length(arr_a) == 1U);
+assert(length(arr_b) == 1U);
+assert(length(arr_c) == 1U);
+assert(arr_a[0] == (char)0xa2);
+assert(arr_b[0] == (char)0x20ac);
+assert(arr_c[0] == (char)0x10abcd);

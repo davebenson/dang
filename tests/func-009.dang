@@ -1,0 +1,6 @@
+// PURPOSE: test NULL-function handling
+
+function<int:int> f;
+var failed = false;
+try { f(42); } catch (error e) { failed = true; }
+assert (failed);

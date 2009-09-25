@@ -1,0 +1,16 @@
+// PURPOSE: test rows, diag
+
+var a = [(["hi" "how"]) ["are" "you?"] ["doing" "today"]];
+var d0 = map(a, function x -> x[0]);
+assert(d0 == ["hi" "are" "doing"]);
+
+  var c = [["hi" "how"] ["are" "you?"] ["doing" "today"]];
+  var d = map(rows(c), function a -> a[1]);
+  //system.println("c=$c; d=$d");
+  assert(d == ["how" "you?" "today"]);
+
+  var e = [0 3 2];
+  assert (diag(e) == [[0 0 0] [0 3 0] [0 0 2]]);
+
+  assert (diag([[31 33] [61 18]]) == [31 18]);
+  //system.println("${diag(e)}");

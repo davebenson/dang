@@ -1,0 +1,38 @@
+// PURPOSE: more global variable handling
+
+var a = 3;
+system.println("a=$a");
+assert(a == 3);
+
+a = 4;
+system.println("a=$a");
+assert(a == 4);
+
+var int b = a * 3; 
+system.println("b=$b");
+assert(b == 12);
+ 
+
+{ for (int i = 0; i < 10; i++) b += i; }
+
+system.println("b=$b");
+assert(b == 57);
+
+b = a;
+assert(b == 4);
+assert(a == 4);
+assert(a == b);
+
+var f = "hi mom";
+assert(length(f) == 6U);
+var ff = f;
+ff = f;
+assert(ff == "hi mom");
+assert(f == "hi mom");
+assert(f == ff);
+assert("hi mom" == ff);
+assert(ff < "zeta");
+
+var A = [[1 2] [3 4]];
+var B = A;
+{ var C = A; C = A * B; B = A; }

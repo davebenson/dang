@@ -1,0 +1,19 @@
+// PURPOSE: test passing functions around
+
+function foo(int a, function<int, string : string> f, string res)
+  assert(f(a, "hoo") == res);
+
+
+function goo(int a, string b : string)
+  return "$a$b";
+function goo2(int a, string b : string)
+  return "$b$a";
+
+foo(42, goo, "42hoo");
+foo(42, goo2, "hoo42");
+
+
+function test_int_apply(int a, int b, function<int, int : int> f, int res)
+  assert (f(a,b) == res);
+
+test_int_apply(1, 1, operator_add, 2);

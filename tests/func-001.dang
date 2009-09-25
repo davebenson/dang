@@ -1,0 +1,16 @@
+// PURPOSE: recursion basics
+
+function fib_recurse(uint N : uint)
+{
+  if (N == 0U || N == 1U)
+    return 1U;
+  else
+    return fib_recurse(N - 2U) + fib_recurse( N - 1U);
+}
+
+assert(fib_recurse(1U) == 1U);
+assert(fib_recurse(2U) == 2U);
+assert(fib_recurse(3U) == 3U);
+assert(fib_recurse(4U) == 5U);
+assert(fib_recurse(5U) == 8U);
+

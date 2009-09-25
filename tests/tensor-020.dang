@@ -1,0 +1,8 @@
+// PURPOSE: non-constant tensor init
+
+function foo( : int) return 42;
+
+var z = [ (foo()) (foo()) ];
+//system.println("z=$z");
+
+assert(z == [42 42]);

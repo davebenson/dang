@@ -1,0 +1,13 @@
+// PURPOSE: test duplicate label (not allowed)
+
+{
+
+{
+a:
+}
+
+{
+a:
+}
+
+}

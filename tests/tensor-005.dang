@@ -1,0 +1,10 @@
+// PURPOSE: basic vector tests
+
+{
+  var A = [ 12 3 451 54 3 1 ];
+  var B = grep(A, function x -> x != 3);
+  //system.println("A=$A; B=$B");
+  assert(B == [12 451 54 1]);
+  assert(length(A) == 6U);
+  assert(length(B) == 4U);
+}

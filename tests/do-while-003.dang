@@ -1,0 +1,44 @@
+// PURPOSE:  test jumping based on globals and pointers (incl NPEs)
+
+object X {
+  new () { }
+  public int x;
+}
+
+{
+  X x = new X();
+  x.x = 5;
+  do { system.println("${x.x*2}"); x.x--; } while (x.x);
+}
+
+
+{
+  X x = new X();
+  x.x = 5;
+  while (x.x) { system.println("${x.x*2}"); x.x--; }
+}
+
+
+var q = 5;
+do { system.println("${q*2}"); q--; } while (q);
+q=5;
+while (q) { system.println("${q*2}"); q--; }
+
+// Null-pointer exception tests.
+boolean failed;
+try {
+  X x;
+  do { } while (x.x);
+} catch (error e) {
+  failed = true;
+}
+assert(failed);
+
+failed = false;
+try {
+  X x;
+  while (x.x) { } 
+} catch (error e) {
+  failed = true;
+}
+assert(failed);

@@ -1,0 +1,11 @@
+// PURPOSE: Not allowed to put "&" on input parameters.
+
+
+function foo(int x) { system.println("hi $x"); }
+{ int xyz = 42;
+  
+  // not allowed &
+  foo(&xyz);
+}
+
+

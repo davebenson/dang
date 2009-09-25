@@ -1,0 +1,5 @@
+// PURPOSE: test pulling variables into closures, new_tensor
+
+for (uint i = 0U; i < 10U; i++)
+  system.println("i=${new_tensor(10U, function j -> i*j)}");
+

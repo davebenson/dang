@@ -1,0 +1,19 @@
+
+{
+  var f = new file.File write("tmp.foo.txt");
+  for (int i = 0; i < 10; i++) f.writeln("$i");
+  f.close();
+  f.close();		// don't crash
+}
+
+{
+  var f = new file.File read("tmp.foo.txt");
+  for (int i = 0; i < 10; i++)
+    {
+      var r = f.readln();
+      assert(r == "$i");
+    }
+  f.close();
+}
+
+file.unlink("tmp.foo.txt");

@@ -1,0 +1,27 @@
+// PURPOSE: test goto statement
+
+// a,d,c,b,e
+{
+
+label0:
+
+int i = 10;
+system.println("a");
+goto label3;
+
+label1:
+system.println("b");
+goto label4;
+
+label2:
+system.println("c");
+goto label1;
+
+label3:
+system.println("d");
+goto label2;
+
+label4:
+system.println("e");
+
+}

@@ -1,0 +1,119 @@
+// PURPOSE: test assignments between globals and objects
+
+object X {
+  new() { }
+  public int z;
+  public string zz;
+}
+
+object Y : X
+{
+  new() { }
+}
+
+var int g = 42;
+var string gg = "hi mom";
+
+{
+  X x = new X();
+  assert(x.z==0);
+  assert(g == 42);
+  g = x.z;
+  int zz = 12;
+  assert(g == 0);
+  assert(zz == 12);
+  g = zz;
+  assert(g == 12);
+  x.z = g;
+  assert(x.z == 12);
+  x.zz = gg;
+  assert(x.zz == "hi mom");
+  assert(gg == "hi mom");
+  x.zz = x.zz + gg;
+  assert(x.zz == "hi momhi mom");
+
+  int q = x.z;
+  assert(q == 12);
+
+  gg = x.zz;
+  assert(gg == "hi momhi mom");
+
+  X xxx;
+  var failed = false;
+  try { xxx.zz = "hi"; } catch (error e) { failed = true; }
+  assert(failed);
+  failed = false;
+  try { xxx.z = 11; } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { var unused = xxx.zz; } catch (error e) { failed = true; }
+  assert(failed);
+  failed = false;
+  try { var unused = xxx.z; } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { x.zz = xxx.zz; } catch (error e) { failed = true; }
+  assert(failed);
+  failed = false;
+  try { x.z = xxx.z; } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { xxx.zz = x.zz; } catch (error e) { failed = true; }
+  assert(failed);
+  failed = false;
+  try { xxx.z = x.z; } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { xxx.zz = gg; } catch (error e) { failed = true; }
+  assert(failed);
+  failed = false;
+  try { xxx.z = g; } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { gg = xxx.zz; } catch (error e) { failed = true; }
+  assert(failed);
+  failed = false;
+  try { g = xxx.z; } catch (error e) { failed = true; }
+  assert(failed);
+
+}
+
+
+
+
+function foo(int q : int) { return q * q + q; }
+function foo2(out int q, int r) { q = r; }
+function foo3(inout int q, int r) { q += r; }
+
+{
+  X yy = new X();
+
+  assert(foo(yy.z) == 0);
+  foo2(&yy.z, 16);
+  assert(yy.z == 16);
+  foo3(&yy.z, 12);
+  assert(yy.z == 28);
+
+}
+
+
+function goo(string q : string) { return q + "R" + q; }
+function goo2(out string q, string r) { q = r; }
+function goo3(inout string q, string r) { q =  q + "P" + r; }
+
+{
+  Y yy = new Y();
+  yy.zz = "hi";
+  assert(goo(yy.zz) == "hiRhi");
+  goo2(&yy.zz, "mom");
+  assert(yy.zz == "mom");
+  goo3(&yy.zz, "hi");
+  assert(yy.zz == "momPhi");
+
+}
+

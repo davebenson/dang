@@ -1,0 +1,11 @@
+// PURPOSE: more testing of untyped functions
+
+function test_int_apply(int a, int b, function<int, int : int> f, int res)
+{
+  system.println("$a $b ${f(a,b)}");
+  assert(f(a,b) == res);
+}
+
+test_int_apply(1, 1, function x y -> x * y, 1);
+test_int_apply(5, 3, function x y -> x / y, 1);
+test_int_apply(100, 3, function x y -> x / y, 33);

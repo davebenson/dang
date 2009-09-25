@@ -1,0 +1,23 @@
+// PURPOSE: function call basics.
+
+function foo (int x : int) { return x*x; }
+function foo2 (int x, int y : int) { return x*y+y; }
+
+assert(foo(1) == 1);
+assert(foo(2) == 4);
+assert(foo(3) == 9);
+{ for (int i = 0; i < 10; i++) assert (i*i == foo(i)); }
+
+{int q = 11;
+  assert(foo(q) == 121);
+  assert("${foo(q)}" == "121");}
+
+
+assert(foo2(3,4)==16);
+assert(foo2(1,0)==0);
+assert(16==foo2(3,4));
+assert(foo2(1,2)==4);
+assert(foo2(2,3)==9);
+assert(foo2(foo2(1,2),foo2(2,3)) == foo2(4,9));
+assert(foo2(foo2(1,2),foo2(2,3)) == 4 * 9 + 9);
+assert(foo2(foo2(1,2),foo2(2,3)) == 45);

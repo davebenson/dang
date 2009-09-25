@@ -1,0 +1,4 @@
+
+function foo(%%b a)
+{ %%a a; }
+

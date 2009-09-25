@@ -1,0 +1,41 @@
+
+function c1(string s, int i : string)
+{
+  return "$s$i";
+}
+
+var x = 3;
+var s = "hi";
+assert(c1(s,x) == "hi3");
+assert(c1(s,x+5) == "hi8");
+
+{
+  var q = s;
+  assert(q == "hi");
+  var r = x;
+  assert(r==3);
+}
+
+function c2(inout string s)
+{
+  s = "$s+$s";
+}
+
+c2(&s);
+assert(s == "hi+hi");
+c2(&s);
+assert(s == "hi+hi+hi+hi");
+
+function c3(inout int i)
+{
+  i *= 2;
+  i += 3;
+}
+
+assert(x==3);
+c3(&x);
+assert(x==9);
+c3(&x);
+assert(x==21);
+c3(&x);
+assert(x==45);

@@ -1,0 +1,10 @@
+// PURPOSE: test inferring type from a user function
+
+function foo(function<int : int> f, int x)
+{
+  system.println("${f(x)}");
+}
+
+
+foo(function z -> 2*z, 4);
+  

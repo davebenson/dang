@@ -1,0 +1,25 @@
+// PURPOSE: more testing of <> (aka operator_concat)
+
+var A = [ 1 2 3 ];
+var B = [ 3 4 5 ];
+vector<int> C = operator_concat(A,B);
+assert(C == [1 2 3 3 4 5]);
+
+var A0 = [ 1 2 3 ];
+var B0 = [ 3 4 5 ];
+var C0 = operator_concat(A0,B);
+assert(C0 == [1 2 3 3 4 5]);
+
+
+var A1 = [ 1 2 3 ];
+var C1 = operator_concat(A,1);
+assert(C1 == [1 2 3 1]);
+
+
+var A2 = [ 1 2 3 ];
+var C2 = operator_concat(1,A);
+assert(C2 == [1 1 2 3]);
+
+var C3 = operator_concat([[1 2] [3 4] [5 6]], [[7 8] [9 10]]);
+assert(C3 == [[1 2] [3 4] [5 6] [7 8] [9 10]]);
+

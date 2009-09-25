@@ -1,0 +1,7 @@
+
+
+{
+  int z = 5;
+  do { system.println("${z*2}"); z--; } while (z);
+}
+

@@ -1,0 +1,19 @@
+// PURPOSE: test constructors
+
+object X {
+  new foo(int i) {
+    this.i = i * 2;
+  }
+  new(int i) {
+    this.i = i;
+  }
+
+  public int i;
+}
+
+{
+  X x = new X foo(8);
+  assert (x.i == 16);
+  x = new X(8);
+  assert (x.i == 8);
+}

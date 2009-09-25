@@ -1,0 +1,2 @@
+// PURPOSE: this number is too negative to be an int64 even.
+-0x8000000000000000;
