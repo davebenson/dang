@@ -1,0 +1,15 @@
+// PURPOSE: test simple do-while loop construct
+
+var z = 32;
+
+{
+  int i = 3;
+  do
+  {
+    var s = "foo";
+    i++;
+    z--;
+  }
+  while (z);
+  assert (i == 35);
+}

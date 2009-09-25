@@ -1,0 +1,55 @@
+// PURPOSE: various null-pointer tests
+
+object X { public int x; }
+
+var X xx;
+
+var failed = false;
+try { xx.x = 1; } catch (error e) { failed = true; }
+assert(failed);
+
+failed = false;
+try { system.println ("${xx.x == 1}"); } catch (error e) { failed = true; }
+assert(failed);
+
+{
+  int i = 42;
+  X yy;
+
+  failed = false;
+  try { xx.x = i; } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { i = xx.x; } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { yy.x = i; } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { i = yy.x; } catch (error e) { failed = true; }
+  assert(failed);
+}
+
+function foo(int q : int) { return q * q + q; }
+function foo2(out int q, int r) { q = r; }
+function foo3(inout int q, int r) { q += r; }
+
+{
+  X yy;
+
+  failed = false;
+  try { foo(yy.x); } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { foo2(&yy.x, 62); } catch (error e) { failed = true; }
+  assert(failed);
+
+  failed = false;
+  try { foo3(&yy.x, 62); } catch (error e) { failed = true; }
+  assert(failed);
+
+}

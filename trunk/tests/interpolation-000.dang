@@ -1,0 +1,9 @@
+
+{
+var a =321;
+var b = 2;
+var c = 27.0;
+var d = 19;
+var e = "sadffaf";
+system.println("$a $b ${(int)c} $d $e");
+}

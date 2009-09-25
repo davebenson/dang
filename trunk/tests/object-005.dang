@@ -1,0 +1,15 @@
+// PURPOSE: test that protected methods can be called from subclasses
+
+object X {
+  new() { }
+  protected method foo(int x) { }
+}
+object Y : X{
+  new() { }
+  public method foo2(int x) { this.foo(x); }
+}
+
+{
+  Y y = new Y();
+  y.foo2(42);
+}

@@ -1,0 +1,10 @@
+// PURPOSE: ensure unbound variable isn't allowed in untyped function
+
+function foo(function<int : int> f, int x)
+{
+  system.println("f(x)");
+}
+
+
+foo(function z -> 2*x, 4.0);
+  

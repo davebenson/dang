@@ -1,0 +1,4 @@
+// PURPOSE: you cannot define the same function twice
+
+function foo(int x) { system.println("x"); }
+function foo(int x) { system.println("x"); }

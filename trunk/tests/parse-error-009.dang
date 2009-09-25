@@ -1,0 +1,14 @@
+// PURPOSE: Test that 'in' parameters cannot be modified by the called function
+
+function foo(in string x)
+{
+  x = "$x$x$x";
+}
+
+{
+  var x = "xy";
+  foo(x);
+  assert(x=="xy");
+  foo(x);
+  assert(x=="xy");
+}

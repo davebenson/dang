@@ -1,0 +1,44 @@
+// PURPOSE: objects containing objects, and global objects
+
+object X {
+  new () { }
+  public int foo;
+  public string bar;
+}
+
+object Y
+{
+  new () { }
+  public X x;
+  public int c;
+}
+
+{
+  var y = new Y();
+  y.x = new X();
+  assert(y.x.foo == 0);
+  y.x.foo = 42;
+  assert(y.x.foo == 42);
+  y.x.bar = "hi";
+  assert(y.x.bar == "hi");
+}
+
+// same test, global objects
+var y = new Y();
+y.x = new X();
+assert(y.x.foo == 0);
+y.x.foo = 42;
+assert(y.x.foo == 42);
+y.x.bar = "hi";
+assert(y.x.bar == "hi");
+
+
+{
+  var y1 = new Y();
+  var y2 = new Y();
+  y1.x = new X();
+  y2.x = y1.x;
+  y1.c = 444;
+  y2.c = y1.c;
+  assert(y2.c == 444);
+}

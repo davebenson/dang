@@ -1,0 +1,3 @@
+// PURPOSE: test empty for-loop init.
+
+{ uint i = 1U; for ( ; i != 64U; i = i * 2U) system.println("$i"); }

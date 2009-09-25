@@ -1,0 +1,14 @@
+// PURPOSE: test to_string function for various basic types
+
+assert(to_string(42T) == "42");
+assert(to_string(42UT) == "42");
+assert(to_string(42S) == "42");
+assert(to_string(42US) == "42");
+assert(to_string(42I) == "42");
+assert(to_string(42UI) == "42");
+assert(to_string(42L) == "42");
+assert(to_string(42UL) == "42");
+assert(to_string("42") == "42");
+assert(to_string('h') == "h");
+assert(to_string(42.) == "42.000000000");	/* ugh, not acceptable */
+assert(to_string(42F) == "42.000000");	/* ugh, not acceptable */

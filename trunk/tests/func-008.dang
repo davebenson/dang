@@ -1,0 +1,13 @@
+// PURPOSE: test functions that are simple expressions
+
+
+function foo(int a : int) a*2;
+assert(foo(0) == 0);
+assert(foo(42) == 84);
+assert(foo(420) == 840);
+
+function foo(string a : int) foo((int)length(a));
+assert(foo("") == 0);
+assert(foo("hi") == 4);
+assert(foo("hihihi") == 12);
+assert(foo("abcdefghijklmnopqrstuvwxyz") == 52);

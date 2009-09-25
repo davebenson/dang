@@ -1,0 +1,11 @@
+// PURPOSE: ensure private methods cannot be called from outside
+
+object X {
+  new() { }
+  private method foo(int x) { system.println("x"); }
+}
+
+{
+  X x = new X();
+  x.foo(42);		// ERROR: accessing private method
+}

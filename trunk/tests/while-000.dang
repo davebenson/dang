@@ -1,0 +1,10 @@
+// PURPOSE: test while-loop
+
+{
+  int i = 3;
+  while (i < 100)
+  {
+    system.println("$i");
+    i = i * 4;
+  }
+}

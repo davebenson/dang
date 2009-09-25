@@ -1,0 +1,20 @@
+// PURPOSE: test that derived classes can access protected members.
+
+object X {
+  new() { }
+  protected int x;
+}
+object Y : X{
+  new() { }
+  public method foo2(int x) { this.x = 1; }
+  public method foo3(int x) { assert(this.x == 1); }
+}
+
+{
+  Y y = new Y();
+  int failed = 0;
+  try { y.foo3(42); } catch (error x) { failed = 1; }
+  assert(failed == 1);
+  y.foo2(42);
+  y.foo3(42);
+}

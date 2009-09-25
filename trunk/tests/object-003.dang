@@ -1,0 +1,30 @@
+// PURPOSE: overloaded and overridden virtual functions
+
+object A {
+  new() { }
+  public method foo(:string) { return "AAA"; }
+}
+object B : A {
+  new() { }
+  public method foo(:string) { return "BBB"; }
+  public method foo(int z:string) { return "BBB$z"; }
+}
+object C : B {
+  new() { }
+  public method foo(:string) { return "CCC"; }
+}
+
+{
+  A a = new A();
+  assert(a.foo() == "AAA");
+  a = new B();
+  assert(a.foo() == "BBB");
+  a = new C();
+  assert(a.foo() == "CCC");
+  B b = new B();
+  assert(b.foo() == "BBB");
+  assert(b.foo(12345) == "BBB12345");
+  b = new C();
+  assert(b.foo() == "CCC");
+  assert(b.foo(12345) == "BBB12345");
+}

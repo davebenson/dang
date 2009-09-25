@@ -1,0 +1,7 @@
+// PURPOSE: test global variables
+
+var foo = 42;
+
+assert(foo == 42);
+foo++;
+assert(foo == 43);

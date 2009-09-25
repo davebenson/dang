@@ -1,0 +1,15 @@
+// PURPOSE: if-then-else statements.
+function digit(uint n : string)
+{
+  if (n == 0U) return "zero";
+  else if (n == 1U) return "one";
+  else if (n == 2U) return "two";
+  else if (n == 3U) return "three";
+  else return "some other number";
+}
+
+assert(digit(0U) == "zero");
+assert(digit(1U) == "one");
+assert(digit(2U) == "two");
+assert(digit(3U) == "three");
+assert(digit(4U) == "some other number");

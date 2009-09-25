@@ -1,0 +1,32 @@
+// PURPOSE: test indexing tensors
+
+function set_int(inout matrix<int> v, int row, int col, int value)
+{
+  v[row,col] = value;
+}
+
+function set_int2(inout int v, int a)
+{
+  v = a;
+}
+
+{
+var a = [[1 2 3] [3 4 5]];
+//system.println("init=$a");
+a[1,1] = 6;
+//system.println("after assign: $a");
+assert(a == [[1 2 3] [3 6 5]]);
+assert(a[0,0] == 1);
+assert(a[0,1] == 2);
+assert(a[0,2] == 3);
+assert(a[1,0] == 3);
+assert(a[1,1] == 6);
+assert(a[1,2] == 5);
+//system.println("before set_int 0 2 666: $a");
+set_int(&a, 0, 2, 666);
+//system.println("after set_int: $a");
+assert(a == [[1 2 666] [3 6 5]]);
+set_int2(&a[1,1], 42);
+//system.println("after set_int2: $a");
+assert(a == [[1 2 666] [3 42 5]]);
+}

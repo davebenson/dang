@@ -1,0 +1,7 @@
+// PURPOSE: test function inference from user-prototype
+
+function test_int_apply(int a, int b, function<int, int : int> f, int res)
+  assert (f(a,b) == res);
+
+test_int_apply(1, 1, operator_add, 2);
+test_int_apply(5, 3, operator_mod, 2);

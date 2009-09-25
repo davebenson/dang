@@ -1,0 +1,6 @@
+// PURPOSE: test elementary casting operators
+
+assert(1U == (uint)1);
+assert(1UL == (ulong)(long)1);
+assert(1UL == (ulong)1F);
+

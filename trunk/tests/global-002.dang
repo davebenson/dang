@@ -1,0 +1,20 @@
+
+struct X
+{
+  int z;
+  int y;
+  string zz;
+}
+
+function to_string(X v : string)
+{
+  return "${v.z}, ${v.y}, ${v.zz}";
+}
+
+X xxxx;
+
+xxxx.z = 42;
+xxxx.y = 123123;
+xxxx.zz = "hi";
+assert(to_string(xxxx) == "42, 123123, hi");
+

@@ -1,0 +1,11 @@
+// PURPOSE: test that a value may only be given once in a struct constructor
+
+struct  X
+{
+  int x;
+}
+
+{
+  var x = X(x -> 0, x -> 0);
+}
+

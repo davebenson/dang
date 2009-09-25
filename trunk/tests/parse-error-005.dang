@@ -1,0 +1,15 @@
+// PURPOSE: ensure private members cannot be accessed from subclasses.
+
+object X {
+  new() { }
+  private int x;
+}
+object Y : X{
+  new() { }
+  public method foo2(int x) { this.x = 1; }
+}
+
+{
+  Y y = new Y();
+  y.foo2(42);
+}

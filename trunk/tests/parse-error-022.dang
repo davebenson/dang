@@ -1,0 +1,8 @@
+// PURPOSE: test label-not-found error
+
+{
+
+a:
+  goto b;
+
+}

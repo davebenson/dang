@@ -1,0 +1,21 @@
+// PURPOSE: string <-> vector<char> conversion
+
+
+var a = (vector<char>) "hi mom";
+assert(length(a) == 6U);
+assert(a[0] == 'h');
+assert(a[1] == 'i');
+assert(a[2] == ' ');
+assert(a[3] == 'm');
+assert(a[4] == 'o');
+assert(a[5] == 'm');
+var s = (string) a;
+assert(s == "hi mom");
+a[2] = 'Q';
+s = (string) a;
+assert(s == "hiQmom");
+
+// test octal
+assert('A' == '\101');
+assert('\15' == '\r');
+

@@ -1,0 +1,4 @@
+
+var a = [[1 2 3] [9 8 7] [3 4 1]];
+//system.println("${box_form(a)}");
+assert (box_form(a) == "1 2 3\n9 8 7\n3 4 1\n");

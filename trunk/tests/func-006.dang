@@ -1,0 +1,19 @@
+// PURPOSE: test inout parameter passing.
+
+function foo(inout int x)
+{
+  x = x * 2;
+}
+
+{
+  int x = 1;
+  foo(&x);
+  assert(x==2);
+  foo(&x);
+  assert(x==4);
+  foo(&x);
+  assert(x==8);
+  foo(&x);
+  assert(x==16);
+}
+

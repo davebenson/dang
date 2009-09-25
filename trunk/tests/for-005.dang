@@ -1,0 +1,7 @@
+// PURPOSE: test continue from within for-loop
+
+for (var i = 0U; i < 10U; i++) {
+  system.println("$i");
+  if (i == 3U) continue;
+  system.println("a");
+}

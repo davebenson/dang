@@ -1,0 +1,2 @@
+// PURPOSE: verify that assertion failure really cause the program to exit.
+assert(1==2);

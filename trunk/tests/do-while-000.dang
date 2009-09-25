@@ -1,0 +1,11 @@
+// PURPOSE: test simple do-while loop construct
+
+{
+  int i = 3;
+  do
+  {
+    i = i * 4;
+    system.println("$i");
+  }
+  while (i < 100);
+}

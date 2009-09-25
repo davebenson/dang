@@ -1,0 +1,6 @@
+// PURPOSE: ensure that structure members have unique names
+
+struct ZZ {
+  int x;
+  string x;
+}

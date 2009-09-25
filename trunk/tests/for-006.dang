@@ -1,0 +1,9 @@
+// PURPOSE: test 'break' from within for-loop that has a variable needing destruction
+
+
+string Z;
+for (var i = 0U; i < 10U; i++) {
+  string s = "$i-$i";
+  if (i == 3U) break;
+  Z = s;
+}

@@ -1,0 +1,5 @@
+// PURPOSE: test ?: operator
+
+assert(((3 < 4) ? 3 : 4) == 3);
+assert(((3 > 4) ? 3 : 4) == 4);
+assert(((3 == 4) ? 3 : 4) == 4);

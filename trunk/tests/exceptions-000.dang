@@ -1,0 +1,13 @@
+// PURPOSE: test trivial exception handling.
+
+function test_try_1( : string)
+{
+  try {
+    system.abort("uh");
+    return "a";
+  } catch (error x) {
+    return "b";
+  }
+}
+
+assert(test_try_1() == "b");

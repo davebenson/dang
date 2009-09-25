@@ -1,0 +1,12 @@
+// PURPOSE: test that private functions can be called from methods.
+
+object X {
+  new() { }
+  private method foo(int x) { }
+  public method foo2(int x) { this.foo(x); }
+}
+
+{
+  X x = new X();
+  x.foo2(42);
+}

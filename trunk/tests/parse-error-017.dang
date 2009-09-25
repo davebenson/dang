@@ -1,0 +1,13 @@
+// PURPOSE: cannot write a readonly member
+
+object OOO {
+  new() { }
+  readonly int x;
+}
+
+var z = new OOO();
+z.x = 0;
+
+
+
+

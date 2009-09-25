@@ -1,0 +1,7 @@
+// PURPOSE: test 'return' syntax for untyped-functions
+
+var xyz = map([1 2 3 4], function q -> {
+                                 if (q == 3) return 66;
+				 else return q;
+		           });
+assert(xyz == [1 2 66 4]);

@@ -1,0 +1,12 @@
+// PURPOSE: test map
+
+assert(map([0 1 2], function q -> "$q") == ["0" "1" "2"]);
+assert(map([0 1 2], [3 5 9], function q r -> q*r) == [0 5 18]);
+
+var failed = false;
+try { map([0 1 2], [1 2], function q r -> q*r); } catch (error e) { failed = true; }
+assert(failed);
+
+failed = false;
+try { map(["a" "" "b"], function q -> "${1U/length(q)}"); } catch (error e) { failed = true; }
+assert(failed);

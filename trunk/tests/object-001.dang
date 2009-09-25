@@ -1,0 +1,21 @@
+// PURPOSE: test method chaining
+
+object X {
+  new(int i) {
+    this.i = i;
+  }
+
+  public method xyz(int a : int) { return this.i + a; }
+  public method xyzxyz(int a, int b : int) { return this.xyz(a) + this.xyz(b); }
+
+  public int i;
+}
+
+{
+  X x = new X(8);
+  assert (x.i == 8);
+  assert(x.xyz(1) == 9);
+  assert(x.xyz(2) == 10);
+  assert(x.xyz(1) + x.xyz(2) == 19);
+  assert(x.xyzxyz(1, 2) == 19);
+}

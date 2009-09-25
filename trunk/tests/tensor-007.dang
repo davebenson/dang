@@ -1,0 +1,21 @@
+// PURPOSE: integer scalar multiple and addition
+
+{
+var A = [[1 2] [3 4]];
+var B = A * A;
+assert(B == [[7 10] [15 22]]);
+//system.println("A=$A; A*4=${A * 4}");
+assert(A * 4 == [[4 8] [12 16]]);
+assert(4 * A == [[4 8] [12 16]]);
+//system.println("A=$A; B=$B; A-B=${A-B}");
+assert(B - A == [[6 8] [12 18]]);
+//system.println("A=$A; B=$B; A+B=${A+B}");
+assert(B + A == [[8 12] [18 26]]);
+}
+
+assert([[[ 1  2] [ 3  4]]
+        [[ 5  6] [ 7  8]]
+        [[ 9 10] [11 12]]] * 3 == [[[ 3  6] [ 9 12]]
+                                   [[15 18] [21 24]]
+                                   [[27 30] [33 36]]]);
+

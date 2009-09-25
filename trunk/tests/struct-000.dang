@@ -1,0 +1,19 @@
+// PURPOSE: struct basics
+
+struct X
+{
+  int y;
+  int z;
+}
+
+function to_string(X x : string)
+{
+  return "y=${x.y}; z=${x.z}";
+}
+
+{
+  X x;
+  x.y = 34;
+  x.z = 111;
+  assert("$x" == "y=34; z=111");
+}

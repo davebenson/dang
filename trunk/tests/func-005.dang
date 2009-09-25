@@ -1,0 +1,30 @@
+// PURPOSE: test that closure sucks local values in
+
+function mk_adder(int a : function<int : int>)
+  return function(int b : int) a + b;
+
+{
+  var f = mk_adder(10);
+  //system.println("f(1)=${f(1)}");
+  assert(f(1) == 11);
+  assert(f(10) == 20);
+  assert(f(100) == 110);
+  f = mk_adder(100);
+  assert(f(1) == 101);
+  assert(f(100) == 200);
+}
+
+// TODO: fix the parser to allow this
+///////////////function mk_adder2(int a : function<int : int>)
+///////////////  return function(int b : int) { return a + b; }
+///////////////{
+///////////////  var f = mk_adder2(10);
+///////////////  //system.println("f(1)=${f(1)}");
+///////////////  assert(f(1) == 11);
+///////////////  assert(f(10) == 20);
+///////////////  assert(f(100) == 110);
+///////////////  f = mk_adder2(100);
+///////////////  assert(f(1) == 101);
+///////////////  assert(f(100) == 200);
+///////////////}
+///////////////

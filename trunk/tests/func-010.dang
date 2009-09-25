@@ -1,0 +1,4 @@
+// PURPOSE: test closures that use grouped-statements + return.
+
+var q = map([10 12 14], function(int a : string) { return "$a-$a"; });
+system.println("$q");

@@ -1,0 +1,19 @@
+// PURPOSE: test overriding virtual functions
+
+object X {
+  new () { }
+  public method foo(int a : int) { return a * 2; }
+}
+
+object Y : X {
+  new () { }
+  public method foo(int a : int) { return a * 3; }
+}
+
+{
+  X x = new X();
+  assert(x.foo(42) == 84);
+  x = new Y();
+  //system.println("${x.foo(42)}");
+  assert(x.foo(42) == 126);
+}

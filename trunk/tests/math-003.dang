@@ -1,0 +1,16 @@
+// PURPOSE: test vector stats
+
+//system.println("${average([1 2 3])}");
+//system.println("${min([1 2 3])}");
+//system.println("${max([1 2 3])}");
+//system.println("${product([1 2 3 4])}");
+
+assert(sum([1 2 3]) == 6);
+assert(average([1 2 3]) == 2);
+assert(min([1 2 3]) == 1);
+assert(max([1 2 3]) == 3);
+assert(product([1 2 3]) == 6);
+
+assert(map(rows([[1 2 3] [3 4 5]]), function x -> average(x)) == [2 4]);
+//system.println("${map(cols([[1 2 3] [3 4 5]]), function x -> sum(x))}");
+assert(map(cols([[1 2 3] [3 4 5]]), function x -> sum(x)) == [4 6 8]);

@@ -1,0 +1,26 @@
+
+assert (0x10 == 16);
+assert (010 == 8);
+assert (0100 == 64);
+assert (0xff == 255);
+assert (0xFF == 255);
+assert (1. == 1.0);
+assert (1.F == (float)1.0);
+
+assert (1000000000 == 999999999 + 1);
+assert (10000000000000 == 9999999999999 + 1L);
+
+assert (1e0 == 1.0);
+assert (1e1 == 10.0);
+assert (1e2 == 100.0);
+assert (1e2 == 100.);
+assert (1e2 == 100.000D);
+
+assert (55T == (tiny) 55);
+assert (55UT == (utiny) 55);
+assert (55S == (short) 55);
+assert (55US == (ushort) 55);
+assert (55I == (int) 55);
+assert (55UI == (uint) 55);
+assert (55L == (long) 55);
+assert (55UL == (ulong) 55);

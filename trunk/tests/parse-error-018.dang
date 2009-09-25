@@ -1,0 +1,15 @@
+// PURPOSE: cannot override a final method
+
+
+object X
+{
+  final public method xyz(int i) { }
+}
+
+
+object Y : X
+{
+  public method xyz(int i) { }
+}
+
+

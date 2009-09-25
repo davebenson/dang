@@ -1,0 +1,17 @@
+// PURPOSE: test inout parameters that require destruction
+
+function foo(inout string x)
+{
+  x = "$x$x$x";
+}
+
+{
+  var x = "xy";
+  foo(&x);
+  assert(x=="xyxyxy");
+  foo(&x);
+  assert(x=="xyxyxyxyxyxyxyxyxy");
+  foo(&x);
+  assert(x=="xyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxyxy");
+}
+

@@ -1,0 +1,41 @@
+// PURPOSE: test <> and <>= (on vectors and matrices)
+
+{
+var a = [1 2 3];
+a <>= 62;
+assert(a == [1 2 3 62]);
+}
+
+
+{
+var a = [1 2 3];
+a <>= [3 4 5 6];
+assert(a == [1 2 3 3 4 5 6]);
+}
+
+{
+var a = ["hi" "mom" "2"];
+a <>= "thirty";
+assert(a == ["hi" "mom" "2" "thirty"]);
+}
+
+
+{
+var a = [[1 2] [3 4] [5 6]];
+a <>= [7 8];
+assert(a == [[1 2] [3 4] [5 6] [7 8]]);
+a <>= [[9 10] [11 12]];
+assert(a == [[1 2] [3 4] [5 6] [7 8] [9 10] [11 12]]);
+}
+
+{
+assert([1 2] <> [3 4] == [1 2 3 4]);
+}
+
+{
+var a = [["hi" "mom"] ["why" "is"]];
+a <>= ["the" "sky"];
+a <>= [["blue" "?"]];
+assert(a == [["hi" "mom"] ["why" "is"] ["the" "sky"] ["blue" "?"]]);
+}
+

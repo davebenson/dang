@@ -1,0 +1,158 @@
+
+/* Test casts from tiny-int */
+{
+  assert((tiny)  42T == 42T);
+  assert((utiny) 42T == 42UT);
+  assert((short) 42T == 42S);
+  assert((ushort)42T == 42US);
+  assert((int)   42T == 42I);
+  assert((uint)  42T == 42UI);
+  assert((long)  42T == 42L);
+  assert((ulong) 42T == 42UL);
+  assert((float) 42T == 42F);
+  assert((double)42T == 42D);
+  assert((char)  42T == '*');
+}
+/* Test casts from unsigned tiny-int */
+{
+  assert((tiny)  42UT == 42T);
+  assert((utiny) 42UT == 42UT);
+  assert((short) 42UT == 42S);
+  assert((ushort)42UT == 42US);
+  assert((int)   42UT == 42I);
+  assert((uint)  42UT == 42UI);
+  assert((long)  42UT == 42L);
+  assert((ulong) 42UT == 42UL);
+  assert((float) 42UT == 42F);
+  assert((double)42UT == 42D);
+  assert((char)  42UT == '*');
+}
+
+/* Test casts from short-int */
+{
+  assert((tiny)  42S == 42T);
+  assert((utiny) 42S == 42UT);
+  assert((short) 42S == 42S);
+  assert((ushort)42S == 42US);
+  assert((int)   42S == 42I);
+  assert((uint)  42S == 42UI);
+  assert((long)  42S == 42L);
+  assert((ulong) 42S == 42UL);
+  assert((float) 42S == 42F);
+  assert((double)42S == 42D);
+  assert((char)  42S == '*');
+}
+/* Test casts from unsigned short-int */
+{
+  assert((tiny)  42US == 42T);
+  assert((utiny) 42US == 42UT);
+  assert((short) 42US == 42S);
+  assert((ushort)42US == 42US);
+  assert((int)   42US == 42I);
+  assert((uint)  42US == 42UI);
+  assert((long)  42US == 42L);
+  assert((ulong) 42US == 42UL);
+  assert((float) 42US == 42F);
+  assert((double)42US == 42D);
+  assert((char)  42US == '*');
+}
+
+/* Test casts from int */
+{
+  assert((tiny)  42I == 42T);
+  assert((utiny) 42I == 42UT);
+  assert((short) 42I == 42S);
+  assert((ushort)42I == 42US);
+  assert((int)   42I == 42I);
+  assert((uint)  42I == 42UI);
+  assert((long)  42I == 42L);
+  assert((ulong) 42I == 42UL);
+  assert((float) 42I == 42F);
+  assert((double)42I == 42D);
+  assert((char)  42I == '*');
+}
+/* Test casts from unsigned int */
+{
+  assert((tiny)  42UI == 42T);
+  assert((utiny) 42UI == 42UT);
+  assert((short) 42UI == 42S);
+  assert((ushort)42UI == 42US);
+  assert((int)   42UI == 42I);
+  assert((uint)  42UI == 42UI);
+  assert((long)  42UI == 42L);
+  assert((ulong) 42UI == 42UL);
+  assert((float) 42UI == 42F);
+  assert((double)42UI == 42D);
+  assert((char)  42UI == '*');
+}
+
+/* Test casts from long */
+{
+  assert((tiny)  42L == 42T);
+  assert((utiny) 42L == 42UT);
+  assert((short) 42L == 42S);
+  assert((ushort)42L == 42US);
+  assert((int)   42L == 42I);
+  assert((uint)  42L == 42UI);
+  assert((long)  42L == 42L);
+  assert((ulong) 42L == 42UL);
+  assert((float) 42L == 42F);
+  assert((double)42L == 42D);
+  assert((char)  42L == '*');
+}
+/* Test casts from unsigned long-int */
+{
+  assert((tiny)  42UL == 42T);
+  assert((utiny) 42UL == 42UT);
+  assert((short) 42UL == 42S);
+  assert((ushort)42UL == 42US);
+  assert((int)   42UL == 42I);
+  assert((uint)  42UL == 42UI);
+  assert((long)  42UL == 42L);
+  assert((ulong) 42UL == 42UL);
+  assert((float) 42UL == 42F);
+  assert((double)42UL == 42D);
+  assert((char)  42UL == '*');
+}
+/* Test casts from float */
+{
+  assert((tiny)  42F == 42T);
+  assert((utiny) 42F == 42UT);
+  assert((short) 42F == 42S);
+  assert((ushort)42F == 42US);
+  assert((int)   42F == 42I);
+  assert((uint)  42F == 42UI);
+  assert((long)  42F == 42L);
+  assert((ulong) 42F == 42UL);
+  assert((float) 42F == 42F);
+  assert((double)42F == 42D);
+  assert((char)  42F == '*');
+}
+/* Test casts from double */
+{
+  assert((tiny)  42. == 42T);
+  assert((utiny) 42. == 42UT);
+  assert((short) 42. == 42S);
+  assert((ushort)42. == 42US);
+  assert((int)   42. == 42I);
+  assert((uint)  42. == 42UI);
+  assert((long)  42. == 42L);
+  assert((ulong) 42. == 42UL);
+  assert((float) 42. == 42F);
+  assert((double)42. == 42D);
+  assert((char)  42. == '*');
+}
+/* Test casts from char */
+{
+  assert((tiny)  '*' == 42T);
+  assert((utiny) '*' == 42UT);
+  assert((short) '*' == 42S);
+  assert((ushort)'*' == 42US);
+  assert((int)   '*' == 42I);
+  assert((uint)  '*' == 42UI);
+  assert((long)  '*' == 42L);
+  assert((ulong) '*' == 42UL);
+  assert((float) '*' == 42F);
+  assert((double)'*' == 42D);
+  assert((char)  '*' == '*');
+}
