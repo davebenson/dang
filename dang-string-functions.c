@@ -20,7 +20,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_n_bytes)
 }
 static DANG_SIMPLE_C_FUNC_DECLARE(do_string_split)
 {
-  DangVector *rv = rv_out;
+  DangVector *rv;
   DangString *delim = *(DangString**)args[0];
   DangString *to_split = *(DangString**)args[1];
   const char *dstr = delim ? delim->str : "";
@@ -93,9 +93,11 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_string_split)
 
     }
   /* construct vector */
+  rv = dang_new (DangVector, 1);
   rv->len = strings.len;
-  rv->alloced = strings.alloced;
   rv->data = strings.data;
+  rv->ref_count = 1;
+  *(DangVector **) rv_out = rv;
   return TRUE;
 }
 static DANG_SIMPLE_C_FUNC_DECLARE(do_string_join)
@@ -131,12 +133,14 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_cast_to_char_array)
     c = dang_utf8_count_unichars (in->len, in->str);
   if (c == 0)
     {
-      out->len = out->alloced = 0;
-      out->data = NULL;
+      *(DangVector **) rv_out = NULL;
       return TRUE;
     }
-  out->len = out->alloced = c;
+  out = dang_new (DangVector, 1);
+  out->ref_count = 1;
+  out->len = c;
   out->data = dang_new (dang_unichar, c);
+  *(DangVector**)rv_out = out;
   dang_utf8_string_to_unichars (in->len, in->str, out->data);
   return TRUE;
 }
