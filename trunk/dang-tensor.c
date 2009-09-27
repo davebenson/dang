@@ -121,6 +121,7 @@ tensor_to_string (DangValueType *type,
       const unsigned *sizes = tensor->sizes;
       const void *elements = tensor->data;
       DangStringBuffer buf = DANG_STRING_BUFFER_INIT;
+      dang_warning ("tensor_to_string: rank=%u", ttype->rank);
       append_tensor_to_string (ttype->element_type, ttype->rank, sizes, &elements, &buf);
       return buf.str;
     }
@@ -352,10 +353,20 @@ to_string__tensor (void      **args,
                    void       *func_data,
                    DangError **error)
 {
-  DangTensor *tensor = args[0];
+  DangTensor *tensor = *(DangTensor**)(args[0]);
   TensorToStringInfo *info = func_data;
   DangStringBuffer buf = DANG_STRING_BUFFER_INIT;
   void *data;
+
+  if (tensor == NULL)
+    {
+      char *rv = dang_alloca (info->rank * 2 + 1);
+      memset (rv, '[', info->rank);
+      memset (rv + info->rank, ']', info->rank);
+      rv[info->rank * 2] = 0;
+      * (DangString **) rv_out = dang_string_new (rv);
+      return TRUE;
+    }
 
   data = tensor->data;
   if (!print_tensor_recursive (info->rank, tensor->sizes, info, &data, &buf, error))
@@ -511,16 +522,33 @@ free_chain_func_data (void *data)
   dang_free (c);
 }
 
+DangTensor *dang_tensor_empty (void)
+{
+  static struct {
+    DangTensor base;
+    unsigned extra_dims[MAX_STANDARD_RANK];
+  } info = {
+    { NULL, 1, {0}, },
+    { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }
+  };
+  return &info.base;
+}
+    
+
 DANG_SIMPLE_C_FUNC_DECLARE(do_tensor_operator_notequal)
 {
   ChainFuncData *f = func_data;
-  const DangTensor *a = args[0];
-  const DangTensor *b = args[1];
+  const DangTensor *a = * (DangTensor **) args[0];
+  const DangTensor *b = * (DangTensor **) args[1];
   unsigned total_size = 1;
   void *values[2];
   unsigned i;
   DangFunction *sub = f->subfunc;
   unsigned elt_size = f->element_type->sizeof_instance;
+  if (a == NULL)
+    a = dang_tensor_empty ();
+  if (b == NULL)
+    b = dang_tensor_empty ();
   for (i = 0; i < f->rank; i++)
     {
       if (a->sizes[i] != b->sizes[i])
@@ -552,13 +580,17 @@ DANG_SIMPLE_C_FUNC_DECLARE(do_tensor_operator_notequal)
 DANG_SIMPLE_C_FUNC_DECLARE(do_tensor_operator_equal)
 {
   ChainFuncData *f = func_data;
-  const DangTensor *a = args[0];
-  const DangTensor *b = args[1];
+  const DangTensor *a = * (DangTensor **) args[0];
+  const DangTensor *b = * (DangTensor **) args[1];
   unsigned total_size = 1;
   void *values[2];
   unsigned i;
   DangFunction *sub = f->subfunc;
   unsigned elt_size = f->element_type->sizeof_instance;
+  if (a == NULL)
+    a = dang_tensor_empty ();
+  if (b == NULL)
+    b = dang_tensor_empty ();
   for (i = 0; i < f->rank; i++)
     {
       if (a->sizes[i] != b->sizes[i])
@@ -640,17 +672,24 @@ variadic_c__operator_equal (DangMatchQuery *query,
 
 static DANG_SIMPLE_C_FUNC_DECLARE (do_tensor_dims)
 {
-  DangVector *rv = (DangVector *) rv_out;
-  DangTensor *in = args[0];
+  DangVector *rv;
+  DangTensor *in = *(DangTensor **) args[0];
   unsigned rank = (unsigned) func_data;
   uint32_t *arr;
   unsigned i;
   DANG_UNUSED (error);
+  rv = dang_new (DangVector, 1);
+  rv->ref_count = 1;
   rv->len = rank;
   arr = dang_new (uint32_t, rank);
   rv->data = arr;
-  for (i = 0; i < rank; i++)
-    arr[i] = in->sizes[i];
+  if (in == NULL)
+    for (i = 0; i < rank; i++)
+      arr[i] = 0;
+  else
+    for (i = 0; i < rank; i++)
+      arr[i] = in->sizes[i];
+  *(DangVector **) rv_out = rv;
   return TRUE;
 }
   
@@ -1752,12 +1791,15 @@ struct _StatFuncInfo
 
 static DANG_SIMPLE_C_FUNC_DECLARE (do_statistic)
 {
-  DangTensor *tensor = args[0];
+  DangTensor *tensor = *(DangTensor**) args[0];
   StatFuncInfo *sfi = func_data;
   unsigned rank = sfi->rank;
-  unsigned N = tensor->sizes[0];
+  unsigned N;
   unsigned i;
   DANG_UNUSED (error);
+  if (tensor == NULL)
+    tensor = dang_tensor_empty ();
+  N = tensor->sizes[0];
   for (i = 1; i < rank; i++)
     N *= tensor->sizes[i];
   if (N == 0 && !sfi->type_info->permits_0_len)

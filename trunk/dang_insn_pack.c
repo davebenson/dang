@@ -1,4 +1,5 @@
 #include <string.h>
+#include "config.h"
 #include "dang.h"
 
 typedef struct _PackedValue PackedValue;
@@ -2451,12 +2452,52 @@ pack__index (DangInsn *insn,
   dang_insn_pack_context_append (context, stepfunc, sd_size, rv, NULL);
 }
 
+static void
+step__new_tensor (void *sd,
+                  DangThreadStackFrame *stack_frame,
+                  DangThread           *thread)
+{
+  unsigned *data = sd;
+  unsigned rank = data[0];
+  unsigned total_size = data[1];
+  unsigned offset = data[2];
+  unsigned *sizes = data + 3;
+  DangTensor **p_tensor = (DangTensor **) ((char*)stack_frame + offset);
+  DangTensor *tensor = dang_malloc (DANG_TENSOR_SIZEOF (rank));
+  DANG_UNUSED (thread);
+  tensor->ref_count = 1;
+  memcpy (tensor->sizes, sizes, sizeof (unsigned) * rank);
+  tensor->data = dang_malloc0 (total_size);
+  *p_tensor = tensor;
+  dang_thread_stack_frame_advance_ip (stack_frame,
+                                      sizeof(unsigned) * (3 + rank));
+}
+
+static void
+pack__new_tensor (DangInsn *insn,
+                  DangInsnPackContext *context)
+{
+  unsigned *rv;
+  unsigned sd_size;
+  unsigned rank = insn->new_tensor.rank;
+  DangStepRun stepfunc;
+  dang_assert (rank >= 1);
+  sd_size = sizeof (unsigned) * (3 + rank);
+  rv = dang_alloca (sd_size);
+  rv[0] = rank;
+  rv[1] = insn->new_tensor.total_size;
+  rv[2] = context->vars[insn->new_tensor.target].offset;
+  memcpy (rv + 3, insn->new_tensor.dims, sizeof (unsigned) * rank);
+  stepfunc = step__new_tensor;
+  dang_insn_pack_context_append (context, stepfunc, sd_size, rv, NULL);
+}
+
 typedef void (*PackFunc) (DangInsn *insn,
                           DangInsnPackContext *context);
 
 
 /* NOTE: must match DangInsnType exactly */
-static PackFunc pack_funcs[12] = 
+static PackFunc pack_funcs[13] = 
 {
   pack__init,
   pack__destruct,
@@ -2469,7 +2510,8 @@ static PackFunc pack_funcs[12] =
   pack__pop_catch_guard,
   pack__return,
   pack__index,
-  pack__create_closure
+  pack__create_closure,
+  pack__new_tensor
 };
 
 void
