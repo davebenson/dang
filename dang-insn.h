@@ -22,6 +22,7 @@ typedef enum
   DANG_INSN_TYPE_INDEX,
 
   DANG_INSN_TYPE_CREATE_CLOSURE,
+  DANG_INSN_TYPE_NEW_TENSOR
 } DangInsnType;
 
 
@@ -80,20 +81,6 @@ struct _DangInsn_Assign           /* from dang_builder_add_assign() */
   DangInsn_Base base;
   DangInsnValue target, source;
   dang_boolean target_uninitialized;    /* only used if target.location==STACK */
-};
-
-typedef struct _DangInsn_CreateClosure DangInsn_CreateClosure;
-struct _DangInsn_CreateClosure    /* from dang_compile_create_closure() */
-{
-  DangInsn_Base base;
-  DangVarId target;               /* where the new function goes */
-  DangClosureFactory *factory;
-  dang_boolean is_literal;
-  union {
-    DangFunction *literal;
-    DangVarId function_var;
-  } underlying;
-  DangVarId *input_vars;
 };
 
 /* note: this becomes two steps: a setup+invoke, and a copy-output-params and cleanup step */
@@ -168,6 +155,31 @@ struct _DangInsn_Index         /* from mf-operator-index */
   dang_boolean is_set;
 };
 
+typedef struct _DangInsn_CreateClosure DangInsn_CreateClosure;
+struct _DangInsn_CreateClosure    /* from dang_compile_create_closure() */
+{
+  DangInsn_Base base;
+  DangVarId target;               /* where the new function goes */
+  DangClosureFactory *factory;
+  dang_boolean is_literal;
+  union {
+    DangFunction *literal;
+    DangVarId function_var;
+  } underlying;
+  DangVarId *input_vars;
+};
+
+typedef struct _DangInsn_NewTensor DangInsn_NewTensor;
+struct _DangInsn_NewTensor
+{
+  DangInsn_Base base;
+  DangVarId target;
+  DangValueType *elt_type;
+  unsigned rank;
+  unsigned *dims;
+  unsigned total_size;
+};
+
 union _DangInsn
 {
   DangInsnType type;
@@ -186,6 +198,7 @@ union _DangInsn
   DangInsn_PopCatchGuard pop_catch_guard;
   DangInsn_Return return_;
   DangInsn_Index index;
+  DangInsn_NewTensor new_tensor;
 };
 
 void dang_insn_init (DangInsn *insn,

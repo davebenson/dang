@@ -57,5 +57,7 @@ struct _DangVector
   unsigned len;
 };
 
+DangTensor *dang_tensor_empty (void);
+
 #define DANG_TENSOR_SIZEOF(rank)                                              \
 (DANG_ALIGN((sizeof(DangTensor) + ((rank)-1)*sizeof(unsigned)), DANG_ALIGNOF_POINTER) )

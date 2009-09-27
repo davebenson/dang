@@ -147,18 +147,20 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_cast_to_char_array)
 static DANG_SIMPLE_C_FUNC_DECLARE(do_cast_to_byte_array)
 {
   DangString *in = *(DangString**)args[0];
-  DangVector *out = rv_out;
+  DangVector *out;
   unsigned c = in ? in->len : 0;
   DANG_UNUSED (func_data);
   DANG_UNUSED (error);
   if (c == 0)
     {
-      out->len = out->alloced = 0;
-      out->data = NULL;
+      * (DangVector **) rv_out = NULL;
       return TRUE;
     }
-  out->len = out->alloced = c;
+  out = dang_new (DangVector, 1);
+  out->ref_count = 1;
+  out->len = c;
   out->data = dang_memdup (in->str, in->len);
+  *(DangVector**) rv_out = out;
   return TRUE;
 }
 static DANG_SIMPLE_C_FUNC_DECLARE(do_cast_to_string)

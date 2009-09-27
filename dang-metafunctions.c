@@ -4112,6 +4112,7 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tensor)
 {
   DangExpr *top;
   DangCompileFlags subflags = DANG_COMPILE_FLAGS_RVALUE_PERMISSIVE;
+  DangCompileResult lvalue, rvalue;
   unsigned rank;
   unsigned total_tensor_size;
   unsigned i;
@@ -4121,11 +4122,10 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tensor)
   DangInsn insn;
   DangValueType *tensor_type;
   DangVarId tensor_var_id;
+  DangVarId data_var_id;
   DangExprTensorSizes *tensor_sizes;
-  char *tensor_data_at;
+  unsigned tensor_data_offset;
   unsigned *indices;
-  DangTensor *literal;
-  DangTensor **p_literal;
 
   if (flags->must_be_lvalue)
     {
@@ -4154,27 +4154,35 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tensor)
   tensor_var_id = dang_builder_add_tmp (builder, tensor_type);
   dang_builder_note_var_create (builder, tensor_var_id);
 
-  dang_insn_init (&insn, DANG_INSN_TYPE_ASSIGN);
-  insn.assign.source.location = DANG_INSN_LOCATION_LITERAL;
-  literal = dang_malloc (DANG_TENSOR_SIZEOF (rank));
-  literal->ref_count = 1;
-  p_literal = dang_new (DangTensor *, 1);
-  *p_literal = literal;
-  insn.assign.source.value = p_literal;
-  insn.assign.source.type = tensor_type;
-  insn.assign.target.location = DANG_INSN_LOCATION_STACK;
-  insn.assign.target.var = tensor_var_id;
-  insn.assign.target.type = tensor_type;
-  insn.assign.target_uninitialized = TRUE;
+  dang_insn_init (&insn, DANG_INSN_TYPE_NEW_TENSOR);
+  insn.new_tensor.target = tensor_var_id;
+  insn.new_tensor.elt_type = elt_type;
+  insn.new_tensor.rank = tensor_sizes->rank;
+  insn.new_tensor.dims = dang_new (unsigned, tensor_sizes->rank);
+  memcpy (insn.new_tensor.dims, tensor_sizes->sizes, sizeof(unsigned) * tensor_sizes->rank);
+  insn.new_tensor.total_size = total_tensor_size * tensor_sizes->elt_type->sizeof_instance;
   dang_builder_add_insn (builder, &insn);
+
+  /* Create a pointer at the data section of the tensor */
+  dang_builder_push_tmp_scope (builder);
+  data_var_id = dang_builder_add_tmp (builder, dang_value_type_reserved_pointer ());
+  dang_compile_result_init_pointer (&rvalue,
+                                    dang_value_type_reserved_pointer (),
+                                    tensor_var_id,
+                                    offsetof (DangTensor, data),
+                                    FALSE, TRUE);
+  dang_compile_result_init_stack (&lvalue,
+                                  dang_value_type_reserved_pointer (),
+                                  data_var_id, FALSE, TRUE, FALSE);
+  dang_builder_add_assign (builder, &lvalue, &rvalue);
+  dang_compile_result_clear (&lvalue, builder);
+  dang_compile_result_clear (&rvalue, builder);
 
   /* walk through tensor data, computing run-lengths */
   indices = dang_newa (unsigned, tensor_sizes->rank);
   for (i = 0; i < tensor_sizes->rank; i++)
     indices[i] = 0;
-  memcpy (literal->sizes, tensor_sizes->sizes, rank * sizeof (unsigned));
-  literal->data = dang_malloc (elt_size * total_tensor_size);
-  tensor_data_at = literal->data;
+  tensor_data_offset = 0;
   for (;;)
     {
       /* Find expr */
@@ -4186,36 +4194,22 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tensor)
         }
       if (e->type == DANG_EXPR_TYPE_VALUE)
         {
-          /* check type */
-          if (elt_type->init_assign)
-            elt_type->init_assign (elt_type, tensor_data_at, e->value.value);
-          else
-            memcpy (tensor_data_at, e->value.value, elt_size);
+          if (!dang_util_is_zero (e->value.value, e->value.type->sizeof_instance))
+            {
+              dang_compile_result_init_literal (&rvalue, e->value.type, e->value.value);
+              dang_compile_result_init_pointer (&lvalue,
+                                                elt_type,
+                                                data_var_id,
+                                                tensor_data_offset,
+                                                TRUE, FALSE);
+              dang_builder_add_assign (builder, &lvalue, &rvalue);
+              dang_compile_result_clear (&lvalue, builder);
+              dang_compile_result_clear (&rvalue, builder);
+            }
         }
       else
         {
-          memset (tensor_data_at, 0, elt_size);
-        }
-      tensor_data_at += elt_size;
-      if (!advance_indices (indices, tensor_sizes))
-        break;
-    }
-
-  for (i = 0; i < tensor_sizes->rank; i++)
-    indices[i] = 0;
-  unsigned total_index = 0;
-  for (;;)
-    {
-      /* Find expr */
-      DangExpr *e = expr;
-      for (i = 0; i < tensor_sizes->rank; i++)
-        {
-          dang_assert (dang_expr_is_function (e, "$tensor"));
-          e = e->function.args[indices[i]];
-        }
-      if (e->type != DANG_EXPR_TYPE_VALUE)
-        {
-          DangCompileResult lvalue;
+          /* Compute the value */
           dang_builder_push_tmp_scope (builder);
           dang_compile (e, builder, &subflags, &subresult);
           if (subresult.type == DANG_COMPILE_RESULT_ERROR)
@@ -4227,23 +4221,20 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tensor)
           /* do assignment */
           dang_compile_result_init_pointer (&lvalue,
                                             elt_type,
-                                            tensor_var_id,
-                                            elt_type->sizeof_instance * total_index,
+                                            data_var_id,
+                                            tensor_data_offset,
                                             TRUE, FALSE);
           dang_builder_add_assign (builder, &lvalue, &subresult);
           dang_compile_result_clear (&subresult, builder);
           dang_compile_result_clear (&lvalue, builder);
           dang_builder_pop_tmp_scope (builder);
         }
-      else if (i == 0)
-        {
-          dang_compile_result_clear (&subresult, builder);
-          dang_builder_pop_tmp_scope (builder);
-        }
+      tensor_data_offset += elt_size;
       if (!advance_indices (indices, tensor_sizes))
         break;
-      total_index++;
     }
+  dang_builder_pop_tmp_scope (builder);
+
 
   dang_compile_result_init_stack (result,
                                   tensor_type,       /* return-type */

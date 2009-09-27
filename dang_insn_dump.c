@@ -220,5 +220,23 @@ dang_insn_dump (DangInsn *insn,
         dang_string_buffer_append (out, "\n");
       }
       break;
+    case DANG_INSN_TYPE_NEW_TENSOR:
+      {
+        unsigned i;
+        dang_string_buffer_append (out, "    NEW_TENSOR $");
+        dang_string_buffer_printf (out, "%u = %s[",
+                                   insn->new_tensor.target,
+                                   insn->new_tensor.elt_type->full_name);
+        for (i = 0; i < insn->new_tensor.rank; i++)
+          {
+            dang_string_buffer_printf (out, "%u", insn->new_tensor.dims[i]);
+            if (i + 1 < insn->new_tensor.rank)
+              dang_string_buffer_append (out, ", ");
+          }
+        dang_string_buffer_append (out, "]\n");
+      }
+      break;
+    default:
+      dang_assert_not_reached ();
     }
 }
