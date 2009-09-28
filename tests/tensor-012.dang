@@ -3,6 +3,7 @@
 var A = [ 1 2 3 ];
 var B = [ 3 4 5 ];
 vector<int> C = operator_concat(A,B);
+system.println("A=$A; B=$B; C=$C");
 assert(C == [1 2 3 3 4 5]);
 
 var A0 = [ 1 2 3 ];

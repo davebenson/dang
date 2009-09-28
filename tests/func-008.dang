@@ -6,7 +6,7 @@ assert(foo(0) == 0);
 assert(foo(42) == 84);
 assert(foo(420) == 840);
 
-function foo(string a : int) foo((int)length(a));
+function foo(string a : int) foo((int)n_chars(a));
 assert(foo("") == 0);
 assert(foo("hi") == 4);
 assert(foo("hihihi") == 12);

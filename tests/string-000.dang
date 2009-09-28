@@ -12,9 +12,9 @@ assert(("a" <=> "b") == -1);
 assert(("a" <=> "a") == 0);
 assert(("b" <=> "a") == 1);
 
-assert(length("") == 0U);
-assert(length("42") == 2U);
-assert(length("abcd") == 4U);
-assert(length("abcdefghijklmnopqrstuvwxyz") == 26U);
+assert(n_chars("") == 0U);
+assert(n_chars("42") == 2U);
+assert(n_chars("abcd") == 4U);
+assert(n_chars("abcdefghijklmnopqrstuvwxyz") == 26U);
 
 assert("\101" == "A");

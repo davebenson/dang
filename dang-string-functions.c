@@ -103,19 +103,23 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_string_split)
 static DANG_SIMPLE_C_FUNC_DECLARE(do_string_join)
 {
   DangString *delim = * (DangString **) args[0];
-  DangVector *b = args[1];
+  DangVector *b = *(DangVector**)args[1];
   DangString **strs = b->data;
   DANG_UNUSED (error);
   DANG_UNUSED (func_data);
-  *(DangString**)rv_out = dang_string_joinv (delim, b->len, strs);
+  if (b == NULL)
+    b = (DangVector *) dang_tensor_empty ();
+  *(DangString**)rv_out = dang_string_joinv (delim, b->len, b->data);
   return TRUE;
 }
 
 static DANG_SIMPLE_C_FUNC_DECLARE(do_string_concat)
 {
-  DangVector *a = args[0];
+  DangVector *a = *(DangVector**) args[0];
   DANG_UNUSED (error);
   DANG_UNUSED (func_data);
+  if (a == NULL)
+    a = (DangVector *) dang_tensor_empty ();
   *(DangString**)rv_out = dang_strings_concat (a->len, a->data);
   return TRUE;
 }
@@ -165,11 +169,13 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_cast_to_byte_array)
 }
 static DANG_SIMPLE_C_FUNC_DECLARE(do_cast_to_string)
 {
-  DangVector *in = args[0];
+  DangVector *in = *(DangVector **) args[0];
   unsigned utf8_len;
   DangString *out;
   DANG_UNUSED (func_data);
   DANG_UNUSED (error);
+  if (in == NULL)
+    in = (DangVector *) dang_tensor_empty ();
   utf8_len = dang_unichar_array_get_utf8_len (in->len, in->data);
   out = dang_string_new_raw (utf8_len);
   dang_unichar_array_to_utf8 (in->len, in->data, out->str);
@@ -178,9 +184,11 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_cast_to_string)
 }
 static DANG_SIMPLE_C_FUNC_DECLARE(do_cast_to_string_from_bytes)
 {
-  DangVector *in = args[0];
+  DangVector *in = *(DangVector**) (args[0]);
   DANG_UNUSED (func_data);
   DANG_UNUSED (error);
+  if (in == NULL)
+    in = (DangVector *) dang_tensor_empty ();
   if (!dang_utf8_validate_str (in->len, in->data, error))
     return FALSE;
   * (DangString**) rv_out = dang_string_new_len (in->data, in->len);

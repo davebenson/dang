@@ -24,7 +24,7 @@ assert(a == 4);
 assert(a == b);
 
 var f = "hi mom";
-assert(length(f) == 6U);
+assert(n_chars(f) == 6U);
 var ff = f;
 ff = f;
 assert(ff == "hi mom");

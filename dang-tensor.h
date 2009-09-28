@@ -58,6 +58,8 @@ struct _DangVector
 };
 
 DangTensor *dang_tensor_empty (void);
+#define dang_vector_empty()  ((DangVector*)dang_tensor_empty())
+#define dang_matrix_empty()  ((DangMatrix*)dang_tensor_empty())
 
 #define DANG_TENSOR_SIZEOF(rank)                                              \
 (DANG_ALIGN((sizeof(DangTensor) + ((rank)-1)*sizeof(unsigned)), DANG_ALIGNOF_POINTER) )

@@ -8,5 +8,5 @@ try { map([0 1 2], [1 2], function q r -> q*r); } catch (error e) { failed = tru
 assert(failed);
 
 failed = false;
-try { map(["a" "" "b"], function q -> "${1U/length(q)}"); } catch (error e) { failed = true; }
+try { map(["a" "" "b"], function q -> "${1U/n_chars(q)}"); } catch (error e) { failed = true; }
 assert(failed);
