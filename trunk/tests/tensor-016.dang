@@ -17,7 +17,7 @@ try { var x = [[1 2] [3 4]]; x[2,0] = 4; } catch (error e) { failed = true; }
 assert(failed);
 
 
-failed = false;
-try { var x = [[1 2] [3 4]]; x <>= [1 2 3]; } catch (error e) { failed = true; }
-assert(failed);
+//failed = false;
+//try { var x = [[1 2] [3 4]]; x <>= [1 2 3]; } catch (error e) { failed = true; }
+//assert(failed);
 

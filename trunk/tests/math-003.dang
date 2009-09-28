@@ -11,6 +11,7 @@ assert(min([1 2 3]) == 1);
 assert(max([1 2 3]) == 3);
 assert(product([1 2 3]) == 6);
 
+//system.println("${map(cols([[1 2 3] [3 4 5]]), function x -> average(x))}");
 assert(map(rows([[1 2 3] [3 4 5]]), function x -> average(x)) == [2 4]);
 //system.println("${map(cols([[1 2 3] [3 4 5]]), function x -> sum(x))}");
 assert(map(cols([[1 2 3] [3 4 5]]), function x -> sum(x)) == [4 6 8]);

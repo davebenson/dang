@@ -12,6 +12,6 @@
 
 {
   vector<string> v = ["hi" "mom" "oops" "whateve" "xyz" "xyzw"];
-  assert(grep(v, function t -> length(t) % 2U) == ["mom" "whateve" "xyz"]);
-  assert(grep(v, function t -> length(t) % 2U == 0U) == ["hi" "oops" "xyzw"]);
+  assert(grep(v, function t -> n_chars(t) % 2U) == ["mom" "whateve" "xyz"]);
+  assert(grep(v, function t -> n_chars(t) % 2U == 0U) == ["hi" "oops" "xyzw"]);
 }
