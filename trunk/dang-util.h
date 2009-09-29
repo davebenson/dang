@@ -33,8 +33,10 @@ typedef int dang_boolean;
 #endif
 
 
+#define DANG_NONZERO_IS_POWER_OF_TWO(value) \
+  (((value) & ((value)-1)) == 0)
 #define DANG_IS_POWER_OF_TWO(value) \
-  ((value) != 0 && (((value) & ((value)-1)) == 0))
+  ((value) != 0 && DANG_NONZERO_IS_POWER_OF_TWO (value))
 
 void *dang_malloc   (size_t);
 void *dang_malloc0  (size_t);

@@ -1,9 +1,16 @@
 
 typedef struct _DangArray DangArray;
+typedef struct _DangArrayClass DangArrayClass;
+
+struct _DangArrayClass
+{
+  DangObjectClass base;
+};
+
 struct _DangArray
 {
+  DangObject base;
   DangArray *tensor;
-  unsigned ref_count;
   unsigned alloced;             /* allocated size of first dimension */
 };
 
@@ -13,6 +20,7 @@ struct _DangValueTypeArray
   DangValueType base_type;
   DangValueType *element_type;
   unsigned rank;
+  DangValueType *tensor_type;
 
   /* cached */
   DangFunction *to_string_function;
