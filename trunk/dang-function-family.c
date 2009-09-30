@@ -7,8 +7,8 @@ dang_function_family_new (const char *name)
   rv->ref_count = 1;
   rv->type = DANG_FUNCTION_FAMILY_CONTAINER;
   rv->name = dang_strdup (name);
-  DANG_ARRAY_INIT (&rv->info.container.families, DangFunctionFamily *);
-  DANG_ARRAY_INIT (&rv->info.container.functions, DangFunction *);
+  DANG_UTIL_ARRAY_INIT (&rv->info.container.families, DangFunctionFamily *);
+  DANG_UTIL_ARRAY_INIT (&rv->info.container.functions, DangFunction *);
   return rv;
 }
 void                dang_function_family_container_add
@@ -17,7 +17,7 @@ void                dang_function_family_container_add
 {
   dang_assert (container->type == DANG_FUNCTION_FAMILY_CONTAINER);
   dang_function_family_ref (subfamily);
-  dang_array_append (&container->info.container.families, 1, &subfamily);
+  dang_util_array_append (&container->info.container.families, 1, &subfamily);
 }
 
 void                dang_function_family_container_add_function
@@ -26,7 +26,7 @@ void                dang_function_family_container_add_function
 {
   dang_assert (container->type == DANG_FUNCTION_FAMILY_CONTAINER);
   dang_function_attach_ref (function);
-  dang_array_append (&container->info.container.functions, 1, &function);
+  dang_util_array_append (&container->info.container.functions, 1, &function);
 }
 
 DangFunctionFamily *dang_function_family_new_variadic_c (const char *name,
@@ -101,8 +101,8 @@ void                dang_function_family_unref (DangFunctionFamily *ff)
               dang_function_unref (subfunctions[i]);
             for (i = 0; i < ff->info.container.families.len; i++)
               dang_function_family_unref (subfamilies[i]);
-            dang_array_clear (&ff->info.container.functions);
-            dang_array_clear (&ff->info.container.families);
+            dang_util_array_clear (&ff->info.container.functions);
+            dang_util_array_clear (&ff->info.container.families);
             break;
           }
         case DANG_FUNCTION_FAMILY_VARIADIC_C:
@@ -156,7 +156,7 @@ dang_function_family_try (DangFunctionFamily *ff,
               {
                 /* Cache the new-found function in the container. */
                 dang_function_ref (rv);
-                dang_array_append (&ff->info.container.functions, 1, &rv);
+                dang_util_array_append (&ff->info.container.functions, 1, &rv);
                 return rv;
               }
             if (error && *error)
@@ -180,13 +180,13 @@ dang_function_family_try (DangFunctionFamily *ff,
       return ff->info.variadic_c.try_sig (mq, ff->info.variadic_c.data, error);
     case DANG_FUNCTION_FAMILY_TEMPLATE:
       {
-        DangArray pairs = DANG_ARRAY_STATIC_INIT (sizeof(DangValueType*));
+        DangArray pairs = DANG_UTIL_ARRAY_STATIC_INIT (sizeof(DangValueType*));
         unsigned i;
         DangFunctionParam *concrete_params;
         DangExpr *real_body;
         if (!dang_signature_test_templated (ff->info.templat.sig, mq, &pairs))
           {
-            dang_array_clear (&pairs);
+            dang_util_array_clear (&pairs);
             return NULL;
           }
         concrete_params = dang_newa (DangFunctionParam, ff->info.templat.sig->n_params);
@@ -234,7 +234,7 @@ dang_function_family_try (DangFunctionFamily *ff,
             dang_var_table_free (var_table);
             dang_annotations_free (annotations);
             dang_expr_unref (real_body);
-            dang_array_clear (&pairs);
+            dang_util_array_clear (&pairs);
             return NULL;
           }
 
@@ -250,7 +250,7 @@ dang_function_family_try (DangFunctionFamily *ff,
                                 DANG_CP_EXPR_ARGS (real_body));
                 dang_var_table_free (var_table);
                 dang_annotations_free (annotations);
-                dang_array_clear (&pairs);
+                dang_util_array_clear (&pairs);
                 dang_expr_unref (real_body);
                 return NULL;
               }
@@ -267,7 +267,7 @@ dang_function_family_try (DangFunctionFamily *ff,
                                       );
         dang_function_stub_set_annotations (stub, annotations, var_table);
         dang_signature_unref (real_sig);
-        dang_array_clear (&pairs);
+        dang_util_array_clear (&pairs);
         dang_expr_unref (real_body);
 
 
@@ -334,21 +334,21 @@ signatures_check_conflict (DangSignature *sig1,
 
   if (sig1->is_templated)
     {
-      DangArray pairs = DANG_ARRAY_STATIC_INIT (sizeof(DangValueType*));
+      DangArray pairs = DANG_UTIL_ARRAY_STATIC_INIT (sizeof(DangValueType*));
       DangMatchQuery *q = dang_signature_make_match_query (sig2);
       if (dang_signature_test_templated (sig1, q, &pairs))
         {
-          dang_array_set_size (&pairs, 0);
+          dang_util_array_set_size (&pairs, 0);
           dang_signature_match_query_free (q);
           q = dang_signature_make_match_query (sig1);
           if (dang_signature_test_templated (sig2, q, &pairs))
             {
               /* Identical/equivalent, so do not permit the addition. */
               dang_set_error (error, "signatures for templated types too close");
-              dang_array_clear (&pairs);
+              dang_util_array_clear (&pairs);
               return FALSE;
             }
-          dang_array_clear (&pairs);
+          dang_util_array_clear (&pairs);
         }
       dang_signature_match_query_free (q);
       return TRUE;

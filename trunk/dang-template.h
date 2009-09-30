@@ -20,12 +20,12 @@ dang_boolean dang_value_type_is_template_param (DangValueType *);
 
 /* 'pairs' is an array of template-param/concrete-type pairs. */
 void         dang_type_gather_template_params (DangValueType *,
-                                               DangArray *tparams_inout);
+                                               DangUtilArray *tparams_inout);
 dang_boolean dang_templated_type_check (DangValueType *templated_type,
                                         DangValueType *match_type,
-                                        DangArray     *pairs_out);
+                                        DangUtilArray     *pairs_out);
 DangValueType *dang_templated_type_make_concrete (DangValueType *templated_type,
-                                                  DangArray *tt_pairs);
+                                                  DangUtilArray *tt_pairs);
 
 dang_boolean dang_expr_contains_disallowed_template_param (DangExpr *,
                                                 unsigned n_allowed,
@@ -38,4 +38,4 @@ dang_boolean dang_value_type_contains_disallowed_template_param (DangValueType *
                                                 const char **bad_name_out);
 
 DangExpr *dang_templated_expr_substitute_types (DangExpr *orig,
-                                          DangArray *pairs);
+                                          DangUtilArray *pairs);

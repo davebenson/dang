@@ -57,7 +57,7 @@ dang_boolean   dang_function_params_test   (unsigned        n_params,
 
 dang_boolean   dang_signature_test_templated(DangSignature *sig,
                                              DangMatchQuery *query,
-                                            DangArray     *tparam_type_pairs_out);
+                                            DangUtilArray     *tparam_type_pairs_out);
 
 void dang_signature_dump (DangSignature *sig,
                           DangStringBuffer *buf);

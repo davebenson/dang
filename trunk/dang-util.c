@@ -471,7 +471,7 @@ void dang_string_buffer_append_repeated_char (DangStringBuffer *buffer,
 }
 
 /* --- arrays --- */
-void dang_array_init            (DangArray   *array,
+void dang_util_array_init            (DangArray   *array,
                                  size_t       elt_size)
 {
   array->len = 0;
@@ -479,7 +479,7 @@ void dang_array_init            (DangArray   *array,
   array->alloced = 0;
   array->elt_size = elt_size;
 }
-void dang_array_append          (DangArray   *array,
+void dang_util_array_append          (DangArray   *array,
                                  unsigned     count,
                                  const void  *data)
 {
@@ -497,7 +497,7 @@ void dang_array_append          (DangArray   *array,
   array->len += count;
 }
 
-void dang_array_set_size        (DangArray   *array,
+void dang_util_array_set_size        (DangArray   *array,
                                  unsigned     size)
 {
   if (size > array->alloced)
@@ -511,21 +511,21 @@ void dang_array_set_size        (DangArray   *array,
   array->len = size;
 }
 
-void dang_array_set_size0       (DangArray   *array,
+void dang_util_array_set_size0       (DangArray   *array,
                                  unsigned     size)
 {
   if (size > array->len)
     {
       unsigned old_len = array->len;
-      dang_array_set_size (array, size);
+      dang_util_array_set_size (array, size);
       memset ((char*)array->data + old_len * array->elt_size, 0, (size - old_len) * array->elt_size);
     }
   else if (size < array->len)
-    dang_array_set_size (array, size);
+    dang_util_array_set_size (array, size);
 }
 
 
-void dang_array_remove (DangArray *array,
+void dang_util_array_remove (DangArray *array,
                         unsigned   start,
                         unsigned   count)
 {
@@ -536,13 +536,13 @@ void dang_array_remove (DangArray *array,
   array->len -= count;
 }
 
-void dang_array_insert          (DangArray   *array,
+void dang_util_array_insert          (DangArray   *array,
                                  unsigned     n,
                                  const void  *data,
                                  unsigned     insert_pos)
 {
   unsigned old_len = array->len;
-  dang_array_set_size (array, array->len + n);
+  dang_util_array_set_size (array, array->len + n);
   memmove ((char*)array->data + (insert_pos + n) * array->elt_size,
            (char*)array->data + (insert_pos) * array->elt_size,
            (old_len - insert_pos) * array->elt_size);
@@ -551,7 +551,7 @@ void dang_array_insert          (DangArray   *array,
           n * array->elt_size);
 }
 
-void dang_array_clear           (DangArray   *array)
+void dang_util_array_clear           (DangArray   *array)
 {
   dang_free (array->data);
 }

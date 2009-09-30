@@ -189,7 +189,7 @@ gather_closure_params (unsigned n_params,
       if (dang_var_table_lookup (table, at->bareword.name, &var_id, &type))
         {
           SET_VAR_USED (vars_used, var_id);
-          dang_array_append (var_ids_used, 1, &var_id);
+          dang_util_array_append (var_ids_used, 1, &var_id);
           return;
         }
     }
@@ -215,7 +215,7 @@ dang_mf_gather_closure_params (unsigned n_params,
                                unsigned *n_var_ids_out,
                                DangVarId **var_ids_out)
 {
-  DangArray var_ids = DANG_ARRAY_STATIC_INIT (DangVarId);
+  DangArray var_ids = DANG_UTIL_ARRAY_STATIC_INIT (DangVarId);
   unsigned vars_used_size = (var_table->variables.len + 7) / 8;
   uint8_t *vars_used = dang_alloca (vars_used_size);
   memset (vars_used, 0, vars_used_size);

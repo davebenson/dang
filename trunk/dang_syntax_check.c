@@ -237,7 +237,7 @@ syntax_check_alternation (DangExpr   *expr,
                           const char *pattern,
                         DangError **error)
 {
-  DangArray errors = DANG_ARRAY_STATIC_INIT (DangError *);
+  DangArray errors = DANG_UTIL_ARRAY_STATIC_INIT (DangError *);
   DangError *e = NULL;
   for (;;)
     {
@@ -251,7 +251,7 @@ syntax_check_alternation (DangExpr   *expr,
           dang_free (e);
           return TRUE;
         }
-      dang_array_append (&errors, 1, &e);
+      dang_util_array_append (&errors, 1, &e);
       e = NULL;
       bar = strchr (pattern, '|');
       if (bar == NULL)
@@ -260,7 +260,7 @@ syntax_check_alternation (DangExpr   *expr,
           if (errors.len == 1)
             {
               *error = *(DangError**)errors.data;
-              dang_array_clear (&errors);
+              dang_util_array_clear (&errors);
               return FALSE;
             }
           else
@@ -278,7 +278,7 @@ syntax_check_alternation (DangExpr   *expr,
               dang_set_error (error, "no branches of alternation succeeded: %s",
                               buf.str);
               dang_free (buf.str);
-              dang_array_clear (&errors);
+              dang_util_array_clear (&errors);
               return FALSE;
             }
         }

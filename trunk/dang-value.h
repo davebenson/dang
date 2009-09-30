@@ -166,7 +166,7 @@ struct _DangValueElement
   DangValueElementType element_type;
   char *name;
   union {
-    DangArray methods;          /* of DangValueMethod */
+    DangUtilArray methods;          /* of DangValueMethod */
     DangValueMember member;
     DangFunctionFamily *ctor;   /* of DangFunction */
   } info;

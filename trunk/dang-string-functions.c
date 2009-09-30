@@ -26,7 +26,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_string_split)
   const char *dstr = delim ? delim->str : "";
   const char *sstr = to_split ? to_split->str : "";
   DangString *tmp;
-  DangArray strings = DANG_ARRAY_STATIC_INIT(DangString*);
+  DangArray strings = DANG_UTIL_ARRAY_STATIC_INIT(DangString*);
   DANG_UNUSED (func_data);
   DANG_UNUSED (error);
   if (dstr[0] == 0)
@@ -40,7 +40,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_string_split)
       else
         {
           tmp = dang_string_new_len (sstr, n-sstr);
-          dang_array_append (&strings, 1, &tmp);
+          dang_util_array_append (&strings, 1, &tmp);
           sstr = n + dlen;
           for (;;)
             {
@@ -52,7 +52,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_string_split)
               else
                 {
                   tmp = dang_string_new_len (sstr, n-sstr);
-                  dang_array_append (&strings, 1, &tmp);
+                  dang_util_array_append (&strings, 1, &tmp);
                   sstr = n + dlen;
                 }
             }
@@ -66,12 +66,12 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_string_split)
       if (n == NULL)
         {
           tmp = to_split ? dang_string_ref_copy (to_split) : NULL;
-          dang_array_append (&strings, 1, &tmp);
+          dang_util_array_append (&strings, 1, &tmp);
         }
       else
         {
           tmp = dang_string_new_len (sstr, n-sstr);
-          dang_array_append (&strings, 1, &tmp);
+          dang_util_array_append (&strings, 1, &tmp);
           sstr = n + dlen;
           for (;;)
             {
@@ -79,13 +79,13 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_string_split)
               if (n == NULL)
                 {
                   tmp = dang_string_new (sstr);
-                  dang_array_append (&strings, 1, &tmp);
+                  dang_util_array_append (&strings, 1, &tmp);
                   break;
                 }
               else
                 {
                   tmp = dang_string_new_len (sstr, n-sstr);
-                  dang_array_append (&strings, 1, &tmp);
+                  dang_util_array_append (&strings, 1, &tmp);
                   sstr = n + dlen;
                 }
             }
@@ -104,7 +104,6 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_string_join)
 {
   DangString *delim = * (DangString **) args[0];
   DangVector *b = *(DangVector**)args[1];
-  DangString **strs = b->data;
   DANG_UNUSED (error);
   DANG_UNUSED (func_data);
   if (b == NULL)

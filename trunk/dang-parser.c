@@ -53,7 +53,7 @@ dang_parser_pop_expr(DangParser *parser)
   if (parser->results.len == 0)
     return NULL;
   rv = * (DangExpr **) parser->results.data;
-  dang_array_remove (&parser->results, 0, 1);
+  dang_util_array_remove (&parser->results, 0, 1);
   return rv;
 }
 
@@ -88,14 +88,14 @@ void dang_parser_factory_register (DangParserFactory *factory,
 void
 dang_parser_base_init        (DangParser        *parser)
 {
-  DANG_ARRAY_INIT (&parser->results, DangExpr *);
+  DANG_UTIL_ARRAY_INIT (&parser->results, DangExpr *);
 }
 
 void
 dang_parser_push_expr        (DangParser        *parser,
                               DangExpr          *expr)
 {
-  dang_array_append (&parser->results, 1, &expr);
+  dang_util_array_append (&parser->results, 1, &expr);
   dang_expr_ref (expr);
 }
 
@@ -103,7 +103,7 @@ void
 dang_parser_take_expr        (DangParser        *parser,
                               DangExpr          *expr)
 {
-  dang_array_append (&parser->results, 1, &expr);
+  dang_util_array_append (&parser->results, 1, &expr);
 }
 
 void
@@ -112,7 +112,7 @@ dang_parser_base_clear (DangParser *parser)
   unsigned i;
   for (i = 0; i < parser->results.len; i++)
     dang_expr_unref (((DangExpr**)parser->results.data)[i]);
-  dang_array_clear (&parser->results);
+  dang_util_array_clear (&parser->results);
 }
 
 /* --- private --- */
@@ -147,7 +147,7 @@ maybe_flush_bareword_dot_arr (DangParserDefault *def,
               return FALSE;
             }
         }
-      dang_array_set_size (&def->bareword_dot_arr, 0);
+      dang_util_array_set_size (&def->bareword_dot_arr, 0);
     }
   return TRUE;
 }
@@ -294,7 +294,7 @@ default_parse           (DangParser *parser,
             if (strcmp (token->v_operator.str, ".") == 0
              && def->bareword_dot_arr.len % 2 == 1)
               {
-                dang_array_append (&def->bareword_dot_arr, 1, &token);
+                dang_util_array_append (&def->bareword_dot_arr, 1, &token);
                 return TRUE;
               }
             if (i == DANG_N_ELEMENTS (ops))
@@ -394,7 +394,7 @@ default_parse           (DangParser *parser,
                 DangToken **bd_arr;
                 unsigned n_names;
                 DangValueType *type;
-                dang_array_append (&def->bareword_dot_arr, 1, &token);
+                dang_util_array_append (&def->bareword_dot_arr, 1, &token);
                 bd_arr = def->bareword_dot_arr.data;
 
                 /* Is this sequence of bw_dot_pairs a type? */
@@ -411,7 +411,7 @@ default_parse           (DangParser *parser,
                     DangToken *old = token;
                     for (i = 0; i < n_names * 2 - 1; i++)
                       dang_token_unref (bd_arr[i]);
-                    dang_array_set_size (&def->bareword_dot_arr, 0);
+                    dang_util_array_set_size (&def->bareword_dot_arr, 0);
                     tag = DANG_DEFAULTPARSER_TOKEN_TYPE_TOKEN;
                     token = dang_token_literal_take (dang_value_type_type (),
                                                      dang_memdup (&type, sizeof(DangValueType*)));
@@ -474,7 +474,7 @@ default_destroy   (DangParser *parser)
   if (def->last_token)
     dang_token_unref (def->last_token);
   dang_imports_unref (def->base.imports);
-  dang_array_clear (&def->bareword_dot_arr);
+  dang_util_array_clear (&def->bareword_dot_arr);
   dang_parser_base_clear (parser);
   dang_free (parser);
 }
@@ -498,8 +498,8 @@ default_create_parser (DangParserFactory *factory,
   rv->last_token = NULL;
   rv->look_for_langle = FALSE;
   rv->langle_count = 0;
-  DANG_ARRAY_INIT (&rv->errors, DangError *);
-  DANG_ARRAY_INIT (&rv->bareword_dot_arr, DangToken *);
+  DANG_UTIL_ARRAY_INIT (&rv->errors, DangError *);
+  DANG_UTIL_ARRAY_INIT (&rv->bareword_dot_arr, DangToken *);
 
   switch (options->mode)
     {

@@ -7,9 +7,6 @@
 //$operator_index(a, I, J, ...)
 //$map(TENSOR, BOUND_VAR, EXPR)
 
-/* anything greater than this requires extra allocations */
-#define MAX_STANDARD_RANK       16
-
 static DangValueTypeTensor *tensor_type_tree;
 #define GET_IS_RED(fi)  (fi)->is_red
 #define SET_IS_RED(fi,v)  (fi)->is_red = v
@@ -125,6 +122,24 @@ tensor_to_string (DangValueType *type,
       append_tensor_to_string (ttype->element_type, ttype->rank, sizes, &elements, &buf);
       return buf.str;
     }
+}
+
+static DANG_SIMPLE_C_FUNC_DECLARE (cast_from_tensor_to_array)
+{
+  DangTensor *tensor = * (DangTensor **) args[0];
+  DangArray *rv = dang_new (DangArray, 1);
+  DANG_UNUSED (func_data);
+  DANG_UNUSED (error);
+  rv->tensor = tensor;
+  if (tensor)
+    tensor->ref_count++;
+  rv->ref_count = 1;
+  if (tensor == NULL)
+    rv->alloced = 0;
+  else
+    rv->alloced = tensor->sizes[0];
+  * (DangArray **) rv_out = rv;
+  return TRUE;
 }
 
 static void
@@ -290,6 +305,29 @@ dang_value_type_tensor (DangValueType *element_type,
 
   GSK_RBTREE_INSERT (GET_TENSOR_TREE (), out, conflict);
   dang_assert (conflict == NULL);
+
+  /* cast to array<type,rank> */
+  {
+    DangValueType *array_type;
+    DangFunctionParam fp;
+    DangSignature *sig;
+    DangFunction *f;
+    DangError *error = NULL;
+    array_type = dang_value_type_array (element_type, rank);
+    fp.dir = DANG_FUNCTION_PARAM_IN;
+    fp.name = "in";
+    fp.type = &out->base_type;
+    sig = dang_signature_new (array_type, 1, &fp);
+    f = dang_function_new_simple_c (sig,
+                                    cast_from_tensor_to_array,
+                                    out, NULL);
+    if (!dang_namespace_add_function (dang_namespace_default (),
+                                      array_type->cast_func_name, f, &error))
+      dang_die ("dang_namespace_add_function failed: %s", error->message);
+    dang_function_unref (f);
+    dang_signature_unref (sig);
+  }
+
   return (DangValueType *) out;
 }
 dang_boolean dang_value_type_is_tensor (DangValueType *type)
@@ -720,7 +758,7 @@ variadic_c__dims (DangMatchQuery *query,
   params[0].name = NULL;
   params[0].dir = DANG_FUNCTION_PARAM_IN;
   params[0].type = query->elements[0].info.simple_input;
-  sig = dang_signature_new (dang_value_type_array (dang_value_type_uint32 ()),
+  sig = dang_signature_new (dang_value_type_vector (dang_value_type_uint32 ()),
                             1, params);
   rv = dang_function_new_simple_c (sig, do_tensor_dims, (void*)rank, NULL);
   dang_signature_unref (sig);
@@ -2508,7 +2546,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE (concat_array_of_tensors)
   ConcatInfo *ci = func_data;
   unsigned rank = ci->a_rank;
   unsigned major_length_total;
-  unsigned n_tensors = in->len;
+  //unsigned n_tensors = in->len;
   DangTensor **tensors = in->data;
   DangTensor *last = tensors[0];
   unsigned elt_size;

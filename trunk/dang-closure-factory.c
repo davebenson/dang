@@ -72,8 +72,8 @@ dang_closure_factory_new  (DangSignature *underlying_sig,
                            unsigned       n_params_to_curry)
 {
   DangClosureFactory *factory = dang_new (DangClosureFactory, 1);
-  DangArray copy_back_regions = DANG_ARRAY_STATIC_INIT (CopyBackRegion);
-  DangArray zero_regions = DANG_ARRAY_STATIC_INIT (ZeroRegion);
+  DangArray copy_back_regions = DANG_UTIL_ARRAY_STATIC_INIT (CopyBackRegion);
+  DangArray zero_regions = DANG_UTIL_ARRAY_STATIC_INIT (ZeroRegion);
   unsigned frame_offset;
   unsigned closure_size;
   unsigned i, piece_i;
@@ -92,11 +92,11 @@ dang_closure_factory_new  (DangSignature *underlying_sig,
       if (type->destruct)
         {
           ZeroRegion zr = { frame_offset, size };
-          dang_array_append (&zero_regions, 1, &zr);
+          dang_util_array_append (&zero_regions, 1, &zr);
         }
       cbr.offset = frame_offset;
       cbr.size = size;
-      dang_array_append (&copy_back_regions, 1, &cbr);
+      dang_util_array_append (&copy_back_regions, 1, &cbr);
       frame_offset += size;
     }
   for (i = 0; i < underlying_sig->n_params - n_params_to_curry; i++)
@@ -109,13 +109,13 @@ dang_closure_factory_new  (DangSignature *underlying_sig,
         {
           /* add zero region */
           ZeroRegion zr = { frame_offset, size };
-          dang_array_append (&zero_regions, 1, &zr);
+          dang_util_array_append (&zero_regions, 1, &zr);
         }
       if (underlying_sig->params[i].type->destruct
        || underlying_sig->params[i].dir != DANG_FUNCTION_PARAM_IN)
         {
           CopyBackRegion cbr = { frame_offset, size };
-          dang_array_append (&copy_back_regions, 1, &cbr);
+          dang_util_array_append (&copy_back_regions, 1, &cbr);
         }
       frame_offset += size;
     }
@@ -159,8 +159,8 @@ dang_closure_factory_new  (DangSignature *underlying_sig,
   factory->n_copy_back_regions = copy_back_regions.len;
   factory->copy_back_regions
     = dang_memdup (copy_back_regions.data, sizeof(CopyBackRegion) * copy_back_regions.len);
-  dang_array_clear (&zero_regions);
-  dang_array_clear (&copy_back_regions);
+  dang_util_array_clear (&zero_regions);
+  dang_util_array_clear (&copy_back_regions);
   factory->result_sig = dang_signature_new (underlying_sig->return_type,
                                             underlying_sig->n_params - n_params_to_curry,
                                             underlying_sig->params);

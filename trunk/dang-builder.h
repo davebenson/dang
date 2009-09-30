@@ -49,7 +49,7 @@ struct _DangBuilderVariable
 typedef struct _DangBuilderScope DangBuilderScope;
 struct _DangBuilderScope
 {
-  DangArray var_ids;
+  DangUtilArray var_ids;
   DangBuilderScope *up;
 };
 
@@ -66,7 +66,7 @@ typedef struct _DangBuilderScopedLabel DangBuilderScopedLabel;
 struct _DangBuilderScopedLabel
 {
   char *name;
-  DangArray labels;             /* of DangLabelId, used like a stack */
+  DangUtilArray labels;             /* of DangLabelId, used like a stack */
 };
 
 typedef struct _DangBuilderCatchClause DangBuilderCatchClause;
@@ -99,16 +99,16 @@ struct _DangBuilder
   DangAnnotations *annotations;
   DangFunction *function;       /* initially a FunctionStub, converted to a FunctionDang by
                                    dang_builder_compile() */
-  DangArray insns;              /* of DangInsn */
-  DangArray labels;             /* of DangBuilderLabel */
-  DangArray scoped_labels;      /* of DangBuilderScopedLabel */
+  DangUtilArray insns;              /* of DangInsn */
+  DangUtilArray labels;             /* of DangBuilderLabel */
+  DangUtilArray scoped_labels;      /* of DangBuilderScopedLabel */
 
   /* All variables: named, temporary or aliased:
        named:       user-named variable
        temporary:   unnamed variable allocated to implement something
        aliased:     pointer into a named or temporary variable
    */
-  DangArray vars;               /* of DangBuilderVariable */
+  DangUtilArray vars;               /* of DangBuilderVariable */
 
   /* the return value is always variable (DangVarId)0.  */
   dang_boolean has_return_value;
@@ -121,7 +121,7 @@ struct _DangBuilder
   DangBuilderScope *tmp_scope;
 
   /* array of all catch blocks for this function */
-  DangArray catch_blocks;
+  DangUtilArray catch_blocks;
 
   DangSignature *sig;
   DangImports *imports;

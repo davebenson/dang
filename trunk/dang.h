@@ -69,6 +69,7 @@ typedef unsigned DangVarId;
 
 /* addons */
 #include "dang-tensor.h"
+#include "dang-array.h"
 
 /* misc */
 #include "dang-cleanup.h"

@@ -226,9 +226,9 @@ struct _DangInsnDestroy
 
 typedef struct
 {
-  DangArray step_data;
-  DangArray label_fixups;
-  DangArray destroys;
+  DangUtilArray step_data;
+  DangUtilArray label_fixups;
+  DangUtilArray destroys;
 
   /* reference to builder array, for convenience */
   unsigned n_vars;

@@ -26,7 +26,7 @@ struct _DangParser
   void             (*destroy)   (DangParser *parser);
 
   /* a queue of expressions. note: we may change this impl someday */
-  DangArray results;
+  DangUtilArray results;
 
   DangImports *imports;
 };
@@ -80,11 +80,11 @@ struct _DangParserDefault
 {
   DangParser base;
   void *lemon_parser;
-  DangArray errors;
+  DangUtilArray errors;
   DangToken *last_token;
 
   /* the our-grammar-depends-on-knowing-the-type hack */
-  DangArray bareword_dot_arr;   /* for identifying types */
+  DangUtilArray bareword_dot_arr;   /* for identifying types */
 
   /* the langle hack. TODO: documnet */
   dang_boolean look_for_langle;

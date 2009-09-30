@@ -57,9 +57,9 @@ struct _DangValueTypeObject
   DangValueTypeObject *first_child, *last_child;
 
   /* Type,offset pairs of all instance members that require destruction */
-  DangArray non_memcpy_members;
+  DangUtilArray non_memcpy_members;
 
-  DangArray mutable_fct_offsets;
+  DangUtilArray mutable_fct_offsets;
 };
 DangValueType *dang_value_type_object (void);
 dang_boolean   dang_value_type_is_object  (DangValueType *type);

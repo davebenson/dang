@@ -56,7 +56,7 @@ dang_type_gather_template_params (DangValueType *type,
       for (i = 0; i < len; i++)
         if (types[i] == type)
           return;
-      dang_array_append (params_out, 1, &type);
+      dang_util_array_append (params_out, 1, &type);
       return;
     }
   if (dang_value_type_is_tensor (type))
@@ -176,8 +176,8 @@ dang_boolean dang_templated_type_check (DangValueType *templated_type,
               return FALSE;
             return TRUE;
           }
-      dang_array_append (pairs_out, 1, &templated_type);
-      dang_array_append (pairs_out, 1, &match_type);
+      dang_util_array_append (pairs_out, 1, &templated_type);
+      dang_util_array_append (pairs_out, 1, &match_type);
       return TRUE;
     }
   if (dang_value_type_is_tensor (templated_type))

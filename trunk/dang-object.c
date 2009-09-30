@@ -122,8 +122,8 @@ static DangValueTypeObject the_type =
   FALSE,        /* instantiated */
   FALSE,        /* compiled_virtuals */
   NULL, NULL, NULL, NULL,       /* type-tree pointers */
-  DANG_ARRAY_STATIC_INIT (NonMemcpyMember),
-  DANG_ARRAY_STATIC_INIT (unsigned)
+  DANG_UTIL_ARRAY_STATIC_INIT (NonMemcpyMember),
+  DANG_UTIL_ARRAY_STATIC_INIT (unsigned)
 };
 DangValueType *dang_value_type_object (void)
 {
@@ -191,8 +191,8 @@ dang_object_type_subclass (DangValueType *parent_type,
   rv->instance_size = parent_otype->instance_size;
   rv->class_alloced = parent_otype->class_alloced;
   rv->instance_alloced = parent_otype->instance_alloced;
-  DANG_ARRAY_INIT (&rv->mutable_fct_offsets, unsigned);
-  DANG_ARRAY_INIT (&rv->non_memcpy_members, NonMemcpyMember);
+  DANG_UTIL_ARRAY_INIT (&rv->mutable_fct_offsets, unsigned);
+  DANG_UTIL_ARRAY_INIT (&rv->non_memcpy_members, NonMemcpyMember);
   rv->the_class = dang_malloc (rv->class_alloced);
   rv->prototype_instance = dang_malloc (rv->instance_alloced);
   ((DangObjectClass *) rv->the_class)->type = &rv->base_type;
@@ -384,7 +384,7 @@ dang_object_add_method  (DangValueType  *object_type,
           * (DangFunction **) ((char*)otype->prototype_instance + offset) = func;
           nmm.offset = offset;
           nmm.type = dang_value_type_function (func->base.sig);
-          dang_array_append (&otype->non_memcpy_members, 1, &nmm);
+          dang_util_array_append (&otype->non_memcpy_members, 1, &nmm);
         }
       dang_function_attach_ref (func);
     }
@@ -506,7 +506,7 @@ dang_object_add_abstract_method (DangValueType  *object_type,
       * (DangFunction **) ((char*)otype->prototype_instance + offset) = NULL;
       nmm.offset = offset;
       nmm.type = dang_value_type_function (sig);
-      dang_array_append (&otype->non_memcpy_members, 1, &nmm);
+      dang_util_array_append (&otype->non_memcpy_members, 1, &nmm);
     }
   return TRUE;
 }
@@ -608,7 +608,7 @@ dang_object_add_member (DangValueType  *object_type,
       NonMemcpyMember nmm;
       nmm.offset = offset;
       nmm.type = member_type;
-      dang_array_append (&otype->non_memcpy_members, 1, &nmm);
+      dang_util_array_append (&otype->non_memcpy_members, 1, &nmm);
     }
   dang_value_type_add_simple_member (object_type, name, flags, member_type,
                                      TRUE, offset);
@@ -724,8 +724,8 @@ free_object_type_recursive2 (DangValueTypeObject *o)
       dtype = next;
     }
 
-  dang_array_clear (&o->non_memcpy_members);
-  dang_array_clear (&o->mutable_fct_offsets);
+  dang_util_array_clear (&o->non_memcpy_members);
+  dang_util_array_clear (&o->mutable_fct_offsets);
 
   dang_value_type_cleanup (&o->base_type);
 

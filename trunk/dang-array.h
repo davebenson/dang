@@ -1,18 +1,23 @@
 
 typedef struct _DangArray DangArray;
-typedef struct _DangArrayClass DangArrayClass;
-
-struct _DangArrayClass
-{
-  DangObjectClass base;
-};
 
 struct _DangArray
 {
-  DangObject base;
-  DangArray *tensor;
+  DangTensor *tensor;
+  unsigned ref_count;
   unsigned alloced;             /* allocated size of first dimension */
 };
+
+static DangValueType **
+make_repeated_type (DangValueType **fill,
+                    unsigned        N,
+                    DangValueType  *s)
+{
+  unsigned i;
+  for (i = 0; i < N; i++)
+    fill[i] = s;
+  return fill;
+}
 
 typedef struct _DangValueTypeArray DangValueTypeArray;
 struct _DangValueTypeArray

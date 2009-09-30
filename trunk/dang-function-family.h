@@ -26,8 +26,8 @@ struct _DangFunctionFamily
   union
   {
     struct {
-      DangArray functions;
-      DangArray families;
+      DangUtilArray functions;
+      DangUtilArray families;
     } container;
     struct {
       DangFunctionTrySigFunc try_sig;

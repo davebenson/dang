@@ -17,6 +17,7 @@ default-parser.o \
 dang-init.o \
 dang-main.o \
 dang.o \
+dang-array.o \
 dang-compile-context.o \
 dang-code-position.o \
 dang-debug.o \

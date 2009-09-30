@@ -93,9 +93,9 @@ dang_builder_compile    (DangBuilder *builder,
 
   /* Pack into DangStep's.  Note fixups, meaning places where places that 
      must be replaced with pointers to DangSteps, once the packed slab is allocated. */
-  DANG_ARRAY_INIT (&context.step_data, char);
-  DANG_ARRAY_INIT (&context.label_fixups, DangInsnLabelFixup);
-  DANG_ARRAY_INIT (&context.destroys, DangInsnDestroy);
+  DANG_UTIL_ARRAY_INIT (&context.step_data, char);
+  DANG_UTIL_ARRAY_INIT (&context.label_fixups, DangInsnLabelFixup);
+  DANG_UTIL_ARRAY_INIT (&context.destroys, DangInsnDestroy);
   labels = builder->labels.data;
   final_step_offsets = dang_new (unsigned, n_steps);
   context.n_vars = builder->vars.len;
@@ -319,7 +319,7 @@ allocate_stack__first_fit (Builder *builder,
   GSK_QSORT (actions, Action, n_actions, COMPARE);
 #undef COMPARE
 
-  DANG_ARRAY_INIT (&free_blocks, FreeBlock);
+  DANG_UTIL_ARRAY_INIT (&free_blocks, FreeBlock);
 
   for (i = 0; i < n_actions; i++)
     if (actions[i].is_start)
@@ -340,7 +340,7 @@ allocate_stack__first_fit (Builder *builder,
               if (at_start && at_end)
                 {
                   /* Free block is destroyed. */
-                  dang_array_remove (&free_blocks, f, 1);
+                  dang_util_array_remove (&free_blocks, f, 1);
                 }
               else if (at_start)
                 {
@@ -357,7 +357,7 @@ allocate_stack__first_fit (Builder *builder,
                   new.start = tmp_fbs[f].start + offset + size;
                   new.size = tmp_fbs[f].start - offset - size;
                   tmp_fbs[f].size = offset;
-                  dang_array_insert (&free_blocks, 1, &new, f+1);
+                  dang_util_array_insert (&free_blocks, 1, &new, f+1);
                 }
               did_allocation = TRUE;
               break;
@@ -406,7 +406,7 @@ allocate_stack__first_fit (Builder *builder,
           {
             unsigned new_end = tmp_fbs[f].size + tmp_fbs[f].start;
             tmp_fbs[f-1].size = new_end - tmp_fbs[f-1].start;
-            dang_array_remove (&free_blocks, f, 1);
+            dang_util_array_remove (&free_blocks, f, 1);
           }
         else if (adj_start)
           {
@@ -422,13 +422,13 @@ allocate_stack__first_fit (Builder *builder,
             FreeBlock tmp;
             tmp.start = var_start;
             tmp.size = var_size;
-            dang_array_insert (&free_blocks, 1, &tmp, f);
+            dang_util_array_insert (&free_blocks, 1, &tmp, f);
           }
       }
 
   /* Clean up */
   dang_free (actions);
-  dang_array_clear (&free_blocks);
+  dang_util_array_clear (&free_blocks);
 }
 
 static void
@@ -478,7 +478,7 @@ init_stack_infos__file_info (Builder *builder,
   DangArray line_infos;
   DangString *last_filename = NULL;
   unsigned n_filenames = 0;
-  DANG_ARRAY_INIT (&array, Triple);
+  DANG_UTIL_ARRAY_INIT (&array, Triple);
   for (i = 0; i < n_steps; i++)
     {
       if (steps[i].base.cp.filename)
@@ -494,7 +494,7 @@ init_stack_infos__file_info (Builder *builder,
                 ((Triple*)array.data)[array.len-1] = triple;
               else
                 {
-                  dang_array_append (&array, 1, &triple);
+                  dang_util_array_append (&array, 1, &triple);
                   last_step = step;
                 }
             }
@@ -519,7 +519,7 @@ init_stack_infos__file_info (Builder *builder,
   *n_file_out = n_filenames;
   *file_info_out = dang_new (DangFunctionFileInfo *, n_filenames);
   last_filename = NULL;
-  DANG_ARRAY_INIT (&line_infos, DangFunctionLineInfo);
+  DANG_UTIL_ARRAY_INIT (&line_infos, DangFunctionLineInfo);
   n_filenames = 0;
   for (i = 0; i < array.len; i++)
     {
@@ -531,7 +531,7 @@ init_stack_infos__file_info (Builder *builder,
             (*file_info_out)[n_filenames-1] = create_file_info (last_filename, &line_infos);
           n_filenames++;
           last_filename = triple->filename;
-          dang_array_set_size (&line_infos, 0);
+          dang_util_array_set_size (&line_infos, 0);
         }
       if (line_infos.len == 0
         || ((DangFunctionLineInfo*)line_infos.data)[line_infos.len-1].line != triple->line)
@@ -539,14 +539,14 @@ init_stack_infos__file_info (Builder *builder,
           DangFunctionLineInfo line_info;
           line_info.step = triple->step;
           line_info.line = triple->line;
-          dang_array_append (&line_infos, 1, &line_info);
+          dang_util_array_append (&line_infos, 1, &line_info);
         }
     }
   /* Allocate FileInfo */
   if (line_infos.len > 0)
     (*file_info_out)[n_filenames-1] = create_file_info (last_filename, &line_infos);
-  dang_array_clear (&array);
-  dang_array_clear (&line_infos);
+  dang_util_array_clear (&array);
+  dang_util_array_clear (&line_infos);
 }
 
 
@@ -693,7 +693,7 @@ renumber_var   (DangBuilderVariable   *var,
 }
 static void add_inits_and_destructs (DangBuilder *builder)
 {
-  DangArray fixups = DANG_ARRAY_STATIC_INIT (VarFixupInsertion);
+  DangArray fixups = DANG_UTIL_ARRAY_STATIC_INIT (VarFixupInsertion);
   unsigned i, j;
   DangInsn *orig_insns = builder->insns.data;
   unsigned n_init, n_destruct;
@@ -723,7 +723,7 @@ static void add_inits_and_destructs (DangBuilder *builder)
               fixup.added_insns[n_destruct + j].init.var = init[j];
             }
           if (fixup.n_add > 0)
-            dang_array_append (&fixups, 1, &fixup);
+            dang_util_array_append (&fixups, 1, &fixup);
           dang_free (destruct);
           dang_free (init);
           break;
@@ -764,7 +764,7 @@ static void add_inits_and_destructs (DangBuilder *builder)
               fixup.orig_step_num = i;
               fixup.n_add = 1 + n_destruct + n_init;
               fixup.added_insns = added_insns;
-              dang_array_append (&fixups, 1, &fixup);
+              dang_util_array_append (&fixups, 1, &fixup);
               dang_free (destruct);
               dang_free (init);
             }
@@ -783,7 +783,7 @@ static void add_inits_and_destructs (DangBuilder *builder)
                   dang_insn_init (&fixup.added_insns[j], DANG_INSN_TYPE_DESTRUCT);
                   fixup.added_insns[j].destruct.var = destruct[j];
                 }
-              dang_array_append (&fixups, 1, &fixup);
+              dang_util_array_append (&fixups, 1, &fixup);
               dang_free (destruct);
             }
           break;
@@ -803,7 +803,7 @@ static void add_inits_and_destructs (DangBuilder *builder)
 
   /* Restructure the insn array */
   unsigned orig_len = builder->insns.len;
-  dang_array_set_size (&builder->insns, builder->insns.len + added_thus_far);
+  dang_util_array_set_size (&builder->insns, builder->insns.len + added_thus_far);
   for (j = 0; j < fixups.len; j++)
     {
       VarFixupInsertion *fixup = (VarFixupInsertion*)fixups.data + (fixups.len - 1 - j);
@@ -861,14 +861,14 @@ add_label_step_pair (Builder *builder,
 {
   Label *lab = (Label*)builder->labels.data + label;
   LabelStepPair pair = { label, lab->target };
-  dang_array_append (lab_step_pairs, 1, &pair);
+  dang_util_array_append (lab_step_pairs, 1, &pair);
 }
 
 static void
 dump_insns (Builder *builder)
 {
   DangStringBuffer buf = DANG_STRING_BUFFER_INIT;
-  DangArray lab_step_pairs = DANG_ARRAY_STATIC_INIT (LabelStepPair);
+  DangArray lab_step_pairs = DANG_UTIL_ARRAY_STATIC_INIT (LabelStepPair);
   unsigned i;
   unsigned n_steps = builder->insns.len;
   DangInsn *steps = builder->insns.data;
@@ -894,7 +894,7 @@ dump_insns (Builder *builder)
             arr[n_out++] = arr[in_index];
           in_index++;
         }
-      dang_array_set_size (&lab_step_pairs, n_out);
+      dang_util_array_set_size (&lab_step_pairs, n_out);
     }
 
   LabelStepPair *pairs = lab_step_pairs.data;

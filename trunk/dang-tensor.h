@@ -19,9 +19,8 @@ DangValueType *dang_value_type_tensor (DangValueType *element_type,
                                        unsigned rank);
 dang_boolean dang_value_type_is_tensor (DangValueType *type);
 
-#define dang_value_type_array(element_type) \
+#define dang_value_type_vector(element_type) \
   dang_value_type_tensor(element_type,1)
-#define dang_value_type_vector dang_value_type_array
 #define dang_value_type_matrix(element_type) \
   dang_value_type_tensor(element_type,2)
 

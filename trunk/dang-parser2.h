@@ -30,7 +30,7 @@ struct _DangTokenTree
 
 struct _DangParser
 {
-  DangArray token_trees;
+  DangUtilArray token_trees;
 };
 
 typedef enum

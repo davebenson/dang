@@ -8,8 +8,8 @@ typedef DangVarTableVariable Variable;
 DangVarTable *dang_var_table_new (dang_boolean has_rv)
 {
   DangVarTable *var_table = dang_new (DangVarTable, 1);
-  DANG_ARRAY_INIT (&var_table->variables, Variable);
-  DANG_ARRAY_INIT (&var_table->scopes, Scope);
+  DANG_UTIL_ARRAY_INIT (&var_table->variables, Variable);
+  DANG_UTIL_ARRAY_INIT (&var_table->scopes, Scope);
   var_table->has_rv = has_rv;
   dang_var_table_push (var_table);
   return var_table;
@@ -17,8 +17,8 @@ DangVarTable *dang_var_table_new (dang_boolean has_rv)
 
 void dang_var_table_push (DangVarTable *var_table)
 {
-  Scope scope = { DANG_ARRAY_STATIC_INIT(DangVarId) };
-  dang_array_append (&var_table->scopes, 1, &scope);
+  Scope scope = { DANG_UTIL_ARRAY_STATIC_INIT(DangVarId) };
+  dang_util_array_append (&var_table->scopes, 1, &scope);
 }
 
 void dang_var_table_pop (DangVarTable *var_table)
@@ -26,8 +26,8 @@ void dang_var_table_pop (DangVarTable *var_table)
   Scope *to_kill;
   dang_assert (var_table->scopes.len > 0);
   to_kill = (Scope*) var_table->scopes.data + var_table->scopes.len - 1;
-  dang_array_clear (&to_kill->var_ids);
-  dang_array_set_size (&var_table->scopes, var_table->scopes.len - 1);
+  dang_util_array_clear (&to_kill->var_ids);
+  dang_util_array_set_size (&var_table->scopes, var_table->scopes.len - 1);
 }
 
 static DangVarId alloc_local (DangVarTable *var_table,
@@ -56,8 +56,8 @@ static DangVarId alloc_local (DangVarTable *var_table,
   v.is_param = is_param;
   v.param_dir = dir;
   rv = var_table->variables.len;
-  dang_array_append (&var_table->variables, 1, &v);
-  dang_array_append (&last->var_ids, 1, &rv);
+  dang_util_array_append (&var_table->variables, 1, &v);
+  dang_util_array_append (&last->var_ids, 1, &rv);
   return rv;
 }
 DangVarId dang_var_table_alloc_local (DangVarTable *var_table,
@@ -141,7 +141,7 @@ void dang_var_table_free (DangVarTable *var_table)
   Variable *vars = var_table->variables.data;
   unsigned i;
   for (i = 0; i < var_table->scopes.len; i++)
-    dang_array_clear (&scopes[i].var_ids);
+    dang_util_array_clear (&scopes[i].var_ids);
   for (i = 0; i < var_table->variables.len; i++)
     dang_free (vars[i].name);
   dang_free (vars);
