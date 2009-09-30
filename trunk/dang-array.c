@@ -1,3 +1,4 @@
+#include <string.h>
 #include "dang.h"
 #include "magic.h"
 #include "config.h"
@@ -15,6 +16,155 @@ static DangValueTypeArray *array_type_tree;
 #define GET_ARRAY_TREE() \
   array_type_tree, DangValueTypeArray *, GET_IS_RED, SET_IS_RED, \
   parent, left, right, COMPARE_ARRAY_TREE_NODES
+
+static DangValueType **
+make_repeated_type (DangValueType **fill,
+                    unsigned        N,
+                    DangValueType  *s)
+{
+  unsigned i;
+  for (i = 0; i < N; i++)
+    fill[i] = s;
+  return fill;
+}
+
+static void
+array_init_assign (DangValueType *type,
+                   void          *dst,
+                   const void    *src)
+{
+  DangArray *arr = * (DangArray **) src;
+  DANG_UNUSED (type);
+  * (DangArray **) dst = arr;
+  if (arr)
+    arr->ref_count += 1;
+}
+
+static void
+array_assign      (DangValueType *type,
+                   void          *dst,
+                   const void    *src)
+{
+  DangArray *arr = * (DangArray **) src;
+  DangArray *orig = * (DangArray **) dst;
+  if (arr)
+    arr->ref_count += 1;
+  if (orig)
+    {
+      if (--(orig->ref_count) == 0)
+        {
+          DangValueTypeArray *atype = (DangValueTypeArray *) type;
+          dang_tensor_unref (atype->tensor_type, orig->tensor);
+          dang_free (orig);
+        }
+    }
+  * (DangArray **) dst = arr;
+}
+static void
+array_destruct (DangValueType *type,
+                void          *to_destruct)
+{
+  DangArray *arr = * (DangArray **) to_destruct;
+  if (arr && --(arr->ref_count) == 0)
+    {
+      DangValueTypeArray *atype = (DangValueTypeArray *) type;
+      dang_tensor_unref (atype->tensor_type, arr->tensor);
+      dang_free (arr);
+    }
+}
+
+static char *
+array_to_string (DangValueType *type,
+                 const void   *data)
+{
+  DangArray *arr = * (DangArray **) data;
+  if (arr == NULL)
+    return dang_strdup ("(null)");
+  else
+    {
+      DangValueTypeArray *atype = (DangValueTypeArray *) type;
+      return dang_tensor_to_string (atype->tensor_type, arr->tensor);
+    }
+}
+
+static dang_boolean
+index_get_ptr_array (DangValueIndexInfo *index_info,
+                      void          *container,
+                      const void   **indices,
+                      void         **rv_ptr_out,
+                      DangError    **error)
+{
+  DangArray *array = *(DangArray**) container;
+  DangTensor *tensor;
+  DangValueTypeArray *ttype = (DangValueTypeArray *) index_info->owner;
+  unsigned rank = ttype->rank;
+  uint32_t ind = * (uint32_t*)(indices[0]);
+  unsigned overall_ind, i;
+  if (array == NULL || array->tensor == NULL)
+    {
+      dang_tensor_oob_error (error, 0, 0, ind);
+      return FALSE;
+    }
+  tensor = array->tensor;
+  if (ind >= tensor->sizes[0])
+    {
+      dang_tensor_oob_error (error, 0, tensor->sizes[0], ind);
+      return FALSE;
+    }
+  overall_ind = ind;
+  for (i = 1; i < rank; i++)
+    {
+      uint32_t ind = * (uint32_t*)(indices[i]);
+      if (ind >= tensor->sizes[i])
+        {
+          dang_tensor_oob_error (error, i, tensor->sizes[i], ind);
+          return FALSE;
+        }
+      overall_ind *= tensor->sizes[i];
+      overall_ind += ind;
+    }
+  *rv_ptr_out = (char*)tensor->data + overall_ind * ttype->element_type->sizeof_instance;
+  return TRUE;
+}
+static dang_boolean
+index_get__array   (DangValueIndexInfo *ii,
+                     void          *container,
+                     const void   **indices,
+                     void          *rv_out,
+                     dang_boolean   may_create,
+                     DangError    **error)
+{
+  DangValueType *elt_type = ((DangValueTypeArray*)ii->owner)->element_type;
+  void *ptr;
+  DANG_UNUSED (may_create);
+  if (!index_get_ptr_array (ii, container, indices, &ptr, error))
+    return FALSE;
+  if (elt_type->init_assign)
+    elt_type->init_assign (elt_type, rv_out, ptr);
+  else
+    memcpy (rv_out, ptr, elt_type->sizeof_instance);
+  return TRUE;
+}
+
+static dang_boolean
+index_set__array   (DangValueIndexInfo *ii,
+                     void          *container,
+                     const void   **indices,
+                     const void    *element_value,
+                     dang_boolean   may_create,
+                     DangError    **error)
+{
+  DangValueType *elt_type = ((DangValueTypeArray*)ii->owner)->element_type;
+  void *ptr;
+  DANG_UNUSED (may_create);
+  if (!index_get_ptr_array (ii, container, indices, &ptr, error))
+    return FALSE;
+  if (elt_type->assign)
+    elt_type->assign (elt_type, ptr, element_value);
+  else
+    memcpy (ptr, element_value, elt_type->sizeof_instance);
+  return TRUE;
+}
 
 
 DangValueType *
@@ -82,15 +232,31 @@ dang_value_type_array  (DangValueType *element_type,
   out->index_infos[1].element_type = element_type;
   out->tensor_type = dang_value_type_tensor (element_type, rank);
 
-  /* add casts to and from tensors */
+  DangFunctionParam fp;
+  DangSignature *sig;
+  DangFunction *f;
+
+  /* add cast from array -> tensor */
   fp.dir = DANG_FUNCTION_PARAM_IN;
   fp.name = "in";
   fp.type = &out->base_type;
   sig = dang_signature_new (out->tensor_type, 1, &fp);
-  f = dang_function_new_simple_c (sig,
-                                  cast_from_array_to_tensor
+  f = dang_function_new_simple_c (sig, cast_from_array_to_tensor, out, NULL);
   if (!dang_namespace_add_function (dang_namespace_default (),
                                     out->tensor_type->cast_func_name,
+                                    f, &error))
+    dang_error ("dang_namespace_add_function failed: %s", error->message);
+  dang_function_unref (f);
+  dang_signature_unref (sig);
+
+  /* add cast from tensor -> array */
+  fp.dir = DANG_FUNCTION_PARAM_IN;
+  fp.name = "in";
+  fp.type = out->tensor_type;
+  sig = dang_signature_new (out->tensor_type, 1, &fp);
+  f = dang_function_new_simple_c (sig, cast_from_tensor_to_array, out, NULL);
+  if (!dang_namespace_add_function (dang_namespace_default (),
+                                    out->base_type.cast_func_name,
                                     f, &error))
     dang_error ("dang_namespace_add_function failed: %s", error->message);
   dang_function_unref (f);

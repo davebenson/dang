@@ -99,12 +99,9 @@ append_tensor_to_string (DangValueType *elt_type,
     }
 }
 
-static char *
-tensor_to_string (DangValueType *type,
-                  const void    *value)
+char *dang_tensor_to_string (DangValueType *type,
+                             DangTensor    *tensor)
 {
-  DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
-  const DangTensor *tensor = * (const DangTensor *const *) value;
   if (tensor == NULL)
     {
       char *rv = dang_malloc (ttype->rank * 2 + 1);
@@ -118,10 +115,18 @@ tensor_to_string (DangValueType *type,
       const unsigned *sizes = tensor->sizes;
       const void *elements = tensor->data;
       DangStringBuffer buf = DANG_STRING_BUFFER_INIT;
-      dang_warning ("tensor_to_string: rank=%u", ttype->rank);
       append_tensor_to_string (ttype->element_type, ttype->rank, sizes, &elements, &buf);
       return buf.str;
     }
+}
+
+static char *
+tensor_to_string (DangValueType *type,
+                  const void    *value)
+{
+  DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
+  DangTensor *tensor = * (DangTensor **) value;
+  return dang_tensor_to_string (ttype, tensor);
 }
 
 static DANG_SIMPLE_C_FUNC_DECLARE (cast_from_tensor_to_array)
@@ -142,11 +147,11 @@ static DANG_SIMPLE_C_FUNC_DECLARE (cast_from_tensor_to_array)
   return TRUE;
 }
 
-static void
-oob_error (DangError **error,
-           unsigned    which_index,
-           unsigned    dim,
-           unsigned    index)
+void
+dang_tensor_oob_error (DangError **error,
+                       unsigned    which_index,
+                       unsigned    dim,
+                       unsigned    index)
 {
   dang_set_error (error, "index #%u to tensor index is out-of-bounds: index %u with dimension %u",
                   which_index+1, index, dim);
@@ -166,12 +171,12 @@ index_get_ptr_tensor (DangValueIndexInfo *index_info,
   unsigned overall_ind, i;
   if (tensor == NULL)
     {
-      oob_error (error, 0, 0, ind);
+      dang_tensor_oob_error (error, 0, 0, ind);
       return FALSE;
     }
   if (ind >= tensor->sizes[0])
     {
-      oob_error (error, 0, tensor->sizes[0], ind);
+      dang_tensor_oob_error (error, 0, tensor->sizes[0], ind);
       return FALSE;
     }
   overall_ind = ind;
@@ -180,7 +185,7 @@ index_get_ptr_tensor (DangValueIndexInfo *index_info,
       uint32_t ind = * (uint32_t*)(indices[i]);
       if (ind >= tensor->sizes[i])
         {
-          oob_error (error, i, tensor->sizes[i], ind);
+          dang_tensor_oob_error (error, i, tensor->sizes[i], ind);
           return FALSE;
         }
       overall_ind *= tensor->sizes[i];
@@ -306,27 +311,6 @@ dang_value_type_tensor (DangValueType *element_type,
   GSK_RBTREE_INSERT (GET_TENSOR_TREE (), out, conflict);
   dang_assert (conflict == NULL);
 
-  /* cast to array<type,rank> */
-  {
-    DangValueType *array_type;
-    DangFunctionParam fp;
-    DangSignature *sig;
-    DangFunction *f;
-    DangError *error = NULL;
-    array_type = dang_value_type_array (element_type, rank);
-    fp.dir = DANG_FUNCTION_PARAM_IN;
-    fp.name = "in";
-    fp.type = &out->base_type;
-    sig = dang_signature_new (array_type, 1, &fp);
-    f = dang_function_new_simple_c (sig,
-                                    cast_from_tensor_to_array,
-                                    out, NULL);
-    if (!dang_namespace_add_function (dang_namespace_default (),
-                                      array_type->cast_func_name, f, &error))
-      dang_die ("dang_namespace_add_function failed: %s", error->message);
-    dang_function_unref (f);
-    dang_signature_unref (sig);
-  }
 
   return (DangValueType *) out;
 }

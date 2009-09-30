@@ -38,6 +38,16 @@ struct _DangTensor
   unsigned sizes[1];
 };
 
+/* functions predominately useful from dang-array */
+void dang_tensor_unref (DangValueType *tensor_type,
+                        DangTensor *tensor);
+
+char * dang_tensor_to_string (DangValueType *type,
+                              DangTensor    *tensor);
+void dang_tensor_oob_error (DangError **error,
+                            unsigned    which_index,
+                            unsigned    dim,
+                            unsigned    index);
 void _dang_tensor_init (DangNamespace *the_ns);
 
 typedef struct _DangMatrix DangMatrix;
