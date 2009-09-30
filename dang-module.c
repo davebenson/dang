@@ -3,16 +3,16 @@
 #include <string.h>
 #include "dang.h"
 
-static DangArray module_search_paths = DANG_ARRAY_STATIC_INIT (char*);
+static DangArray module_search_paths = DANG_UTIL_ARRAY_STATIC_INIT (char*);
 static unsigned max_path_len = 0;
-static DangArray loaded_modules = DANG_ARRAY_STATIC_INIT (char *);
+static DangArray loaded_modules = DANG_UTIL_ARRAY_STATIC_INIT (char *);
 
 void
 dang_module_add_path (const char *path)
 {
   unsigned path_len = strlen (path);
   char *copy = dang_strdup (path);
-  dang_array_append (&module_search_paths, 1, &copy);
+  dang_util_array_append (&module_search_paths, 1, &copy);
   max_path_len = DANG_MAX (max_path_len, path_len);
 }
 
@@ -62,7 +62,7 @@ dang_module_load     (unsigned    n_names,
               dang_free (buf);
               return FALSE;
             }
-          dang_array_append (&loaded_modules, 1, &last);
+          dang_util_array_append (&loaded_modules, 1, &last);
           return TRUE;
         }
     }

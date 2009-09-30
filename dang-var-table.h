@@ -1,7 +1,7 @@
 typedef struct _DangVarTableScope DangVarTableScope;
 struct _DangVarTableScope
 {
-  DangArray var_ids;
+  DangUtilArray var_ids;
 };
 
 typedef struct _DangVarTableVariable DangVarTableVariable;
@@ -17,8 +17,8 @@ struct _DangVarTableVariable
 
 struct _DangVarTable
 {
-  DangArray variables;
-  DangArray scopes;
+  DangUtilArray variables;
+  DangUtilArray scopes;
   dang_boolean has_rv;
 };
 

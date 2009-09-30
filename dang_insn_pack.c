@@ -86,8 +86,8 @@ dang_insn_pack_context_append (DangInsnPackContext *context,
   DangStep step = { func, step_data_size };
   unsigned step_data_offset = context->step_data.len + sizeof (DangStep);
                       
-  dang_array_append (&context->step_data, sizeof (step), &step);
-  dang_array_append (&context->step_data, step_data_size, step_data);
+  dang_util_array_append (&context->step_data, sizeof (step), &step);
+  dang_util_array_append (&context->step_data, step_data_size, step_data);
   if (step_data_destroy != NULL)
     {
       DangInsnDestroy des = { TRUE,
@@ -95,7 +95,7 @@ dang_insn_pack_context_append (DangInsnPackContext *context,
                               step_data_offset,
                               NULL,         /* no 'first_arg': it'll be the step */
                               NULL };       /* no 'second_arg': for step_data_destroy */
-      dang_array_append (&context->destroys, 1, &des);
+      dang_util_array_append (&context->destroys, 1, &des);
     }
 }
 static void
@@ -105,7 +105,7 @@ dang_insn_pack_context_add_destroy (DangInsnPackContext *context,
                                     void *arg2)
 {
   DangInsnDestroy des = { FALSE, destroy, 0, arg1, arg2 };
-  dang_array_append (&context->destroys, 1, &des);
+  dang_util_array_append (&context->destroys, 1, &des);
 }
 
 static void
@@ -118,7 +118,7 @@ dang_insn_pack_context_note_target (DangInsnPackContext *context,
                          + sizeof (DangStep)
                          + offset_in_next_step_data;
   fixup.label = target;
-  dang_array_append (&context->label_fixups, 1, &fixup);
+  dang_util_array_append (&context->label_fixups, 1, &fixup);
 }
 
 
@@ -1672,7 +1672,7 @@ handle_param_substeps (DangInsnPackContext *context,
 //      /* Just zero the param on input */
 //      istep.type = INVOCATION_INPUT_SUBSTEP_ZERO;
 //      istep.type_info.size = type->sizeof_instance;
-//      dang_array_append (input_substeps, 1, &istep);
+//      dang_util_array_append (input_substeps, 1, &istep);
 //    }
 //  else
     {
@@ -1692,7 +1692,7 @@ handle_param_substeps (DangInsnPackContext *context,
         case DANG_INSN_LOCATION_POINTER:
           {
             unsigned offset = context->vars[res->var].offset;
-            dang_array_append (pointers, 1, &offset);
+            dang_util_array_append (pointers, 1, &offset);
             istep.type = INVOCATION_INPUT_SUBSTEP_MEMCPY_POINTER;
             istep.info.pointer.ptr = context->vars[res->var].offset;
             istep.info.pointer.offset = res->offset;
@@ -1711,12 +1711,12 @@ handle_param_substeps (DangInsnPackContext *context,
             {
               unsigned needed = res->type->alignof_instance
                               - value_data->len % res->type->alignof_instance;
-              dang_array_set_size (value_data, value_data->len + needed);
+              dang_util_array_set_size (value_data, value_data->len + needed);
               memset (value_data->data + value_data->len - needed, 0, needed);
             }
 
           istep.info.literal.offset = value_data->len;
-          dang_array_set_size (value_data,
+          dang_util_array_set_size (value_data,
                                value_data->len + res->type->sizeof_instance);
           {
             void *dst = value_data->data + value_data->len - res->type->sizeof_instance;
@@ -1734,7 +1734,7 @@ handle_param_substeps (DangInsnPackContext *context,
       if (!use_memcpy)
         istep.type += 1;
 
-      dang_array_append (input_substeps, 1, &istep);
+      dang_util_array_append (input_substeps, 1, &istep);
     }
 
   if (dir == DANG_FUNCTION_PARAM_OUT
@@ -1769,14 +1769,14 @@ handle_param_substeps (DangInsnPackContext *context,
       if (!use_memcpy)
         ostep.type += 1;
 
-      dang_array_append (output_substeps, 1, &ostep);
+      dang_util_array_append (output_substeps, 1, &ostep);
     }
   else if (res->type->destruct != NULL)
     {
       /* add destructor */
       ostep.type = INVOCATION_OUTPUT_SUBSTEP_DESTRUCT;
       ostep.type_info.type = res->type;
-      dang_array_append (output_substeps, 1, &ostep);
+      dang_util_array_append (output_substeps, 1, &ostep);
     }
 }
 
@@ -1814,10 +1814,10 @@ pack__function_call (DangInsn *insn,
 
 
   /* Compute parameter details */
-  DANG_ARRAY_INIT (&pointers, unsigned);
-  DANG_ARRAY_INIT (&input_substeps, InvocationInputSubstep);
-  DANG_ARRAY_INIT (&output_substeps, InvocationOutputSubstep);
-  DANG_ARRAY_INIT (&value_data, char);
+  DANG_UTIL_ARRAY_INIT (&pointers, unsigned);
+  DANG_UTIL_ARRAY_INIT (&input_substeps, InvocationInputSubstep);
+  DANG_UTIL_ARRAY_INIT (&output_substeps, InvocationOutputSubstep);
+  DANG_UTIL_ARRAY_INIT (&value_data, char);
   fparams = sig->params;
   cur_called_offset = sizeof (DangThreadStackFrame);
   if (sig->return_type != NULL)
@@ -1909,10 +1909,10 @@ pack__function_call (DangInsn *insn,
                                  NULL);
   dang_free (output_info);
 
-  dang_array_clear (&pointers);
-  dang_array_clear (&input_substeps);
-  dang_array_clear (&output_substeps);
-  dang_array_clear (&value_data);
+  dang_util_array_clear (&pointers);
+  dang_util_array_clear (&input_substeps);
+  dang_util_array_clear (&output_substeps);
+  dang_util_array_clear (&value_data);
 }
 
 
@@ -2050,7 +2050,7 @@ init_param_source_info (ParamSourceInfo *psi,
       break;
     case DANG_INSN_LOCATION_LITERAL:
       /* Align literal data if needed */
-      dang_array_set_size0 (literal_data,
+      dang_util_array_set_size0 (literal_data,
                             DANG_ALIGN (literal_data->len, type->alignof_instance));
 
       psi->type = PARAM_SOURCE_TYPE_LITERAL;
@@ -2059,7 +2059,7 @@ init_param_source_info (ParamSourceInfo *psi,
 
       /* append space */
       old_len = literal_data->len;
-      dang_array_set_size (literal_data, literal_data->len + type->sizeof_instance);
+      dang_util_array_set_size (literal_data, literal_data->len + type->sizeof_instance);
 
       /* init_assign */
       if (type->init_assign)
@@ -2113,11 +2113,11 @@ pack__run_simple_c (DangInsn *insn,
   unsigned i;
   unsigned offset;
 
-  DANG_ARRAY_INIT (&literal_data, char);
+  DANG_UTIL_ARRAY_INIT (&literal_data, char);
   tmp_size = (n_params+1) * sizeof (void *);
   orig_step_size = sizeof (CompiledSimpleCInvocation)
                  + (sig->n_params + 1) * sizeof (ParamSourceInfo);
-  dang_array_set_size (&literal_data, orig_step_size);
+  dang_util_array_set_size (&literal_data, orig_step_size);
   csi = dang_alloca (orig_step_size);
   csi->n_param_source_infos = n_params + 1;
   psi = (ParamSourceInfo *) (csi + 1);

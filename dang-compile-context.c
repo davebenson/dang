@@ -6,8 +6,8 @@
 DangCompileContext *dang_compile_context_new (void)
 {
   DangCompileContext *rv = dang_new (DangCompileContext, 1);
-  DANG_ARRAY_INIT (&rv->stubs, DangFunction *);
-  DANG_ARRAY_INIT (&rv->new_object_functions, DangFunction *);
+  DANG_UTIL_ARRAY_INIT (&rv->stubs, DangFunction *);
+  DANG_UTIL_ARRAY_INIT (&rv->new_object_functions, DangFunction *);
   rv->finishing = FALSE;
   return rv;
 }
@@ -24,8 +24,8 @@ void dang_compile_context_free (DangCompileContext *cc)
       DangFunction *function = ((DangFunction**)cc->new_object_functions.data)[i];
       dang_function_unref (function);
     }
-  dang_array_clear (&cc->stubs);
-  dang_array_clear (&cc->new_object_functions);
+  dang_util_array_clear (&cc->stubs);
+  dang_util_array_clear (&cc->new_object_functions);
   dang_free (cc);
 }
 
@@ -37,12 +37,12 @@ void                dang_compile_context_register(DangCompileContext *cc,
     case DANG_FUNCTION_TYPE_STUB:
       dang_function_ref (function);
       function->stub.cc = cc;
-      dang_array_append (&cc->stubs, 1, &function);
+      dang_util_array_append (&cc->stubs, 1, &function);
       break;
     case DANG_FUNCTION_TYPE_NEW_OBJECT:
       dang_function_ref (function);
       function->new_object.cc = cc;
-      dang_array_append (&cc->new_object_functions, 1, &function);
+      dang_util_array_append (&cc->new_object_functions, 1, &function);
       if (dang_function_needs_registration (function->new_object.constructor))
         dang_compile_context_register (cc, function->new_object.constructor);
       break;
@@ -191,7 +191,7 @@ dang_compile_context_finish (DangCompileContext *cc,
       continue;         /* go on with the loop */
 
 got_error:
-      dang_array_remove (&cc->stubs, 0, i);
+      dang_util_array_remove (&cc->stubs, 0, i);
       cc->finishing = FALSE;
       dang_builder_destroy (builder);
       dang_expr_unref (body);
@@ -207,8 +207,8 @@ got_error:
       dang_function_unref (no);
     }
 
-  dang_array_set_size (&cc->new_object_functions, 0);
-  dang_array_set_size (&cc->stubs, 0);
+  dang_util_array_set_size (&cc->new_object_functions, 0);
+  dang_util_array_set_size (&cc->stubs, 0);
   cc->finishing = FALSE;
   return TRUE;
 }

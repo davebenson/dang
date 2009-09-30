@@ -62,10 +62,10 @@ read_string_from_file (FILE *fp)
   DangArray array;
   int nread;
   char buf[4096];
-  DANG_ARRAY_INIT (&array, char);
+  DANG_UTIL_ARRAY_INIT (&array, char);
   while ((nread=fread (buf, 1, sizeof (buf), fp)) > 0)
-    dang_array_append (&array, nread, buf);
-  dang_array_append (&array, 1, "");
+    dang_util_array_append (&array, nread, buf);
+  dang_util_array_append (&array, 1, "");
   return array.data;
 }
 

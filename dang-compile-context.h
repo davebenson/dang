@@ -3,8 +3,8 @@ typedef struct _DangCompileContextVirtualMethodSlot DangCompileContextVirtualMet
 
 struct _DangCompileContext
 {
-  DangArray stubs;
-  DangArray new_object_functions;
+  DangUtilArray stubs;
+  DangUtilArray new_object_functions;
   dang_boolean finishing;
   DangCompileContextVirtualMethodSlot *virtual_method_slots;
 };

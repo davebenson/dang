@@ -9,7 +9,7 @@ typedef DangBuilderScopedLabel ScopedLabel;
 typedef DangBuilderCatchBlock  CatchBlock;
 typedef DangBuilderScope       Scope;
 #define GET_VAR(builder, var_id)  \
-  DANG_ARRAY_INDEX_PTR (&(builder)->vars, Variable, (var_id))
+  DANG_UTIL_ARRAY_INDEX_PTR (&(builder)->vars, Variable, (var_id))
 
 #if 0
 static void
@@ -46,11 +46,11 @@ dang_builder_new         (DangFunction        *stub,
   dang_assert (sig != NULL);
   unsigned i;
 
-  DANG_ARRAY_INIT (&builder->insns, DangInsn);
-  DANG_ARRAY_INIT (&builder->labels, Label);
-  DANG_ARRAY_INIT (&builder->scoped_labels, ScopedLabel);
-  DANG_ARRAY_INIT (&builder->vars, Variable);
-  DANG_ARRAY_INIT (&builder->catch_blocks, CatchBlock);
+  DANG_UTIL_ARRAY_INIT (&builder->insns, DangInsn);
+  DANG_UTIL_ARRAY_INIT (&builder->labels, Label);
+  DANG_UTIL_ARRAY_INIT (&builder->scoped_labels, ScopedLabel);
+  DANG_UTIL_ARRAY_INIT (&builder->vars, Variable);
+  DANG_UTIL_ARRAY_INIT (&builder->catch_blocks, CatchBlock);
   builder->function = dang_function_ref (stub);
   builder->annotations = annotations;
 
@@ -71,7 +71,7 @@ dang_builder_new         (DangFunction        *stub,
   builder->needs_return = TRUE;
 
   dang_builder_push_local_scope (builder);
-  dang_array_set_size (&builder->vars, var_table->variables.len);
+  dang_util_array_set_size (&builder->vars, var_table->variables.len);
   for (i = 0; i < var_table->variables.len; i++)
     {
       DangVarTableVariable *in = ((DangVarTableVariable*) var_table->variables.data) + i;
@@ -84,7 +84,7 @@ dang_builder_new         (DangFunction        *stub,
       if (var->is_param)
         {
           DangVarId var_id = i;
-          dang_array_append (&builder->local_scope->var_ids, 1, &var_id);
+          dang_util_array_append (&builder->local_scope->var_ids, 1, &var_id);
         }
       var->start = DANG_STEP_NUM_INVALID;
       var->end = DANG_STEP_NUM_INVALID;
@@ -137,7 +137,7 @@ dang_builder_add_insn    (DangBuilder *builder,
   DangInsn insn_copy = *insn;
   if (insn_copy.base.cp.filename == NULL)
     dang_code_position_copy (&insn_copy.base.cp, &builder->pos);
-  dang_array_append (&builder->insns, 1, &insn_copy);
+  dang_util_array_append (&builder->insns, 1, &insn_copy);
   builder->needs_return = TRUE;
 }
 
@@ -250,7 +250,7 @@ dang_builder_find_named_label            (DangBuilder *builder,
 
   label_init (&new_label, DANG_FUNCTION_BUILDER_LABEL_TYPE_NAMED);
   new_label.name = dang_strdup (name);
-  dang_array_append (&builder->labels, 1, &new_label);
+  dang_util_array_append (&builder->labels, 1, &new_label);
   dang_code_position_init (&new_label.first_goto_position);
   dang_code_position_init (&new_label.definition_position);
   labels = builder->labels.data;                /* re-initialize after append */
@@ -303,8 +303,8 @@ dang_builder_start_scoped_label (DangBuilder *builder,
     {
       ScopedLabel scoped_label;
       scoped_label.name = dang_strdup (name);
-      DANG_ARRAY_INIT (&scoped_label.labels, DangLabelId);
-      dang_array_append (&builder->scoped_labels, 1, &scoped_label);
+      DANG_UTIL_ARRAY_INIT (&scoped_label.labels, DangLabelId);
+      dang_util_array_append (&builder->scoped_labels, 1, &scoped_label);
       scoped_labels = builder->scoped_labels.data;  /* re-initialize after append */
       n_scoped_labels = builder->scoped_labels.len;  /* re-initialize after append */
     }
@@ -315,10 +315,10 @@ dang_builder_start_scoped_label (DangBuilder *builder,
   new_label.name = dang_strdup (name);
   new_label.first_active = builder->insns.len;
   new_label.scope_index = i;
-  dang_array_append (&builder->labels, 1, &new_label);
+  dang_util_array_append (&builder->labels, 1, &new_label);
 
   /* push label_id */
-  dang_array_append (&scoped_labels[i].labels, 1, &rv);
+  dang_util_array_append (&scoped_labels[i].labels, 1, &rv);
 
   /* return the label: it has no associated step-num */
   return rv;
@@ -331,7 +331,7 @@ dang_builder_create_label (DangBuilder *builder)
   DangBuilderLabel label;
   DangLabelId id = builder->labels.len;
   label_init (&label, DANG_FUNCTION_BUILDER_LABEL_TYPE_TMP);
-  dang_array_append (&builder->labels, 1, &label);
+  dang_util_array_append (&builder->labels, 1, &label);
   return id;
 }
 
@@ -343,7 +343,7 @@ dang_builder_create_label_at (DangBuilder *builder,
   DangLabelId id = builder->labels.len;
   label_init (&label, DANG_FUNCTION_BUILDER_LABEL_TYPE_TMP);
   label.target = step;
-  dang_array_append (&builder->labels, 1, &label);
+  dang_util_array_append (&builder->labels, 1, &label);
   return id;
 }
 
@@ -360,7 +360,7 @@ dang_builder_end_scoped_label (DangBuilder *builder,
   sl = (ScopedLabel*)(sl_arr->data) + lab->scope_index;
   last = ((DangLabelId*)(sl->labels.data))[sl->labels.len - 1];
   dang_assert (last == label);
-  dang_array_set_size (&sl->labels, sl->labels.len - 1);
+  dang_util_array_set_size (&sl->labels, sl->labels.len - 1);
   dang_assert (lab->last_active == DANG_STEP_NUM_INVALID);
   lab->last_active = builder->insns.len;
   if (lab->target == DANG_STEP_NUM_INVALID)
@@ -427,7 +427,7 @@ dang_builder_add_local     (DangBuilder *builder,
   dang_assert (type == NULL || var->type == type);
   dang_assert (!var->bound);
   var->bound = TRUE;
-  dang_array_append (&scope->var_ids, 1, &var_id);
+  dang_util_array_append (&scope->var_ids, 1, &var_id);
 }
 
 DangVarId
@@ -450,8 +450,8 @@ dang_builder_add_tmp       (DangBuilder *builder,
   var.bound = TRUE;
   var.container_offset = 0;
   var_id = builder->vars.len;
-  dang_array_append (&builder->vars, 1, &var);
-  dang_array_append (&scope->var_ids, 1, &var_id);
+  dang_util_array_append (&builder->vars, 1, &var);
+  dang_util_array_append (&scope->var_ids, 1, &var_id);
   return var_id;
 }
 
@@ -486,7 +486,7 @@ dang_builder_bind_local_var (DangBuilder *builder,
   else if (var->name == NULL && opt_name != NULL)
     var->name = dang_strdup (opt_name);
   var->bound = TRUE;
-  dang_array_append (&scope->var_ids, 1, &var_id);
+  dang_util_array_append (&scope->var_ids, 1, &var_id);
 }
 
 DangVarId
@@ -525,7 +525,7 @@ void
 dang_builder_push_local_scope(DangBuilder *builder)
 {
   Scope *scope = dang_new (Scope, 1);
-  DANG_ARRAY_INIT (&scope->var_ids, DangVarId);
+  DANG_UTIL_ARRAY_INIT (&scope->var_ids, DangVarId);
   scope->up = builder->local_scope;
   builder->local_scope = scope;
 }
@@ -534,7 +534,7 @@ void
 dang_builder_push_tmp_scope  (DangBuilder *builder)
 {
   Scope *scope = dang_new (Scope, 1);
-  DANG_ARRAY_INIT (&scope->var_ids, DangVarId);
+  DANG_UTIL_ARRAY_INIT (&scope->var_ids, DangVarId);
   scope->up = builder->tmp_scope;
   builder->tmp_scope = scope;
 }
@@ -604,7 +604,7 @@ kill_scope (Builder *builder,
       dang_free (destruct_ids);
     }
 
-  dang_array_clear (&to_kill->var_ids);
+  dang_util_array_clear (&to_kill->var_ids);
   dang_free (to_kill);
 }
 
@@ -657,7 +657,7 @@ dang_builder_start_catch_block (DangBuilder *builder,
   cb.end = DANG_STEP_NUM_INVALID;
   cb.n_clauses = n_clauses;
   cb.clauses = clauses;
-  dang_array_append (&builder->catch_blocks, 1, &cb);
+  dang_util_array_append (&builder->catch_blocks, 1, &cb);
   return id;
 }
 
@@ -686,8 +686,8 @@ dang_builder_query_vars      (DangBuilder *builder,
   DangVarId id;
   DangArray destruct;
   DangArray init;
-  DANG_ARRAY_INIT (&destruct, DangVarId);
-  DANG_ARRAY_INIT (&init, DangVarId);
+  DANG_UTIL_ARRAY_INIT (&destruct, DangVarId);
+  DANG_UTIL_ARRAY_INIT (&init, DangVarId);
   for (id = 0; id < n_vars; id++)
     {
       dang_boolean was_live, will_be_live;
@@ -702,10 +702,10 @@ dang_builder_query_vars      (DangBuilder *builder,
       if (was_live && !will_be_live)
         {
           if (vars[id].type->destruct != NULL)
-            dang_array_append (&destruct, 1, &id);
+            dang_util_array_append (&destruct, 1, &id);
         }
       else if (!was_live && will_be_live)
-        dang_array_append (&init, 1, &id);
+        dang_util_array_append (&init, 1, &id);
     }
 
   if (n_destruct_out)
@@ -716,7 +716,7 @@ dang_builder_query_vars      (DangBuilder *builder,
   else
     {
       dang_assert (destruct.len == 0);
-      dang_array_clear (&destruct);
+      dang_util_array_clear (&destruct);
     }
   if (n_init_out)
     {
@@ -726,7 +726,7 @@ dang_builder_query_vars      (DangBuilder *builder,
   else
     {
       dang_assert (init.len == 0);
-      dang_array_clear (&init);
+      dang_util_array_clear (&init);
     }
 }
 
@@ -841,7 +841,7 @@ free_scope_list (Scope *scope)
   while (scope != NULL)
     {
       Scope *up = scope->up;
-      dang_array_clear (&scope->var_ids);
+      dang_util_array_clear (&scope->var_ids);
       dang_free (scope);
       scope = up;
     }
@@ -862,7 +862,7 @@ dang_builder_destroy    (DangBuilder *builder)
   unsigned i;
   for (i = 0; i < builder->insns.len; i++)
     dang_insn_destruct (((DangInsn*)builder->insns.data) + i);
-  dang_array_clear (&builder->insns);
+  dang_util_array_clear (&builder->insns);
 
   for (i = 0; i < builder->labels.len; i++)
     {
@@ -871,20 +871,20 @@ dang_builder_destroy    (DangBuilder *builder)
       dang_code_position_clear (&label->first_goto_position);
       dang_code_position_clear (&label->definition_position);
     }
-  dang_array_clear (&builder->labels);
+  dang_util_array_clear (&builder->labels);
   for (i = 0; i < builder->scoped_labels.len; i++)
     {
       ScopedLabel *sl = (ScopedLabel *) builder->scoped_labels.data + i;
       dang_free (sl->name);
-      dang_array_clear (&sl->labels);
+      dang_util_array_clear (&sl->labels);
     }
-  dang_array_clear (&builder->scoped_labels);
+  dang_util_array_clear (&builder->scoped_labels);
   for (i = 0; i < builder->vars.len; i++)
     {
       Variable *var = GET_VAR (builder, i);
       dang_free (var->name);
     }
-  dang_array_clear (&builder->vars);
+  dang_util_array_clear (&builder->vars);
   free_scope_list (builder->local_scope);
   free_scope_list (builder->tmp_scope);
   for (i = 0; i < builder->catch_blocks.len; i++)
@@ -892,7 +892,7 @@ dang_builder_destroy    (DangBuilder *builder)
       CatchBlock *cb = (CatchBlock *) builder->catch_blocks.data + i;
       dang_free (cb->clauses);
     }
-  dang_array_clear (&builder->catch_blocks);
+  dang_util_array_clear (&builder->catch_blocks);
 
   if (builder->sig)
     dang_signature_unref (builder->sig);

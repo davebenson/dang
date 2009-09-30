@@ -35,7 +35,7 @@ DangTokenizer *dang_tokenizer_new       (DangString     *filename)
   rv->n_tokens = rv->first_token = 0;
   rv->queue_size = 32;
   rv->token_queue = dang_new0 (DangToken *, rv->queue_size);
-  DANG_ARRAY_INIT (&rv->data, char);
+  DANG_UTIL_ARRAY_INIT (&rv->data, char);
   rv->brace_terminated = 0;
   rv->got_terminal_brace = 0;
   rv->brace_balance = 0;
@@ -549,8 +549,8 @@ maybe_clear_istring_buf (DangTokenizer *tokenizer)
                            &tokenizer->cp);
   piece.info.string = dang_strndup (tokenizer->istring_buf.data,
                                     tokenizer->istring_buf.len);
-  dang_array_append (&tokenizer->istring_pieces, 1, &piece);
-  dang_array_set_size (&tokenizer->istring_buf, 0);
+  dang_util_array_append (&tokenizer->istring_pieces, 1, &piece);
+  dang_util_array_set_size (&tokenizer->istring_buf, 0);
 }
 
 static TokenizeResult
@@ -572,7 +572,7 @@ parse_escape_seq (char *str,
     if (str[0] == pairs[i])
       {
         *end_out = str + 1;
-        dang_array_append (out, 1, pairs + i + 1);
+        dang_util_array_append (out, 1, pairs + i + 1);
         return TOKENIZE_RESULT_SUCCESS;
       }
   octal_val = 0;
@@ -592,7 +592,7 @@ parse_escape_seq (char *str,
       if (str + i == end)
         return TOKENIZE_RESULT_NEEDS_MORE_DATA;
       n_bytes = dang_utf8_encode (v, utf8);
-      dang_array_append (out, n_bytes, utf8);
+      dang_util_array_append (out, n_bytes, utf8);
       *end_out = str + i;
       return TOKENIZE_RESULT_SUCCESS;
     }
@@ -743,7 +743,7 @@ dang_tokenizer_feed      (DangTokenizer  *tokenizer,
     }
   else
     {
-      dang_array_append (&tokenizer->data, len, str);
+      dang_util_array_append (&tokenizer->data, len, str);
       parse_at = tokenizer->data.data;
       parse_end = parse_at + tokenizer->data.len;
     }
@@ -772,8 +772,8 @@ restart:
                       return FALSE;
                     }
 
-                  dang_array_clear (&tokenizer->data);
-                  DANG_ARRAY_INIT (&tokenizer->data, char);
+                  dang_util_array_clear (&tokenizer->data);
+                  DANG_UTIL_ARRAY_INIT (&tokenizer->data, char);
                   if (tokenizer->istring_subtokenizer->got_terminal_brace)
                     {
                       DangTokenInterpolatedPiece piece;
@@ -786,7 +786,7 @@ restart:
                       for (i = 0; i < piece.info.tokens.n; i++)
                         piece.info.tokens.array[i]
                           = dang_tokenizer_pop_token (tokenizer->istring_subtokenizer);
-                      dang_array_append (&tokenizer->istring_pieces, 1, &piece);
+                      dang_util_array_append (&tokenizer->istring_pieces, 1, &piece);
 
                       /* steal raw data back from tokenizer */
                       {
@@ -823,7 +823,7 @@ restart:
                       piece.info.tokens.n = 1;
                       piece.info.tokens.array = dang_new (DangToken*, 1);
                       piece.info.tokens.array[0] = token;
-                      dang_array_append (&tokenizer->istring_pieces, 1, &piece);
+                      dang_util_array_append (&tokenizer->istring_pieces, 1, &piece);
                       parse_at = end;
                       break;
                     case TOKENIZE_RESULT_NEEDS_MORE_DATA:
@@ -865,7 +865,7 @@ restart:
               maybe_clear_istring_buf (tokenizer);
               parse_at++;
               tokenizer->in_interpolated_string = 0;
-              dang_array_clear (&tokenizer->istring_buf);
+              dang_util_array_clear (&tokenizer->istring_buf);
 
               /* Create INTERPOLATED_STRING token */
 
@@ -875,7 +875,7 @@ restart:
 
               push_token (tokenizer, token);
 
-              dang_array_clear (&tokenizer->istring_pieces);
+              dang_util_array_clear (&tokenizer->istring_pieces);
               break;
             }
           else
@@ -891,7 +891,7 @@ restart:
                     n_newlines++;
                   tmp++;
                 }
-              dang_array_append (&tokenizer->istring_buf,
+              dang_util_array_append (&tokenizer->istring_buf,
                                  tmp - parse_at, parse_at);
               parse_at = tmp;
               tokenizer->cp.line += n_newlines;
@@ -1040,8 +1040,8 @@ restart:
   else if (*parse_at == '"')
     {
       tokenizer->in_interpolated_string = 1;
-      DANG_ARRAY_INIT (&tokenizer->istring_buf, char);
-      DANG_ARRAY_INIT (&tokenizer->istring_pieces, DangTokenInterpolatedPiece);
+      DANG_UTIL_ARRAY_INIT (&tokenizer->istring_buf, char);
+      DANG_UTIL_ARRAY_INIT (&tokenizer->istring_pieces, DangTokenInterpolatedPiece);
       parse_at++;
       goto restart;
     }
@@ -1077,7 +1077,7 @@ restart:
   if (parse_at < parse_end)
     goto restart;
 done:
-  dang_array_remove (&tokenizer->data, 0, parse_at - (char*)(tokenizer->data.data));
+  dang_util_array_remove (&tokenizer->data, 0, parse_at - (char*)(tokenizer->data.data));
   return TRUE;
 }
 
@@ -1099,7 +1099,7 @@ void           dang_tokenizer_free      (DangTokenizer  *tokenizer)
   while ((tok=dang_tokenizer_pop_token (tokenizer)) != NULL)
     dang_token_unref (tok);
   dang_free (tokenizer->token_queue);
-  dang_array_clear (&tokenizer->data);
+  dang_util_array_clear (&tokenizer->data);
   dang_code_position_clear (&tokenizer->cp);
   dang_free (tokenizer);
 }

@@ -1,6 +1,6 @@
 #include "dang.h"
 
-static DangArray concat_functions = DANG_ARRAY_STATIC_INIT (DangFunction *);
+static DangArray concat_functions = DANG_UTIL_ARRAY_STATIC_INIT (DangFunction *);
 
 
 static dang_boolean
@@ -27,7 +27,7 @@ dang_function_concat_peek (unsigned N)
 {
   DangFunction **prv;
   if (N >= concat_functions.len)
-    dang_array_set_size0 (&concat_functions, N + 1);
+    dang_util_array_set_size0 (&concat_functions, N + 1);
   prv = ((DangFunction **) (concat_functions.data)) + N;
   if (*prv == NULL)
     {
@@ -57,6 +57,6 @@ _dang_function_concat_cleanup (void)
   for (i = 0; i < concat_functions.len; i++)
     if (functions[i])
       dang_function_unref (functions[i]);
-  dang_array_clear (&concat_functions);
-  DANG_ARRAY_INIT (&concat_functions, DangFunction *);
+  dang_util_array_clear (&concat_functions);
+  DANG_UTIL_ARRAY_INIT (&concat_functions, DangFunction *);
 }

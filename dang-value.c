@@ -998,14 +998,14 @@ dang_value_type_add_simple_virtual_method (DangValueType  *type,
       element->name = dang_strdup (name);
       GSK_RBTREE_INSERT (GET_TYPE_ELEMENT_TREE (type),
                          element, conflict);
-      DANG_ARRAY_INIT (&element->info.methods, DangValueMethod);
+      DANG_UTIL_ARRAY_INIT (&element->info.methods, DangValueMethod);
       dang_assert (conflict == NULL);
     }
   else
     {
       dang_assert (element->element_type == DANG_VALUE_ELEMENT_TYPE_METHOD);
     }
-  dang_array_set_size (&element->info.methods, element->info.methods.len + 1);
+  dang_util_array_set_size (&element->info.methods, element->info.methods.len + 1);
   method = ((DangValueMethod*)element->info.methods.data) 
          + (element->info.methods.len - 1);
   method->sig = dang_signature_ref (sig);
@@ -1067,14 +1067,14 @@ dang_value_type_add_simple_mutable_method (DangValueType  *type,
       element->name = dang_strdup (name);
       GSK_RBTREE_INSERT (GET_TYPE_ELEMENT_TREE (type),
                          element, conflict);
-      DANG_ARRAY_INIT (&element->info.methods, DangValueMethod);
+      DANG_UTIL_ARRAY_INIT (&element->info.methods, DangValueMethod);
       dang_assert (conflict == NULL);
     }
   else
     {
       dang_assert (element->element_type == DANG_VALUE_ELEMENT_TYPE_METHOD);
     }
-  dang_array_set_size (&element->info.methods, element->info.methods.len + 1);
+  dang_util_array_set_size (&element->info.methods, element->info.methods.len + 1);
   method = ((DangValueMethod*)element->info.methods.data) 
          + (element->info.methods.len - 1);
   method->sig = dang_signature_ref (sig);
@@ -1114,14 +1114,14 @@ dang_value_type_add_constant_method (DangValueType  *type,
       element->name = dang_strdup (name);
       GSK_RBTREE_INSERT (GET_TYPE_ELEMENT_TREE (type),
                          element, conflict);
-      DANG_ARRAY_INIT (&element->info.methods, DangValueMethod);
+      DANG_UTIL_ARRAY_INIT (&element->info.methods, DangValueMethod);
       dang_assert (conflict == NULL);
     }
   else
     {
       dang_assert (element->element_type == DANG_VALUE_ELEMENT_TYPE_METHOD);
     }
-  dang_array_set_size (&element->info.methods, element->info.methods.len + 1);
+  dang_util_array_set_size (&element->info.methods, element->info.methods.len + 1);
   method = ((DangValueMethod*)element->info.methods.data) 
          + (element->info.methods.len - 1);
   method->sig = dang_signature_ref (func->base.sig);

@@ -147,47 +147,47 @@ void dang_string_buffer_append_len (DangStringBuffer *buf,
                                     unsigned          len);
 
 /* --- arrays --- */
-typedef struct _DangArray DangArray;
-struct _DangArray
+typedef struct _DangUtilArray DangUtilArray;
+struct _DangUtilArray
 {
   unsigned len;
   void *data;
   unsigned alloced;
   unsigned elt_size;
 };
-void dang_array_init            (DangArray   *array,
+void dang_util_array_init            (DangUtilArray   *array,
                                  size_t       elt_size);
-void dang_array_append          (DangArray   *array,
+void dang_util_array_append          (DangUtilArray   *array,
                                  unsigned     count,
                                  const void  *data);
-void dang_array_append_data     (DangArray   *array,
+void dang_util_array_append_data     (DangUtilArray   *array,
                                  unsigned     n_bytes,
                                  const void  *data);
-void dang_array_remove          (DangArray   *array,
+void dang_util_array_remove          (DangUtilArray   *array,
                                  unsigned     start,
                                  unsigned     count);
-void dang_array_insert          (DangArray   *array,
+void dang_util_array_insert          (DangUtilArray   *array,
                                  unsigned     n,
                                  const void  *data,
                                  unsigned     insert_pos);
-void dang_array_set_size        (DangArray   *array,
+void dang_util_array_set_size        (DangUtilArray   *array,
                                  unsigned     new_len);
-void dang_array_set_size0       (DangArray   *array,
+void dang_util_array_set_size0       (DangUtilArray   *array,
                                  unsigned     new_len);
-void dang_array_clear           (DangArray   *array);
+void dang_util_array_clear           (DangUtilArray   *array);
 
 /* Initializations of global or stack-allocated arrays */
-#define DANG_ARRAY_STATIC_INIT(type) DANG_ARRAY_STATIC_INIT_SIZEOF(sizeof(type))
-#define DANG_ARRAY_STATIC_INIT_SIZEOF(size) { 0, NULL, 0, (size) }
+#define DANG_UTIL_ARRAY_STATIC_INIT(type) DANG_UTIL_ARRAY_STATIC_INIT_SIZEOF(sizeof(type))
+#define DANG_UTIL_ARRAY_STATIC_INIT_SIZEOF(size) { 0, NULL, 0, (size) }
 
 /* Function-style initialization of arrays */
-#define DANG_ARRAY_INIT(array, type) \
-  dang_array_init (array, sizeof (type))
+#define DANG_UTIL_ARRAY_INIT(array, type) \
+  dang_util_array_init (array, sizeof (type))
 
 /* Standard indexing functions */
-#define DANG_ARRAY_INDEX(array, type, index) \
+#define DANG_UTIL_ARRAY_INDEX(array, type, index) \
   ((type*)((array)->data))[index]
-#define DANG_ARRAY_INDEX_PTR(array, type, index) \
+#define DANG_UTIL_ARRAY_INDEX_PTR(array, type, index) \
   (((type*)((array)->data)) + (index))
 
 

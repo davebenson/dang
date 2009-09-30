@@ -243,7 +243,7 @@ gather_closure_params (unsigned n_params,
       if (dang_var_table_lookup (table, at->bareword.name, &var_id, &type))
         {
           SET_VAR_USED (vars_used, var_id);
-          dang_array_append (var_ids_used, 1, &var_id);
+          dang_util_array_append (var_ids_used, 1, &var_id);
           return;
         }
     }
@@ -269,7 +269,7 @@ dang_mf_gather_closure_params (unsigned n_params,
                                unsigned *n_var_ids_out,
                                DangVarId **var_ids_out)
 {
-  DangArray var_ids = DANG_ARRAY_STATIC_INIT (DangVarId);
+  DangArray var_ids = DANG_UTIL_ARRAY_STATIC_INIT (DangVarId);
   unsigned vars_used_size = (var_table->variables.len + 7) / 8;
   uint8_t *vars_used = dang_alloca (vars_used_size);
   memset (vars_used, 0, vars_used_size);
@@ -1312,7 +1312,7 @@ DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__define_function)
       DangFunctionFamily *ff;
       const char *bad_name;
       DangExpr *bad_expr;
-      DangArray tparams = DANG_ARRAY_STATIC_INIT (DangValueType *);
+      DangArray tparams = DANG_UTIL_ARRAY_STATIC_INIT (DangValueType *);
       unsigned i;
 
       /* Collect the template parameters. */
@@ -1327,11 +1327,11 @@ DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__define_function)
                                          "disallowed template-parameter %%%%%s in %s ("DANG_CP_FORMAT")",
                                          bad_name, symbol_name,
                                          DANG_CP_EXPR_ARGS (bad_expr));
-          dang_array_clear (&tparams);
+          dang_util_array_clear (&tparams);
           dang_signature_unref (sig);
           return;
         }
-      dang_array_clear (&tparams);
+      dang_util_array_clear (&tparams);
 
 
       ff = dang_function_family_new_template (symbol_name, builder->imports, sig, body_expr, &error);
