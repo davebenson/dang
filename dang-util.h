@@ -155,26 +155,26 @@ struct _DangUtilArray
   unsigned alloced;
   unsigned elt_size;
 };
-void dang_util_array_init            (DangUtilArray   *array,
-                                 size_t       elt_size);
-void dang_util_array_append          (DangUtilArray   *array,
-                                 unsigned     count,
-                                 const void  *data);
-void dang_util_array_append_data     (DangUtilArray   *array,
-                                 unsigned     n_bytes,
-                                 const void  *data);
-void dang_util_array_remove          (DangUtilArray   *array,
-                                 unsigned     start,
-                                 unsigned     count);
-void dang_util_array_insert          (DangUtilArray   *array,
-                                 unsigned     n,
-                                 const void  *data,
-                                 unsigned     insert_pos);
-void dang_util_array_set_size        (DangUtilArray   *array,
-                                 unsigned     new_len);
-void dang_util_array_set_size0       (DangUtilArray   *array,
-                                 unsigned     new_len);
-void dang_util_array_clear           (DangUtilArray   *array);
+void dang_util_array_init       (DangUtilArray   *array,
+                                 size_t           elt_size);
+void dang_util_array_append     (DangUtilArray   *array,
+                                 unsigned         count,
+                                 const void      *data);
+void dang_util_array_append_data(DangUtilArray   *array,
+                                 unsigned         n_bytes,
+                                 const void      *data);
+void dang_util_array_remove     (DangUtilArray   *array,
+                                 unsigned         start,
+                                 unsigned         count);
+void dang_util_array_insert     (DangUtilArray   *array,
+                                 unsigned         n,
+                                 const void      *data,
+                                 unsigned         insert_pos);
+void dang_util_array_set_size   (DangUtilArray   *array,
+                                 unsigned          new_len);
+void dang_util_array_set_size0  (DangUtilArray   *array,
+                                 unsigned         new_len);
+void dang_util_array_clear      (DangUtilArray   *array);
 
 /* Initializations of global or stack-allocated arrays */
 #define DANG_UTIL_ARRAY_STATIC_INIT(type) DANG_UTIL_ARRAY_STATIC_INIT_SIZEOF(sizeof(type))

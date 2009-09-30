@@ -291,12 +291,6 @@ typedef dang_boolean (*DangValueIndexSetFunc) (DangValueIndexInfo *info,
                                                const void    *element_value,
                                                dang_boolean   may_create,
                                                DangError    **error);
-typedef dang_boolean (*DangValueIndexGetPtrFunc)(DangValueIndexInfo *info,
-                                               void          *container,
-                                               const void   **indices,
-                                               void         **rv_ptr_out,
-                                               dang_boolean   may_create,
-                                               DangError    **error);
 struct _DangValueIndexInfo
 {
   DangValueType *owner;
@@ -305,7 +299,6 @@ struct _DangValueIndexInfo
   DangValueType *element_type;
   DangValueIndexGetFunc get;
   DangValueIndexSetFunc set;
-  DangValueIndexGetPtrFunc get_ptr;     /* optional */
 
   DangValueIndexInfo *next;
 };

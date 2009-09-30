@@ -201,17 +201,17 @@ set_parse_error (DangParserDefault *def,
                  DangError         *error)
 {
   dang_warning ("set_parse_error: %s", error->message);
-  dang_array_append (&def->errors, 1, &error);
+  dang_util_array_append (&def->errors, 1, &error);
 }
 #define SET_PARSE_ERROR(error) set_parse_error(parser, error)
 
-static void free_expr_array (DangArray *array)
+static void free_expr_array (DangUtilArray *array)
 {
   DangExpr **exprs = array->data;
   unsigned i;
   for (i = 0; i < array->len; i++)
     dang_expr_unref (exprs[i]);
-  dang_array_clear (array);
+  dang_util_array_clear (array);
 }
 
 /* For implementing += -= /= *= %= */
@@ -303,8 +303,8 @@ struct _ParserScopedLabel
 %destructor limited_expression { dang_expr_unref ($$); }
 %destructor raw_expr { dang_expr_unref ($$); }
 %destructor parenthesized_expression { dang_expr_unref ($$); }
-%destructor function_type_arg_list_params { dang_array_clear (&$$); }
-%destructor nonempty_function_type_arg_list_params { dang_array_clear (&$$); }
+%destructor function_type_arg_list_params { dang_util_array_clear (&$$); }
+%destructor nonempty_function_type_arg_list_params { dang_util_array_clear (&$$); }
 %destructor untyped_function { dang_expr_unref ($$); }
 %destructor untyped_function_body { dang_expr_unref ($$); }
 %destructor naked_var_list { free_expr_array (&$$); }
@@ -341,24 +341,24 @@ struct _ParserScopedLabel
 %type invoke_expr {DangExpr *}
 %type literal_expr {DangExpr *}
 %type vector_expr {DangExpr *}
-%type raw_expr_list {DangArray}
+%type raw_expr_list {DangUtilArray}
 %type map_expr {DangExpr *}
 %type opt_expr {DangExpr *}
 %type new_expr {DangExpr *}
 %type interpolated_string_expr {DangExpr *}
 %type array_index_expr {DangExpr *}
 %type argument {DangExpr *}
-%type argument_list {DangArray}			/* of DangExpr* */
-%type nonempty_argument_list {DangArray}	/* of DangExpr* */
+%type argument_list {DangUtilArray}			/* of DangExpr* */
+%type nonempty_argument_list {DangUtilArray}	/* of DangExpr* */
 %type argument_decl {DangExpr *}
-%type argument_decl_list {DangArray}		/* of DangExpr* */
-%type nonempty_argument_decl_list {DangArray}	/* of DangExpr* */
+%type argument_decl_list {DangUtilArray}		/* of DangExpr* */
+%type nonempty_argument_decl_list {DangUtilArray}	/* of DangExpr* */
 %type opt_rv_type {DangExpr *}
 %type type {DangExpr *}
 %type simple_type {DangExpr *}
-%type statement_list {DangArray}		/* of DangExpr* */
+%type statement_list {DangUtilArray}		/* of DangExpr* */
 %type function_declaration {DangExpr *}
-%type catch_blocks {DangArray}			/* of DangExpr* */
+%type catch_blocks {DangUtilArray}			/* of DangExpr* */
 %type catch_block {DangExpr *}
 %type toplevel_statement {DangExpr *}
 %type if_statement {DangExpr *}
@@ -368,8 +368,8 @@ struct _ParserScopedLabel
 %type non_hanging_while_statement {DangExpr *}
 %type jump_scoped_label_statement {DangExpr *}
 %type member {DangExpr*}
-%type member_declarations {DangArray}
-%type case_declarations {DangArray}
+%type member_declarations {DangUtilArray}
+%type case_declarations {DangUtilArray}
 %type case_declaration {DangExpr *}
 %type structure_declaration {DangExpr*}
 %type union_declaration {DangExpr*}
@@ -378,13 +378,13 @@ struct _ParserScopedLabel
 %type parenthesized_expression {DangExpr *}
 %type opt_return_type {DangValueType *}
 %type function_type_from_args {DangValueType *}
-%type function_type_arg_list_params {DangArray}	/* of DangFunctionParam */
-%type nonempty_function_type_arg_list_params {DangArray}/* of DangFunctionParam */
+%type function_type_arg_list_params {DangUtilArray}	/* of DangFunctionParam */
+%type nonempty_function_type_arg_list_params {DangUtilArray}/* of DangFunctionParam */
 %type function_type_arg_list_param {DangFunctionParam}
 %type function_body {DangExpr *}
 %type untyped_function {DangExpr *}
 %type untyped_function_body {DangExpr *}
-%type naked_var_list {DangArray}		/* of DangExpr* */
+%type naked_var_list {DangUtilArray}		/* of DangExpr* */
 %type closure_expr {DangExpr *}
 %type object_declaration {DangExpr *}
 %type object_element {DangExpr *}
@@ -393,21 +393,21 @@ struct _ParserScopedLabel
 %type struct_create_expr {DangExpr *}
 %type union_create_expr {DangExpr *}
 %type struct_create_arg {DangExpr *}
-%type struct_create_arg_list {DangArray}
-%type nonempty_struct_create_arg_list {DangArray}
+%type struct_create_arg_list {DangUtilArray}
+%type nonempty_struct_create_arg_list {DangUtilArray}
 %type enum_declaration {DangExpr *}
-%type enum_values {DangArray}
+%type enum_values {DangUtilArray}
 %type enum_value {DangExpr *}
-%type module_list {DangArray}
+%type module_list {DangUtilArray}
 %type as_clause {DangExpr *}
-%type bareword_list {DangArray}
+%type bareword_list {DangUtilArray}
 %type opt_import_list {DangExpr *}
 %type tree_expr {DangExpr *}
-%type tree_node_expr_list {DangArray}
+%type tree_node_expr_list {DangUtilArray}
 %type tree_node {DangExpr *}
 
-%type object_elements {DangArray}
-%type m_flags {DangArray}
+%type object_elements {DangUtilArray}
+%type m_flags {DangUtilArray}
 %type m_flag {DangExpr *}
 
 //%type scoped_label {ParserScopedLabelInfo}
@@ -467,7 +467,7 @@ limited_expression(RV) ::= limited_expression(A) DOT BAREWORD(B).
 limited_expression(A) ::= parenthesized_expression(B).
 	{ A = B; }
 invoke_expr(RV) ::= limited_expression(BW) LPAREN argument_list(ARGS) RPAREN. [FCTCALL]
-        { dang_array_insert (&ARGS, 1, &BW, 0);
+        { dang_util_array_insert (&ARGS, 1, &BW, 0);
 	  RV = dang_expr_new_function ("$invoke",
 	                               ARGS.len, (DangExpr **) ARGS.data);
           free_expr_array (&ARGS);
@@ -703,7 +703,7 @@ expr(A) ::= expr(B) OP_QUESTION_MARK expr(C) COLON expr(D).
 	  get_expr_pos_from_expr (A, B); }
 
 array_index_expr(A) ::= expr(B) LBRACKET argument_list(ARGS) RBRACKET.
-	{ dang_array_insert (&ARGS, 1, &B, 0);
+	{ dang_util_array_insert (&ARGS, 1, &B, 0);
 	  A = expr_new_function ("$operator_index", ARGS.len, ARGS.data);
 	  get_expr_pos_from_expr (A, B);
 	  free_expr_array (&ARGS);
@@ -712,18 +712,18 @@ expr(A) ::= array_index_expr(B).
 	{ A = B; }
 
 try_statement(STMT) ::= TRY(p) grouped_statement(BODY) catch_blocks(BLOCKS).
-	{ dang_array_insert (&BLOCKS, 1, &BODY, 0);
+	{ dang_util_array_insert (&BLOCKS, 1, &BODY, 0);
 	  STMT = expr_new_function ("$catch", BLOCKS.len, BLOCKS.data);
 	  get_expr_pos_from_token (STMT, p);
 	  dang_token_unref (p);
 	  free_expr_array (&BLOCKS); }
 
 catch_blocks(RV) ::= catch_block(A).
-	{ DANG_ARRAY_INIT (&RV, DangExpr*);
-	  dang_array_append (&RV, 1, &A); }
+	{ DANG_UTIL_ARRAY_INIT (&RV, DangExpr*);
+	  dang_util_array_append (&RV, 1, &A); }
 catch_blocks(RV) ::= catch_blocks(A) catch_block(B).
 	{ RV = A;
-	  dang_array_append (&RV, 1, &B); }
+	  dang_util_array_append (&RV, 1, &B); }
 
 catch_block(C) ::= CATCH(p) LPAREN type(T) BAREWORD(varname) RPAREN grouped_statement(BODY).
 	{ C = expr_new_function_take_3 ("$catch_block", T,
@@ -734,16 +734,16 @@ catch_block(C) ::= CATCH(p) LPAREN type(T) BAREWORD(varname) RPAREN grouped_stat
 	  dang_token_unref (p); }
 
 argument_list(ARGS) ::= .
-        { dang_array_init (&ARGS, sizeof (DangExpr *)); }
+        { dang_util_array_init (&ARGS, sizeof (DangExpr *)); }
 argument_list(ARGS) ::= nonempty_argument_list(A).
         { ARGS = A; }
 
 nonempty_argument_list(A) ::= argument(B).
-        { dang_array_init (&A, sizeof (DangExpr *));
-          dang_array_append (&A, 1, &B); }
+        { dang_util_array_init (&A, sizeof (DangExpr *));
+          dang_util_array_append (&A, 1, &B); }
 nonempty_argument_list(A) ::= nonempty_argument_list(B) COMMA argument(C).
         { A = B;
-          dang_array_append (&A, 1, &C); }
+          dang_util_array_append (&A, 1, &C); }
 
 argument(A) ::= expr(B).
 	{ A = B; }
@@ -766,12 +766,12 @@ untyped_function_body(A) ::= grouped_statement(B).
 	{ A = B; }
 
 naked_var_list(RV) ::= .
-	{ DANG_ARRAY_INIT (&RV, DangExpr*); }
+	{ DANG_UTIL_ARRAY_INIT (&RV, DangExpr*); }
 naked_var_list(RV) ::= naked_var_list(A) BAREWORD(B).
 	{ DangExpr *b;
 	  b = expr_bareword_from_token (B);
 	  RV = A;
-	  dang_array_append (&RV, 1, &b);
+	  dang_util_array_append (&RV, 1, &b);
 	  dang_token_unref (B); }
 
 expr_statement(STMT) ::= expr(A) SEMICOLON.
@@ -887,13 +887,13 @@ expr(RV) ::= closure_expr(A).
 	{ RV = A; }
 
 statement_list(RV) ::= .
-	{ dang_array_init (&RV, sizeof (DangExpr *)); }
+	{ dang_util_array_init (&RV, sizeof (DangExpr *)); }
 statement_list(RV) ::= statement_list(A) statement(B).
 	{ RV = A;
-	  dang_array_append (&RV, 1, &B); }
+	  dang_util_array_append (&RV, 1, &B); }
 statement_list(RV) ::= statement_list(A) label(B).
 	{ RV = A;
-	  dang_array_append (&RV, 1, &B); }
+	  dang_util_array_append (&RV, 1, &B); }
 
 for_statement(STMT) ::= FOR(p) LPAREN opt_expr(INIT) SEMICOLON opt_expr(COND) SEMICOLON opt_expr(ADV) RPAREN statement(BODY).
 	{ STMT = expr_new_function_take_4 ("$for", INIT, COND, ADV, BODY);
@@ -984,16 +984,16 @@ function_body(RV) ::= untyped_function(A) SEMICOLON.
 	{ RV = A; }
 
 argument_decl_list(ARGS) ::= .
-	{ dang_array_init (&ARGS, sizeof (DangExpr *)); }
+	{ dang_util_array_init (&ARGS, sizeof (DangExpr *)); }
 argument_decl_list(ARGS) ::= VOID.
-	{ dang_array_init (&ARGS, sizeof (DangExpr *)); }
+	{ dang_util_array_init (&ARGS, sizeof (DangExpr *)); }
 argument_decl_list(ARGS) ::= nonempty_argument_decl_list(A).
 	{ ARGS = A; }
 nonempty_argument_decl_list(ARGS) ::= argument_decl(DECL).
-	{ dang_array_init (&ARGS, sizeof (DangExpr *));
-	  dang_array_append (&ARGS, 1, &DECL); }
+	{ dang_util_array_init (&ARGS, sizeof (DangExpr *));
+	  dang_util_array_append (&ARGS, 1, &DECL); }
 nonempty_argument_decl_list(ARGS) ::= nonempty_argument_decl_list(A) COMMA argument_decl(B).
-	{ ARGS = A; dang_array_append (&ARGS, 1, &B); }
+	{ ARGS = A; dang_util_array_append (&ARGS, 1, &B); }
 
 argument_decl(DECL) ::= type(TYPE) BAREWORD(name).
 	{ DECL = make_argument (NULL, TYPE, name);
@@ -1079,18 +1079,18 @@ function_type_from_args(RV) ::= function_type_arg_list_params(A) opt_return_type
 	                            A.len, A.data);
           RV = dang_value_type_function (sig); 
 	  dang_signature_unref (sig);
-	  dang_array_clear (&A);
+	  dang_util_array_clear (&A);
 	}
 function_type_arg_list_params(RV) ::= .
-	{ dang_array_init (&RV, sizeof (DangFunctionParam)); }
+	{ dang_util_array_init (&RV, sizeof (DangFunctionParam)); }
 function_type_arg_list_params(RV) ::= nonempty_function_type_arg_list_params(A).
 	{ RV = A; }
 nonempty_function_type_arg_list_params(RV) ::= function_type_arg_list_param(B).
-	{ dang_array_init (&RV, sizeof (DangFunctionParam));
-	  dang_array_append (&RV, 1, &B); }
+	{ dang_util_array_init (&RV, sizeof (DangFunctionParam));
+	  dang_util_array_append (&RV, 1, &B); }
 nonempty_function_type_arg_list_params(RV) ::= nonempty_function_type_arg_list_params(A) COMMA function_type_arg_list_param(B).
 	{ RV = A;
-	  dang_array_append (&RV, 1, &B); }
+	  dang_util_array_append (&RV, 1, &B); }
 function_type_arg_list_param(RV) ::= IN type(T).
 	{ RV.dir = DANG_FUNCTION_PARAM_IN;
 	  RV.name = NULL;
@@ -1127,9 +1127,9 @@ structure_declaration(B) ::= STRUCT(p) BAREWORD(b) LBRACE member_declarations(ME
 	  dang_token_unref (b);
 	}
 member_declarations(RV) ::= .
-	{ DANG_ARRAY_INIT (&RV, DangExpr*); }
+	{ DANG_UTIL_ARRAY_INIT (&RV, DangExpr*); }
 member_declarations(RV) ::= member_declarations(A) member(B).
-	{ RV = A; dang_array_append (&RV, 1, &B); }
+	{ RV = A; dang_util_array_append (&RV, 1, &B); }
 
 member(X) ::= type(T) BAREWORD(N) SEMICOLON.
 	{ X = expr_new_function_take_2 ("$member", T, expr_bareword_from_token (N));
@@ -1152,11 +1152,11 @@ union_declaration(B) ::= UNION(p) BAREWORD(b) LBRACE case_declarations(CASES) RB
 	  dang_token_unref (b);
 	}
 case_declarations(RV) ::= case_declaration(B).
-	{ dang_array_init (&RV, sizeof (DangExpr *));
-	  dang_array_append (&RV, 1, &B); }
+	{ dang_util_array_init (&RV, sizeof (DangExpr *));
+	  dang_util_array_append (&RV, 1, &B); }
 case_declarations(RV) ::= case_declarations(A) case_declaration(B).
 	{ RV = A;
-	  dang_array_append (&RV, 1, &B); }
+	  dang_util_array_append (&RV, 1, &B); }
 
 case_declaration(RV) ::= BAREWORD(A) COLON LBRACE(p) member_declarations(MEMS) RBRACE.
 	{ DangExpr *mems = dang_expr_new_function ("$members", MEMS.len, MEMS.data);
@@ -1195,9 +1195,9 @@ object_declaration(RV) ::= OBJECT(p) BAREWORD(NAME) opt_return_type(T) LBRACE ob
 	  dang_token_unref (NAME);
 	}
 object_elements(RV) ::= .
-	{ DANG_ARRAY_INIT (&RV, DangExpr*); }
+	{ DANG_UTIL_ARRAY_INIT (&RV, DangExpr*); }
 object_elements(RV) ::= object_elements(A) object_element(B).
-	{ RV = A; dang_array_append (&RV, 1, &B); }
+	{ RV = A; dang_util_array_append (&RV, 1, &B); }
 object_element(OE) ::= m_flags(flags) METHOD BAREWORD(NAME) LPAREN argument_decl_list(ARGS) opt_rv_type(RVTYPE) RPAREN method_body(BODY).
 	{ OE = expr_new_function_take_5 ("$object_method",
 	                                 expr_new_function ("$method_flags", flags.len, flags.data),
@@ -1243,9 +1243,9 @@ enum_declaration(RV) ::= ENUM(p) BAREWORD(NAME) LBRACE enum_values(VALS) RBRACE.
 	  dang_token_unref (NAME);
 	}
 enum_values(RV) ::= .
-	{ DANG_ARRAY_INIT (&RV, DangExpr*); }
+	{ DANG_UTIL_ARRAY_INIT (&RV, DangExpr*); }
 enum_values(RV) ::= enum_values(A) enum_value(B).
-	{ RV = A; dang_array_append (&RV, 1, &B); }
+	{ RV = A; dang_util_array_append (&RV, 1, &B); }
 enum_value(A) ::= BAREWORD(b) OP_ASSIGN literal_expr(e).
 	{ DangExpr *bb = expr_bareword_from_token (b);
 	  A = expr_new_function_take_2 ("$enum_value", bb, e);
@@ -1273,9 +1273,9 @@ vector_expr(RV) ::= LBRACKET(p) raw_expr_list(LIST) RBRACKET.
 	  dang_token_unref (p);
         }
 raw_expr_list(LIST) ::= .
-	{ DANG_ARRAY_INIT (&LIST, DangExpr*); }
+	{ DANG_UTIL_ARRAY_INIT (&LIST, DangExpr*); }
 raw_expr_list(LIST) ::= raw_expr_list(A) raw_expr(B).
-	{ LIST = A; dang_array_append (&LIST, 1, &B); }
+	{ LIST = A; dang_util_array_append (&LIST, 1, &B); }
 raw_expr(A) ::= limited_expression(B).
 	{ A = B; }
 raw_expr(A) ::= literal_expr(B).
@@ -1294,10 +1294,10 @@ tree_expr(A) ::= TREE(p) LBRACKET tree_node_expr_list(ARGS) RBRACKET.
 	  get_expr_pos_from_token (A, p);
 	  dang_token_unref (p); }
 tree_node_expr_list(LIST) ::= tree_node(A).
-	{ DANG_ARRAY_INIT (&LIST, DangExpr*);
-	  dang_array_append (&LIST, 1, &A); }
+	{ DANG_UTIL_ARRAY_INIT (&LIST, DangExpr*);
+	  dang_util_array_append (&LIST, 1, &A); }
 tree_node_expr_list(LIST) ::= tree_node_expr_list(A) COMMA tree_node(B).
-	{ LIST = A; dang_array_append (&LIST, 1, &B); }
+	{ LIST = A; dang_util_array_append (&LIST, 1, &B); }
 tree_node(RV) ::= expr(K) ARROW expr(V).
 	{ RV = expr_new_function_take_2 ("$tree_entry", K, V);
 	  get_expr_pos_from_expr (RV, K); }
@@ -1313,7 +1313,7 @@ new_expr(RV) ::= NEW(p) simple_type(T) opt_name(NAME) LPAREN argument_list(ARGS)
 	  else
 	    n = expr_new_function_take_2 ("$operator_new", T, NAME);
 	  get_expr_pos_from_token (n, p);
-	  dang_array_insert (&ARGS, 1, &n, 0);
+	  dang_util_array_insert (&ARGS, 1, &n, 0);
 	  RV = dang_expr_new_function ("$invoke",
 	                               ARGS.len, (DangExpr **) ARGS.data);
           free_expr_array (&ARGS);
@@ -1358,15 +1358,15 @@ struct_create_arg(RV) ::= BAREWORD(A) ARROW expr(B).
           get_expr_pos_from_token (RV, A);
 	  dang_token_unref (A); }
 struct_create_arg_list(LIST) ::= .
-	{ DANG_ARRAY_INIT (&LIST, DangExpr*); }
+	{ DANG_UTIL_ARRAY_INIT (&LIST, DangExpr*); }
 struct_create_arg_list(A) ::= nonempty_struct_create_arg_list(B).
 	{ A = B; }
 nonempty_struct_create_arg_list(LIST) ::= struct_create_arg(B).
-	{ DANG_ARRAY_INIT (&LIST, DangExpr*);
-	  dang_array_append (&LIST, 1, &B); }
+	{ DANG_UTIL_ARRAY_INIT (&LIST, DangExpr*);
+	  dang_util_array_append (&LIST, 1, &B); }
 nonempty_struct_create_arg_list(LIST) ::= nonempty_struct_create_arg_list(A) COMMA struct_create_arg(B).
 	{ LIST = A;
-	  dang_array_append (&LIST, 1, &B); }
+	  dang_util_array_append (&LIST, 1, &B); }
 expr(RV) ::= struct_create_expr(A).
 	{ RV = A; }
 expr(RV) ::= union_create_expr(A).
@@ -1381,10 +1381,10 @@ object_element(OE) ::= m_flags(flags) type(T) BAREWORD(NAME) SEMICOLON.
           free_expr_array (&flags);
 	  dang_token_unref (NAME); }
 m_flags(A) ::= .
-	{ DANG_ARRAY_INIT (&A, DangExpr*); }
+	{ DANG_UTIL_ARRAY_INIT (&A, DangExpr*); }
 m_flags(RV) ::= m_flags(A) m_flag(B).
 	{ RV = A;
-	  dang_array_append (&RV, 1, &B); }
+	  dang_util_array_append (&RV, 1, &B); }
 m_flag(A) ::= PRIVATE(B).
 	{ A = expr_bareword_from_token (B);
 	  dang_token_unref (B); }
@@ -1412,16 +1412,16 @@ m_flag(A) ::= STATIC(B).
 
 module_list(RV) ::= BAREWORD(B).
 	{ DangExpr *tmp;
-	  DANG_ARRAY_INIT (&RV, DangExpr*);
+	  DANG_UTIL_ARRAY_INIT (&RV, DangExpr*);
 	  tmp = expr_bareword_from_token (B);
 	  dang_token_unref (B);
-	  dang_array_append (&RV, 1, &tmp); }
+	  dang_util_array_append (&RV, 1, &tmp); }
 module_list(RV) ::= module_list(A) DOT BAREWORD(B).
 	{ DangExpr *tmp;
 	  RV = A;
 	  tmp = expr_bareword_from_token (B);
 	  dang_token_unref (B);
-	  dang_array_append (&RV, 1, &tmp); }
+	  dang_util_array_append (&RV, 1, &tmp); }
 
 
 toplevel_statement(RV) ::= MODULE(p) module_list(B) SEMICOLON.
@@ -1437,11 +1437,11 @@ as_clause(Q) ::= AS BAREWORD(B).
 opt_import_list(I) ::= .
 	{ I = NULL; }
 bareword_list(RV) ::= .
-	{ dang_array_init (&RV, sizeof (DangExpr *)); }
+	{ dang_util_array_init (&RV, sizeof (DangExpr *)); }
 bareword_list(RV) ::= bareword_list(A) BAREWORD(B).
 	{ RV = A;
 	  DangExpr *b = expr_bareword_from_token (B);
-	  dang_array_append (&RV, 1, &b); }
+	  dang_util_array_append (&RV, 1, &b); }
 opt_import_list(I) ::= LPAREN(p) bareword_list(B) RPAREN.
 	{ I = expr_new_function ("$include", B.len, B.data);
 	  get_expr_pos_from_token (I, p);

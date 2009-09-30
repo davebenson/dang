@@ -88,7 +88,10 @@ char *dang_strdup_vprintf (const char *format,
                            va_list     args)
 {
   char *rv = NULL;
+
+  /* NOTE:  MEMORY ALLOCATION ENTRY POINT!!!! */
   vasprintf (&rv, format, args);
+
   if (rv == NULL)
     out_of_memory ();
   return rv;

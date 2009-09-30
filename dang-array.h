@@ -8,17 +8,6 @@ struct _DangArray
   unsigned alloced;             /* allocated size of first dimension */
 };
 
-static DangValueType **
-make_repeated_type (DangValueType **fill,
-                    unsigned        N,
-                    DangValueType  *s)
-{
-  unsigned i;
-  for (i = 0; i < N; i++)
-    fill[i] = s;
-  return fill;
-}
-
 typedef struct _DangValueTypeArray DangValueTypeArray;
 struct _DangValueTypeArray
 {

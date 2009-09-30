@@ -59,7 +59,7 @@ debug_options_usage (void)
 char *
 read_string_from_file (FILE *fp)
 {
-  DangArray array;
+  DangUtilArray array;
   int nread;
   char buf[4096];
   DANG_UTIL_ARRAY_INIT (&array, char);
