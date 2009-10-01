@@ -1,0 +1,13 @@
+// PURPOSE: test array out-of-bounds exceptions.
+
+var boolean failed;
+
+failed = false;
+try { var x = (array<int,2>) [[1 2] [3 4]]; x[2,0] = 4; } catch (error e) { failed = true; }
+assert(failed);
+
+
+failed = false;
+try { var x = (array<int,2>) [[1 2] [3 4]]; x <>= [1 2 3]; } catch (error e) { failed = true; }
+assert(failed);
+
