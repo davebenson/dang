@@ -3,21 +3,11 @@
 var failed = false;
 
 failed = false;
-try { var x = [1 2 3 4]; x[4] = 4; } catch (error e) { failed = true; }
+try { var x = [1 2 3 4]; system.println("${x[4]}"); } catch (error e) { failed = true; }
 assert(failed);
 
 
 failed = false;
-try { var x = [[1 2] [3 4]]; x[1,2] = 4; } catch (error e) { failed = true; }
+try { var x = [[1 2] [3 4]]; system.println("${x[1,2]}"); } catch (error e) { failed = true; }
 assert(failed);
-
-
-failed = false;
-try { var x = [[1 2] [3 4]]; x[2,0] = 4; } catch (error e) { failed = true; }
-assert(failed);
-
-
-//failed = false;
-//try { var x = [[1 2] [3 4]]; x <>= [1 2 3]; } catch (error e) { failed = true; }
-//assert(failed);
 
