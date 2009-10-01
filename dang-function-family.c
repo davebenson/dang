@@ -180,7 +180,7 @@ dang_function_family_try (DangFunctionFamily *ff,
       return ff->info.variadic_c.try_sig (mq, ff->info.variadic_c.data, error);
     case DANG_FUNCTION_FAMILY_TEMPLATE:
       {
-        DangArray pairs = DANG_UTIL_ARRAY_STATIC_INIT (sizeof(DangValueType*));
+        DangUtilArray pairs = DANG_UTIL_ARRAY_STATIC_INIT (sizeof(DangValueType*));
         unsigned i;
         DangFunctionParam *concrete_params;
         DangExpr *real_body;
@@ -334,7 +334,7 @@ signatures_check_conflict (DangSignature *sig1,
 
   if (sig1->is_templated)
     {
-      DangArray pairs = DANG_UTIL_ARRAY_STATIC_INIT (sizeof(DangValueType*));
+      DangUtilArray pairs = DANG_UTIL_ARRAY_STATIC_INIT (sizeof(DangValueType*));
       DangMatchQuery *q = dang_signature_make_match_query (sig2);
       if (dang_signature_test_templated (sig1, q, &pairs))
         {

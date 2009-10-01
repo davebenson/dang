@@ -1655,10 +1655,10 @@ run_compiled_function_output (void                 *step_data,
 
 static void
 handle_param_substeps (DangInsnPackContext *context,
-                       DangArray           *pointers,
-                       DangArray           *input_substeps,
-                       DangArray           *output_substeps,
-                       DangArray           *value_data,
+                       DangUtilArray           *pointers,
+                       DangUtilArray           *input_substeps,
+                       DangUtilArray           *output_substeps,
+                       DangUtilArray           *value_data,
                        DangInsnValue      *res,
                        DangFunctionParamDir dir,
                        unsigned             called_offset)
@@ -1794,7 +1794,7 @@ pack__function_call (DangInsn *insn,
   InvocationInputInfo *input_info;
   InvocationOutputInfo *output_info;
   DangFunctionParam *fparams;
-  DangArray pointers, input_substeps, output_substeps, value_data;
+  DangUtilArray pointers, input_substeps, output_substeps, value_data;
   unsigned i;
   unsigned iii_size, ioi_size;
   unsigned cur_called_offset;
@@ -2026,7 +2026,7 @@ static void
 init_param_source_info (ParamSourceInfo *psi,
                         DangInsnValue *value,
                         DangInsnPackContext *context,
-                        DangArray *literal_data,
+                        DangUtilArray *literal_data,
                         dang_boolean *needs_destruct_inout)
 {
   DangValueType *type = value->type;
@@ -2104,7 +2104,7 @@ pack__run_simple_c (DangInsn *insn,
   DangInsnValue *args = insn->run_simple_c.args;
   DangSignature *sig = function->base.sig;
   unsigned n_params = sig->n_params;
-  DangArray literal_data;
+  DangUtilArray literal_data;
   CompiledSimpleCInvocation *csi;
   ParamSourceInfo *psi;
   unsigned tmp_size;

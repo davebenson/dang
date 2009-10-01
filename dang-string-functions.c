@@ -26,7 +26,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE(do_string_split)
   const char *dstr = delim ? delim->str : "";
   const char *sstr = to_split ? to_split->str : "";
   DangString *tmp;
-  DangArray strings = DANG_UTIL_ARRAY_STATIC_INIT(DangString*);
+  DangUtilArray strings = DANG_UTIL_ARRAY_STATIC_INIT(DangString*);
   DANG_UNUSED (func_data);
   DANG_UNUSED (error);
   if (dstr[0] == 0)

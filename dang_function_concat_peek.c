@@ -1,6 +1,6 @@
 #include "dang.h"
 
-static DangArray concat_functions = DANG_UTIL_ARRAY_STATIC_INIT (DangFunction *);
+static DangUtilArray concat_functions = DANG_UTIL_ARRAY_STATIC_INIT (DangFunction *);
 
 
 static dang_boolean

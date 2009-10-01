@@ -298,7 +298,6 @@ dang_value_type_tree (DangValueType *key,
   rv->index_info.element_type = value;
   rv->index_info.get = index_get__tree;
   rv->index_info.set = index_set__tree;
-  rv->index_info.get_ptr = index_get_ptr__tree;
   rv->index_info.next = NULL;
   rv->key = key;
   rv->value = value;

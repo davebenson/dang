@@ -33,14 +33,11 @@ tensor_init_assign (DangValueType   *type,
     src_tensor->ref_count += 1;
   *p_dst_tensor = src_tensor;
 }
-static void
-tensor_destruct (DangValueType *type,
-                 void          *data)
+
+void dang_tensor_unref (DangValueType *type,
+                        DangTensor    *tensor)
 {
-  DangTensor *tensor = * (DangTensor **) data;
   DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
-  if (tensor == NULL)
-    return;
   if (--(tensor->ref_count) > 0)
     return;
   if (ttype->element_type->destruct != NULL)
@@ -58,6 +55,16 @@ tensor_destruct (DangValueType *type,
     }
   dang_free (tensor->data);
   dang_free (tensor);
+}
+
+static void
+tensor_destruct (DangValueType *type,
+                 void          *data)
+{
+  DangTensor *tensor = * (DangTensor **) data;
+  if (tensor == NULL)
+    return;
+  dang_tensor_unref (type, tensor);
 }
 
 static void
@@ -102,6 +109,8 @@ append_tensor_to_string (DangValueType *elt_type,
 char *dang_tensor_to_string (DangValueType *type,
                              DangTensor    *tensor)
 {
+  DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
+  dang_assert (dang_value_type_is_tensor (type));
   if (tensor == NULL)
     {
       char *rv = dang_malloc (ttype->rank * 2 + 1);
@@ -124,27 +133,8 @@ static char *
 tensor_to_string (DangValueType *type,
                   const void    *value)
 {
-  DangValueTypeTensor *ttype = (DangValueTypeTensor *) type;
   DangTensor *tensor = * (DangTensor **) value;
-  return dang_tensor_to_string (ttype, tensor);
-}
-
-static DANG_SIMPLE_C_FUNC_DECLARE (cast_from_tensor_to_array)
-{
-  DangTensor *tensor = * (DangTensor **) args[0];
-  DangArray *rv = dang_new (DangArray, 1);
-  DANG_UNUSED (func_data);
-  DANG_UNUSED (error);
-  rv->tensor = tensor;
-  if (tensor)
-    tensor->ref_count++;
-  rv->ref_count = 1;
-  if (tensor == NULL)
-    rv->alloced = 0;
-  else
-    rv->alloced = tensor->sizes[0];
-  * (DangArray **) rv_out = rv;
-  return TRUE;
+  return dang_tensor_to_string (type, tensor);
 }
 
 void
@@ -214,6 +204,7 @@ index_get__tensor   (DangValueIndexInfo *ii,
   return TRUE;
 }
 
+#if 0
 static dang_boolean
 index_set__tensor   (DangValueIndexInfo *ii,
                      void          *container,
@@ -233,6 +224,7 @@ index_set__tensor   (DangValueIndexInfo *ii,
     memcpy (ptr, element_value, elt_type->sizeof_instance);
   return TRUE;
 }
+#endif
 
 static DangValueType **
 make_repeated_type (DangValueType **fill,
@@ -298,14 +290,14 @@ dang_value_type_tensor (DangValueType *element_type,
     }
   out->index_infos[0].element_type = element_type;
   out->index_infos[0].get = index_get__tensor;
-  out->index_infos[0].set = index_set__tensor;
+  out->index_infos[0].set = NULL;               //index_set__tensor;
   out->index_infos[0].element_type = element_type;
   out->index_infos[1].next = NULL;
   out->index_infos[1].owner = &out->base_type;
   out->index_infos[1].n_indices = rank;
   out->index_infos[1].element_type = element_type;
   out->index_infos[1].get = index_get__tensor;
-  out->index_infos[1].set = index_set__tensor;
+  out->index_infos[1].set = NULL;               //index_set__tensor;
   out->index_infos[1].element_type = element_type;
 
   GSK_RBTREE_INSERT (GET_TENSOR_TREE (), out, conflict);

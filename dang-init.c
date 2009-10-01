@@ -1246,6 +1246,7 @@ dang_namespace_default (void)
 
       dang_namespace_unref (sys_ns);
       _dang_tensor_init (the_ns);
+      _dang_array_init (the_ns);
       _dang_enum_init (the_ns);
 
       add_variadic_c_family (the_ns,

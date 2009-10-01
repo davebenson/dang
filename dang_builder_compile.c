@@ -280,7 +280,7 @@ allocate_stack__first_fit (Builder *builder,
   Variable *vars = builder->vars.data;
   Action *actions = dang_new (Action, n_vars * 2);
   unsigned n_actions = 0;
-  DangArray free_blocks;
+  DangUtilArray free_blocks;
   for (i = 0; i < n_vars; i++)
     {
       /* Disregard variables that are just aliases
@@ -454,7 +454,7 @@ struct _Triple
 };
 static DangFunctionFileInfo *
 create_file_info (DangString *filename,
-                  DangArray  *line_infos)
+                  DangUtilArray  *line_infos)
 {
   DangFunctionFileInfo *fi = dang_malloc (sizeof (DangFunctionFileInfo)
                                           * sizeof (DangFunctionLineInfo) * line_infos->len);
@@ -474,8 +474,8 @@ init_stack_infos__file_info (Builder *builder,
   unsigned n_steps = builder->insns.len;
   DangInsn *steps = builder->insns.data;
   unsigned i;
-  DangArray array;
-  DangArray line_infos;
+  DangUtilArray array;
+  DangUtilArray line_infos;
   DangString *last_filename = NULL;
   unsigned n_filenames = 0;
   DANG_UTIL_ARRAY_INIT (&array, Triple);
@@ -693,7 +693,7 @@ renumber_var   (DangBuilderVariable   *var,
 }
 static void add_inits_and_destructs (DangBuilder *builder)
 {
-  DangArray fixups = DANG_UTIL_ARRAY_STATIC_INIT (VarFixupInsertion);
+  DangUtilArray fixups = DANG_UTIL_ARRAY_STATIC_INIT (VarFixupInsertion);
   unsigned i, j;
   DangInsn *orig_insns = builder->insns.data;
   unsigned n_init, n_destruct;
@@ -856,7 +856,7 @@ static int compare_lab_step_pair_by_step_then_label (const void *a,
 }
 static void
 add_label_step_pair (Builder *builder,
-                     DangArray *lab_step_pairs,
+                     DangUtilArray *lab_step_pairs,
                      DangLabelId label)
 {
   Label *lab = (Label*)builder->labels.data + label;
@@ -868,7 +868,7 @@ static void
 dump_insns (Builder *builder)
 {
   DangStringBuffer buf = DANG_STRING_BUFFER_INIT;
-  DangArray lab_step_pairs = DANG_UTIL_ARRAY_STATIC_INIT (LabelStepPair);
+  DangUtilArray lab_step_pairs = DANG_UTIL_ARRAY_STATIC_INIT (LabelStepPair);
   unsigned i;
   unsigned n_steps = builder->insns.len;
   DangInsn *steps = builder->insns.data;

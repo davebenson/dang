@@ -230,7 +230,7 @@ gather_closure_params (unsigned n_params,
                        DangVarTable *table,
                        DangExpr *at,
                        uint8_t *vars_used,
-                       DangArray *var_ids_used)
+                       DangUtilArray *var_ids_used)
 {
   unsigned i;
   if (at->type == DANG_EXPR_TYPE_BAREWORD)
@@ -269,7 +269,7 @@ dang_mf_gather_closure_params (unsigned n_params,
                                unsigned *n_var_ids_out,
                                DangVarId **var_ids_out)
 {
-  DangArray var_ids = DANG_UTIL_ARRAY_STATIC_INIT (DangVarId);
+  DangUtilArray var_ids = DANG_UTIL_ARRAY_STATIC_INIT (DangVarId);
   unsigned vars_used_size = (var_table->variables.len + 7) / 8;
   uint8_t *vars_used = dang_alloca (vars_used_size);
   memset (vars_used, 0, vars_used_size);
@@ -1312,7 +1312,7 @@ DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__define_function)
       DangFunctionFamily *ff;
       const char *bad_name;
       DangExpr *bad_expr;
-      DangArray tparams = DANG_UTIL_ARRAY_STATIC_INIT (DangValueType *);
+      DangUtilArray tparams = DANG_UTIL_ARRAY_STATIC_INIT (DangValueType *);
       unsigned i;
 
       /* Collect the template parameters. */
@@ -3655,6 +3655,13 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__operator_index)
   if (flags->must_be_lvalue)
     {
       IndexLValueCallbackData *cbdata;
+      if (eii->index_info->set == NULL)
+        {
+          dang_compile_result_set_error (result, &expr->any.code_position,
+                                         "%s is not mutable",
+                                         eii->index_info->owner->full_name);
+          return;
+        }
       cbdata = dang_malloc (sizeof (IndexLValueCallbackData));
       if (must_copy_index_values)
         cbdata->indices = copy_values (eii->index_info->n_indices,

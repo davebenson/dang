@@ -474,7 +474,7 @@ void dang_string_buffer_append_repeated_char (DangStringBuffer *buffer,
 }
 
 /* --- arrays --- */
-void dang_util_array_init            (DangArray   *array,
+void dang_util_array_init            (DangUtilArray   *array,
                                  size_t       elt_size)
 {
   array->len = 0;
@@ -482,7 +482,7 @@ void dang_util_array_init            (DangArray   *array,
   array->alloced = 0;
   array->elt_size = elt_size;
 }
-void dang_util_array_append          (DangArray   *array,
+void dang_util_array_append          (DangUtilArray   *array,
                                  unsigned     count,
                                  const void  *data)
 {
@@ -500,7 +500,7 @@ void dang_util_array_append          (DangArray   *array,
   array->len += count;
 }
 
-void dang_util_array_set_size        (DangArray   *array,
+void dang_util_array_set_size        (DangUtilArray   *array,
                                  unsigned     size)
 {
   if (size > array->alloced)
@@ -514,7 +514,7 @@ void dang_util_array_set_size        (DangArray   *array,
   array->len = size;
 }
 
-void dang_util_array_set_size0       (DangArray   *array,
+void dang_util_array_set_size0       (DangUtilArray   *array,
                                  unsigned     size)
 {
   if (size > array->len)
@@ -528,7 +528,7 @@ void dang_util_array_set_size0       (DangArray   *array,
 }
 
 
-void dang_util_array_remove (DangArray *array,
+void dang_util_array_remove (DangUtilArray *array,
                         unsigned   start,
                         unsigned   count)
 {
@@ -539,7 +539,7 @@ void dang_util_array_remove (DangArray *array,
   array->len -= count;
 }
 
-void dang_util_array_insert          (DangArray   *array,
+void dang_util_array_insert          (DangUtilArray   *array,
                                  unsigned     n,
                                  const void  *data,
                                  unsigned     insert_pos)
@@ -554,7 +554,7 @@ void dang_util_array_insert          (DangArray   *array,
           n * array->elt_size);
 }
 
-void dang_util_array_clear           (DangArray   *array)
+void dang_util_array_clear           (DangUtilArray   *array)
 {
   dang_free (array->data);
 }

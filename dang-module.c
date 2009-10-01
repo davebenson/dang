@@ -3,9 +3,9 @@
 #include <string.h>
 #include "dang.h"
 
-static DangArray module_search_paths = DANG_UTIL_ARRAY_STATIC_INIT (char*);
+static DangUtilArray module_search_paths = DANG_UTIL_ARRAY_STATIC_INIT (char*);
 static unsigned max_path_len = 0;
-static DangArray loaded_modules = DANG_UTIL_ARRAY_STATIC_INIT (char *);
+static DangUtilArray loaded_modules = DANG_UTIL_ARRAY_STATIC_INIT (char *);
 
 void
 dang_module_add_path (const char *path)

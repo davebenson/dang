@@ -146,6 +146,33 @@ index_get__array   (DangValueIndexInfo *ii,
   return TRUE;
 }
 
+static void
+maybe_copy_on_write (DangValueType *type,
+                     DangArray     *array)
+{
+  if (array->tensor != NULL && array->tensor->ref_count > 1)
+    {
+      /* copy (since we're writing) */
+      DangValueTypeArray *atype = (DangValueTypeArray *) type;
+      DangTensor *copy = dang_malloc (DANG_TENSOR_SIZEOF (atype->rank));
+      size_t size = atype->element_type->sizeof_instance;
+      size_t n_elts = 1;
+      unsigned i;
+      copy->ref_count = 1;
+      for (i = 0; i < atype->rank; i++)
+        {
+          copy->sizes[i] = array->tensor->sizes[i];
+          n_elts *= copy->sizes[i];
+        }
+      size *= n_elts;
+      copy->data = dang_malloc (size);
+      dang_value_bulk_copy (atype->element_type, copy->data, array->tensor->data, n_elts);
+
+      dang_tensor_unref (atype->tensor_type, array->tensor);
+      array->tensor = copy;
+    }
+}
+
 static dang_boolean
 index_set__array   (DangValueIndexInfo *ii,
                      void          *container,
@@ -156,7 +183,13 @@ index_set__array   (DangValueIndexInfo *ii,
 {
   DangValueType *elt_type = ((DangValueTypeArray*)ii->owner)->element_type;
   void *ptr;
+  DangArray *array = *(DangArray **) container;
   DANG_UNUSED (may_create);
+
+  /* implement copy-on-write */
+  if (array)
+    maybe_copy_on_write (ii->owner, array);
+
   if (!index_get_ptr_array (ii, container, indices, &ptr, error))
     return FALSE;
   if (elt_type->assign)
@@ -166,6 +199,36 @@ index_set__array   (DangValueIndexInfo *ii,
   return TRUE;
 }
 
+static DANG_SIMPLE_C_FUNC_DECLARE (cast_from_array_to_tensor)
+{
+  DangArray *array = * (DangArray **) args[0];
+  DANG_UNUSED (error);
+  DANG_UNUSED (func_data);
+  if (array == NULL || array->tensor == NULL)
+    * (DangTensor **) rv_out = NULL;
+  else
+    {
+      DangTensor *t = array->tensor;
+      ++(t->ref_count);
+      * (DangTensor **) rv_out = t;
+    }
+  return TRUE;
+}
+static DANG_SIMPLE_C_FUNC_DECLARE (cast_from_tensor_to_array)
+{
+  DangTensor *t = * (DangTensor **) args[0];
+  DangArray *array;
+  DANG_UNUSED (func_data);
+  DANG_UNUSED (error);
+  if (t != NULL)
+    t->ref_count++;
+  array = dang_new (DangArray, 1);
+  array->ref_count = 1;
+  array->tensor = t;
+  array->alloced = t ? t->sizes[0] : 0;
+  * (DangArray **) rv_out = array;
+  return TRUE;
+}
 
 DangValueType *
 dang_value_type_array  (DangValueType *element_type,
@@ -174,6 +237,7 @@ dang_value_type_array  (DangValueType *element_type,
   DangValueTypeArray dummy, *out, *conflict = NULL;
   static DangValueType *common_int32_array[MAX_STANDARD_RANK];
   static DangValueType *common_uint32_array[MAX_STANDARD_RANK];
+  DangError *error = NULL;
   dummy.element_type = element_type;
   dummy.rank = rank;
   GSK_RBTREE_LOOKUP (GET_ARRAY_TREE (), &dummy, out);
@@ -245,7 +309,7 @@ dang_value_type_array  (DangValueType *element_type,
   if (!dang_namespace_add_function (dang_namespace_default (),
                                     out->tensor_type->cast_func_name,
                                     f, &error))
-    dang_error ("dang_namespace_add_function failed: %s", error->message);
+    dang_die ("dang_namespace_add_function failed: %s", error->message);
   dang_function_unref (f);
   dang_signature_unref (sig);
 
@@ -253,18 +317,77 @@ dang_value_type_array  (DangValueType *element_type,
   fp.dir = DANG_FUNCTION_PARAM_IN;
   fp.name = "in";
   fp.type = out->tensor_type;
-  sig = dang_signature_new (out->tensor_type, 1, &fp);
+  sig = dang_signature_new (&out->base_type, 1, &fp);
   f = dang_function_new_simple_c (sig, cast_from_tensor_to_array, out, NULL);
   if (!dang_namespace_add_function (dang_namespace_default (),
                                     out->base_type.cast_func_name,
                                     f, &error))
-    dang_error ("dang_namespace_add_function failed: %s", error->message);
+    dang_die ("dang_namespace_add_function failed: %s", error->message);
   dang_function_unref (f);
   dang_signature_unref (sig);
 
   GSK_RBTREE_INSERT (GET_ARRAY_TREE (), out, conflict);
   dang_assert (conflict == NULL);
   return (DangValueType *) out;
+}
+
+static DANG_SIMPLE_C_FUNC_DECLARE (simple_c__array_to_string)
+{
+  DangArray *array = * (DangArray **) args[0];
+  DangValueTypeArray *atype = func_data;
+  if (array == NULL)
+    {
+      * (DangString **) rv_out = dang_string_new ("(null)");
+    }
+  else
+    {
+      void *datum = &array->tensor;
+      void *sub_data[1] = {datum};
+      DangValueTypeTensor *ttype = (DangValueTypeTensor*)atype->tensor_type;
+      DangFunction *tfunc = ttype->to_string_function;
+      if (!dang_function_call_nonyielding_v (tfunc, rv_out, sub_data, error))
+        return FALSE;
+    }
+  return TRUE;
+}
+
+static DANG_FUNCTION_TRY_SIG_FUNC_DECLARE (variadic_c__array_to_string)
+{
+  DangMatchQueryElement subquery_elt;
+  DangMatchQuery subquery;
+  DangValueTypeArray *atype;
+  DangFunctionParam param;
+  DangFunction *subfunc;
+  DangSignature *sig;
+  char *to_string_str = "to_string";
+  DangFunction *f;
+  DANG_UNUSED (data);
+  if (query->n_elements != 1
+   || query->elements[0].type != DANG_MATCH_QUERY_ELEMENT_SIMPLE_INPUT
+   || !dang_value_type_is_array (query->elements[0].info.simple_input))
+    {
+      return NULL;
+    }
+  atype = (DangValueTypeArray *) query->elements[0].info.simple_input;
+  memset (&subquery_elt, 0, sizeof (subquery_elt));
+  subquery_elt.type = DANG_MATCH_QUERY_ELEMENT_SIMPLE_INPUT;
+  subquery_elt.info.simple_input = atype->element_type;
+  subquery.n_elements = 1;
+  subquery.elements = &subquery_elt;
+  subquery.imports = query->imports;
+  subfunc = dang_imports_lookup_function (query->imports,
+                                 1, &to_string_str, &subquery,
+                                 error);
+  if (subfunc == NULL)
+    return NULL;
+
+  param.dir = DANG_FUNCTION_PARAM_IN;
+  param.type = (DangValueType*) atype;
+  param.name = NULL;
+  sig = dang_signature_new (dang_value_type_string (), 1, &param);
+  f = dang_function_new_simple_c (sig, simple_c__array_to_string, atype, NULL);
+  dang_signature_unref (sig);
+  return f;
 }
 
 void
@@ -274,8 +397,8 @@ _dang_array_init (DangNamespace *the_ns)
   DangFunctionFamily *family;
 
   family = dang_function_family_new_variadic_c ("array_to_string",
-                                                variadic_c__generic_substrings, 
-                                                &vsd_to_string,
+                                                variadic_c__array_to_string, 
+                                                NULL,
                                                 NULL);
   if (!dang_namespace_add_function_family (the_ns, "to_string",
                                            family, &error))
@@ -288,8 +411,8 @@ _dang_array_init (DangNamespace *the_ns)
 static void
 free_array_tree_recursive (DangValueTypeArray *a)
 {
-  if (a->to_string_function)
-    dang_function_unref (a->to_string_function);
+  //if (a->to_string_function)
+    //dang_function_unref (a->to_string_function);
   if (a->left)
     free_array_tree_recursive (a->left);
   if (a->right)
@@ -306,4 +429,10 @@ _dang_array_cleanup (void)
   array_type_tree = NULL;
   if (old_tree)
     free_array_tree_recursive (old_tree);
+}
+
+dang_boolean
+dang_value_type_is_array (DangValueType *type)
+{
+  return type->assign == array_assign;
 }

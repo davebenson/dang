@@ -353,7 +353,7 @@ dang_builder_end_scoped_label (DangBuilder *builder,
                                         DangLabelId          label)
 {
   DangLabelId last;
-  DangArray *sl_arr = &builder->scoped_labels;
+  DangUtilArray *sl_arr = &builder->scoped_labels;
   ScopedLabel *sl;
   Label *lab = ((Label*)builder->labels.data) + label;
   dang_assert (lab->type == DANG_FUNCTION_BUILDER_LABEL_TYPE_SCOPED);
@@ -684,8 +684,8 @@ dang_builder_query_vars      (DangBuilder *builder,
   unsigned n_vars = builder->vars.len;
   Variable *vars = builder->vars.data;
   DangVarId id;
-  DangArray destruct;
-  DangArray init;
+  DangUtilArray destruct;
+  DangUtilArray init;
   DANG_UTIL_ARRAY_INIT (&destruct, DangVarId);
   DANG_UTIL_ARRAY_INIT (&init, DangVarId);
   for (id = 0; id < n_vars; id++)

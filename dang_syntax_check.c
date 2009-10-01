@@ -237,7 +237,7 @@ syntax_check_alternation (DangExpr   *expr,
                           const char *pattern,
                         DangError **error)
 {
-  DangArray errors = DANG_UTIL_ARRAY_STATIC_INIT (DangError *);
+  DangUtilArray errors = DANG_UTIL_ARRAY_STATIC_INIT (DangError *);
   DangError *e = NULL;
   for (;;)
     {

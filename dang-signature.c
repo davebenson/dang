@@ -144,7 +144,7 @@ static dang_boolean
 match_query_simple_element_test_param
                                (DangFunctionParam *param, /* may be templated */
                                 DangMatchQueryElement *query,
-                                DangArray *pairs)
+                                DangUtilArray *pairs)
 {
   switch (query->type)
     {
@@ -185,7 +185,7 @@ match_query_function_element_test_param
                                (DangFunctionParam *param, /* may be templated */
                                 DangMatchQueryElement *query,
                                 DangImports *imports,
-                                DangArray *pairs)
+                                DangUtilArray *pairs)
 {
   /* Can we reduce the param to a concrete type?
      If not, bail. */
@@ -239,7 +239,7 @@ match_query_function_element_test_param
 dang_boolean
 dang_signature_test_templated (DangSignature   *sig,
                                DangMatchQuery  *query,
-                               DangArray       *pairs_out)
+                               DangUtilArray       *pairs_out)
 {
   unsigned n_params;
   unsigned i;
