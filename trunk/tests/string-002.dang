@@ -11,7 +11,7 @@ assert(a[4] == 'o');
 assert(a[5] == 'm');
 var s = (string) a;
 assert(s == "hi mom");
-a[2] = 'Q';
+a = ['h' 'i' 'Q' 'm' 'o' 'm'];
 s = (string) a;
 assert(s == "hiQmom");
 

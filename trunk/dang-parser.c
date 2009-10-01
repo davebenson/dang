@@ -357,6 +357,7 @@ default_parse           (DangParser *parser,
         } template_type_words[] = {
           { "function", DANG_DEFAULTPARSER_TOKEN_FUNCTION },
           { "tensor", DANG_DEFAULTPARSER_TOKEN_TENSOR },
+          { "array", DANG_DEFAULTPARSER_TOKEN_ARRAY },
           { "vector", DANG_DEFAULTPARSER_TOKEN_VECTOR },
           { "matrix", DANG_DEFAULTPARSER_TOKEN_MATRIX },
           { "tree", DANG_DEFAULTPARSER_TOKEN_TREE },

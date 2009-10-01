@@ -16,9 +16,6 @@ struct _DangValueTypeArray
   unsigned rank;
   DangValueType *tensor_type;
 
-  /* cached */
-  DangFunction *to_string_function;
-
   DangValueTypeArray *left, *right, *parent;
   dang_boolean is_red;
 
@@ -27,4 +24,6 @@ struct _DangValueTypeArray
 
 DangValueType *dang_value_type_array (DangValueType *element_type,
                                       unsigned       rank);
+dang_boolean   dang_value_type_is_array (DangValueType *type);
 
+void _dang_array_init (DangNamespace *ns);

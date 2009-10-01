@@ -136,6 +136,7 @@ run_test_set cast
 run_test_set if
 run_test_set "string-interpolation tests" interpolation
 run_test_set tensor
+run_test_set array
 run_test_set "do-while loop tests" "do-while"
 run_test_set "while loop tests" "while"
 run_test_set goto

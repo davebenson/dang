@@ -13,7 +13,7 @@ struct _DangTokenizer
   DangCodePosition cp;
   unsigned n_tokens, first_token, queue_size;
   DangToken **token_queue;
-  DangArray data;
+  DangUtilArray data;
   unsigned brace_terminated : 1;
   unsigned got_terminal_brace : 1;
   unsigned in_interpolated_string : 1;
@@ -22,8 +22,8 @@ struct _DangTokenizer
   unsigned brace_balance;
 
   /* For when in_interpolated_string is TRUE */
-  DangArray istring_buf;
-  DangArray istring_pieces;
+  DangUtilArray istring_buf;
+  DangUtilArray istring_pieces;
   DangTokenizer *istring_subtokenizer;
 };
 
@@ -557,7 +557,7 @@ static TokenizeResult
 parse_escape_seq (char *str,
                   char *end,
                   char **end_out,
-                  DangArray *out,
+                  DangUtilArray *out,
                   DangError **error)
 {
   static const char pairs[] = "n\n"
@@ -732,7 +732,7 @@ dang_tokenizer_feed      (DangTokenizer  *tokenizer,
       if (tokenizer->istring_subtokenizer->got_terminal_brace)
         {
           /* Transfer data back into tokenizer->data */
-          DangArray tmp;
+          DangUtilArray tmp;
           dang_assert (tokenizer->data.len == 0);
           tmp = tokenizer->data;
           tokenizer->data = tokenizer->istring_subtokenizer->data;
@@ -790,7 +790,7 @@ restart:
 
                       /* steal raw data back from tokenizer */
                       {
-                        DangArray tmp = tokenizer->istring_subtokenizer->data;
+                        DangUtilArray tmp = tokenizer->istring_subtokenizer->data;
                         tokenizer->istring_subtokenizer->data = tokenizer->data;
                         tokenizer->data = tmp;
                       }

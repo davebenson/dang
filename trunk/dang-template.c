@@ -46,7 +46,7 @@ dang_value_type_is_template_param (DangValueType *type)
 
 void
 dang_type_gather_template_params (DangValueType *type,
-                                  DangArray     *params_out)
+                                  DangUtilArray     *params_out)
 {
   if (dang_value_type_is_template_param (type))
     {
@@ -160,7 +160,7 @@ dang_value_type_contains_disallowed_template_param (DangValueType *type,
 }
 dang_boolean dang_templated_type_check (DangValueType *templated_type,
                                         DangValueType *match_type,
-                                        DangArray     *pairs_out)
+                                        DangUtilArray     *pairs_out)
 {
   unsigned n_pairs = pairs_out->len / 2;
   DangValueType **pairs = pairs_out->data;
@@ -231,7 +231,7 @@ dang_boolean dang_templated_type_check (DangValueType *templated_type,
 
 DangExpr *
 dang_templated_expr_substitute_types (DangExpr  *orig,
-                                      DangArray *pairs)
+                                      DangUtilArray *pairs)
 {
   switch (orig->type)
     {
@@ -281,7 +281,7 @@ dang_templated_expr_substitute_types (DangExpr  *orig,
 }
 
 DangValueType *dang_templated_type_make_concrete (DangValueType *templated_type,
-                                                  DangArray *tt_pairs)
+                                                  DangUtilArray *tt_pairs)
 {
   unsigned n_pairs = tt_pairs->len / 2;
   DangValueType **pairs = tt_pairs->data;

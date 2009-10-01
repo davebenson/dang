@@ -72,8 +72,8 @@ dang_closure_factory_new  (DangSignature *underlying_sig,
                            unsigned       n_params_to_curry)
 {
   DangClosureFactory *factory = dang_new (DangClosureFactory, 1);
-  DangArray copy_back_regions = DANG_UTIL_ARRAY_STATIC_INIT (CopyBackRegion);
-  DangArray zero_regions = DANG_UTIL_ARRAY_STATIC_INIT (ZeroRegion);
+  DangUtilArray copy_back_regions = DANG_UTIL_ARRAY_STATIC_INIT (CopyBackRegion);
+  DangUtilArray zero_regions = DANG_UTIL_ARRAY_STATIC_INIT (ZeroRegion);
   unsigned frame_offset;
   unsigned closure_size;
   unsigned i, piece_i;
