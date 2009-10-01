@@ -1065,6 +1065,13 @@ type(RV) ::= ARRAY(p) LANGLE type(A) COMMA LITERAL(N) RANGLE.
 	  get_expr_pos_from_token (RV, p);
 	  dang_token_unref (p);
 	  dang_token_unref (N); }
+type(RV) ::= ARRAY(p) LANGLE type(A) RANGLE.
+	{ DangValueType *elt_type = get_type_from_expr (A);  /* unref's A */
+	  DangValueType *type;
+          type = dang_value_type_array (elt_type, 1);
+	  RV = dang_expr_new_value (dang_value_type_type (), &type);
+	  get_expr_pos_from_token (RV, p);
+	  dang_token_unref (p); }
 type(RV) ::= VECTOR(p) LANGLE type(A) RANGLE.
 	{ DangValueType *elt_type = get_type_from_expr (A);  /* unref's A */
 	  DangValueType *type = dang_value_type_tensor (elt_type, 1);
