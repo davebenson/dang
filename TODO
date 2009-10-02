@@ -1,4 +1,3 @@
-
 _ built-in compare and hash functions
 _ ability to set mutable methods
   _ tests
@@ -8,7 +7,6 @@ _ BUG:
   >>>> i=42;
   [int32] = 0
 
-_ tokenizing bug: array<%%a> not allowed
 _ make_array() function-family (or should be just be array() ? or a method?)
 _ make_tensor() --- or maybe just a member
 _ array resizing methods
@@ -47,6 +45,9 @@ _ Tree
 
 _ case statement (as general as possible...)
 
+
+
+RELATIVELY LOW PRIORITY
 _ module system
   X "use modulename;"  would be a toplevel statement
   X "import modulename as bareword;" - "module modulename;"
@@ -60,6 +61,8 @@ _ module system
     _ should "import" module... unless "!" given
 
 _ native (C) function interface
+
+_ tokenizing bug: array<%%a> not allowed (currently need space, ala c++, twixt < and %%)
 
 Tests:
 _ static
