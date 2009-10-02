@@ -141,6 +141,12 @@ dang_value_type_contains_disallowed_template_param (DangValueType *type,
                     (((DangValueTypeTensor*)type)->element_type,
                      n_allowed, allowed, bad_name_out);
     }
+  if (dang_value_type_is_array (type))
+    {
+      return dang_value_type_contains_disallowed_template_param
+                    (((DangValueTypeArray*)type)->element_type,
+                     n_allowed, allowed, bad_name_out);
+    }
   if (dang_value_type_is_function (type))
     {
       DangSignature *sig = ((DangValueTypeFunction*)type)->sig;
@@ -303,6 +309,13 @@ DangValueType *dang_templated_type_make_concrete (DangValueType *templated_type,
       DangValueType *new_elt_type;
       new_elt_type = dang_templated_type_make_concrete (ttype->element_type, tt_pairs);
       return dang_value_type_tensor (new_elt_type, ttype->rank);
+    }
+  if (dang_value_type_is_array (templated_type))
+    {
+      DangValueTypeArray *atype = (DangValueTypeArray *) templated_type;
+      DangValueType *new_elt_type;
+      new_elt_type = dang_templated_type_make_concrete (atype->element_type, tt_pairs);
+      return dang_value_type_array (new_elt_type, atype->rank);
     }
   if (dang_value_type_is_function (templated_type))
     {

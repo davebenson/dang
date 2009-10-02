@@ -1,0 +1,67 @@
+// PURPOSE: test standard union operations
+
+union U
+{
+  x: int x;
+  y: { int y0 = 42; int y1; }
+  z: { string z0 = "xyz"; string z1; }
+  y2: { int y0; int y1 = 42; }
+  z2: { string z0; string z1 = "XYZ"; }
+  zy: { int y; string z; }
+}
+
+boolean failed;
+
+U u = U(x: x -> 42);
+assert(u.x.x == 42);
+
+u = U(y: y0 -> 666, y1 -> 1000);
+assert(u.y.y0 == 666);
+assert(u.y.y1 == 1000);
+u = U(y: y1 -> 1000);
+assert(u.y.y0 == 42);
+assert(u.y.y1 == 1000);
+
+failed = false;
+try { u.x.x = 42; } catch (error e) { failed = true; }
+assert(failed);
+failed = false;
+try { u.x.x == 42; } catch (error e) { failed = true; }
+assert(failed);
+failed = false;
+try { u.z.z0 = "hi"; } catch (error e) { failed = true; }
+assert(failed);
+failed = false;
+try { u.z.z1 == "whatever"; } catch (error e) { failed = true; }
+assert(failed);
+
+u = U(z: z0 -> "alpha", z1 -> "omega");
+assert(u.z.z0 == "alpha");
+assert(u.z.z1 == "omega");
+u = U(z: z1 -> "abc");
+assert(u.z.z0 == "xyz");
+assert(u.z.z1 == "abc");
+
+u = U(y2: y1 -> 1000, y0 -> 666);
+assert(u.y2.y0 == 666);
+assert(u.y2.y1 == 1000);
+u = U(y2: y0 -> 1000);
+assert(u.y2.y0 == 1000);
+assert(u.y2.y1 == 42);
+
+u = U(z2: z1 -> "omega", z0 -> "alpha");
+assert(u.z2.z0 == "alpha");
+assert(u.z2.z1 == "omega");
+u = U(z2: z0 -> "abc");
+assert(u.z2.z0 == "abc");
+assert(u.z2.z1 == "XYZ");
+
+u = U(zy: 42, "hi");
+assert(u.zy.y == 42);
+assert(u.zy.z == "hi");
+u = U(zy: y->42, z->"hi");
+assert(u.zy.y == 42);
+assert(u.zy.z == "hi");
+u = U(zy: z->"hi", y->42);
+assert(u.zy.y == 42);
+assert(u.zy.z == "hi");

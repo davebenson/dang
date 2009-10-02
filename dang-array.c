@@ -215,6 +215,17 @@ static DANG_SIMPLE_C_FUNC_DECLARE (do_vector_append_element)
       return FALSE;
     }
   vec = (DangVector *) (array->tensor);
+  if (vec == NULL)
+    {
+      vec = dang_new (DangVector, 1);
+      vec->ref_count = 1;
+      vec->len = 1;
+      array->alloced = 1;
+      vec->data = dang_malloc (elt_type->sizeof_instance);
+      dang_value_bulk_copy (elt_type, vec->data, value, 1);
+      array->tensor = (DangTensor *) vec;
+      return TRUE;
+    }
   if (array->alloced == array->tensor->sizes[0]
    || array->tensor->ref_count > 1)
     {
