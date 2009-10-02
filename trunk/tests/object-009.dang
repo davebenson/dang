@@ -3,18 +3,18 @@
 object X
 {
   new () { }
-  public matrix<string> y;
-  public vector<int> z;
+  public array<string, 2> y;
+  public array<int> z;
 }
 
 {
   X x = new X();
-  x.y = [["hi" "mom"] ["what" "ever"]];
-  x.z = [42 32 12 2];
-  assert(x.y == [["hi" "mom"] ["what" "ever"]]);
-  assert(x.z == [42 32 12 2]);
+  x.y = (array<string,2>) [["hi" "mom"] ["what" "ever"]];
+  x.z = (array<int>) [42 32 12 2];
+  assert((matrix<string>) x.y == [["hi" "mom"] ["what" "ever"]]);
+  assert((vector<int>) x.z == [42 32 12 2]);
   x.y[0,1] = "foo";
-  assert(x.y == [["hi" "foo"] ["what" "ever"]]);
+  assert((matrix<string>) x.y == [["hi" "foo"] ["what" "ever"]]);
   x.z[3] = 92;
-  assert(x.z == [42 32 12 92]);
+  assert((vector<int>) x.z == [42 32 12 92]);
 }

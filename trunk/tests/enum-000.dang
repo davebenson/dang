@@ -1,0 +1,25 @@
+// PURPOSE: test enum basics
+
+enum X
+{
+  foo
+  bar
+  baz
+}
+
+{ }
+
+{ (X. foo); }
+
+assert(X.foo == X.foo);
+assert((uint)X.foo == 0U);
+assert((uint)X.bar == 1U);
+assert((uint)X.baz == 2U);
+assert("${X.foo}" == "foo");
+assert("${X.bar}" == "bar");
+assert("${X.baz}" == "baz");
+
+
+boolean failed = false;
+try { uint x = 4U; (X)x; } catch (error e) { failed = true; }
+assert(failed);

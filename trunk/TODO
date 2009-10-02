@@ -7,6 +7,16 @@ _ BUG:
   >>>> i=42;
   [int32] = 0
 
+_ tokenizing bug: array<%%a> not allowed
+_ make_array() function-family (or should be just be array() ? or a method?)
+_ make_tensor() --- or maybe just a member
+_ array resizing methods
+_ generify templatization code... each non-fundamental type should have
+  methods:  get_subtypes() and replace_subtypes()
+_ blocking functions - so we can call yielding functions
+  _ reimplement map(), all foreach() functions etc
+
+
 _ cast to same type should be a no-op
 _ cast of function-family to exact function type
   should have the expected consequences
@@ -31,9 +41,16 @@ _ Tree
   _ misc methods (keys, values, map)
   _ foreach
   _ implement compare,hash,equal for all types
+  _ ref-counted object like thing
+    _ immutable core w/ ref-count guided mutation.
+      in this case, we probably do not need to expose immutable_tree?
+      or maybe we should...
 
 // MAYBE this should be gotten rid of and cleaned into
 // a larger optimization project
+// XXX XXX XXX: I think getting rid of locks is the right approach...
+// we can probably come up with a strict eval order that makes
+// these weird cases have well defined meaning
 _ Clean up aliasing stuff to disallow
    X  u.x += foo(&u);
    X  u.x += foo(&u.x);

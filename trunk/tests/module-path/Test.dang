@@ -1,0 +1,7 @@
+
+module Test;
+
+function print_42()
+{
+  system.println("42");
+}

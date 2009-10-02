@@ -1,0 +1,36 @@
+\documentclass{article}
+\title{Extensible Parsers}
+\author{Dave Benson}
+\frenchspacing
+\usepackage{amsfonts,amsmath,amssymb,epsfig,eucal}
+\pagestyle{headings}
+\begin{document}
+\maketitle
+
+\section{Overview}
+Machine-generated parsers have a long history
+in the computer science literature, starting with {\tt yacc}.
+This state of affairs represents a compromise between
+two more standard approaches:
+\begin{itemize}
+\item Hand-coding the parser without intermediary tools.
+For this to work well, the language must be expressive
+enough to concisely write the parsing code.
+Nonetheless, for many languages the parsing is easy enough
+that standard language primitives can easily describe the parsing process.
+\item Writing a general purpose parsing library.
+This is probably the most traditional approach to writing reusable code;
+however, certain idiosyncracies of the parsing problem make this
+error-prone.  Probably the most egregious problem is handling type-safety.
+\end{itemize}
+
+Though machine-generation works well for many languages
+whose grammar quite stable (possibly even codified into legalese
+by a standards body), it does constrain the types of situations that
+the parser can be applied to.
+
+\section{Compromises on Type-Safety}
+\section{The Parsing Algorithm, and Handling Conflicts}
+\section{Comparisons of the Performance of Several Techniques}
+
+\section{Conclusion}
