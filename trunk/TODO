@@ -1,3 +1,4 @@
+
 _ built-in compare and hash functions
 _ ability to set mutable methods
   _ tests
@@ -15,23 +16,20 @@ _ generify templatization code... each non-fundamental type should have
   methods:  get_subtypes() and replace_subtypes()
 _ blocking functions - so we can call yielding functions
   _ reimplement map(), all foreach() functions etc
-
-
 _ cast to same type should be a no-op
 _ cast of function-family to exact function type
   should have the expected consequences
-_ singleton function-families should be treated as functions.
-  (??? or not due to forward compatibility)
 
-_ Restructure insns to a list
-  _ Q: how to deal with variable liveness?
 
-_ DangValueType:: index methods
-  X Added DangValueIndexInfo
-  X use DangValueIndexInfo methods from operator_index (just get/set; no get_ptr i guess)
-  X move current impl of operator_index
-  _ future: analyze situations when get_ptr can be used
-     
+Inferring untyped functions...
+_ on the RHS of an assignment where the LHS's type is known
+_ in a return statement when the ret-type is known
+
+unending todo items:
+- improve code coverage (see utils/get-coverage)
+- ensure ./run-tests --valgrind exits cleanly
+
+
 _ Tree
   X indexing
   X index insn is only for tensors right now
@@ -45,6 +43,76 @@ _ Tree
     _ immutable core w/ ref-count guided mutation.
       in this case, we probably do not need to expose immutable_tree?
       or maybe we should...
+
+
+_ case statement (as general as possible...)
+
+_ module system
+  X "use modulename;"  would be a toplevel statement
+  X "import modulename as bareword;" - "module modulename;"
+    _ support list of names, with optional '!' to mean invert.
+      X done in parser and in dang-run-file.c
+      _ implement in dang_imports_lookup()
+         (figure out the exact list of places that need checking are)
+        _ use bsearch or radix+bsearch
+    _ restructure as metafunction
+  X "module name;"  -- create and use module as definition ns
+    _ should "import" module... unless "!" given
+
+_ native (C) function interface
+
+Tests:
+_ static
+_ try on machine without gsl, readline (or provide flags)
+escaped-literals:
+_ \regex /.../
+  _ match(regex, string)
+  _ apply(regex, string, function)
+
+Functions:
+_ some gsl support
+  _ det
+  _ invert
+
+_ BUG: parsing 100000000000000000000 works.
+
+_ modify dang_function_call_nonyielding_v() to use alloca()
+  for the thread and for the stack-frame
+
+Document:
+_ tensor/vector construction nuances
+_ templates
+
+_ cleanup up so that all DangStepRun's are named step__*() with
+  the debug-name registered as simply "*".
+_ cleanup so Flags (and maybe Result) are const when appropriate
+_ cleanup: should it be args,rv or rv,args to (e.g.) SimpleCFunc,
+  call nonyielding, etc.
+_ cleanup: use DANG_CP_{FORMAT,ARGS} to make changes to CodePosition easier
+_ cleanup: have dang_signature_new() map dang_value_type_void() to NULL
+_ cleanup: compound type uniformity.
+  _ make define-struct, enum, union object all handled more
+    uniformly.  probably at annotate-time; maybe before.
+  _ dang_value_type_new_enum() returns an error;
+    dang_value_type_new_struct() does not.  which is right?
+  _ mf-define_union's parse_union_case should share
+    with mf-define_struct.
+OLD TODO ITEMS
+
+
+
+_ singleton function-families should be treated as functions.
+  (??? or not due to forward compatibility)
+
+_ Restructure insns to a list
+  _ Q: how to deal with variable liveness?
+
+_ DangValueType:: index methods
+  X Added DangValueIndexInfo
+  X use DangValueIndexInfo methods from operator_index (just get/set; no get_ptr i guess)
+  X move current impl of operator_index
+  _ future: analyze situations when get_ptr can be used
+     
 
 // MAYBE this should be gotten rid of and cleaned into
 // a larger optimization project
@@ -76,34 +144,9 @@ _ can map be made to crash?
 
 _ tree, hashtable, maybe list?
 
-_ case statement (as general as possible...)
-
-_ module system
-  X "use modulename;"  would be a toplevel statement
-  X "import modulename as bareword;" - "module modulename;"
-    _ support list of names, with optional '!' to mean invert.
-      X done in parser and in dang-run-file.c
-      _ implement in dang_imports_lookup()
-         (figure out the exact list of places that need checking are)
-        _ use bsearch or radix+bsearch
-    _ restructure as metafunction
-  X "module name;"  -- create and use module as definition ns
-    _ should "import" module... unless "!" given
-
-_ native (C) function interface
-
 Tests:
 _ static
 _ try on machine without gsl, readline (or provide flags)
-
-Inferring untyped functions...
-_ on the RHS of an assignment where the LHS's type is known
-_ in a return statement when the ret-type is known
-
-unending todo items:
-- improve code coverage (see utils/get-coverage)
-- ensure ./run-tests --valgrind exits cleanly
-
 escaped-literals:
 _ \regex /.../
   _ match(regex, string)
@@ -130,20 +173,6 @@ _ parser description
 
 _ semantic description from the DangExpr onward
 
-_ cleanup up so that all DangStepRun's are named step__*() with
-  the debug-name registered as simply "*".
-_ cleanup so Flags (and maybe Result) are const when appropriate
-_ cleanup: should it be args,rv or rv,args to (e.g.) SimpleCFunc,
-  call nonyielding, etc.
-_ cleanup: use DANG_CP_{FORMAT,ARGS} to make changes to CodePosition easier
-_ cleanup: have dang_signature_new() map dang_value_type_void() to NULL
-_ cleanup: compound type uniformity.
-  _ make define-struct, enum, union object all handled more
-    uniformly.  probably at annotate-time; maybe before.
-  _ dang_value_type_new_enum() returns an error;
-    dang_value_type_new_struct() does not.  which is right?
-  _ mf-define_union's parse_union_case should share
-    with mf-define_struct.
 
 /* TODO: share code with parse_member if mf-define_struct.
    Generally, all these types should be handled more uniformly. */
