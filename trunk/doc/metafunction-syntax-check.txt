@@ -1,0 +1,29 @@
+The Syntax-Checking String for Metafunctions
+--------------------------------------------
+
+DangMetafunction has a curious and somewhat
+cryptic member, "char *syntax_check".
+Here we attempt to document it.
+
+To minimize repetitive syntax checking, we have a little efficient
+specification language giving basic constraints on the arguments
+to metafunctions.  'grep syntax_check mf-*.c' for many examples.
+
+@               -- match any (remaining) arguments
+
+A               -- match any expr
+B               -- match a bareword
+foo()           -- insist on fct named foo (must begin with lowercase or '$')
+V               -- match any value
+T               -- match a type (must be a value too)
+I               -- match a literal int or int32
+*               -- repeat whatever follows next any number of times
+
+At the toplevel, multiple patterns may be alternated:
+    "A|"   == accept one token or nothing
+
+Examples:
+   "*I"        -- match any number of integers
+   "AA*A"      -- match two or more arguments
+   "TB|TBV"    -- match a type/bareword pair or a type/bareword/value triple
+

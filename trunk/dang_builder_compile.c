@@ -44,6 +44,16 @@ init_stack_infos__file_info (Builder *builder,
 static void dump_insns (Builder *builder);
 #endif
 
+/* Function: dang_builder_compile
+ * Convert the Stub function used to construct the builder
+ * into a real native Dang function.
+ * 
+ * Parameters:
+ *     builder - the function builder object.
+ *     error - place for error if something goes wrong
+ * Returns:
+ *     whether the compilation succeeded
+ */
 dang_boolean   
 dang_builder_compile    (DangBuilder *builder,
 				  DangError          **error)

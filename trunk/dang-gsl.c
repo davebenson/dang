@@ -1,7 +1,6 @@
 #include "dang.h"
 #include <gsl/gsl_linalg.h>
 
-/* NOTE: MUST MATCH DangTensor!! */
 static dang_boolean
 check_matrix_square (DangMatrix *m,
                      const char *func_name,

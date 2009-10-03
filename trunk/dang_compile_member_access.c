@@ -27,7 +27,7 @@ handle_deref_by_moving_onto_stack (DangBuilder *builder,
   //dang_compile_obey_flags (flags, new_res);
 }
 
-/* NOTE: takes responsibility for cleanup cur_res */
+/* CAUTION: takes responsibility for cleanup cur_res */
 void
 dang_compile_member_access (DangBuilder *builder, 
                             DangCompileResult *cur_res,

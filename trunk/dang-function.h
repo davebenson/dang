@@ -129,7 +129,7 @@ struct _DangFunctionDang
   DangFunctionDangDestruct *destroy;
 };
 
-/* NOTE: only used for native dang objects. */
+/* This is only used for native dang objects. */
 typedef struct _DangFunctionNewObject DangFunctionNewObject;
 struct _DangFunctionNewObject
 {
@@ -202,7 +202,7 @@ DangFunction *dang_function_new_stub     (DangImports     *imports,
                                           DangValueType   *method_type,
                                           unsigned         n_friends,
                                           DangValueType  **friends);
-/* note: takes ownership of annotations and var_table */
+/* takes ownership of annotations and var_table */
 void dang_function_stub_set_annotations (DangFunction *function,
                                          DangAnnotations *annotations,
                                          DangVarTable *var_table);

@@ -34,6 +34,12 @@ static char *int8_to_string (DangValueType *type, const void *data)
   DANG_UNUSED (type);
   return dang_strdup_printf ("%d", (int) (*(const int8_t*)data));
 }
+
+/*
+ * Function: dang_value_type_int8
+ *
+ * Returns: the static type object representing a 8-bit signed integer.
+ */
 DangValueType *dang_value_type_int8(void)
 {
   static DangValueType type = {

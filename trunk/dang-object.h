@@ -92,7 +92,8 @@ dang_boolean dang_object_add_member       (DangValueType *object_type,
                                            const void    *default_value,
                                            DangError     **error);
 
-/* NOTE: this api is for native objects only.
+/* This api is for native objects only.
+
    To foreign-objects: perhaps you could move
    along to some other api?
 

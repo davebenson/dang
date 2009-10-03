@@ -22,17 +22,19 @@ add_param (Builder *builder,
 }
 #endif
 
-/**
- * dang_builder_new:
- * @stub: the function to compile
- * @var_table: the known named variables and parameters.
- * @annotations: table of information about each subexpression.
- *
- * Create a new function "builder".  The builder consists
- * of an array of instructions (DangInsn), a table of variables (named and unnamed),
+/*
+ * Function: dang_builder_new
+ * Create a new function "builder".
+ * The builder consists of an array of instructions (DangInsn),
+ * a table of variables (named and unnamed),
  * a set of labels (possibly untargetted jump destinations).
+ * 
+ * Parameters:
+ *     stub - the function to compile
+ *     var_table - the known named variables and parameters.
+ *     annotations - table of information about each subexpression.
  *
- * returns: a new function builder.
+ * return value: a new function builder.
  */
 DangBuilder*
 dang_builder_new         (DangFunction        *stub,
@@ -98,21 +100,22 @@ dang_builder_new         (DangFunction        *stub,
   return builder;
 }
 
-/**
- * dang_builder_is_param:
- * @builder: the builder to query.
- * @id: the variable id to inquire about.
- * @dir_out: optional place to store the parameters direction (in, out or inout).
- *
+/* Function: dang_builder_is_param
  * Detect if the variable is a function parameter,
  * including the return_value (which is always var-id 0 with direction 'out').
  *
- * returns: the type of the parameter, or NULL if the variable is not a parameter.
+ * Parameters:
+ *   builder - the builder to query.
+ *   id - the variable id to inquire about.
+ *   dir_out - optional place to store the parameters direction (in, out or inout).
+ *
+ * Return value:
+ *     the type of the parameter, or NULL if the variable is not a parameter.
  */
 DangValueType *
-dang_builder_is_param (DangBuilder *builder,
-                                DangVarId            id,
-                                DangFunctionParamDir *dir_out)
+dang_builder_is_param (DangBuilder          *builder,
+                       DangVarId             id,
+                       DangFunctionParamDir *dir_out)
 {
   Variable *var = GET_VAR (builder, id);
   if (!var->is_param)
@@ -122,14 +125,29 @@ dang_builder_is_param (DangBuilder *builder,
   return var->type;
 }
 
+/* Function: dang_builder_set_pos
+ * Indicate the location in the source code that we are building.
+ *
+ * Parameters:
+ *    builder - the function builder
+ *    position - the location in the code that is about to be compiled.
+ *
+ */
 void
-dang_builder_set_pos     (DangBuilder *builder,
-                                   DangCodePosition    *position)
+dang_builder_set_pos     (DangBuilder       *builder,
+                          DangCodePosition  *position)
 {
   dang_code_position_clear (&builder->pos);
   dang_code_position_copy (&builder->pos, position);
 }
 
+/* Function: dang_builder_add_insn
+ * Add an instruction to the builder.
+ *
+ * Parameters:
+ *    builder - the function builder
+ *    insn - the instruction to add; it is copied
+ */
 void
 dang_builder_add_insn    (DangBuilder *builder,
                           DangInsn    *insn)
@@ -142,9 +160,17 @@ dang_builder_add_insn    (DangBuilder *builder,
 }
 
 
-void         dang_builder_add_assign   (DangBuilder     *builder,
-                                        DangCompileResult       *lvalue,
-                                        DangCompileResult       *rvalue)
+/* Function: dang_builder_add_assign
+ *
+ * Parameters:
+ *    builder - the function builder
+ *    lvalue - the destination for the assignment
+ *    rvalue - the source for the assignment
+ */
+void
+dang_builder_add_assign   (DangBuilder          *builder,
+                           DangCompileResult    *lvalue,
+                           DangCompileResult    *rvalue)
 {
   DangInsn insn;
   dang_assert (dang_value_type_is_autocast (lvalue->any.return_type, rvalue->any.return_type));

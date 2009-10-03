@@ -186,7 +186,7 @@ void         dang_compile              (DangExpr                *expr,
                                         DangBuilder     *builder,
                                         DangCompileFlags        *flags,
                                         DangCompileResult       *result);
-/* NOTE: takes responsibility for cleanup cur_res */
+/* CAUTION: takes responsibility for cleanup cur_res */
 void         dang_compile_member_access(DangBuilder     *builder, 
                                         DangCompileResult       *cur_res,
                                         DangValueType           *member_type,

@@ -7,8 +7,11 @@ _ BUG:
   >>>> i=42;
   [int32] = 0
 
-_ make_array() function-family (or should be just be array() ? or a method?)
-_ make_tensor() --- or maybe just a member
+_ struct and unions members should be immutable by default;
+  the type of a union should be unchangeable?
+
+X make_array() function-family (or should be just be array() ? or a method?)
+X make_tensor() --- or maybe just a member
 _ array resizing methods
 _ generify templatization code... each non-fundamental type should have
   methods:  get_subtypes() and replace_subtypes()
@@ -22,6 +25,7 @@ _ cast of function-family to exact function type
 Inferring untyped functions...
 _ on the RHS of an assignment where the LHS's type is known
 _ in a return statement when the ret-type is known
+_ in an explicit cast
 
 unending todo items:
 - improve code coverage (see utils/get-coverage)

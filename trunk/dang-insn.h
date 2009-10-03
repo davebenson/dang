@@ -1,4 +1,4 @@
-// NOTE: these are not handled b/c they never go through a function builder 
+// these are not handled b/c they never go through a function builder 
 //dang-closure-factory.c:  dang_debug_register_run_func (step__closure_invoke,
 //dang-closure-factory.c:  dang_debug_register_run_func (step__closure_finish,
 
@@ -83,7 +83,8 @@ struct _DangInsn_Assign           /* from dang_builder_add_assign() */
   dang_boolean target_uninitialized;    /* only used if target.location==STACK */
 };
 
-/* note: this becomes two steps: a setup+invoke, and a copy-output-params and cleanup step */
+/* this becomes two steps: a setup+invoke,
+   and a copy-output-params and cleanup step */
 typedef struct _DangInsn_FunctionCall DangInsn_FunctionCall;
 struct _DangInsn_FunctionCall
 {

@@ -218,7 +218,7 @@ failed:
   memcpy (failure + 1, params, sizeof (DangFunctionParam) * untyped->n_params);
   failure->error = e;
 
-  /* NOTE: should probably zero out the name,
+  /* cheesy optimization? we should probably zero out the name,
      but we just don't use them. */
 
   failure->next = untyped->failures;

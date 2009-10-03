@@ -668,7 +668,7 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE (compile__catch)
         return;
       dang_compile_result_clear (result, builder);
 
-      /* note: destroys clauses[i].var_id */
+      /* This destroys clauses[i].var_id */
       dang_builder_pop_local_scope (builder);
 
       /* Goto after the whole thing,
@@ -2067,7 +2067,7 @@ parse_union_case (DangExpr      *case_expr,
       members[i].type = *(DangValueType**)(mem_expr->function.args[0]->value.value);
       members[i].name = dang_strdup (mem_expr->function.args[1]->bareword.name);
 
-      /* NOTE: members[i].offset is initialized by dang_value_type_new_union() */
+      /* members[i].offset is initialized by dang_value_type_new_union() */
 
       members[i].has_default_value = (mem_expr->function.n_args == 3);
       if (members[i].has_default_value)
@@ -2803,7 +2803,7 @@ static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__invoke)
                 return FALSE;
               }
 
-            /* NOTE: sig and function will include 'this' for
+            /* sig and function will include 'this' for
                non-static methods; we need to keep track
                since we will coerce our partially typed arguments
                with 'sig', they have to line up. */

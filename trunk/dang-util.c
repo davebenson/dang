@@ -89,7 +89,7 @@ char *dang_strdup_vprintf (const char *format,
 {
   char *rv = NULL;
 
-  /* NOTE:  MEMORY ALLOCATION ENTRY POINT!!!! */
+  /* NOTE THAT THIS IS MEMORY ALLOCATION ENTRY POINT!!!! */
   vasprintf (&rv, format, args);
 
   if (rv == NULL)

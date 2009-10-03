@@ -22,7 +22,7 @@ struct _DangValueTypeStruct
   DangValueTypeStruct *prev_struct;
 };
 
-/* NOTE: takes ownership! (of 'name' and 'members'!) 
+/* CAUTION: this takes ownership! (of 'name' and 'members'!) 
    this function will handle computing the offsets */
 DangValueType *dang_value_type_new_struct (char *name,
                                            unsigned    n_members,

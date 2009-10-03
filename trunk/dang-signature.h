@@ -73,6 +73,6 @@ DangMatchQuery *dang_signature_make_match_query (DangSignature *);
 
 
 
-/* NOTE: ignores names */
+/* ignores parameter names */
 dang_boolean dang_signatures_equal (DangSignature *a,
                                     DangSignature *b);
