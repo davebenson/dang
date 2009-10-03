@@ -88,6 +88,10 @@ char **dang_util_split_by_dot (const char *dotted_name,
 dang_boolean dang_util_is_zero (const void *mem,
                                 unsigned    len);
 
+/* computes the product of a number of terms;
+   useful for sizing tensors */
+unsigned dang_util_uint_product (unsigned N, const unsigned *terms);
+
 /* --- strings --- */
 typedef struct _DangString DangString;
 struct _DangString

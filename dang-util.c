@@ -115,6 +115,18 @@ dang_boolean dang_util_is_zero (const void *mem,
       return FALSE;
   return TRUE;
 }
+unsigned dang_util_uint_product (unsigned N, const unsigned *terms)
+{
+  if (N == 0)
+    return 1;
+  else
+    {
+      unsigned rv = terms[0], i;
+      for (i = 1; i < N; i++)
+        rv *= terms[i];
+      return rv;
+    }
+}
 
 void dang_fatal_user_error (const char *format,
                             ...)
