@@ -583,54 +583,170 @@ DANG_SIMPLE_C_FUNC_DECLARE (dang_internal_cast_from_tensor_to_array)
   return TRUE;
 }
 
-static DANG_SIMPLE_C_FUNC_DECLARE (array_resize_1)
+static void
+copy_and_zero_recursively (unsigned        rank,
+                           DangValueType  *elt_type,
+                           void           *dst,
+                           const unsigned *dst_sizes,
+                           const void     *src,
+                           const unsigned *src_sizes)
+{
+  if (rank == 1)
+    {
+      if (*dst_sizes < *src_sizes)
+        dang_value_bulk_copy (elt_type, dst, src, *dst_sizes);
+      else
+        {
+          dang_value_bulk_copy (elt_type, dst, src, *src_sizes);
+          memset ((char*) dst + *src_sizes * elt_type->sizeof_instance, 0,
+                  (*dst_sizes - *src_sizes) * elt_type->sizeof_instance);
+        }
+    }
+  else
+    {
+      unsigned min = DANG_MIN (*src_sizes, *dst_sizes);
+      unsigned dst_inner_size = elt_type->sizeof_instance;
+      unsigned src_inner_size = elt_type->sizeof_instance;
+      unsigned i;
+      for (i = 1; i < rank; i++)
+        {
+          dst_inner_size *= dst_sizes[i];
+          src_inner_size *= src_sizes[i];
+        }
+      for (i = 0; i < min; i++)
+        {
+          copy_and_zero_recursively (rank - 1,
+                                     elt_type,
+                                     dst, dst_sizes + 1,
+                                     src, src_sizes + 1);
+          src = (const char *) src + src_inner_size;
+          dst = (char *) dst + dst_inner_size;
+        }
+      memset (dst, 0, (dst_sizes[0] - min) * dst_inner_size);
+    }
+}
+
+static DANG_SIMPLE_C_FUNC_DECLARE (array_resize)
 {
   DangValueTypeArray *atype = func_data;
   DangArray *array = * (DangArray **) args[0];
-  unsigned i = * (unsigned *) args[1];
+  DangTensor *tensor;
+  unsigned rank = atype->rank;
+  unsigned *sizes = dang_newa (unsigned, atype->rank);
+  unsigned i;
+  unsigned new_n_elements, cur_n_elements;
+  DangValueType *elt_type = atype->element_type;
+  unsigned elt_size = elt_type->sizeof_instance;
+
+  DANG_UNUSED (rv_out);
+  DANG_UNUSED (error);
+
   if (array == NULL)
     {
       dang_set_error (error, "null pointer exception");
       return FALSE;
     }
-  if (array->tensor == NULL || array->tensor->sizes[0] == 0)
+
+  /* gather sizes from arguments */
+  for (i = 0; i < rank; i++)
+    sizes[i] = * (uint32_t *) args[i + 1];
+
+
+  tensor = array->tensor;
+  new_n_elements = dang_util_uint_product (rank, sizes);
+  cur_n_elements = tensor ? dang_util_uint_product (rank, tensor->sizes) : 0U;
+
+  /* Handle the case we are starting from an empty array */
+  if (cur_n_elements == 0)
     {
-      if (array->tensor)
+      if (array->tensor != NULL)
         {
           dang_tensor_unref (atype->tensor_type, array->tensor);
           array->tensor = NULL;
         }
-      if (i > 0)
+      if (new_n_elements > 0)
         {
-          array->tensor = dang_new (DangVector, 1);
+          array->tensor = (DangTensor *) dang_new (DangVector, 1);
           array->tensor->ref_count = 1;
-          array->tensor->len = i;
-          array->tensor->data = dang_malloc0 (elt_type->sizeof_instance * i);
-          array->alloced = i;
+          array->tensor->sizes[0] = new_n_elements;
+          array->tensor->data = dang_malloc0 (elt_size * new_n_elements);
+          array->alloced = sizes[0];
         }
       return TRUE;
     }
+
   if (array->tensor->ref_count > 1)
     {
       /* create a new tensor */
-      ...
+      DangTensor *old_tensor = array->tensor;
+      array->tensor->ref_count -= 1;
+
+      array->tensor = (DangTensor *) dang_new (DangVector, 1);
+      array->tensor->ref_count = 1;
+      array->tensor->data = dang_malloc (elt_size * new_n_elements);
+      memcpy (array->tensor->sizes, sizes, sizeof (unsigned) * atype->rank);
+      array->alloced = sizes[0];
+
+      copy_and_zero_recursively (atype->rank,
+                                 elt_type,
+                                 array->tensor->data,
+                                 sizes,
+                                 old_tensor->data,
+                                 old_tensor->sizes);
     }
   else
     {
-      /* do a realloc (if needed) */
-      ...
+      DangTensor *tensor = array->tensor;
+      for (i = 1; i < rank; i++)
+        if (tensor->sizes[i] != sizes[i])
+          break;
+      if (i == rank)
+        {
+          /* simple realloc (just changing size of first index) */
+          unsigned inner_size = dang_util_uint_product (rank - 1, sizes + 1);
+          if (tensor->sizes[0] < sizes[0])
+            {
+              /* zero the end */
+              tensor->data = dang_realloc (tensor->data, new_n_elements * elt_size);
+              memset ((char*)tensor->data + (elt_size * inner_size * tensor->sizes[0]), 0,
+                      elt_size * inner_size * (sizes[0] - tensor->sizes[0]));
+            }
+          else if (tensor->sizes[0] > sizes[0])
+            {
+              /* destruct dead elements */
+              dang_value_bulk_destruct (elt_type,
+                                       (char*)tensor->data + (elt_size * inner_size * sizes[0]),
+                                        (tensor->sizes[0] - sizes[0]) * inner_size);
+              tensor->data = dang_realloc (tensor->data, new_n_elements * elt_size);
+            }
+          else if (array->alloced != sizes[0])
+            {
+              /* realloc just to tighten memory use */
+              tensor->data = dang_realloc (tensor->data, new_n_elements * elt_size);
+            }
+          tensor->sizes[0] = sizes[0];
+          array->alloced = sizes[0];
+        }
+      else
+        {
+          void *new_data = dang_malloc (elt_size * new_n_elements);
+
+          /* combining the copy/zero and destruct could be (in some cases) more efficient */
+          copy_and_zero_recursively (atype->rank,
+                                     elt_type,
+                                     new_data,
+                                     sizes,
+                                     tensor->data,
+                                     tensor->sizes);
+          dang_value_bulk_destruct (elt_type, tensor->data, cur_n_elements);
+
+          dang_free (tensor->data);
+          tensor->data = new_data;
+          memcpy (tensor->sizes, sizes, sizeof (unsigned) * rank);
+          array->alloced = sizes[0];
+        }
     }
   return TRUE;
-}
-static DANG_SIMPLE_C_FUNC_DECLARE (array_resize_2)
-{
-  DangValueTypeArray *atype = func_data;
-  ...
-}
-static DANG_SIMPLE_C_FUNC_DECLARE (array_resize_generic)
-{
-  DangValueTypeArray *atype = func_data;
-  ...
 }
 
 DangValueType *
@@ -642,6 +758,8 @@ dang_value_type_array  (DangValueType *element_type,
   static DangValueType *common_uint32_array[MAX_STANDARD_RANK];
   DangError *error = NULL;
   DangFunctionParam *params;
+  DangFunction *func;
+  unsigned i;
   dummy.element_type = element_type;
   dummy.rank = rank;
   GSK_RBTREE_LOOKUP (GET_ARRAY_TREE (), &dummy, out);
@@ -749,18 +867,12 @@ dang_value_type_array  (DangValueType *element_type,
   params[0].name = "this";
   for (i = 0; i < rank; i++)
     {
-      params[i+1].type = dang_value_type_uint ();
+      params[i+1].type = dang_value_type_uint32 ();
       params[i+1].dir = DANG_FUNCTION_PARAM_IN;
       params[i+1].name = NULL;
     }
   sig = dang_signature_new (dang_value_type_void (), rank + 1, params);
-  if (rank == 1)
-    cfunc = array_resize_1;
-  else if (rank == 2)
-    cfunc = array_resize_2;
-  else
-    cfunc = array_resize_generic;
-  func = dang_function_new_simple_c (sig, cfunc, out, NULL);
+  func = dang_function_new_simple_c (sig, array_resize, out, NULL);
   dang_value_type_add_constant_method ((DangValueType *) out, "resize",
                                        DANG_METHOD_PUBLIC|DANG_METHOD_FINAL,
                                        func);

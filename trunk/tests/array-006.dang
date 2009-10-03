@@ -1,0 +1,29 @@
+
+
+// vector resize
+var a = [1 2 3].make_array();
+assert(a.v == [1 2 3]);
+var old_v = a.v;
+a.resize(10U);
+assert(old_v == [1 2 3]);
+assert(a.v == [1 2 3 0 0 0 0 0 0 0]);
+a.resize(1U);
+assert(a.v == [1]);
+assert(old_v == [1 2 3]);
+old_v = a.v;
+
+a.resize(10U);
+assert(old_v == [1]);
+assert(a.v == [1 0 0 0 0 0 0 0 0 0]);
+
+
+// matrix resize
+var b = [[1 2] [3 4]].make_array();
+assert(b.v == [[1 2] [3 4]]);
+b.resize(3U, 2U);
+assert(b.v == [[1 2] [3 4] [0 0]]);
+b.resize(3U, 3U);
+assert(b.v == [[1 2 0] [3 4 0] [0 0 0]]);
+b.resize(2U, 3U);
+assert(b.v == [[1 2 0] [3 4 0]]);
+

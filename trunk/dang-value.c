@@ -700,6 +700,23 @@ dang_value_bulk_copy (DangValueType *type,
     }
 }
 void
+dang_value_bulk_destruct (DangValueType *type,
+                          void *to_kill,
+                          unsigned N)
+{
+  char *k = to_kill;
+  if (type->destruct)
+    {
+      unsigned skip = type->sizeof_instance;
+      while (N--)
+        {
+          type->destruct (type, k);
+          k += skip;
+        }
+    }
+}
+
+void
 dang_value_assign    (DangValueType *type,
                       void *dst,
                       const void *src)

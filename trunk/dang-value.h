@@ -145,6 +145,9 @@ void dang_value_bulk_copy (DangValueType *type,
                            void          *dst,
                            const void    *src,
                            unsigned       N);
+void dang_value_bulk_destruct (DangValueType *type,
+                               void          *to_kill,
+                               unsigned       N);
 void dang_value_init_assign (DangValueType *type,
                              void          *dst,
                              const void    *src);
