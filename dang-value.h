@@ -81,7 +81,7 @@ DangValueType *dang_value_type_integer(void);
 DangValueType *dang_value_type_error(void);
 DangValueType *dang_value_type_void(void);
 
-/* NOTE: unlike in c, the boolean type in dang is a single byte */
+/* Unlike in c, the boolean type in dang is a single byte! */
 DangValueType *dang_value_type_boolean(void);
 
 DangValueType *dang_value_type_reserved_pointer (void);
@@ -101,7 +101,7 @@ typedef enum
 } DangValueMemberType;
 
 /* functions for virtual members */
-/* NOTE: function is responsible for clearing 'container' */
+/* Note that function is responsible for clearing 'container' */
 typedef dang_boolean (*DangCompileVirtualMember)
                                            (DangBuilder   *builder,
                                             DangCompileResult     *container,

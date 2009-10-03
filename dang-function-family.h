@@ -8,7 +8,7 @@ typedef enum
   DANG_FUNCTION_FAMILY_TEMPLATE
 } DangFunctionFamilyType;
 
-/* NOTE: this may or may not set 'error' !!! */
+/* CAUTION: this may or may not set 'error' !!! */
 typedef DangFunction *(*DangFunctionTrySigFunc) (DangMatchQuery *query,
                                                  void *data,
                                                  DangError **error);

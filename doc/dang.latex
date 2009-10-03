@@ -1,0 +1,355 @@
+\documentclass{book}
+\begin{document}
+\title{How Dang Works}
+\author{Dave Benson}
+\maketitle
+
+\begin{chapter}{Introduction}
+
+\begin{section}{Goals}
+...
+\end{section}
+\begin{section}{Getting Started}
+...
+\end{section}
+\begin{section}{Basic Syntax}
+A lot of the syntax of dang is similar to C or Java:
+\begin{verbatim}
+ for (int i = 0; i < 10; i++)
+   system.println("hello world $i");
+\end{verbatim}
+This is a complete working dang program.  There is no need for {\tt main} or
+its ilk in dang: simply do what you want without a scope.
+
+Also, notice dang's string interpolation.  It works by calling the {\tt to\_string}
+function on any types that are interpolated, so you can define you
+own ``printing'' routines.
+
+Types are often inferred in dang, but you still have to use the {\tt var} keyword
+to introduce a new variable, if you don't plan on explicitly naming its type:
+\begin{verbatim}
+  var x = [[1 2] [3 4]];
+\end{verbatim}
+We could have equivalently said:
+\begin{verbatim}
+  matrix<int> x = [[1 2] [3 4]];
+\end{verbatim}
+Or even:
+\begin{verbatim}
+  tensor<int, 2> x = [[1 2] [3 4]];
+\end{verbatim}
+
+
+...
+\end{section}
+\begin{section}{Defining Functions}
+To define a function at the top-level:
+\begin{verbatim}
+  function square(int x : int) x * x;
+\end{verbatim}
+or equivalently:
+\begin{verbatim}
+  function square(int x : int) { return x * x; }
+\end{verbatim}
+To call that function you might do something like:
+\begin{verbatim}
+  var z = square(64);
+\end{verbatim}
+or
+\begin{verbatim}
+  system.println("square of four is ${square(4)}");
+\end{verbatim}
+
+It is a little different than most languages because
+the return type is included in the parentheses.
+This is actually useful if you are trying to parse
+a complicated function prototype:
+\begin{verbatim}
+  function make_adder(int x : function<int:int>)
+\end{verbatim}
+This is a function that takes an integer {\tt x} and
+returns a function that maps from integer to integer.
+This is pretty hard to write as a single type in C.
+
+Here is the natural implementation of that:
+\begin{verbatim}
+  function make_adder(int x : function<int:int>)
+  {
+    return function(int z : int) x + z;
+  }
+\end{verbatim}
+or equivalently:
+\begin{verbatim}
+  function make_adder(int x : function<int:int>)
+  {
+    return function(int z : int) { return x + z; }
+  }
+\end{verbatim}
+To use this function, you might do:
+\begin{verbatim}
+  var x = make_adder(3);
+  system.println("${x(4)}");
+\end{verbatim}
+It will print {\tt 7} since {\tt x} is a function return 3 plus its argument.
+
+
+\end{section}
+
+\begin{section}{Working with Tensors and Arrays}
+We use some general vocabulary in rather specific ways:
+\begin{itemize}
+\item a {\it tensor} is an immutable multidimensional indexed data store;
+it is internally stored as packed values.
+\item a {\it vector} is a one-dimension tensor.  Like the tensor, it is immutable.
+\item a {\it matrix} is a one-dimension tensor.  It is also immutable.
+\item an {\it array} is a mutable multidimensional indexed data store.
+\end{itemize}
+
+Vectors are often declared as constants:
+\begin{verbatim}
+  var v = [1 2 3 4 5];
+\end{verbatim}
+This type of each element in the vector must be the same,
+so the last example makes a vector of length 5 of type {\tt int}.
+To make a vector of doubles, you might use:
+\begin{verbatim}
+  var w1 = [1. 2. 3. 4. 5.];
+\end{verbatim}
+Another option is to use the general {\tt map} function:
+\begin{verbatim}
+  var w = map(v, function x -> (double) x);
+\end{verbatim}
+The type of {\tt w} is once again inferred,
+as is the type of {\tt x}.
+
+The {\tt map} function can be used to collate two lists as well:
+\begin{verbatim}
+  var nums = ["one" "two" "three" "four" "five"];
+  var weird = map(nums, v, function a b -> "$a$b");
+  system.println("weird=$weird");
+\end{verbatim}
+Will output:
+\begin{verbatim}
+weird={one1,two2,three3,four4,five5}
+\end{verbatim}
+
+Vectors can be indexed in the usual fashion:
+\begin{verbatim}
+  system.println("weird[2] = ${weird[2]}");
+  weird[2] = "huh?";
+  system.println("weird now is $weird");
+\end{verbatim}
+Will output:
+\begin{verbatim}
+weird[2] = three3
+weird now is {one1,two2,huh?,four4,five5}
+\end{verbatim}
+
+Another higher-order function is {\tt grep},
+which returns a new vector containing the
+elements of the input that meet some condition:
+\begin{verbatim}
+  var odd = grep(v, function i -> (i % 2) == 1);
+\end{verbatim}
+
+A way to formulaically define a vector
+is given by {\tt new\_tensor}.  Obviously it is general-purpose
+for matrices and other tensors, but it is fine for simple vectors too:
+\begin{verbatim}
+  var a = new_tensor(10U, function z -> z * z);
+  system.println("$a");
+\end{verbatim}
+will output:
+\begin{verbatim}
+[0 1 4 9 16 25 36 49 64 81]
+\end{verbatim}
+
+In addition to all these methods, there are optimized
+implementations of {\tt sum}, {\tt product}, {\tt average},
+{\tt min} and {\tt max} for vectors (and tensors of all ranks).
+
+To concatenate two vectors, use the concatenation operator {\tt <>}:
+\begin{verbatim}
+  assert([1 2] <> [3 4] == [1 2 3 4]);
+\end{verbatim}
+
+The {\tt concat} function can help if you have a vector of vectors
+you want to flatten:
+\begin{verbatim}
+  assert(concat([[1] [1 2] [1 2 3]]) == [1 1 2 1 2 3]);
+\end{verbatim}
+
+Finally a few standard numerical functions
+exist: {\tt sum}, {\tt product}, {\tt average}, {\tt min}, {\tt max}.
+
+\vskip 5ex
+Note again that a vector is immutable, so that
+\begin{verbatim}
+  var a = [1 2 3];
+  a[1] = 4;
+\end{verbatim}
+will give a syntax error ``tensor<int, 1> is immutable''.
+
+An {\em array} is a mutable data store.  Use either a cast or the
+\verb|to_array| method.
+\begin{verbatim}
+  var a = (array<int>) [1 2 3];
+  var b = [1 2 3].to_array();
+  a[1] = 4;
+  b[1] = 5;
+  assert(a.v != b.v);
+\end{verbatim}
+Note that the vector is available as a simple member of the array
+named {\tt v}.  Most operations only work on vectors (as they are easier to
+optimize) and so you must use {\tt .v} a lot when mixing array construction
+and standard methods.
+\begin{verbatim}
+  var vector<int> a;
+  array<int> b = a;
+  for (int i = 0; i < 10; i++)
+  {
+    b <>= i;
+    system.println("average of 0..$i is ${average(b.v)}");
+  }
+\end{verbatim}
+
+Note that the \verb|<>=| operator accepts elements or vectors
+(or subtensors and tensors for higher-ranking tensors).
+
+It has an assignment form:
+\begin{verbatim}
+  var a = [1 2 3].to_array();
+  a <>= 4;
+  a <>= [5 6 7];
+  assert(a.v == [1 2 3 4 5 6 7]);
+\end{verbatim}
+
+\end{section}
+
+\begin{section}{Working with Matrices}
+TODO: document: *, +, -, {\tt diag}, {\tt transpose}, {\tt rows}, {\tt cols},
+{\tt reshape}, {\tt concat}.
+
+TODO: implement: {\tt det}, {\tt invert}.
+
+TODO: the concatenation operator {\tt <>} accepts a variety of ranks.
+If they are the same, we concatenate.  If they differ by one, we assume that the element
+is another plane to append.
+
+\end{section}
+
+\begin{section}{Working with Higher-Order Tensors}
+not much: {\tt new\_tensor}, {\tt map},
+{\tt reshape}, {\tt dims}.
+\end{section}
+
+\begin{section}{Working with Strings}
+{\tt concat}, {\tt split}, {\tt join}.
+\end{section}
+
+\end{chapter}
+
+\begin{chapter}{Functions, Types, and Objects}
+\begin{section}{What is a Type?}
+A {\tt type} describes a fixed-length,
+relocatable piece of data, called a {\it value}.
+With a typed-value, you can copy it, and you can
+free any memory it uses.
+
+Things like objects and strings, which are obviously
+not fixed-length or relocatable are not values.
+Instead, pointers to them are considered to be the value.
+
+The fundamental types in {\tt dang} are, so far,
+\begin{itemize}
+\item {\tt tiny}, {\tt utiny}, {\tt short}, {\tt ushort}, 
+{\tt int}, {\tt uint}, {\tt long}, {\tt ulong}.
+\item {\tt boolean}.
+\item {\tt float}, {\tt double}.
+\item {\tt char}.
+\item {\tt string}.
+\end{itemize}
+
+You can define more types:  tensors, objects, structures.
+
+\end{section}
+\begin{section}{Functions and Closures}
+...
+\end{section}
+\begin{section}{Templates}
+...
+\end{section}
+\end{chapter}
+
+\begin{chapter}{Standard File I/O}
+\begin{section}{Text Files}
+Here's how to read a file:
+\begin{verbatim}
+  var f = new file.File read("/etc/motd");
+  vector<string> lines;
+  while (var line = f.readln()) lines <>= line;
+  f.close();
+\end{verbatim}
+
+And here's how to write one:
+\begin{verbatim}
+  var f = new file.File write("my-file");
+  f.writeln("hello world");
+  f.close();
+\end{verbatim}
+\end{section}
+\end{chapter}
+
+\begin{chapter}{The Dang Interpreter Main-Loop}
+\begin{section}{...}
+...
+\end{section}
+\end{chapter}
+
+\begin{chapter}{Extending and Embedding: Dang in Your Program}
+\begin{section}{Extending Dang}
+...
+\end{section}
+\begin{section}{Embedding Dang}
+...
+\end{section}
+
+\end{chapter}
+
+\begin{chapter}{Miscellaneous Technical Notes}
+\begin{section}{LValues, RValues, and LRValues}
+
+To be on the left-side of an assignment, or to be 
+used as an output variable (with ``{\tt \&}''),
+the expression must be what is called an LValue.
+
+An expression suitable for use on the right-side
+is called an RValue.  Most expressions are rvalues;
+the only non-rvalues you are likely to encounter as
+{\tt out} parameters.
+
+If something is an LValue and an RValue, we sometimes
+call it an LRValue:  they are needed for {\tt inout} parameters,
+and operators like {\tt ++} and {\tt +=}.
+
+Here is how we determine if something is an LValue.
+\begin{itemize}
+\item array subscript on a lvalue-array.
+\item any writable object member
+\item a structure member of a lvalue-structure.
+\item a local variable or a global
+\end{itemize}
+Everything else is not an LValue.  Here are some examples:
+\begin{itemize}
+\item input parameters to functions.
+\item literal values, like {\tt 4} or {\tt "hi mom"}.
+\item function invocations, like {\tt f()}.
+\end{itemize}
+
+
+\end{section}
+
+\end{chapter}
+
+
+\end{document}

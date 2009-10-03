@@ -29,7 +29,7 @@ struct _DangExprAnnotation
 
 DangAnnotations *dang_annotations_new (void);
 
-/* note: assertion fails if we already have an annotation of that type+expr */
+/* caution: assertion fails if we already have an annotation of that type+expr */
 void   dang_expr_annotation_init(DangAnnotations *annotations,
                                  DangExpr        *expr,
                                  DangExprAnnotationType type,

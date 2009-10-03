@@ -1,0 +1,3 @@
+#! /bin/sh
+
+naturaldocs -i . -p project -o html out

@@ -473,6 +473,8 @@ invoke_expr(RV) ::= limited_expression(BW) LPAREN argument_list(ARGS) RPAREN. [F
           free_expr_array (&ARGS);
           get_expr_pos_from_expr (RV, BW);
 	  }
+limited_expression(A) ::= vector_expr(B).
+	{ A = B; }
 expr(RV) ::= invoke_expr(A).
 	{ RV = A; }
 parenthesized_expression(RV) ::= LPAREN expr(A) RPAREN.
@@ -1287,8 +1289,6 @@ expr(RV) ::= type(T) DOT BAREWORD(B).
 	  get_expr_pos_from_expr (RV, T);
 	  dang_token_unref (B); }
 
-expr(A) ::= vector_expr(B).
-	{ A = B; }
 vector_expr(RV) ::= LBRACKET(p) raw_expr_list(LIST) RBRACKET.
 	{ RV = expr_new_function ("$tensor", LIST.len, LIST.data);
 	  free_expr_array (&LIST);
@@ -1302,8 +1302,6 @@ raw_expr_list(LIST) ::= raw_expr_list(A) raw_expr(B).
 raw_expr(A) ::= limited_expression(B).
 	{ A = B; }
 raw_expr(A) ::= literal_expr(B).
-	{ A = B; }
-raw_expr(A) ::= vector_expr(B).
 	{ A = B; }
 raw_expr(A) ::= interpolated_string_expr(B).
 	{ A = B; }

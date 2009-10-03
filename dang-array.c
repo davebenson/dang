@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stddef.h>
 #include "dang.h"
 #include "magic.h"
 #include "config.h"
@@ -566,7 +567,7 @@ static DANG_SIMPLE_C_FUNC_DECLARE (cast_from_array_to_tensor)
     }
   return TRUE;
 }
-static DANG_SIMPLE_C_FUNC_DECLARE (cast_from_tensor_to_array)
+DANG_SIMPLE_C_FUNC_DECLARE (dang_internal_cast_from_tensor_to_array)
 {
   DangTensor *t = * (DangTensor **) args[0];
   DangArray *array;
@@ -582,6 +583,56 @@ static DANG_SIMPLE_C_FUNC_DECLARE (cast_from_tensor_to_array)
   return TRUE;
 }
 
+static DANG_SIMPLE_C_FUNC_DECLARE (array_resize_1)
+{
+  DangValueTypeArray *atype = func_data;
+  DangArray *array = * (DangArray **) args[0];
+  unsigned i = * (unsigned *) args[1];
+  if (array == NULL)
+    {
+      dang_set_error (error, "null pointer exception");
+      return FALSE;
+    }
+  if (array->tensor == NULL || array->tensor->sizes[0] == 0)
+    {
+      if (array->tensor)
+        {
+          dang_tensor_unref (atype->tensor_type, array->tensor);
+          array->tensor = NULL;
+        }
+      if (i > 0)
+        {
+          array->tensor = dang_new (DangVector, 1);
+          array->tensor->ref_count = 1;
+          array->tensor->len = i;
+          array->tensor->data = dang_malloc0 (elt_type->sizeof_instance * i);
+          array->alloced = i;
+        }
+      return TRUE;
+    }
+  if (array->tensor->ref_count > 1)
+    {
+      /* create a new tensor */
+      ...
+    }
+  else
+    {
+      /* do a realloc (if needed) */
+      ...
+    }
+  return TRUE;
+}
+static DANG_SIMPLE_C_FUNC_DECLARE (array_resize_2)
+{
+  DangValueTypeArray *atype = func_data;
+  ...
+}
+static DANG_SIMPLE_C_FUNC_DECLARE (array_resize_generic)
+{
+  DangValueTypeArray *atype = func_data;
+  ...
+}
+
 DangValueType *
 dang_value_type_array  (DangValueType *element_type,
                         unsigned       rank)
@@ -590,6 +641,7 @@ dang_value_type_array  (DangValueType *element_type,
   static DangValueType *common_int32_array[MAX_STANDARD_RANK];
   static DangValueType *common_uint32_array[MAX_STANDARD_RANK];
   DangError *error = NULL;
+  DangFunctionParam *params;
   dummy.element_type = element_type;
   dummy.rank = rank;
   GSK_RBTREE_LOOKUP (GET_ARRAY_TREE (), &dummy, out);
@@ -646,6 +698,10 @@ dang_value_type_array  (DangValueType *element_type,
   out->index_infos[1].get = index_get__array;
   out->index_infos[1].set = index_set__array;
   out->index_infos[1].element_type = element_type;
+
+  GSK_RBTREE_INSERT (GET_ARRAY_TREE (), out, conflict);
+  dang_assert (conflict == NULL);
+
   out->tensor_type = dang_value_type_tensor (element_type, rank);
 
   DangFunctionParam fp;
@@ -665,12 +721,14 @@ dang_value_type_array  (DangValueType *element_type,
   dang_function_unref (f);
   dang_signature_unref (sig);
 
+  params = dang_newa (DangFunctionParam, rank + 1);
+
   /* add cast from tensor -> array */
   fp.dir = DANG_FUNCTION_PARAM_IN;
   fp.name = "in";
   fp.type = out->tensor_type;
   sig = dang_signature_new (&out->base_type, 1, &fp);
-  f = dang_function_new_simple_c (sig, cast_from_tensor_to_array, out, NULL);
+  f = dang_function_new_simple_c (sig, dang_internal_cast_from_tensor_to_array, out, NULL);
   if (!dang_namespace_add_function (dang_namespace_default (),
                                     out->base_type.cast_func_name,
                                     f, &error))
@@ -678,8 +736,37 @@ dang_value_type_array  (DangValueType *element_type,
   dang_function_unref (f);
   dang_signature_unref (sig);
 
-  GSK_RBTREE_INSERT (GET_ARRAY_TREE (), out, conflict);
-  dang_assert (conflict == NULL);
+  dang_value_type_add_simple_member ((DangValueType *) out,
+                                     "v",
+                                     DANG_MEMBER_PUBLIC_READABLE,
+                                     out->tensor_type,
+                                     TRUE,
+                                     offsetof (DangArray, tensor));
+
+  /* Add a resize(uint...) method */
+  params[0].type = (DangValueType *) out;
+  params[0].dir = DANG_FUNCTION_PARAM_IN;
+  params[0].name = "this";
+  for (i = 0; i < rank; i++)
+    {
+      params[i+1].type = dang_value_type_uint ();
+      params[i+1].dir = DANG_FUNCTION_PARAM_IN;
+      params[i+1].name = NULL;
+    }
+  sig = dang_signature_new (dang_value_type_void (), rank + 1, params);
+  if (rank == 1)
+    cfunc = array_resize_1;
+  else if (rank == 2)
+    cfunc = array_resize_2;
+  else
+    cfunc = array_resize_generic;
+  func = dang_function_new_simple_c (sig, cfunc, out, NULL);
+  dang_value_type_add_constant_method ((DangValueType *) out, "resize",
+                                       DANG_METHOD_PUBLIC|DANG_METHOD_FINAL,
+                                       func);
+  dang_function_unref (func);
+  dang_signature_unref (sig);
+
   return (DangValueType *) out;
 }
 

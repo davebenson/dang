@@ -2496,7 +2496,7 @@ typedef void (*PackFunc) (DangInsn *insn,
                           DangInsnPackContext *context);
 
 
-/* NOTE: must match DangInsnType exactly */
+/* CAREFUL: must match DangInsnType exactly */
 static PackFunc pack_funcs[13] = 
 {
   pack__init,

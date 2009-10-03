@@ -34,6 +34,17 @@ struct _CopyBackRegion
   unsigned size;
 };
 
+/* Object: DangClosureFactory
+
+   This object makes clusures, which are just DangFunctions
+   which call other DangFunctions with certain fixed parameter values.
+   
+   For example, if you have the addition function:
+        function<int a, int b : int>  add
+   then you can create a closure like
+        f = create_closure(add, 2)
+   then f is a function that adds 2 to an integer.
+ */
 struct _DangClosureFactory
 {
   unsigned ref_count;
@@ -67,6 +78,18 @@ struct _DangClosureFactory
   unsigned closure_frame_size;
 };
 
+/*
+ * Function: dang_closure_factory_new
+ * Create a new closure factory.
+ *
+ * Parameters:
+ *   underlying_sig - signature of the real function that is called
+ *   n_params_to_curry - number of parameters to fix (which will no longer 
+ *                       be parameters to the returned function.
+ *
+ * Returns:
+ *   the new closure factory.
+ */
 DangClosureFactory *
 dang_closure_factory_new  (DangSignature *underlying_sig,
                            unsigned       n_params_to_curry)
@@ -168,12 +191,27 @@ dang_closure_factory_new  (DangSignature *underlying_sig,
   return factory;
 }
 
+/*
+ * Function: dang_closure_factory_ref
+ * Increase the reference count on the factory.
+ *
+ * Parameters:
+ *    factory - the factory
+ *
+ * Returns: the factory
+ */
 DangClosureFactory *dang_closure_factory_ref  (DangClosureFactory*factory)
 {
   ++(factory->ref_count);
   return factory;
 }
 
+/* Function: dang_closure_factory_unref
+ * Reduce the reference-count on the factory, freeing it if it reached 0.
+ *
+ * Parameters:
+ *    factory - the factory
+ */
 void                dang_closure_factory_unref(DangClosureFactory*factory)
 {
   if (--(factory->ref_count) == 0)
@@ -186,6 +224,14 @@ void                dang_closure_factory_unref(DangClosureFactory*factory)
     }
 }
 
+/* Function: dang_closure_factory_get_n_inputs
+ * Find the number of curried inputs that this factory accepts.
+ *
+ * Parameters:
+ *     factory - the factory
+ *
+ * Return value: the number of curried inputs.
+ */
 unsigned dang_closure_factory_get_n_inputs (DangClosureFactory *factory)
 {
   return factory->n_pieces;
@@ -288,6 +334,19 @@ step__closure_finish  (void                 *step_data,
   dang_thread_pop_frame (thread);
 }
 
+/* Function: dang_function_new_closure
+ * Create a closure which will pass the given values
+ * to the underlying function.
+ * 
+ * Parameters:
+ *    factory - the factory for constructing the closure
+ *    underlying - the function that the closure should invoke
+ *    param_values - the fixed parameters to pass to underlying
+ *     (the remaining parameters will be passed to the returned function)
+ *
+ * Return value: the new function which has the parameter values
+ * built into it.
+ */
 DangFunction *
 dang_function_new_closure (DangClosureFactory *factory,
                            DangFunction       *underlying,

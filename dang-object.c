@@ -302,7 +302,7 @@ dang_object_add_method  (DangValueType  *object_type,
           return FALSE;
         }
 
-      /* NOTE: assumes that all are methods are 'simple' */
+      /* This assumes that all our methods are 'simple' */
       unsigned offset;
       offset = method->offset;
       DangFunction **pfunc, **parent_pfunc;

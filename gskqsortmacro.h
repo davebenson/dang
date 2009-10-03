@@ -411,7 +411,7 @@ struct _GskQsortStackNode
   }while(0)
 
 
-/* note: do not allow equality, since that would make the next push a
+/* Do not allow equality, since that would make the next push a
    stack overflow, and we might not detect it correctly to stack corruption. */
 #define GSK_QSORT_ASSERT_STACK_SIZE(stack_alloced)                          \
   g_assert(gsk_stack_size < stack_alloced)

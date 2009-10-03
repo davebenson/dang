@@ -237,6 +237,8 @@ make_repeated_type (DangValueType **fill,
   return fill;
 }
 
+DANG_SIMPLE_C_FUNC_DECLARE (dang_internal_cast_from_tensor_to_array);
+
 DangValueType *
 dang_value_type_tensor (DangValueType *element_type,
                         unsigned       rank)
@@ -244,6 +246,7 @@ dang_value_type_tensor (DangValueType *element_type,
   DangValueTypeTensor dummy, *out, *conflict = NULL;
   static DangValueType *common_int32_array[MAX_STANDARD_RANK];
   static DangValueType *common_uint32_array[MAX_STANDARD_RANK];
+  DangFunctionParam params[2];
   dummy.rank = rank;
   dummy.element_type = element_type;
   GSK_RBTREE_LOOKUP (GET_TENSOR_TREE (), &dummy, out);
@@ -303,7 +306,20 @@ dang_value_type_tensor (DangValueType *element_type,
   GSK_RBTREE_INSERT (GET_TENSOR_TREE (), out, conflict);
   dang_assert (conflict == NULL);
 
-
+  params[0].type = (DangValueType *) out;
+  params[0].name = "this";
+  params[0].dir = DANG_FUNCTION_PARAM_IN;
+  DangSignature *sig;
+  DangFunction *func;
+  sig = dang_signature_new (dang_value_type_array (element_type, rank),
+                            1, params);
+  func = dang_function_new_simple_c (sig, dang_internal_cast_from_tensor_to_array, NULL, NULL);
+  dang_value_type_add_constant_method ((DangValueType *) out,
+                                       "make_array",
+                                       DANG_METHOD_FINAL|DANG_METHOD_PUBLIC,
+                                       func);
+  dang_function_unref (func);
+  dang_signature_unref (sig);
   return (DangValueType *) out;
 }
 dang_boolean dang_value_type_is_tensor (DangValueType *type)

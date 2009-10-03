@@ -26,7 +26,7 @@ void     dang_utf8_string_to_unichars    (unsigned            len,
 unsigned dang_unichar_array_get_utf8_len (unsigned            n_chars,
                                           const dang_unichar *chars);
 
-/* note: does NOT NUL-terminate */
+/* Note that this does NOT NUL-terminate! */
 void     dang_unichar_array_to_utf8      (unsigned            n_chars,
                                           const dang_unichar *chars,
                                           char               *utf8_out);

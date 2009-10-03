@@ -57,6 +57,15 @@ append_label (DangLabelId label,
     dang_string_buffer_printf (out, "LABEL$%u", label);
 }
 
+/* Function: dang_insn_dump
+ * Dump an instruction in human-readable form to a buffer.
+ *
+ * Parameters:
+ *    insn - the instruction to print
+ *    vars - map from variable names to variables
+ *    labels - map from label names to label-ids 
+ *    out - the buffer to write the instruction to
+ */
 void
 dang_insn_dump (DangInsn *insn,
                 DangBuilderVariable *vars,
