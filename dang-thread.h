@@ -19,6 +19,8 @@ struct _DangThreadStackFrame
 };
 
 typedef DangDestroyNotify DangThreadYieldCancelFunc;
+typedef void (*DangThreadDoneFunc) (DangThread *thread,
+                                    void *done_func_data);
 
 typedef struct _DangThreadCatchGuard DangThreadCatchGuard;
 struct _DangThreadCatchGuard
@@ -49,6 +51,12 @@ struct _DangThread
          if the thread is destroyed. */
       DangThreadYieldCancelFunc yield_cancel_func;
       void *yield_cancel_func_data;
+
+      /* Function that may be set by the caller of dang_thread_run()
+         to receive notification that the function finally returned or
+         threw an exception. */
+      DangThreadDoneFunc done_func;
+      void *done_func_data;
     } yield;
     struct {
       void *value;
@@ -77,6 +85,7 @@ void          dang_thread_push_catch_guard (DangThread *thread,
                                             DangThreadStackFrame *stack_frame,
                                             DangCatchBlock *catch_block);
 void          dang_thread_pop_catch_guard  (DangThread *thread);
+
 
  
 void dang_thread_throw_null_pointer_exception (DangThread *);

@@ -12,11 +12,14 @@ _ struct and unions members should be immutable by default;
 
 X make_array() function-family (or should be just be array() ? or a method?)
 X make_tensor() --- or maybe just a member
-_ array resizing methods
+X array resizing methods
 _ generify templatization code... each non-fundamental type should have
   methods:  get_subtypes() and replace_subtypes()
 _ blocking functions - so we can call yielding functions
-  _ reimplement map(), all foreach() functions etc
+  _ reimplement map()
+  _ implement foreach()
+  _ reimplement grep()
+
 _ cast to same type should be a no-op
 _ cast of function-family to exact function type
   should have the expected consequences

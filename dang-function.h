@@ -27,6 +27,7 @@ typedef void         (*DangFunctionCompileFunc)(DangFunction        *function,
 
 typedef struct _DangFunctionBase DangFunctionBase;
 typedef struct _DangFunctionSimpleC DangFunctionSimpleC;
+typedef struct _DangFunctionC DangFunctionC;
 typedef struct _DangFunctionDang DangFunctionDang;
 
 
@@ -161,6 +162,34 @@ struct _DangFunctionSimpleC
   DangDestroyNotify func_data_destroy;
 };
 
+typedef enum
+{
+  DANG_C_FUNCTION_SUCCESS,
+  DANG_C_FUNCTION_YIELDED,
+  DANG_C_FUNCTION_ERROR
+} DangCFunctionResult;
+
+typedef DangCFunctionResult (*DangCFunc)     (void      **args,
+                                              void       *rv_out,
+                                              void       *state_data,
+                                              void       *func_data,
+                                              DangError **error);
+#define DANG_C_FUNC_DECLARE(func_name)                                \
+        DangCFunctionResult       func_name  (void      **args,       \
+                                              void       *rv_out,     \
+                                              void       *state_data, \
+                                              void       *func_data,  \
+                                              DangError **error)
+
+struct _DangFunctionC
+{
+  DangFunctionBase base;
+  DangValueType *state_type;
+  DangCFunc func;
+  void *func_data;
+  DangDestroyNotify func_data_destroy;
+};
+
 typedef struct _DangFunctionStub DangFunctionStub;
 struct _DangFunctionStub
 {
@@ -190,6 +219,7 @@ union _DangFunction
   DangFunctionBase base;
   DangFunctionDang dang;
   DangFunctionSimpleC simple_c;
+  DangFunctionC c;
   DangFunctionClosure closure;
   DangFunctionNewObject new_object;
   DangFunctionStub stub;
@@ -208,6 +238,11 @@ void dang_function_stub_set_annotations (DangFunction *function,
                                          DangVarTable *var_table);
 DangFunction *dang_function_new_simple_c (DangSignature   *sig,
                                           DangSimpleCFunc  func,
+                                          void            *func_data,
+                                          DangDestroyNotify func_data_destroy);
+DangFunction *dang_function_new_c        (DangSignature   *sig,
+                                          DangValueType   *state_type,
+                                          DangCFunc        func,
                                           void            *func_data,
                                           DangDestroyNotify func_data_destroy);
 void          dang_function_unref        (DangFunction    *function);
