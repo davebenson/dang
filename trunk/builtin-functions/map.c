@@ -1,3 +1,4 @@
+#include <string.h>
 #include "../dang.h"
 #include "../dang-builtin-functions.h"
 
@@ -10,11 +11,13 @@ struct _TensorMapData
   DangValueType *output_tensor_type;
   unsigned rank;
 };
+
+typedef struct _TensorMapRunData TensorMapRunData;
 struct _TensorMapRunData
 {
   DangThread *yielded;
-  unsigned index;
-  DangValueType *output_tensor_type;
+  unsigned remaining;
+  DangValueType *output_type;           /* element type */
   DangTensor *constructing;
   char *output_data_ptr;
   char *data_ptrs[1];
@@ -36,10 +39,33 @@ destruct__tensor_run_data (void *data)
     {
       dang_thread_cancel (rd->yielded);
       rd->yielded = NULL;
-      dang_tensor_unref (rd->output_tensor_type, rd->constructing);
+    }
+  if (rd->constructing)
+    {
+      DangValueType *elt_type = rd->output_type;
+      if (elt_type->destruct)
+        {
+          unsigned elt_size = elt_type->sizeof_instance;
+          unsigned n_built = (rd->output_data_ptr - (char*)rd->constructing->data) / elt_size;
+          dang_value_bulk_destruct (elt_type, rd->constructing->data, n_built);
+        }
+      dang_free (rd->constructing->data);
+      dang_free (rd->constructing);
       rd->constructing = NULL;
     }
 }
+
+static inline void
+run_data_advance (TensorMapData *md,
+                  TensorMapRunData *rd)
+{
+  unsigned i;
+  for (i = 0; i < md->n_inputs; i++)
+    rd->data_ptrs[i] += md->input_types[i]->sizeof_instance;
+  rd->output_data_ptr += md->output_type->sizeof_instance;
+  rd->remaining--;
+}
+
 DANG_C_FUNC_DECLARE (do_tensor_map)
 {
   TensorMapData *md = func_data;
@@ -53,8 +79,7 @@ DANG_C_FUNC_DECLARE (do_tensor_map)
       unsigned *elt_sizes = dang_newa (unsigned, n_inputs);
       DangFunction *func = *(DangFunction**)(args[n_inputs]);
       unsigned total_size = 1;
-      unsigned i, j, d;
-      DangTensor *rv;
+      unsigned i, d;
       DangValueType *elt_type = md->output_type;
       char *rv_at;
       DangTensor **inputs = dang_newa (DangTensor *, n_inputs);
@@ -100,7 +125,28 @@ DANG_C_FUNC_DECLARE (do_tensor_map)
   else
     {
       /* yielded:  handle error code, otherwise, load up variables. */
-      ...
+      switch (rd->yielded->status)
+        {
+        case DANG_THREAD_STATUS_THREW:
+          dang_thread_unref (rd->yielded);
+          rd->yielded = NULL;
+          return DANG_C_FUNCTION_ERROR;
+
+        case DANG_THREAD_STATUS_DONE:
+          /* copy output data */
+          memcpy (rd->output_data_ptr, rd->yielded->rv_frame + 1,
+                  rd->output_type->sizeof_instance);
+          memset (rd->yielded->rv_frame + 1, 0, 
+                  rd->output_type->sizeof_instance);
+
+          /* advance all pointers */
+          run_data_advance (md, rd);
+          break;
+
+        default:
+          dang_die ("map: subthread status '%s': should be threw or yielded",
+                    dang_thread_status_name (rd->yielded->status));
+        }
     }
 
   /* TODO: implement a way to recycle a thread
@@ -108,44 +154,42 @@ DANG_C_FUNC_DECLARE (do_tensor_map)
 
   while (rd->remaining > 0)
     {
-      --(rd->remaining);
-      if (rd->thread == NULL)
-        rd->thread = dang_thread_new (...);
+      if (rd->yielded == NULL)
+        rd->yielded = dang_thread_new (...);
       else
-        dang_thread_reset (rd->thread, ...);
+        dang_thread_reset (rd->yielded, ...);
       for (;;)
         {
-          dang_thread_run (rd->thread);
-          switch (rd->thread->status)
+          dang_thread_run (rd->yielded);
+          switch (rd->yielded->status)
             {
             case DANG_THREAD_STATUS_RUNNING:
-              ...
-              break;
+              continue;
             case DANG_THREAD_STATUS_YIELDED:
-              ...
-              break;
+              return DANG_C_FUNCTION_YIELDED;
             case DANG_THREAD_STATUS_DONE:
+              /* copy output data */
               ...
               break;
             case DANG_THREAD_STATUS_THREW:
+              /* propagate error */
               ...
               break;
             case DANG_THREAD_STATUS_CANCELLED:
-              ...
-              break;
+              dang_assert_not_reached ();
             }
         }
-      for (j = 0; j < n_inputs; j++)
-        rd->data_ptrs[j] += elt_sizes[j];
-      rd->output_data_ptr += elt_type->sizeof_instance;
+      run_data_advance (rd);
     }
 
-  rv = dang_malloc (DANG_TENSOR_SIZEOF (md->rank));
-  rv->ref_count = 1;
-  for (d = 0; d < md->rank; d++)
-    rv->sizes[d] = inputs[0]->sizes[d];
-  rv->data = rv_data;
-  *(DangTensor **)rv_out = rv;
+  *(DangTensor **)rv_out = rd->constructing;
+  rd->constructing = NULL;
+
+  if (rd->yielded)
+    {
+      dang_thread_unref (rd->yielded);
+      rd->yielded = NULL;
+    }
 
   return TRUE;
 }
