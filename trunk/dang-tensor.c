@@ -808,111 +808,7 @@ try_sig__vector__length (DangMatchQuery *query,
 //}
 
 
-typedef struct _TensorMapData TensorMapData;
-struct _TensorMapData
-{
-  unsigned n_inputs;
-  DangValueType **input_types;          /* element types */
-  DangValueType *output_type;           /* element type */
-  unsigned rank;
-};
-static void
-free_tensor_map_data (void *data)
-{
-  TensorMapData *md = data;
-  dang_free (md->input_types);
-  dang_free (md);
-}
 
-static dang_boolean
-do_tensor_map (void      **args,
-               void       *rv_out,
-               void       *func_data,
-               DangError **error)
-{
-  TensorMapData *md = func_data;
-  unsigned n_inputs = md->n_inputs;
-  char **at = dang_newa (char *, n_inputs);
-  unsigned *elt_sizes = dang_newa (unsigned, n_inputs);
-  DangFunction *func = *(DangFunction**)(args[n_inputs]);
-  unsigned total_size = 1;
-  unsigned i, j, d;
-  DangTensor *rv;
-  DangValueType *elt_type = md->output_type;
-  char *rv_at;
-  DangTensor **inputs = dang_newa (DangTensor *, n_inputs);
-  if (func == NULL)
-    {
-      dang_set_error (error, "null-pointer exception");
-      return FALSE;
-    }
-  for (i = 0; i < n_inputs; i++)
-    {
-      inputs[i] = *(DangTensor**)(args[i]);
-      if (inputs[i] == NULL)
-        inputs[i] = dang_tensor_empty ();
-    }
-  for (d = 0; d < md->rank; d++)
-    {
-      unsigned dim = inputs[0]->sizes[d];
-      total_size *= dim;
-      for (i = 1; i < n_inputs; i++)
-        {
-          unsigned this_dim = inputs[i]->sizes[d];
-          if (dim != this_dim)
-            {
-              dang_set_error (error, "dimension #%u differ between params #1 and #%u to tensor.map", dim+1, i+1);
-              return FALSE;
-            }
-        }
-    }
-  for (i = 0; i < n_inputs; i++)
-    {
-      at[i] = inputs[i]->data;
-      elt_sizes[i] = md->input_types[i]->sizeof_instance;
-    }
-
-  void *rv_data;
-  if (elt_type->destruct)
-    rv_data = dang_malloc0 (total_size * elt_type->sizeof_instance);
-  else
-    rv_data = dang_malloc (total_size * elt_type->sizeof_instance);
-  rv_at = rv_data;
-
-  /* TODO: implement a way to recycle a thread
-   *       to call the same function twice! */
-
-  for (i = 0; i < total_size; i++)
-    {
-      if (!dang_function_call_nonyielding_v (func, rv_at, (void**)at, error))
-        {
-          /* free partially constructed tensor */
-          if (elt_type->destruct)
-            {
-              rv_at = rv_data;
-              for (j = 0; j < i; j++)
-                {
-                  elt_type->destruct (elt_type, rv_at);
-                  rv_at += elt_type->sizeof_instance;
-                }
-            }
-          dang_free (rv_data);
-          return FALSE;
-        }
-      for (j = 0; j < n_inputs; j++)
-        at[j] += elt_sizes[j];
-      rv_at += elt_type->sizeof_instance;
-    }
-
-  rv = dang_malloc (DANG_TENSOR_SIZEOF (md->rank));
-  rv->ref_count = 1;
-  for (d = 0; d < md->rank; d++)
-    rv->sizes[d] = inputs[0]->sizes[d];
-  rv->data = rv_data;
-  *(DangTensor **)rv_out = rv;
-
-  return TRUE;
-}
 
 /* For a given query element that supposed to be a function
    in n_params inputs conforming to params,  see if the query
@@ -1075,27 +971,9 @@ try_sig__tensor__map (DangMatchQuery *query, void *data, DangError **error)
       return NULL;
     }
 
-  /* Construct the tensor_map_data */
-  TensorMapData *tensor_map_data;
-  tensor_map_data = dang_new (TensorMapData, 1);
-  tensor_map_data->n_inputs = n_tensors;
-  tensor_map_data->input_types = dang_new (DangValueType *, tensor_map_data->n_inputs);
-  for (i = 0; i < tensor_map_data->n_inputs; i++)
-    tensor_map_data->input_types[i] = fparams[i].type;
-  tensor_map_data->output_type = func_sig->return_type;
-  tensor_map_data->rank = rank;
 
-  /* Construct the overall signature of this flavor of map. */
-  fparams[query->n_elements - 1].dir = DANG_FUNCTION_PARAM_IN;
-  fparams[query->n_elements - 1].name = NULL;
-  fparams[query->n_elements - 1].type = dang_value_type_function (func_sig);
-  sig = dang_signature_new (dang_value_type_tensor (func_sig->return_type, rank),
-                            query->n_elements, fparams);
-  rv = dang_function_new_simple_c (sig, do_tensor_map,
-                                   tensor_map_data,
-                                   free_tensor_map_data);
-  dang_signature_unref (sig);
-  dang_signature_unref (func_sig);
+  ... call dang_builtin_function_map_tensors()
+
   return rv;
 }
 
