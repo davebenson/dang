@@ -67,7 +67,8 @@ dang_compile_function_invocation.o \
 dang_compile_create_closure.o \
 dang_compile_member_access.o \
 dang_compile_obey_flags.o \
-dang_syntax_check.o
+dang_syntax_check.o \
+builtin-functions/map.o
 
 all: dang
 

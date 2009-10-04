@@ -3,6 +3,7 @@
 #include "config.h"
 #include "magic.h"
 #include "gskrbtreemacros.h"
+#include "dang-builtin-functions.h"
 
 //$operator_index(a, I, J, ...)
 //$map(TENSOR, BOUND_VAR, EXPR)
@@ -923,10 +924,9 @@ try_sig__tensor__map (DangMatchQuery *query, void *data, DangError **error)
 {
   unsigned rank = 0;
   DangFunctionParam *fparams;
+  DangValueType **ttypes;
   unsigned i;
   DangSignature *func_sig;
-  DangSignature *sig;           /* signature of this flavor of map() */
-  DangFunction *rv;
   unsigned n_tensors = query->n_elements - 1;
   DANG_UNUSED (data);
   if (query->n_elements < 2)
@@ -935,6 +935,7 @@ try_sig__tensor__map (DangMatchQuery *query, void *data, DangError **error)
       return NULL;
     }
   fparams = dang_newa (DangFunctionParam, query->n_elements);
+  ttypes = dang_newa (DangValueType *, n_tensors);
   for (i = 0; i < n_tensors; i++)
     {
       DangValueType *type;
@@ -950,6 +951,7 @@ try_sig__tensor__map (DangMatchQuery *query, void *data, DangError **error)
           dang_set_error (error, "all args but last to map() must be tensor");
           return NULL;
         }
+      ttypes[i] = type;
       this_rank = ((DangValueTypeTensor*)type)->rank;
       if (i == 0)
         rank = this_rank;
@@ -971,10 +973,11 @@ try_sig__tensor__map (DangMatchQuery *query, void *data, DangError **error)
       return NULL;
     }
 
+  if (func_sig->return_type == NULL || func_sig->return_type == dang_value_type_void ())
+    return NULL;
 
-  ... call dang_builtin_function_map_tensors()
-
-  return rv;
+  return dang_builtin_function_map_tensors (n_tensors, ttypes,
+                                            dang_value_type_tensor (func_sig->return_type, rank));
 }
 
 typedef struct _NewTensorData NewTensorData;
