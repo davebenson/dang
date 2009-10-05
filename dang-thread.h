@@ -86,7 +86,16 @@ void          dang_thread_push_catch_guard (DangThread *thread,
                                             DangCatchBlock *catch_block);
 void          dang_thread_pop_catch_guard  (DangThread *thread);
 
+void          dang_thread_resume           (DangThread *thread);
 
+/* when a thread you are running goes into a "yielded" state, you can
+   either of these functions once to tell the system what to do when
+   the function returns. */
+void          dang_thread_set_wakeup_func  (DangThread *thread,
+                                            DangThreadDoneFunc func,
+                                            void       *func_data);
+void          dang_thread_set_wakeup_thread(DangThread *yielded_thread,
+                                            DangThread *to_resume);
  
 void dang_thread_throw_null_pointer_exception (DangThread *);
 void dang_thread_throw_array_bounds_exception (DangThread *);
