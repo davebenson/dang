@@ -61,6 +61,7 @@ dang-value-function.o \
 dang-var-table.o \
 dang_builder_compile.o \
 dang_function_new_simple_c.o \
+dang_function_new_c.o \
 dang_function_concat_peek.o \
 dang_compile.o \
 dang_compile_function_invocation.o \

@@ -19,6 +19,7 @@ const char *dang_function_type_name (DangFunctionType type)
     {
     case DANG_FUNCTION_TYPE_DANG: return "dang";
     case DANG_FUNCTION_TYPE_SIMPLE_C: return "simple-c";
+    case DANG_FUNCTION_TYPE_C: return "c";
     case DANG_FUNCTION_TYPE_STUB: return "stub";
     case DANG_FUNCTION_TYPE_CLOSURE: return "closure";
     case DANG_FUNCTION_TYPE_NEW_OBJECT: return "new-object";
@@ -80,6 +81,11 @@ dang_function_unref        (DangFunction    *function)
         case DANG_FUNCTION_TYPE_SIMPLE_C:
           if (function->simple_c.func_data_destroy)
             function->simple_c.func_data_destroy (function->simple_c.func_data);
+          dang_free (function->base.steps);
+          break;
+        case DANG_FUNCTION_TYPE_C:
+          if (function->c.func_data_destroy)
+            function->c.func_data_destroy (function->c.func_data);
           dang_free (function->base.steps);
           break;
         case DANG_FUNCTION_TYPE_STUB:
