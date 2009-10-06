@@ -5,13 +5,13 @@
   var b = grep(a, function a -> (a % 3 == 1));
   assert(b == [1 4 7]);
 
-  b = grep(a, function a -> a % 3);
+  b = grep(a, function a -> a % 3 != 0);
   assert(b == [1 2 4 5 7]);
 }
 
 
 {
   vector<string> v = ["hi" "mom" "oops" "whateve" "xyz" "xyzw"];
-  assert(grep(v, function t -> n_chars(t) % 2U) == ["mom" "whateve" "xyz"]);
+  assert(grep(v, function t -> n_chars(t) % 2U != 0U) == ["mom" "whateve" "xyz"]);
   assert(grep(v, function t -> n_chars(t) % 2U == 0U) == ["hi" "oops" "xyzw"]);
 }

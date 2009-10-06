@@ -4,3 +4,4 @@
 DangFunction *dang_builtin_function_map_tensors (unsigned n_tensor_args,
 					         DangValueType **tensor_types,
                                                  DangValueType *output_tensor_type);
+DangFunction *dang_builtin_function_grep        (DangValueType *tensor_type);

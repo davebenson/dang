@@ -16,9 +16,9 @@ X array resizing methods
 _ generify templatization code... each non-fundamental type should have
   methods:  get_subtypes() and replace_subtypes()
 _ blocking functions - so we can call yielding functions
-  _ reimplement map()
+  X reimplement map()
   _ implement foreach()
-  _ reimplement grep()
+  X reimplement grep()
 
 _ cast to same type should be a no-op
 _ cast of function-family to exact function type

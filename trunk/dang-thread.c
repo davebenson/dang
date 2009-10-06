@@ -157,7 +157,6 @@ dang_thread_unwind_one_frame (DangThread *thread)
     }
 
 
-  kill = thread->stack_frame;
   thread->stack_frame = kill->caller;
   dang_free (kill);
 

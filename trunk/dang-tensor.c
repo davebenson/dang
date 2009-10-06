@@ -1166,140 +1166,6 @@ try_sig__tensor__new_tensor (DangMatchQuery *query,
 }
 
 
-static dang_boolean
-do_grep_vector (void      **args,
-               void       *rv_out,
-               void       *func_data,
-               DangError **error)
-{
-  DangValueType *elt_type = func_data;
-  unsigned elt_size = elt_type->sizeof_instance;
-  DangVector *vector = *(DangVector**) args[0];
-  DangFunction *func = *(DangFunction**)(args[1]);
-  DangVector *rv;
-  unsigned bitvec_size;
-  void *to_free = NULL;
-  uint8_t *bitvec, *bitvec_at;
-  uint8_t mask;
-  unsigned i;
-  uint8_t *call_rv_buf;
-  unsigned grepfunc_rv_size = func->base.sig->return_type->sizeof_instance;
-  unsigned new_len;
-  if (func == NULL)
-    {
-      dang_set_error (error, "null-pointer exception");
-      return FALSE;
-    }
-  if (vector == NULL)
-    vector = dang_vector_empty ();
-  bitvec_size = (vector->len + 7) / 8;
-  if (bitvec_size < 1024)
-    bitvec = dang_alloca (bitvec_size);
-  else
-    to_free = bitvec = dang_malloc (bitvec_size);
-  memset (bitvec, 0, bitvec_size);
-
-  call_rv_buf = dang_alloca (grepfunc_rv_size);
-
-  /* TODO: implement a way to recycle a thread
-   *       to call the same function twice! */
-
-  bitvec_at = bitvec;
-  mask = 1;
-  new_len = 0;
-  char *input_at = vector->data;
-  if (grepfunc_rv_size == 1)
-    for (i = 0; i < vector->len; i++)
-      {
-        if (!dang_function_call_nonyielding_v (func, call_rv_buf, (void**) &input_at, error))
-          goto call_failed;
-        if (call_rv_buf[0] != 0)
-          {
-            *bitvec_at |= mask;
-            new_len++;
-          }
-        mask <<= 1;
-        if (mask == 0)
-          {
-            mask = 1;
-            bitvec_at++;
-          }
-        input_at += elt_size;
-      }
-  else
-    for (i = 0; i < vector->len; i++)
-      {
-        if (!dang_function_call_nonyielding_v (func, call_rv_buf, (void**) &input_at, error))
-          goto call_failed;
-        if (!dang_util_is_zero (call_rv_buf, grepfunc_rv_size))
-          {
-            *bitvec_at |= mask;
-            new_len++;
-          }
-        mask <<= 1;
-        if (mask == 0)
-          {
-            mask = 1;
-            bitvec_at++;
-          }
-        input_at += elt_size;
-      }
-
-  rv = dang_new (DangVector, 1);
-  rv->ref_count = 1;
-  rv->len = new_len;
-  rv->data = dang_malloc (elt_size * new_len);
-  bitvec_at = bitvec;
-  char *output_at = rv->data;
-  input_at = vector->data;
-  mask = 1;
-  if (elt_type->init_assign)
-    {
-      for (i = 0; i < vector->len; i++)
-        {
-          if (*bitvec_at & mask)
-            {
-              elt_type->init_assign (elt_type, output_at, input_at);
-              output_at += elt_size;
-            }
-          mask <<= 1;
-          if (mask == 0)
-            {
-              mask = 1;
-              bitvec_at++;
-            }
-          input_at += elt_size;
-        }
-    }
-  else
-    {
-      /* TODO: optimize for *bitvec_at == 0 and *bitvec_at == 255. */
-      for (i = 0; i < vector->len; i++)
-        {
-          if (*bitvec_at & mask)
-            {
-              memcpy (output_at, input_at, elt_size);
-              output_at += elt_size;
-            }
-          mask <<= 1;
-          if (mask == 0)
-            {
-              mask = 1;
-              bitvec_at++;
-            }
-          input_at += elt_size;
-        }
-    }
-  if (to_free)
-    dang_free (to_free);
-  *(DangVector **) rv_out = rv;
-
-  return TRUE;
-
-call_failed:
-  dang_free (to_free);
-  return FALSE;
-}
 
 /* grep(vector<A>, function<A : boolean> : vector<A>) */
 static DangFunction *
@@ -1310,7 +1176,6 @@ try_sig__vector__grep       (DangMatchQuery *query,
   DangFunctionParam params[2];
   DangValueTypeTensor *ttype;
   DangSignature *func_sig;
-  DangSignature *sig;
   DANG_UNUSED (data);
   if (query->n_elements != 2)
     {
@@ -1350,22 +1215,9 @@ try_sig__vector__grep       (DangMatchQuery *query,
       return NULL;
     }
 
-  /* OK, now build a signature for our 'grep' variant that takes
-     the exact right sig: grep(vector<A>, function<A : B> : vector<A>)
-     where A is the element type and B is the return type 
-     of the second param. */
-  params[0].type = (DangValueType*) ttype;
-  params[1].name = NULL;
-  params[1].dir = DANG_FUNCTION_PARAM_IN;
-  params[1].type = dang_value_type_function (func_sig);
-  sig = dang_signature_new ((DangValueType *) ttype, 2, params);
-
-  DangFunction *rv;
-  rv = dang_function_new_simple_c (sig, do_grep_vector, ttype->element_type, NULL);
-  dang_signature_unref (sig);
-  dang_signature_unref (func_sig);
-  return rv;
+  return dang_builtin_function_grep ((DangValueType*)ttype);
 }
+
   /* Take two tensors of the same rank and element type,
      and, if we know about the element-type,
      bulk perform that operation.
