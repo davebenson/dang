@@ -69,7 +69,8 @@ dang_compile_create_closure.o \
 dang_compile_member_access.o \
 dang_compile_obey_flags.o \
 dang_syntax_check.o \
-builtin-functions/map.o
+builtin-functions/map.o \
+builtin-functions/grep.o
 
 all: dang
 
