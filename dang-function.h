@@ -166,16 +166,19 @@ typedef enum
 {
   DANG_C_FUNCTION_SUCCESS,
   DANG_C_FUNCTION_YIELDED,
+  DANG_C_FUNCTION_BEGAN_CALL,
   DANG_C_FUNCTION_ERROR
 } DangCFunctionResult;
 
-typedef DangCFunctionResult (*DangCFunc)     (void      **args,
+typedef DangCFunctionResult (*DangCFunc)     (DangThread *thread,
+                                              void      **args,
                                               void       *rv_out,
                                               void       *state_data,
                                               void       *func_data,
                                               DangError **error);
 #define DANG_C_FUNC_DECLARE(func_name)                                \
-        DangCFunctionResult       func_name  (void      **args,       \
+        DangCFunctionResult       func_name  (DangThread *thread,     \
+                                              void      **args,       \
                                               void       *rv_out,     \
                                               void       *state_data, \
                                               void       *func_data,  \
@@ -189,6 +192,18 @@ struct _DangFunctionC
   void *func_data;
   DangDestroyNotify func_data_destroy;
 };
+
+/* NOTE: only input and inout arguments must be given. */
+DangCFunctionResult dang_c_function_begin_subcall (DangThread *thread,
+                                                   DangFunction *function,
+                                                   void        **args);
+
+/* NOTE: only inout and output arguments must be given */
+void                dang_c_function_end_subcall   (DangThread *thread,
+                                                   DangFunction *function,
+                                                   void        **args,
+                                                   void         *rv_out);
+                                    
 
 typedef struct _DangFunctionStub DangFunctionStub;
 struct _DangFunctionStub
