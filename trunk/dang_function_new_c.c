@@ -1,25 +1,6 @@
 #include <string.h>
 #include "dang.h"
-
-/* XXX: move into dang_util -- this is duped in simple_c */
-static inline unsigned
-align_offset (DangValueType *type,
-               unsigned       offset)
-{
-  offset += (type->alignof_instance - 1);
-  offset &= ~(type->alignof_instance - 1);
-  return offset;
-}
-
-static inline unsigned
-adjust_offset (DangValueType *type,
-               unsigned       offset)
-{
-  offset += (type->alignof_instance - 1);
-  offset &= ~(type->alignof_instance - 1);
-  offset += type->sizeof_instance;
-  return offset;
-}
+#include "config.h"
 
 /* Step to handle the initial step of a general C function. */
 static void
@@ -29,30 +10,21 @@ run_c_first   (void                 *step_data,
 {
   DangFunction *function = stack_frame->function;
   DangSignature *sig = function->base.sig;
-  void **args;
+  char *frame = (char*) stack_frame;
+  void **args = (void**)(frame + function->c.args_frame_offset);
   void *rv;
-  unsigned offset = sizeof (DangThreadStackFrame);
   unsigned i;
-  DangError *error = NULL;
   DANG_UNUSED (step_data);
   DANG_UNUSED (thread);
   if (sig->return_type != NULL)
-    {
-      offset = align_offset (sig->return_type, offset);
-      rv = (char*)stack_frame + offset;
-      offset += sig->return_type->sizeof_instance;
-    }
+    rv = frame + function->c.rv_frame_offset;
   else
     rv = NULL;
-  args = alloca (sizeof (void*) * sig->n_params);
   for (i = 0; i < sig->n_params; i++)
-    {
-      offset = align_offset (sig->params[i].type, offset);
-      args[i] = (char*)stack_frame + offset;
-      offset += sig->params[i].type->sizeof_instance;
-    }
+    args[i] = frame + function->c.arg_frame_offsets[i];
+  memset (frame + function->c.state_data_frame_offset, 0, function->c.state_type->sizeof_instance);
 
-  dang_thread_stack_frame_advance_ip (frame, 0);
+  dang_thread_stack_frame_advance_ip (stack_frame, 0);
 }
 
 
@@ -62,9 +34,13 @@ run_c_nonfirst   (void                 *step_data,
                   DangThread           *thread)
 {
   DangFunction *function = stack_frame->function;
-  void **args = (void **) ((char*)stack_frame + function->args_frame_offset);
+  char *frame = (char *) stack_frame;
+  void **args = (void **) (frame + function->c.args_frame_offset);
+  void *rv = frame + function->c.rv_frame_offset;
+  DangError *error = NULL;
+  DANG_UNUSED (step_data);
   switch (function->c.func (thread, args, rv,
-                            (char*)stack_frame + function->state_data_offset,
+                            frame + function->c.state_data_frame_offset,
                             function->c.func_data, &error))
     {
     case DANG_C_FUNCTION_ERROR:
@@ -79,48 +55,14 @@ run_c_nonfirst   (void                 *step_data,
       return;
     case DANG_C_FUNCTION_YIELDED:
       thread->status = DANG_THREAD_STATUS_YIELDED;
-      thread->yield_cancel_func = NULL;
-      thread->yield_cancel_func_data = NULL;
-      thread->done_func = NULL;
-      thread->done_func_data = NULL;
+      thread->info.yield.yield_cancel_func = NULL;
+      thread->info.yield.yield_cancel_func_data = NULL;
+      thread->info.yield.done_func = NULL;
+      thread->info.yield.done_func_data = NULL;
       return;
     }
 }
 
-#if 0
-static void
-compile_c (DangFunction        *function,
-           DangBuilder *builder,
-           DangCompileResult   *return_value_info,
-           unsigned             n_params,
-           DangCompileResult   *params)
-{
-  DangInsn insn;
-  unsigned n_args = (return_value_info ? 1 : 0) + n_params;
-  unsigned out = 0;
-  unsigned i;
-
-  if (return_value_info)
-    {
-      dang_compile_result_force_initialize (builder, return_value_info);
-      dang_assert (function->base.sig->return_type != NULL
-                   && function->base.sig->return_type != dang_value_type_void ());
-    }
-  for (i = 0; i < n_params; i++)
-    dang_compile_result_force_initialize (builder, params + i);
-
-  dang_insn_init (&insn, DANG_INSN_TYPE_RUN_SIMPLE_C);
-  insn.run_simple_c.func = dang_function_ref (function);
-  insn.run_simple_c.args = dang_new (DangInsnValue, n_args);
-  if (return_value_info)
-    dang_insn_value_from_compile_result (insn.run_simple_c.args + out++,
-                                         return_value_info);
-  for (i = 0; i < n_params; i++)
-    dang_insn_value_from_compile_result (insn.run_simple_c.args + out++,
-                                         params + i);
-  dang_builder_add_insn (builder, &insn);
-}
-#endif
 
 DangFunction *
 dang_function_new_c        (DangSignature   *sig,
@@ -148,9 +90,26 @@ dang_function_new_c        (DangSignature   *sig,
   /* Compute argument packing info */
   offset = sizeof (DangThreadStackFrame);
   if (sig->return_type != NULL)
-    offset = adjust_offset (sig->return_type, offset);
+    {
+      offset = DANG_ALIGN (offset, sig->return_type->alignof_instance);
+      rv->c.rv_frame_offset = offset;
+      offset += sig->return_type->sizeof_instance;
+    }
+  rv->c.arg_frame_offsets = dang_new (unsigned, sig->n_params);
   for (i = 0; i < sig->n_params; i++)
-    offset = adjust_offset (sig->params[i].type, offset);
+    {
+      offset = DANG_ALIGN (offset, sig->params[i].type->alignof_instance);
+      rv->c.arg_frame_offsets[i] = offset;
+      offset += sig->params[i].type->sizeof_instance;
+    }
+  offset = DANG_ALIGN (offset, state_type->alignof_instance);
+  rv->c.state_data_frame_offset = offset;
+  offset += state_type->sizeof_instance;
+  offset = DANG_ALIGN (offset, DANG_ALIGNOF_POINTER);
+  rv->c.args_frame_offset = offset;
+  offset += sizeof (void*) * sig->n_params;
+  rv->c.subcall_frame_offset = offset;
+  offset += sizeof (void*);
   rv->base.frame_size = offset;
 
   rv->c.state_type = state_type;
@@ -160,3 +119,90 @@ dang_function_new_c        (DangSignature   *sig,
   return rv;
 }
 
+/* NOTE: only input and inout arguments must be given. */
+DangCFunctionResult
+dang_c_function_begin_subcall (DangThread *thread,
+                               DangFunction *function,
+                               void        **args)
+{
+  DangSignature *sig = function->base.sig;
+  unsigned offset = sizeof (DangThreadStackFrame);
+  DangThreadStackFrame *new_frame = dang_malloc (function->base.frame_size);
+  unsigned i;
+  dang_assert (thread->stack_frame->function->type == DANG_FUNCTION_TYPE_C);
+  if (sig->return_type)
+    {
+      DangValueType *type = sig->return_type;
+      offset = DANG_ALIGN (offset, type->alignof_instance);
+      memset ((char*)new_frame + offset, 0, type->sizeof_instance);
+      offset += type->sizeof_instance;
+    }
+  for (i = 0; i < sig->n_params; i++)
+    {
+      DangValueType *type = sig->params[i].type;
+      offset = DANG_ALIGN (offset, type->alignof_instance);
+      if (sig->params[i].dir == DANG_FUNCTION_PARAM_IN
+       || sig->params[i].dir == DANG_FUNCTION_PARAM_INOUT)
+        {
+          if (type->init_assign)
+            type->init_assign (type, (char*)new_frame + offset, args[i]);
+          else
+            memcpy ((char*)new_frame + offset, args[i], type->sizeof_instance);
+        }
+      else
+        memset ((char*) new_frame + offset, 0, type->sizeof_instance);
+      offset += sig->params[i].type->sizeof_instance;
+    }
+
+  * (void**)((char*)thread->stack_frame + function->c.subcall_frame_offset) = new_frame;
+  new_frame->caller = thread->stack_frame;
+  new_frame->function = function;
+  new_frame->ip = function->base.steps;
+  thread->stack_frame = new_frame;
+
+  return DANG_C_FUNCTION_BEGAN_CALL;
+}
+
+/* NOTE: only inout and output arguments must be given */
+void                dang_c_function_end_subcall   (DangThread *thread,
+                                                   DangFunction *function,
+                                                   void        **args,
+                                                   void         *rv_out)
+{
+  unsigned offset = sizeof (DangThreadStackFrame);
+  DangSignature *sig = function->base.sig;
+  DangThreadStackFrame *old_frame = * (void**)((char*)thread->stack_frame + function->c.subcall_frame_offset);
+  unsigned i;
+  dang_assert (thread->stack_frame->function->type == DANG_FUNCTION_TYPE_C);
+  dang_assert (old_frame->function == function);
+  dang_assert (old_frame->caller == thread->stack_frame);
+
+  if (sig->return_type)
+    {
+      DangValueType *type = sig->return_type;
+      offset = DANG_ALIGN (offset, type->alignof_instance);
+      if (type->init_assign)                    /* XXX: assign() or init_assign() ??? */
+        type->init_assign (type, rv_out, (char*)old_frame + offset);
+      else
+        memcpy (rv_out, (char*)old_frame + offset, type->sizeof_instance);
+      offset += type->sizeof_instance;
+    }
+  for (i = 0; i < sig->n_params; i++)
+    {
+      DangValueType *type = sig->params[i].type;
+      offset = DANG_ALIGN (offset, type->alignof_instance);
+      if (sig->params[i].dir == DANG_FUNCTION_PARAM_OUT
+       || sig->params[i].dir == DANG_FUNCTION_PARAM_INOUT)
+        {
+          if (type->destruct != NULL)
+            type->destruct (type, args[i]);
+          memcpy (args[i], (char*)old_frame + offset, type->sizeof_instance);
+        }
+      else if (type->destruct)
+        {
+          type->destruct (type, (char*)old_frame + offset);
+        }
+      offset += sig->params[i].type->sizeof_instance;
+    }
+  dang_free (old_frame);
+}

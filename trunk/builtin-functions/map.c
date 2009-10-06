@@ -119,6 +119,10 @@ DANG_C_FUNC_DECLARE (do_tensor_map)
       rd->start_output_data_ptr = rd->output_data_ptr;
       rd->output_size = elt_type->sizeof_instance;
       rd->remaining = total_size;
+      rd->constructing = dang_malloc (DANG_TENSOR_SIZEOF (md->rank));
+      memcpy (rd->constructing->sizes, inputs[0]->sizes, sizeof(unsigned) * md->rank);
+      rd->constructing->ref_count = 1;
+      rd->constructing->data = rd->output_data_ptr;
     }
   else
     {
@@ -146,7 +150,8 @@ DangFunction *dang_builtin_function_map_tensors (unsigned n_tensor_args,
   TensorMapData *tensor_map_data;
   unsigned i;
   unsigned rank;
-  DangFunctionParam *fparams;
+  DangFunctionParam *fparams, *arg_fparams;
+  DangSignature *arg_sig;
   static DangValueType *map_state_types[MAX_MAP_ARGS + 1];
   DangSignature *sig;
   DangFunction *rv;
@@ -175,12 +180,23 @@ DangFunction *dang_builtin_function_map_tensors (unsigned n_tensor_args,
   tensor_map_data->rank = rank;
 
   /* Construct the overall signature of this flavor of map. */
+  fparams = dang_newa (DangFunctionParam, n_tensor_args + 1);
+  arg_fparams = dang_newa (DangFunctionParam, n_tensor_args);
   for (i = 0; i < n_tensor_args; i++)
     {
       fparams[i].dir = DANG_FUNCTION_PARAM_IN;
       fparams[i].type = tensor_types[i];
       fparams[i].name = NULL;
+      arg_fparams[i].dir = DANG_FUNCTION_PARAM_IN;
+      arg_fparams[i].type = ((DangValueTypeTensor*)tensor_types[i])->element_type;
+      arg_fparams[i].name = NULL;
     }
+  arg_sig = dang_signature_new (((DangValueTypeTensor*)output_tensor_type)->element_type,
+                                n_tensor_args, arg_fparams);
+  fparams[i].dir = DANG_FUNCTION_PARAM_IN;
+  fparams[i].name = NULL;
+  fparams[i].type = dang_value_type_function (arg_sig);
+  dang_signature_unref (arg_sig);
 
   if (map_state_types[n_tensor_args] == NULL)
     {
@@ -196,7 +212,7 @@ DangFunction *dang_builtin_function_map_tensors (unsigned n_tensor_args,
     }
 
 
-  sig = dang_signature_new (output_tensor_type, n_tensor_args, fparams);
+  sig = dang_signature_new (output_tensor_type, n_tensor_args + 1, fparams);
   rv = dang_function_new_c (sig,
                             map_state_types[n_tensor_args],
                             do_tensor_map,

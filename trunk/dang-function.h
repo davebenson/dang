@@ -35,6 +35,7 @@ typedef enum
 {
   DANG_FUNCTION_TYPE_DANG,
   DANG_FUNCTION_TYPE_SIMPLE_C,
+  DANG_FUNCTION_TYPE_C,
   DANG_FUNCTION_TYPE_STUB,
   DANG_FUNCTION_TYPE_CLOSURE,
   DANG_FUNCTION_TYPE_NEW_OBJECT
@@ -191,6 +192,11 @@ struct _DangFunctionC
   DangCFunc func;
   void *func_data;
   DangDestroyNotify func_data_destroy;
+  unsigned rv_frame_offset;
+  unsigned *arg_frame_offsets;
+  unsigned args_frame_offset;
+  unsigned state_data_frame_offset;
+  unsigned subcall_frame_offset;
 };
 
 /* NOTE: only input and inout arguments must be given. */
