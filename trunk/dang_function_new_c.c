@@ -38,6 +38,7 @@ run_c_nonfirst   (void                 *step_data,
   void **args = (void **) (frame + function->c.args_frame_offset);
   void *rv = frame + function->c.rv_frame_offset;
   DangError *error = NULL;
+  dang_assert (function->type == DANG_FUNCTION_TYPE_C);
   DANG_UNUSED (step_data);
   switch (function->c.func (thread, args, rv,
                             frame + function->c.state_data_frame_offset,
@@ -49,6 +50,11 @@ run_c_nonfirst   (void                 *step_data,
       return;
     case DANG_C_FUNCTION_SUCCESS:
       thread->stack_frame = stack_frame->caller;
+      {
+        DangValueType *type = function->c.state_type;
+        if (type && type->destruct != NULL)
+          type->destruct (type, (char*)stack_frame + function->c.state_data_frame_offset);
+      }
       break;
     case DANG_C_FUNCTION_BEGAN_CALL:
       dang_assert (thread->stack_frame->caller == stack_frame);
@@ -74,6 +80,7 @@ dang_function_new_c        (DangSignature   *sig,
   DangFunction *rv;
   unsigned offset;
   unsigned i;
+  DangFunctionStackInfo *stack_info;
   rv = dang_new (DangFunction, 1);
   rv->base.type = DANG_FUNCTION_TYPE_C;
   rv->base.ref_count = 1;
@@ -86,6 +93,10 @@ dang_function_new_c        (DangSignature   *sig,
   rv->base.steps[1].func = run_c_nonfirst;
   rv->base.steps[1]._step_data_size = 0;
   rv->base.is_owned = FALSE;
+  rv->c.state_type = state_type;
+  rv->c.func = func;
+  rv->c.func_data = func_data;
+  rv->c.func_data_destroy = func_data_destroy;
 
   /* Compute argument packing info */
   offset = sizeof (DangThreadStackFrame);
@@ -112,10 +123,17 @@ dang_function_new_c        (DangSignature   *sig,
   offset += sizeof (void*);
   rv->base.frame_size = offset;
 
-  rv->c.state_type = state_type;
-  rv->c.func = func;
-  rv->c.func_data = func_data;
-  rv->c.func_data_destroy = func_data_destroy;
+  stack_info = dang_new0 (DangFunctionStackInfo, 1);
+  rv->base.stack_info = stack_info;
+  stack_info->first_step = rv->base.steps + 0;
+  stack_info->last_step = rv->base.steps + 1;
+  stack_info->vars = dang_new (DangFunctionStackVarInfo, 1);
+  /* XXX: variable liveness non-inclusive... this is weird */
+  stack_info->vars[0].start = rv->base.steps + 0;
+  stack_info->vars[0].end = rv->base.steps + 2;
+  stack_info->vars[0].offset = rv->c.state_data_frame_offset;
+  stack_info->vars[0].type = state_type;
+
   return rv;
 }
 
@@ -129,7 +147,8 @@ dang_c_function_begin_subcall (DangThread *thread,
   unsigned offset = sizeof (DangThreadStackFrame);
   DangThreadStackFrame *new_frame = dang_malloc (function->base.frame_size);
   unsigned i;
-  dang_assert (thread->stack_frame->function->type == DANG_FUNCTION_TYPE_C);
+  DangFunction *caller = thread->stack_frame->function;
+  dang_assert (caller->type == DANG_FUNCTION_TYPE_C);
   if (sig->return_type)
     {
       DangValueType *type = sig->return_type;
@@ -154,7 +173,7 @@ dang_c_function_begin_subcall (DangThread *thread,
       offset += sig->params[i].type->sizeof_instance;
     }
 
-  * (void**)((char*)thread->stack_frame + function->c.subcall_frame_offset) = new_frame;
+  * (void**)((char*)thread->stack_frame + caller->c.subcall_frame_offset) = new_frame;
   new_frame->caller = thread->stack_frame;
   new_frame->function = function;
   new_frame->ip = function->base.steps;
@@ -171,9 +190,10 @@ void                dang_c_function_end_subcall   (DangThread *thread,
 {
   unsigned offset = sizeof (DangThreadStackFrame);
   DangSignature *sig = function->base.sig;
-  DangThreadStackFrame *old_frame = * (void**)((char*)thread->stack_frame + function->c.subcall_frame_offset);
+  DangFunction *caller = thread->stack_frame->function;
+  DangThreadStackFrame *old_frame = * (void**)((char*)thread->stack_frame + caller->c.subcall_frame_offset);
   unsigned i;
-  dang_assert (thread->stack_frame->function->type == DANG_FUNCTION_TYPE_C);
+  dang_assert (caller->type == DANG_FUNCTION_TYPE_C);
   dang_assert (old_frame->function == function);
   dang_assert (old_frame->caller == thread->stack_frame);
 
