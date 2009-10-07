@@ -251,6 +251,22 @@ void dang_value_type_add_simple_member (DangValueType *type,
                                         DangValueType *member_type,
                                         dang_boolean   dereference,
                                         unsigned       offset);
+typedef dang_boolean (*DangValueMemberSetFunc) (void     *container,
+                                                const void *member_value,
+                                                void     *member_data,
+                                                DangError **error);
+typedef dang_boolean (*DangValueMemberGetFunc) (const void *container,
+                                                void     *member_value,
+                                                void     *member_data,
+                                                DangError **error);
+void dang_value_type_add_setget_member (DangValueType *type,
+                                        const char    *name,
+                                        DangMemberFlags flags,
+                                        DangValueType *member_type,
+                                        DangValueMemberSetFunc setter,
+                                        DangValueMemberGetFunc getter,
+                                        void          *member_data,
+                                        DangDestroyNotify destroy);
 void dang_value_type_add_virtual_member(DangValueType *type,
                                         const char    *name,
                                         DangMemberFlags flags,

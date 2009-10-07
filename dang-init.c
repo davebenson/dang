@@ -1355,6 +1355,7 @@ void _dang_template_cleanup (void);
 void _dang_union_cleanup (void);
 void _dang_function_concat_cleanup (void);
 void _dang_tensor_cleanup (void);
+void _dang_array_cleanup (void);
 void _dang_enum_cleanup (void);
 
 
@@ -1378,6 +1379,7 @@ dang_cleanup (void)
   /* From here out, types may be freed,
      therefore, type->destruct() is not allowed */
   _dang_tensor_cleanup ();
+  _dang_array_cleanup();
   _dang_value_function_cleanup ();
   _dang_template_cleanup ();
   _dang_object_cleanup2 ();

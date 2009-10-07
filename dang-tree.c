@@ -22,7 +22,7 @@
                                                            (char*)node + ttype->value_offset);
 #define IMPLEMENT_TREE_VALUE_FUNCS(suffix)                         \
 static void                                                        \
-destruct_tree_node__##suffix (DangValueTypeTree *ttype,            \
+destruct_tree_node__##suffix (DangValueTreeTypes *ttype,            \
                               DangTreeNode      *node)             \
 {                                                                  \
   DESTRUCT__##suffix                                               \
@@ -34,7 +34,7 @@ destruct_tree_node__##suffix (DangValueTypeTree *ttype,            \
   ttype->recycling_list = node;                                    \
 }                                                                  \
 static DangTreeNode *                                              \
-copy_tree_node__##suffix (DangValueTypeTree *ttype,                \
+copy_tree_node__##suffix (DangValueTreeTypes *ttype,                \
                           DangTreeNode      *parent,               \
                           DangTreeNode      *node)                 \
 {                                                                  \
@@ -65,83 +65,130 @@ IMPLEMENT_TREE_VALUE_FUNCS(v)
 IMPLEMENT_TREE_VALUE_FUNCS(kv)
 
 static void
-destruct__tree (DangValueType *type,
-                void          *value)
+destruct__constant_tree (DangValueType *type,
+                         void          *value)
 {
-  DangValueTypeTree *ttype = (DangValueTypeTree *) type;
-  DangTree *tree = value;
-  if (tree->top)
-    ttype->destruct_tree_node (ttype, tree->top);
-  if (tree->compare != NULL)
-    dang_function_unref (tree->compare);
+  DangConstantTree *ctree = * (DangConstantTree **) value;
+  DangValueTreeTypes *tt = ((DangValueTypeTree *) type)->owner;
+  if (ctree == NULL)
+    return;
+  if (--(ctree->ref_count) > 0)
+    return;
+  if (ctree->top)
+    tt->destruct_tree_node (tt, ctree->top);
+  if (ctree->compare != NULL)
+    dang_function_unref (ctree->compare);
 }
 
 static void
-init_assign__tree          (DangValueType *type,
-                            void          *dst,
-	                    const void    *src)
+destruct__mutable_tree (DangValueType *type,
+                         void          *value)
 {
-  DangValueTypeTree *ttype = (DangValueTypeTree *) type;
-  DangTree *dst_tree = dst;
-  DangTree *src_tree = (DangTree*) src;
-  dst_tree->top = ttype->copy_tree_node (ttype, NULL, src_tree->top);
-  dst_tree->size = src_tree->size;
-  dst_tree->compare = src_tree->compare ? dang_function_ref (src_tree->compare) : NULL;
+  DangTree *tree = * (DangTree **) value;
+  DangValueTreeTypes *tt = ((DangValueTypeTree *) type)->owner;
+  if (tree == NULL)
+    return;
+  if (--(tree->ref_count) > 0)
+    return;
+  destruct__constant_tree (&tt->types[1].base_type, &tree->v);
 }
 
 static void
-assign__tree         (DangValueType *type,
-                      void          *dst,
-	              const void    *src)
+init_assign__constant_tree          (DangValueType *type,
+                                     void          *dst,
+	                             const void    *src)
 {
-  destruct__tree (type, dst);
-  init_assign__tree (type, dst, src);
+  DangConstantTree *src_tree = * (DangConstantTree **) src;
+  DANG_UNUSED (type);
+  if (src_tree)
+    src_tree->ref_count++;
+  * (DangConstantTree **) dst = src_tree;
 }
 
 static void
-append_string_recursive (DangValueTypeTree *ttype,
+init_assign__mutable_tree          (DangValueType *type,
+                                     void          *dst,
+	                             const void    *src)
+{
+  DangTree *src_tree = * (DangTree **) src;
+  DANG_UNUSED (type);
+  if (src_tree)
+    src_tree->ref_count++;
+  * (DangTree **) dst = src_tree;
+}
+
+static void
+assign__constant_tree         (DangValueType *type,
+                               void          *dst,
+	                       const void    *src)
+{
+  destruct__constant_tree (type, dst);
+  init_assign__constant_tree (type, dst, src);
+}
+
+static void
+assign__mutable_tree         (DangValueType *type,
+                               void          *dst,
+	                       const void    *src)
+{
+  destruct__mutable_tree (type, dst);
+  init_assign__mutable_tree (type, dst, src);
+}
+
+static void
+append_string_recursive (DangValueTreeTypes *tt,
                          DangTreeNode      *node,
                          DangStringBuffer  *buf)
 {
   char *s;
   if (node == NULL)
     return;
-  append_string_recursive (ttype, node->left, buf);
+  append_string_recursive (tt, node->left, buf);
   if (buf->len > 1)
     dang_string_buffer_append (buf, ", ");
-  s = dang_value_to_string (ttype->key, node + 1);
+  s = dang_value_to_string (tt->key, node + 1);
   dang_string_buffer_append (buf, s);
   dang_free (s);
   dang_string_buffer_append (buf, " => ");
-  s = dang_value_to_string (ttype->value, (char*)node + ttype->value_offset);
+  s = dang_value_to_string (tt->value, (char*)node + tt->value_offset);
   dang_string_buffer_append (buf, s);
   dang_free (s);
-  append_string_recursive (ttype, node->right, buf);
+  append_string_recursive (tt, node->right, buf);
 }
 
 static char *
-to_string__tree (DangValueType *type,
-                 const void    *value)
+to_string__constant_tree (DangValueType *type,
+                          const void    *value)
 {
-  DangTree *tree = (DangTree *) value;
+  DangConstantTree *tree = * (DangConstantTree **) value;
   DangStringBuffer buf = DANG_STRING_BUFFER_INIT;
   dang_string_buffer_append_c (&buf, '{');
-  append_string_recursive ((DangValueTypeTree*)type, tree->top, &buf);
+  append_string_recursive (((DangValueTypeTree*)type)->owner, tree->top, &buf);
   dang_string_buffer_append (&buf, " }");
   return buf.str;
 }
+static char *
+to_string__mutable_tree (DangValueType *type,
+                          const void    *value)
+{
+  DangTree *tree = * (DangTree **) value;
+  if (tree == NULL)
+    return dang_strdup ("(null)");
+  else
+    return to_string__constant_tree (&((DangValueTypeTree *)type)->owner->types[1].base_type, &tree->v);
+}
 
 static dang_boolean
-compare_node_keys (DangValueTypeTree *ttype,
-               DangTree          *tree,
-               void              *a,
-               void              *b,
+compare_node_keys (DangValueTreeTypes *tt,
+               DangConstantTree          *tree,
+               const void              *a,
+               const void              *b,
                int               *cmp_rv_out,
                DangError        **error)
 {
   if (tree->compare != NULL)
     {
-      void *values[2] = { a, b };
+      void *values[2] = { (void *) a, (void *) b };
       int32_t rv;
       if (!dang_function_call_nonyielding_v (tree->compare, &rv, values, error))
         return FALSE;
@@ -149,7 +196,7 @@ compare_node_keys (DangValueTypeTree *ttype,
     }
   else
     {
-      *cmp_rv_out = ttype->key->compare (ttype->key, a, b);
+      *cmp_rv_out = tt->key->compare (tt->key, a, b);
     }
   return TRUE;
 }
@@ -157,7 +204,7 @@ compare_node_keys (DangValueTypeTree *ttype,
 #define GET_NODE_IS_RED(n)   n->is_red
 #define SET_NODE_IS_RED(n,v)   n->is_red=v
 #define COMPARE_NODES(a,b,rv) \
-{ if (!compare_node_keys (ttype, tree, a + 1, b + 1, &rv, error)) \
+{ if (!compare_node_keys (tt, tree, a + 1, b + 1, &rv, error)) \
     return FALSE; }
 #define GET_TREE(ttype, tree) \
   tree->top, DangTreeNode *, GET_NODE_IS_RED, SET_NODE_IS_RED, parent, left, right, \
@@ -169,33 +216,49 @@ compare_node_keys (DangValueTypeTree *ttype,
   else if (a->value < b->value) rv = -1;        \
   else if (a->value > b->value) rv = 1;         \
   else rv = 0;
-static DangValueTypeTree *top_tree_type = NULL;
+static DangValueTreeTypes *top_tree_type = NULL;
 #define GET_TREE_TYPE_TREE() \
-        top_tree_type, DangValueTypeTree *, GET_NODE_IS_RED, SET_NODE_IS_RED, \
+        top_tree_type, DangValueTreeTypes *, GET_NODE_IS_RED, SET_NODE_IS_RED, \
         parent, left, right, COMPARE_TREE_TYPES
 
 static dang_boolean
-index_get_ptr__tree   (DangValueIndexInfo *info,
-                   void          *container,
-                   const void   **indices,
-                   void         **rv_ptr_out,
-                   dang_boolean   may_create,
-                   DangError    **error)
+constant_tree_get_pointer   (DangValueTreeTypes *tt,
+                             DangConstantTree   **ptree,
+                             const void         *key,
+                             void         **rv_ptr_out,
+                             dang_boolean   may_create,
+                             DangError    **error)
 {
-  DangValueTypeTree *ttype = (DangValueTypeTree *) info->owner;
-  DangTree *tree = container;
+  DangConstantTree *tree = *ptree;
+  if (tree == NULL)
+    {
+      if (may_create)
+        {
+          tree = dang_new (DangConstantTree, 1);
+          tree->ref_count = 1;
+          tree->top = NULL;
+          tree->compare = NULL;
+          tree->size = 0;
+          *ptree = tree;
+        }
+      else
+        {
+          if (error)
+            *error = dang_error_new ("key not found in tree");
+          return FALSE;
+        }
+    }
   DangTreeNode *n = tree->top;
   DangTreeNode *last = n;
-  void *key = (void*) (indices[0]);
   int cmp;
   while (n != NULL)
     {
-      if (!compare_node_keys (ttype, tree, key, n + 1, &cmp, error))
+      if (!compare_node_keys (tt, tree, key, n + 1, &cmp, error))
         return FALSE;
       last = n;
       if (cmp == 0)
         {
-          *rv_ptr_out = ((char*)n) + ttype->value_offset;
+          *rv_ptr_out = ((char*)n) + tt->value_offset;
           return TRUE;
         }
       else if (cmp < 0)
@@ -210,95 +273,124 @@ index_get_ptr__tree   (DangValueIndexInfo *info,
       return FALSE;
     }
 
-  if (ttype->recycling_list)
+  if (tt->recycling_list)
     {
-      n = ttype->recycling_list;
-      ttype->recycling_list = n->parent;
+      n = tt->recycling_list;
+      tt->recycling_list = n->parent;
     }
   else
-    n = dang_malloc (ttype->node_size);
+    n = dang_malloc (tt->node_size);
 
   /* Initialize key/value */
-  dang_value_init_assign (ttype->key, n+1, indices[0]);
-  memset ((char*)n + ttype->value_offset, 0, ttype->value->sizeof_instance);
+  dang_value_init_assign (tt->key, n+1, key);
+  memset ((char*)n + tt->value_offset, 0, tt->value->sizeof_instance);
 
   if (last == NULL)
     {
       DangTreeNode *conflict;
-      GSK_RBTREE_INSERT (GET_TREE (ttype, tree), n, conflict);
+      GSK_RBTREE_INSERT (GET_TREE (tt, tree), n, conflict);
       dang_assert (conflict == NULL);
     }
   else
     {
       dang_boolean is_right = (cmp > 0);
-      GSK_RBTREE_INSERT_AT (GET_TREE (ttype, tree), last, is_right, n);
+      GSK_RBTREE_INSERT_AT (GET_TREE (tt, tree), last, is_right, n);
     }
-  *rv_ptr_out = ((char*)n) + ttype->value_offset;
+  *rv_ptr_out = ((char*)n) + tt->value_offset;
   return TRUE;
 }
 
 static dang_boolean
-index_set__tree   (DangValueIndexInfo *info,
+index_set__mutable_tree   (DangValueIndexInfo *info,
                    void          *container,
                    const void   **indices,
                    const void    *element_value,
                    dang_boolean   may_create,
                    DangError    **error)
 {
-  void *ptr;
-  if (!index_get_ptr__tree (info, container, indices, &ptr, may_create, error))
+  DangValueTypeTree *ttype = (DangValueTypeTree *) (info->owner);
+  DangValueTreeTypes *tt = ttype->owner;
+  DangTree *tree = * (DangTree **) container;
+  void *value_ptr;
+  if (tree == NULL)
+    {
+      dang_set_error (error, "null pointer exception");
+      return FALSE;
+    }
+  if (tree->v->ref_count > 1)
+    {
+      /* copy constant tree */
+      DangConstantTree *ctree = dang_new (DangConstantTree, 1);
+      ctree->ref_count = 1;
+      ctree->top = tt->copy_tree_node (tt, NULL, tree->v->top);
+      ctree->compare = tree->v->compare ? dang_function_ref (tree->v->compare) : NULL;
+      ctree->size = tree->v->size;
+      tree->v->ref_count -= 1;
+      tree->v = ctree;
+    }
+  if (!constant_tree_get_pointer (tt, &tree->v, indices[0], &value_ptr, may_create, error))
     return FALSE;
-  dang_value_assign (info->element_type, ptr, element_value);
+  dang_value_assign (tt->value, value_ptr, element_value);
   return TRUE;
 }
 
 static dang_boolean
-index_get__tree (DangValueIndexInfo *info,
-                     void          *container,
-                     const void   **indices,
-                     void          *rv_out,
-                     dang_boolean   may_create,
-                     DangError    **error)
+index_get__mutable_tree (DangValueIndexInfo *info,
+                         void          *container,
+                         const void   **indices,
+                         void          *rv_out,
+                         dang_boolean   may_create,
+                         DangError    **error)
 {
-  void *ptr;
-  if (!index_get_ptr__tree (info, container, indices, &ptr, may_create, error))
+  DangTree *tree = * (DangTree **) container;
+  DangValueTypeTree *ttype = (DangValueTypeTree *)info->owner;
+  DangValueTreeTypes *tt = ttype->owner;
+  void *value_ptr;
+  if (tree == NULL)
+    {
+      dang_set_error (error, "null pointer exception");
+      return FALSE;
+    }
+  if (!constant_tree_get_pointer (tt, &tree->v, indices[0], &value_ptr, may_create, error))
     return FALSE;
-  dang_value_init_assign (info->element_type, rv_out, ptr);
+  dang_value_assign (tt->value, rv_out, value_ptr);
   return TRUE;
 }
 
-DangValueType *
-dang_value_type_tree (DangValueType *key,
-                      DangValueType *value)
+static dang_boolean
+index_get__constant_tree (DangValueIndexInfo *info,
+                         void          *container,
+                         const void   **indices,
+                         void          *rv_out,
+                         dang_boolean   may_create,
+                         DangError    **error)
 {
-  DangValueTypeTree *rv;
-  DangValueTypeTree dummy;
-  DangValueTypeTree *conflict;
+  DangValueTypeTree *ttype = (DangValueTypeTree *)info->owner;
+  DangValueTreeTypes *tt = ttype->owner;
+  void *value_ptr;
+  if (!constant_tree_get_pointer (tt, container, indices[0], &value_ptr, may_create, error))
+    return FALSE;
+  dang_value_assign (tt->value, rv_out, value_ptr);
+  return TRUE;
+}
+
+static DangValueTreeTypes *
+dang_value_tree_types (DangValueType *key,
+                       DangValueType *value)
+{
+  DangValueTreeTypes *rv;
+  DangValueTreeTypes dummy;
+  DangValueTreeTypes *conflict;
   unsigned align;
+  unsigned i;
   dummy.key = key;
   dummy.value = value;
   GSK_RBTREE_LOOKUP (GET_TREE_TYPE_TREE (), &dummy, rv);
   if (rv)
-    return &rv->base_type;
+    return rv;
 
-  rv = dang_new0 (DangValueTypeTree, 1);
-  rv->base_type.magic = DANG_VALUE_TYPE_MAGIC;
-  rv->base_type.ref_count = 1;
-  rv->base_type.full_name = dang_strdup_printf ("tree<%s,%s>", key->full_name, value->full_name);
-  rv->base_type.sizeof_instance = sizeof (DangTree);
-  rv->base_type.alignof_instance = DANG_ALIGNOF_POINTER;
-  rv->base_type.init_assign = init_assign__tree;
-  rv->base_type.assign = assign__tree;
-  rv->base_type.destruct = destruct__tree;
-  rv->base_type.to_string = to_string__tree;
-  rv->base_type.internals.index_infos = &rv->index_info;
-  rv->index_info.owner = &rv->base_type;
-  rv->index_info.n_indices = 1;
-  rv->index_info.indices = &rv->value;
-  rv->index_info.element_type = value;
-  rv->index_info.get = index_get__tree;
-  rv->index_info.set = index_set__tree;
-  rv->index_info.next = NULL;
+  rv = dang_new0 (DangValueTreeTypes, 1);
+
   rv->key = key;
   rv->value = value;
   rv->value_offset = sizeof (DangTreeNode) + key->sizeof_instance;
@@ -307,6 +399,37 @@ dang_value_type_tree (DangValueType *key,
   align = DANG_MAX (DANG_ALIGNOF_POINTER, key->alignof_instance);
   align = DANG_MAX (align, value->alignof_instance);
   rv->node_size = DANG_ALIGN (rv->node_size, align);
+
+  for (i = 0; i < 2; i++)
+    {
+      rv->types[i].base_type.magic = DANG_VALUE_TYPE_MAGIC;
+      rv->types[i].base_type.ref_count = 1;
+      rv->types[i].base_type.full_name = dang_strdup_printf ("tree<%s,%s>", key->full_name, value->full_name);
+      rv->types[i].base_type.sizeof_instance = sizeof (void*);
+      rv->types[i].base_type.alignof_instance = DANG_ALIGNOF_POINTER;
+      rv->types[i].owner = rv;
+      rv->types[i].base_type.internals.index_infos = &rv->types[i].index_info;
+      rv->types[i].index_info.owner = &rv->types[i].base_type;
+      rv->types[i].index_info.n_indices = 1;
+      rv->types[i].index_info.indices = &rv->key;
+      rv->types[i].index_info.element_type = value;
+    }
+
+  rv->types[0].base_type.init_assign = init_assign__mutable_tree;
+  rv->types[0].base_type.assign = assign__mutable_tree;
+  rv->types[0].base_type.destruct = destruct__mutable_tree;
+  rv->types[0].base_type.to_string = to_string__mutable_tree;
+  rv->types[0].index_info.get = index_get__mutable_tree;
+  rv->types[0].index_info.set = index_set__mutable_tree;
+  rv->types[0].index_info.next = NULL;
+  rv->types[1].base_type.init_assign = init_assign__constant_tree;
+  rv->types[1].base_type.assign = assign__constant_tree;
+  rv->types[1].base_type.destruct = destruct__constant_tree;
+  rv->types[1].base_type.to_string = to_string__constant_tree;
+  rv->types[1].index_info.get = index_get__constant_tree;
+  rv->types[1].index_info.set = NULL;
+  rv->types[1].index_info.next = NULL;
+
   if (key->init_assign)
     {
       if (value->init_assign)
@@ -335,5 +458,19 @@ dang_value_type_tree (DangValueType *key,
     }
   GSK_RBTREE_INSERT (GET_TREE_TYPE_TREE (), rv, conflict);
   dang_assert (conflict == NULL);
-  return &rv->base_type;
+  return rv;
+}
+
+
+DangValueType *
+dang_value_type_tree (DangValueType *key,
+                      DangValueType *value)
+{
+  return &dang_value_tree_types (key, value)->types[0].base_type;
+}
+DangValueType *
+dang_value_type_constant_tree (DangValueType *key,
+                               DangValueType *value)
+{
+  return &dang_value_tree_types (key, value)->types[1].base_type;
 }

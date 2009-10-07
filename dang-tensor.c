@@ -3096,6 +3096,7 @@ free_tensor_tree_recursive (DangValueTypeTensor *a)
 {
   if (a->to_string_function)
     dang_function_unref (a->to_string_function);
+  dang_value_type_cleanup (&a->base_type);
   if (a->left)
     free_tensor_tree_recursive (a->left);
   if (a->right)

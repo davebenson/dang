@@ -86,6 +86,7 @@ dang_function_unref        (DangFunction    *function)
         case DANG_FUNCTION_TYPE_C:
           if (function->c.func_data_destroy)
             function->c.func_data_destroy (function->c.func_data);
+          dang_free (function->c.arg_frame_offsets);
           dang_free (function->base.steps);
           break;
         case DANG_FUNCTION_TYPE_STUB:
@@ -111,8 +112,7 @@ dang_function_unref        (DangFunction    *function)
         }
       if (function->base.stack_info)
         free_stack_info (function->base.stack_info);
-      //if (function->base.sig)
-        dang_signature_unref (function->base.sig);
+      dang_signature_unref (function->base.sig);
       dang_free (function);
     }
 }
