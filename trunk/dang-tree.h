@@ -1,25 +1,35 @@
 
 typedef struct _DangValueTypeTree DangValueTypeTree;
 typedef struct _DangTreeNode DangTreeNode;
+typedef struct _DangConstantTree DangConstantTree;
 typedef struct _DangTree DangTree;
 
+typedef struct _DangValueTreeTypes DangValueTreeTypes;
 struct _DangValueTypeTree
 {
   DangValueType base_type;
+  DangValueTreeTypes *owner;
+  DangValueIndexInfo index_info;
+};
+struct _DangValueTreeTypes
+{
   DangValueType *key, *value;
   unsigned value_offset;
   //DangValueType *node_type;
   unsigned node_size;
   DangTreeNode *recycling_list;         /* connected by 'parent' */
 
-  void (*destruct_tree_node) (DangValueTypeTree *, DangTreeNode *);
-  DangTreeNode *(*copy_tree_node) (DangValueTypeTree *, DangTreeNode *, DangTreeNode *);
+  void (*destruct_tree_node) (DangValueTreeTypes *, DangTreeNode *);
+  DangTreeNode *(*copy_tree_node) (DangValueTreeTypes *, DangTreeNode *, DangTreeNode *);
   DangValueIndexInfo index_info;
 
   /* for the tree of tree-types */
-  DangValueTypeTree *parent,*left,*right;
+  DangValueTreeTypes *parent,*left,*right;
   dang_boolean is_red;
+
+  DangValueTypeTree types[2];           /* 0=mutable, 1=constant */
 };
+
 
 struct _DangTreeNode
 {
@@ -31,14 +41,22 @@ struct _DangTreeNode
   /* key and value follow */
 };
 
-struct _DangTree
+struct _DangConstantTree
 {
+  unsigned ref_count;
   DangTreeNode *top;
   DangFunction *compare;		/* or NULL for default */
   unsigned size;
-  DangThread *cached;                   /* for calling compare() efficiently */
 };
 
+struct _DangTree
+{
+  DangConstantTree *v;
+  unsigned ref_count;
+};
+
+DangValueType *dang_value_type_constant_tree (DangValueType *key,
+                                     DangValueType *value);
 DangValueType *dang_value_type_tree (DangValueType *key,
                                      DangValueType *value);
 

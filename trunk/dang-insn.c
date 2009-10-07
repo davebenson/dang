@@ -58,6 +58,9 @@ void dang_insn_destruct (DangInsn *insn)
         dang_insn_value_clear (insn->index.indices + i);
       dang_free (insn->index.indices);
       break;
+    case DANG_INSN_TYPE_NEW_TENSOR:
+      dang_free (insn->new_tensor.dims);
+      break;
     default:
       break;
     }

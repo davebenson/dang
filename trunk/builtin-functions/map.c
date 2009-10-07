@@ -152,7 +152,7 @@ DangFunction *dang_builtin_function_map_tensors (unsigned n_tensor_args,
   unsigned rank;
   DangFunctionParam *fparams, *arg_fparams;
   DangSignature *arg_sig;
-  static DangValueType *map_state_types[MAX_MAP_ARGS + 1];
+  static DangValueType map_state_types[MAX_MAP_ARGS + 1];
   DangSignature *sig;
   DangFunction *rv;
   if (n_tensor_args > MAX_MAP_ARGS)
@@ -198,9 +198,9 @@ DangFunction *dang_builtin_function_map_tensors (unsigned n_tensor_args,
   fparams[i].type = dang_value_type_function (arg_sig);
   dang_signature_unref (arg_sig);
 
-  if (map_state_types[n_tensor_args] == NULL)
+  if (map_state_types[n_tensor_args].destruct == NULL)
     {
-      DangValueType *type = dang_new0 (DangValueType, 1);
+      DangValueType *type = map_state_types + n_tensor_args;
       type->destruct = destruct__tensor_run_data;
       type->sizeof_instance = sizeof (TensorMapRunData)
                             + sizeof (void *) * (n_tensor_args - 1)
@@ -208,13 +208,12 @@ DangFunction *dang_builtin_function_map_tensors (unsigned n_tensor_args,
       type->alignof_instance = DANG_ALIGNOF_POINTER;
       type->sizeof_instance = DANG_ALIGN (type->sizeof_instance, DANG_ALIGNOF_POINTER);
       type->full_name = "internal-map-state";
-      map_state_types[n_tensor_args] = type;
     }
 
 
   sig = dang_signature_new (output_tensor_type, n_tensor_args + 1, fparams);
   rv = dang_function_new_c (sig,
-                            map_state_types[n_tensor_args],
+                            &map_state_types[n_tensor_args],
                             do_tensor_map,
                             tensor_map_data,
                             free_tensor_map_data);
