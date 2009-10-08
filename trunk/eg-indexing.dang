@@ -1,0 +1,29 @@
+
+var a = tree[ "a" -> "b", "c" -> "d" ];
+assert(a["a"] == "b");
+assert(a["c"] == "d");
+
+for (var i = 0; i < 2; i++)
+{
+  // test throw-missing lvalue
+  var failed = false;
+  try { a["q"] == "e"; } catch { failed = true; }
+  assert(failed);
+  const_tree<string,string> copy;
+  if (i == 1) copy = a.v;
+
+  // test soft-assignment:  fail if key does not exist
+  failed = false;
+  try { a[?"q"] = "e"; } catch { failed = true; }
+  assert(failed);
+
+  // test soft-query:  return 0 if key does not exist
+  assert(a[?"q"] == null<string>);
+
+  // test normal-assignment:  create key
+  a["q"] = "foo";		// create key/value pair!
+  assert(a["q"] == "foo");
+
+  if (i == 1) 
+    assert(copy[?"q"] == null<string>);
+}

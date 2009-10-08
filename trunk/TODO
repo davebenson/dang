@@ -53,6 +53,11 @@ _ Tree
       in this case, we probably do not need to expose immutable_tree?
       or maybe we should...
 
+Syntax:
+  _ new empty literals?  eg array<int>[];   (need that to work somehow anyway)
+  _ indexing that ignores problems and indexing that creates elements
+        [?1]   [!1]     ???
+
 
 _ case statement (as general as possible...)
 
