@@ -928,6 +928,7 @@ try_sig__tensor__map (DangMatchQuery *query, void *data, DangError **error)
   unsigned i;
   DangSignature *func_sig;
   unsigned n_tensors = query->n_elements - 1;
+  DangFunction *rv;
   DANG_UNUSED (data);
   if (query->n_elements < 2)
     {
@@ -976,8 +977,10 @@ try_sig__tensor__map (DangMatchQuery *query, void *data, DangError **error)
   if (func_sig->return_type == NULL || func_sig->return_type == dang_value_type_void ())
     return NULL;
 
-  return dang_builtin_function_map_tensors (n_tensors, ttypes,
+  rv = dang_builtin_function_map_tensors (n_tensors, ttypes,
                                             dang_value_type_tensor (func_sig->return_type, rank));
+  dang_signature_unref (func_sig);
+  return rv;
 }
 
 typedef struct _NewTensorData NewTensorData;
@@ -1215,6 +1218,7 @@ try_sig__vector__grep       (DangMatchQuery *query,
       return NULL;
     }
 
+  dang_signature_unref (func_sig);
   return dang_builtin_function_grep ((DangValueType*)ttype);
 }
 

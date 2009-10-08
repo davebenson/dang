@@ -466,6 +466,15 @@ limited_expression(RV) ::= limited_expression(A) DOT BAREWORD(B).
 	  dang_token_unref (B); }
 limited_expression(A) ::= parenthesized_expression(B).
 	{ A = B; }
+limited_expression(RV) ::= type(A) DOT BAREWORD(B).
+	{
+	DangValueType *t = get_type_from_expr (dang_expr_ref (A));
+	  const char *func_name = "$operator_dot";
+	  if (dang_value_type_is_enum (t))
+	    func_name = "$type_dot";
+	  RV = expr_new_function_take_2 (func_name, A, dang_expr_new_bareword (B->v_bareword.name));
+          get_expr_pos_from_expr (RV, A);
+	  dang_token_unref (B); }
 invoke_expr(RV) ::= limited_expression(BW) LPAREN argument_list(ARGS) RPAREN. [FCTCALL]
         { dang_util_array_insert (&ARGS, 1, &BW, 0);
 	  RV = dang_expr_new_function ("$invoke",
@@ -1284,10 +1293,12 @@ enum_value(A) ::= BAREWORD(b).
 	  dang_token_unref (b);
 	}
 
+/*
 expr(RV) ::= type(T) DOT BAREWORD(B).
 	{ RV = expr_new_function_take_2 ("$type_dot", T, expr_bareword_from_token (B));
 	  get_expr_pos_from_expr (RV, T);
 	  dang_token_unref (B); }
+*/
 
 vector_expr(RV) ::= LBRACKET(p) raw_expr_list(LIST) RBRACKET.
 	{ RV = expr_new_function ("$tensor", LIST.len, LIST.data);
@@ -1479,6 +1490,7 @@ toplevel_statement(RV) ::= IMPORT(p) module_list(B) opt_import_list(I) as_clause
 	  else
 	    RV = expr_new_function_take_3 ("$import", i, mod, Q);
 	  get_expr_pos_from_token (RV, p);
+	  free_expr_array (&B);
 	  dang_token_unref (p);
 	}
 toplevel_statement(RV) ::= USE(p) module_list(LIST) SEMICOLON.

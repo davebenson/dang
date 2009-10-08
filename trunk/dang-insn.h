@@ -22,7 +22,8 @@ typedef enum
   DANG_INSN_TYPE_INDEX,
 
   DANG_INSN_TYPE_CREATE_CLOSURE,
-  DANG_INSN_TYPE_NEW_TENSOR
+  DANG_INSN_TYPE_NEW_TENSOR,
+  DANG_INSN_TYPE_NEW_CONSTANT_TREE
 } DangInsnType;
 
 
@@ -181,6 +182,15 @@ struct _DangInsn_NewTensor
   unsigned total_size;
 };
 
+typedef struct _DangInsn_NewConstantTree DangInsn_NewConstantTree;
+struct _DangInsn_NewConstantTree
+{
+  DangInsn_Base base;
+  DangVarId target;
+  DangValueType *key_type;
+  DangValueType *value_type;
+};
+
 union _DangInsn
 {
   DangInsnType type;
@@ -200,6 +210,7 @@ union _DangInsn
   DangInsn_Return return_;
   DangInsn_Index index;
   DangInsn_NewTensor new_tensor;
+  DangInsn_NewConstantTree new_constant_tree;
 };
 
 void dang_insn_init (DangInsn *insn,

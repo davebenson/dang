@@ -34,11 +34,15 @@ unending todo items:
 - improve code coverage (see utils/get-coverage)
 - ensure ./run-tests --valgrind exits cleanly
 
+_ Array
+  _ construct mutable arrays like array[1 2 3];
 
 _ Tree
   X indexing
   X index insn is only for tensors right now
   X instantiation (inline)
+  _ to_string
+  _ call the constant_tree ctree
   _ instantiation (from pair of vectors)
   _ parsing the type
   _ misc methods (keys, values, map)

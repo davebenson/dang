@@ -374,6 +374,34 @@ index_get__constant_tree (DangValueIndexInfo *info,
   return TRUE;
 }
 
+static DANG_SIMPLE_C_FUNC_DECLARE (constant_tree_to_mutable_tree)
+{
+  DangConstantTree *in = * (DangConstantTree **) args[0];
+  DangTree *out;
+  DANG_UNUSED (func_data);
+  DANG_UNUSED (error);
+  if (in)
+    in->ref_count += 1;
+  out = dang_new (DangTree, 1);
+  out->ref_count = 1;
+  out->v = in;
+  * (DangTree **) rv_out = out;
+  return TRUE;
+}
+
+static DANG_SIMPLE_C_FUNC_DECLARE (construct_empty_mutable_tree)
+{
+  DangTree *tree = dang_new (DangTree, 1);
+  DANG_UNUSED (func_data);
+  DANG_UNUSED (error);
+  DANG_UNUSED (args);
+  tree->ref_count = 1;
+  tree->v = dang_new (DangConstantTree, 1);
+  tree->v->ref_count = 1;
+  tree->v->top = NULL;
+  * (DangTree **) rv_out = tree;
+  return TRUE;
+}
 static DangValueTreeTypes *
 dang_value_tree_types (DangValueType *key,
                        DangValueType *value)
@@ -383,6 +411,7 @@ dang_value_tree_types (DangValueType *key,
   DangValueTreeTypes *conflict;
   unsigned align;
   unsigned i;
+  DangFunctionParam params[5];
   dummy.key = key;
   dummy.value = value;
   GSK_RBTREE_LOOKUP (GET_TREE_TYPE_TREE (), &dummy, rv);
@@ -430,6 +459,42 @@ dang_value_tree_types (DangValueType *key,
   rv->types[1].index_info.set = NULL;
   rv->types[1].index_info.next = NULL;
 
+  GSK_RBTREE_INSERT (GET_TREE_TYPE_TREE (), rv, conflict);
+  dang_assert (conflict == NULL);
+
+  dang_value_type_add_simple_member (&rv->types[0].base_type,
+                                     "v",
+                                     DANG_MEMBER_PUBLIC_READABLE,
+                                     &rv->types[1].base_type,
+                                     TRUE,
+                                     offsetof (DangArray, tensor));
+
+  /* make_tree() function */
+  params[0].type = &rv->types[1].base_type;
+  params[0].name = "this";
+  params[0].dir = DANG_FUNCTION_PARAM_IN;
+  DangSignature *sig;
+  DangFunction *func;
+  sig = dang_signature_new (&rv->types[0].base_type,
+                            1, params);
+  func = dang_function_new_simple_c (sig, constant_tree_to_mutable_tree, NULL, NULL);
+  dang_value_type_add_constant_method ((DangValueType *) &rv->types[0].base_type,
+                                       "make_tree",
+                                       DANG_METHOD_FINAL|DANG_METHOD_PUBLIC,
+                                       func);
+  dang_function_unref (func);
+  dang_signature_unref (sig);
+
+
+  sig = dang_signature_new (&rv->types[0].base_type, 0, NULL);
+  func = dang_function_new_simple_c (sig, construct_empty_mutable_tree, NULL, NULL);
+  dang_value_type_add_constant_method ((DangValueType *) &rv->types[0].base_type,
+                                       "make_empty",
+                                       DANG_METHOD_FINAL|DANG_METHOD_PUBLIC|DANG_METHOD_STATIC,
+                                       func);
+  dang_signature_unref (sig);
+  dang_function_unref (func);
+
   if (key->init_assign)
     {
       if (value->init_assign)
@@ -456,8 +521,6 @@ dang_value_tree_types (DangValueType *key,
           rv->destruct_tree_node = destruct_tree_node__none;
         }
     }
-  GSK_RBTREE_INSERT (GET_TREE_TYPE_TREE (), rv, conflict);
-  dang_assert (conflict == NULL);
   return rv;
 }
 

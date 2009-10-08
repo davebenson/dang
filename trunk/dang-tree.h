@@ -21,7 +21,7 @@ struct _DangValueTreeTypes
 
   void (*destruct_tree_node) (DangValueTreeTypes *, DangTreeNode *);
   DangTreeNode *(*copy_tree_node) (DangValueTreeTypes *, DangTreeNode *, DangTreeNode *);
-  DangValueIndexInfo index_info;
+  DangFunction *constant_tree_set;
 
   /* for the tree of tree-types */
   DangValueTreeTypes *parent,*left,*right;
