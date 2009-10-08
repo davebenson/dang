@@ -11,8 +11,6 @@ struct _DangSignature
   DangFunctionParam *params;            /* name is optional in the parameters */
   DangValueType *return_type;
   dang_boolean is_templated;
-  
-  dang_boolean HACK_tracked;
 };
 
 DangSignature *dang_signature_new          (DangValueType     *return_type,
