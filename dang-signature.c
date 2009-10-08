@@ -111,16 +111,21 @@ DangSignature *dang_signature_new          (DangValueType     *return_type,
         is_templated = TRUE;
     }
   sig->is_templated = is_templated;
+  sig->HACK_tracked = FALSE;
   return sig;
 }
 
 DangSignature *dang_signature_ref          (DangSignature*sig)
 {
+  if (sig->HACK_tracked)
+    dang_warning ("dang_signature_ref: %p: %u => %u", sig, sig->ref_count, sig->ref_count + 1);
   ++(sig->ref_count);
   return sig;
 }
 void           dang_signature_unref        (DangSignature*sig)
 {
+  if (sig->HACK_tracked)
+    dang_warning ("dang_signature_unref: %p: %u => %u", sig, sig->ref_count, sig->ref_count - 1);
   if (--(sig->ref_count) == 0)
     {
       unsigned i;

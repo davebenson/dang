@@ -201,10 +201,7 @@ void                dang_c_function_end_subcall   (DangThread *thread,
     {
       DangValueType *type = sig->return_type;
       offset = DANG_ALIGN (offset, type->alignof_instance);
-      if (type->init_assign)                    /* XXX: assign() or init_assign() ??? */
-        type->init_assign (type, rv_out, (char*)old_frame + offset);
-      else
-        memcpy (rv_out, (char*)old_frame + offset, type->sizeof_instance);
+      memcpy (rv_out, (char*)old_frame + offset, type->sizeof_instance);
       offset += type->sizeof_instance;
     }
   for (i = 0; i < sig->n_params; i++)
@@ -214,7 +211,8 @@ void                dang_c_function_end_subcall   (DangThread *thread,
       if (sig->params[i].dir == DANG_FUNCTION_PARAM_OUT
        || sig->params[i].dir == DANG_FUNCTION_PARAM_INOUT)
         {
-          if (type->destruct != NULL)
+          if (sig->params[i].dir == DANG_FUNCTION_PARAM_INOUT
+           && type->destruct != NULL)
             type->destruct (type, args[i]);
           memcpy (args[i], (char*)old_frame + offset, type->sizeof_instance);
         }

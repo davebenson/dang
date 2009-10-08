@@ -3001,14 +3001,23 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE (compile__invoke)
         }
       else
         {
-          DangFunction *f = method->get_func;
-          dang_assert (f->base.sig->n_params == 0);
-          dang_compile_result_init_stack (&func_name_res, f->base.sig->return_type,
-                                          dang_builder_add_tmp (builder,
-                                                                         f->base.sig->return_type),
-                                          FALSE, TRUE, FALSE);
-          dang_compile_literal_function_invocation (f, builder, &func_name_res,
-                                                    0, NULL);
+          if (method->func != NULL)
+            {
+              dang_compile_result_init_literal (&func_name_res,
+                                                method->method_func_type,
+                                                &method->func);
+            }
+          else
+            {
+              DangFunction *f = method->get_func;
+              dang_assert (f->base.sig->n_params == 0);
+              dang_compile_result_init_stack (&func_name_res, f->base.sig->return_type,
+                                              dang_builder_add_tmp (builder,
+                                                                             f->base.sig->return_type),
+                                              FALSE, TRUE, FALSE);
+              dang_compile_literal_function_invocation (f, builder, &func_name_res,
+                                                        0, NULL);
+            }
         }
       sig = method->sig;
     }
@@ -3327,7 +3336,7 @@ DANG_BUILTIN_METAFUNCTION (operator_assign_logical_and);
 /* $operator_dot(whatever, member) */
 
 
-#define syntax_check__operator_dot   "AB"
+#define syntax_check__operator_dot   "AB|TB"
 
 static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__operator_dot)
 {
@@ -3403,8 +3412,49 @@ static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__operator_dot)
         dang_mf_annotate_from_namespace_symbol (annotations, expr, sym);
         return TRUE;
       }
-    case DANG_EXPR_TAG_FUNCTION_FAMILY:
     case DANG_EXPR_TAG_TYPE:
+      {
+        DangValueType *type = * (DangValueType **) expr->function.args[0]->value.value;
+        DangValueElement *element;
+        dang_assert (type->magic == DANG_VALUE_TYPE_MAGIC);
+        element = dang_value_type_lookup_element (type, member_name, TRUE, NULL);
+        if (element == NULL)
+          {
+            dang_set_error (error, "no member %s of type '%s' (%s:%u)",
+                            member_name, type->full_name,
+                            DANG_CP_EXPR_ARGS (expr));
+            return FALSE;
+          }
+        if (element->element_type == DANG_VALUE_ELEMENT_TYPE_METHOD)
+          {
+            dang_mf_annotate_method (annotations, expr, FALSE, type, element);
+            return TRUE;
+          }
+        if (element->element_type != DANG_VALUE_ELEMENT_TYPE_MEMBER)
+          {
+            dang_set_error (error, "non-member %s %s of type '%s' (%s:%u)",
+                            dang_value_element_type_name (element->element_type),
+                            member_name, type->full_name,
+                            DANG_CP_EXPR_ARGS (expr));
+            return FALSE;
+          }
+        DangValueMember *member;
+        dang_boolean is_lvalue = TRUE, is_rvalue = TRUE;
+        member = &element->info.member;
+        /* XXX: this would be a good time to check,
+         * but we test in compile__operator_dot,
+         * so not checking here is safe. */
+        //if ((member->flags & DANG_MEMBER_PUBLIC_READABLE) == 0)
+        //  is_rvalue = FALSE;
+        //if ((member->flags & DANG_MEMBER_PUBLIC_WRITABLE) == 0)
+        //  is_lvalue = FALSE;
+        dang_mf_annotate_value (annotations, expr, member->member_type, is_lvalue, is_rvalue);
+        dang_mf_annotate_member (annotations, expr, member);
+
+        dang_die ("static members not supported");
+        return TRUE;
+      }
+    case DANG_EXPR_TAG_FUNCTION_FAMILY:
     case DANG_EXPR_TAG_STATEMENT:
     case DANG_EXPR_TAG_UNTYPED_FUNCTION:
     case DANG_EXPR_TAG_CLOSURE:
@@ -4255,10 +4305,10 @@ DANG_BUILTIN_METAFUNCTION(tensor);
 /* === mf-tree === */
 #include "config.h"
 
-#define syntax_check__tree            "$tree_entry()*$tree_entry()"
-#define syntax_check__tree_entry      "AA"
+#define syntax_check__ctree            "$ctree_entry()*$ctree_entry()"
+#define syntax_check__ctree_entry      "AA"
 
-static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__tree)
+static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__ctree)
 {
   unsigned i;
   DangValueType *key_type, *value_type;
@@ -4272,6 +4322,7 @@ static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__tree)
       if (!dang_expr_annotate_types (annotations, kv->function.args[0], imports, var_table, error)
        || !dang_expr_annotate_types (annotations, kv->function.args[1], imports, var_table, error))
         return FALSE;
+
       tag = dang_mf_get_tag (annotations, kv->function.args[0], var_table);
       dang_assert (tag);
       dang_assert (tag->tag_type == DANG_EXPR_TAG_VALUE);
@@ -4303,11 +4354,11 @@ static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__tree)
         }
     }
 
-  dang_mf_annotate_value (annotations, expr, dang_value_type_tree (key_type, value_type), FALSE, TRUE);
+  dang_mf_annotate_value (annotations, expr, dang_value_type_constant_tree (key_type, value_type), FALSE, TRUE);
   return TRUE;
 }
 
-static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tree)
+static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__ctree)
 {
   unsigned i;
   DangInsn insn;
@@ -4315,7 +4366,7 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tree)
   DangValueType *key_type, *value_type;
   DangVarId tree_var_id;
   DangExprTag *tag;
-  DangTree *literal;
+  DangValueTreeTypes *tt;
 
   if (flags->must_be_lvalue)
     {
@@ -4326,23 +4377,20 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tree)
 
   tag = dang_expr_get_annotation (builder->annotations, expr, DANG_EXPR_ANNOTATION_TAG);
   tree_type = tag->info.value.type;
-  key_type = ((DangValueTypeTree *) tree_type)->key;
-  value_type = ((DangValueTypeTree *) tree_type)->value;
+  tt = ((DangValueTypeTree *) tree_type)->owner;
+  key_type = tt->key;
+  value_type = tt->value;
 
   /* Reserve space for the 'make_tree' step,
      as well as the stack space for the tree. */
   tree_var_id = dang_builder_add_tmp (builder, tree_type);
   dang_builder_note_var_create (builder, tree_var_id);
 
-  dang_insn_init (&insn, DANG_INSN_TYPE_ASSIGN);
-  insn.assign.source.location = DANG_INSN_LOCATION_LITERAL;
-  literal = dang_new0 (DangTree, 1);
-  insn.assign.source.value = literal;
-  insn.assign.source.type = tree_type;
-  insn.assign.target.location = DANG_INSN_LOCATION_STACK;
-  insn.assign.target.var = tree_var_id;
-  insn.assign.target.type = tree_type;
-  insn.assign.target_uninitialized = TRUE;
+  /* create an empty (pseudo-constant) tree */
+  dang_insn_init (&insn, DANG_INSN_TYPE_NEW_CONSTANT_TREE);
+  insn.new_constant_tree.target = tree_var_id;
+  insn.new_constant_tree.key_type = key_type;
+  insn.new_constant_tree.value_type = value_type;
   dang_builder_add_insn (builder, &insn);
 
   for (i = 0; i < expr->function.n_args; i++)
@@ -4353,61 +4401,46 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tree)
       if (key_expr->type != DANG_EXPR_TYPE_VALUE
        || value_expr->type != DANG_EXPR_TYPE_VALUE)
         {
-          DangCompileResult rvalue_res, index_res;
+          DangCompileResult params[3];
+          DangCompileResult subrv;
           dang_builder_push_tmp_scope (builder);
 
-          /* add rvalue computation */
+          /* compile key */
           dang_compile (key_expr, builder,
-                        &dang_compile_flags_rvalue_restrictive, &rvalue_res);
-          if (rvalue_res.type == DANG_COMPILE_RESULT_ERROR)
+                        &dang_compile_flags_rvalue_restrictive, &params[1]);
+          if (params[1].type == DANG_COMPILE_RESULT_ERROR)
             {
-              *result = rvalue_res;
+              *result = params[1];
               return;
             }
-          dang_assert (rvalue_res.type == DANG_COMPILE_RESULT_STACK);
+          dang_assert (params[1].type == DANG_COMPILE_RESULT_STACK);
 
-          /* compile index of lvalue */
+          /* compile value */
           dang_compile (key_expr, builder,
-                        &dang_compile_flags_rvalue_restrictive, &index_res);
-          if (index_res.type == DANG_COMPILE_RESULT_ERROR)
+                        &dang_compile_flags_rvalue_restrictive, &params[2]);
+          if (params[2].type == DANG_COMPILE_RESULT_ERROR)
             {
-              *result = index_res;
+              dang_compile_result_clear (params + 1, builder);
+              *result = params[2];
               return;
             }
-          dang_assert (index_res.type == DANG_COMPILE_RESULT_STACK);
+          dang_assert (params[2].type == DANG_COMPILE_RESULT_STACK);
 
-          /* add index-set instruction */
-          insn.type = DANG_INSN_TYPE_INDEX;
-          insn.index.container.location = DANG_INSN_LOCATION_STACK;
-          insn.index.container.type = tree_type;
-          insn.index.container.var = tree_var_id;
-          insn.index.indices = dang_newa (DangInsnValue, 1);
-          dang_insn_value_from_compile_result (insn.index.indices+0,
-                                               &index_res);
-          dang_insn_value_from_compile_result (&insn.index.element,
-                                               &rvalue_res);
-          insn.index.is_set = TRUE;
-          dang_builder_add_insn (builder, &insn);
+          dang_compile_result_init_stack (params + 0,
+                                          tree_type,
+                                          tree_var_id,
+                                          TRUE, FALSE, TRUE);
+          dang_compile_result_init_void (&subrv);
+          dang_compile_literal_function_invocation (tt->constant_tree_set,
+                                                    builder,
+                                                    &subrv,
+                                                    3,
+                                                    params);
 
-          dang_compile_result_clear (&rvalue_res, builder);
-          dang_compile_result_clear (&index_res, builder);
+          dang_compile_result_clear (&params[0], builder);
+          dang_compile_result_clear (&params[1], builder);
+          dang_compile_result_clear (&params[2], builder);
           dang_builder_pop_tmp_scope (builder);
-        }
-      else
-        {
-          /* Add key/value pair to literal */
-          DangValueIndexInfo *ii = tree_type->internals.index_infos;
-          DangValueIndexSetFunc set = ii->set;
-          DangError *e = NULL;
-          if (!set (ii, literal, (const void **) &key_expr->value.value,
-                    value_expr->value.value, TRUE, &e))
-            {
-              dang_compile_result_set_error (result, &expr->any.code_position,
-                                             "setting literal k/v of tree: %s",
-                                             e->message);
-              dang_error_unref (e);
-              return;
-            }
         }
     }
 
@@ -4418,8 +4451,8 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__tree)
                                   FALSE, TRUE);      /* is-lvalue, is-rvalue */
 }
 
-DANG_BUILTIN_METAFUNCTION__SYNTAX_CHECK_ONLY(tree_entry);
-DANG_BUILTIN_METAFUNCTION(tree);
+DANG_BUILTIN_METAFUNCTION__SYNTAX_CHECK_ONLY(ctree_entry);
+DANG_BUILTIN_METAFUNCTION(ctree);
 
 /* === mf-type_dot.c === */
 
