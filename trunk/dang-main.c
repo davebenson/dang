@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include "config.h"
 #ifdef HAVE_READLINE
 # ifdef READLINE_HEADER_REQUIRE_PREFIX
@@ -70,12 +71,17 @@ read_string_from_file (FILE *fp)
 }
 
 #ifndef HAVE_READLINE
+static dang_boolean echo_readline = 0;
 static char *readline (const char *prompt)
 {
   static char buf[1024];
+  char *rv;
   fputs (prompt, stdout);
   fflush (stdout);
-  return fgets (buf, sizeof (buf), stdin);
+  rv = fgets (buf, sizeof (buf), stdin);
+  if (echo_readline && rv)
+    fputs (rv, stdout);
+  return rv;
 }
 static void add_history (const char *str)
 {
@@ -334,6 +340,12 @@ int main(int argc, char **argv)
 
   if (input_name == NULL)
     usage ();
+
+#ifndef HAVE_READLINE
+  if (strcmp (input_name, "-") == 0 && interactive && !isatty (STDIN_FILENO))
+    echo_readline = 1;
+#endif
+    
 
   if (!got_errors_fatal)
     errors_fatal = !interactive;
