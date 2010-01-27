@@ -1,4 +1,6 @@
 #include "dang.h"
+
+#ifdef HAVE_GSL
 #include <gsl/gsl_linalg.h>
 
 static dang_boolean
@@ -64,3 +66,4 @@ void _dang_gsl_init (DangNamespace *ns)
               1,
               DANG_FUNCTION_PARAM_IN, "A", mat_type);
 }
+#endif

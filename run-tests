@@ -5,6 +5,8 @@ silent=0
 valgrind=0
 debug_all=0
 
+echo_n=printf
+
 RUNTEST_DANG_OPTIONS=""
 
 while test "x$1" != x; do
@@ -30,13 +32,13 @@ if test "$silent" = 1 ; then
   end_test () { :; }
   running_test () { :; }
 else
-  start_test () { echo -n "$1... " ; }
+  start_test () { $echo_n "$1... " ; }
   end_test () { echo " done." ; }
 
   if test "$verbose" = 0 ; then
-    running_test () { echo -n '.' ; }
+    running_test () { $echo_n '.' ; }
   else
-    running_test () { echo -n "[$1]" ; }
+    running_test () { $echo_n "[$1]" ; }
   fi
 fi
 
@@ -154,7 +156,7 @@ run_test_set module
 RUNTEST_DANG_OPTIONS=""
 
 if test "$valgrind" = 1; then
-  echo -n "Checking valgrind output... "
+  $echo_n "Checking valgrind output... "
   got_error=0
   for z in $vgdir/* ; do
     error=0
@@ -164,7 +166,7 @@ if test "$valgrind" = 1; then
       echo "*** valgrind reports problems ... see $z" 1>&2
       got_error=1
     else
-      echo -n .
+      $echo_n .
     fi
   done
   if test "$got_error" = 1 ; then
