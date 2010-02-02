@@ -1,4 +1,5 @@
 #include "dang.h"
+#include "config.h"
 
 #ifdef HAVE_GSL
 #include <gsl/gsl_linalg.h>
