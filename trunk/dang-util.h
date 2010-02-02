@@ -49,7 +49,7 @@ char *dang_strdup   (const char *);
 void *dang_memdup   (const void *, size_t len);
 char *dang_strndup   (const char *, size_t len);
 uint32_t dang_str_hash (const char *str);
-uint32_t dang_binary_data_hash (size_t len, const uint8_t *data);
+uint32_t dang_util_binary_data_hash (size_t len, const uint8_t *data);
 #define dang_assert(condition)   assert(condition)
 #define dang_assert_not_reached() assert(0)
 char *dang_strdup_printf (const char *format,
@@ -59,6 +59,13 @@ char *dang_strdup_vprintf (const char *format,
 char *dang_util_c_escape (unsigned len,
                           const void *data,
                           dang_boolean include_quotes);
+char *dang_util_hex_escape (unsigned len,
+                          const void *data);
+/* writes 2*len hex chars to 'out' */
+void  dang_util_hex_escape_inplace (char *out,
+                                    unsigned len,
+                                    const void *data);
+void  dang_warning(const char *format,...) DANG_GNUC_PRINTF(1,2);
 void  dang_warning(const char *format,...) DANG_GNUC_PRINTF(1,2);
 void  dang_printerr(const char *format,...) DANG_GNUC_PRINTF(1,2);
 
@@ -213,8 +220,8 @@ const uint8_t *dang_binary_data_peek_data (const DangBinaryData *);
 #endif
 DangBinaryData *dang_binary_data_new      (unsigned              len,
                                            const uint8_t *       data);
-DangBinaryData *dang_binary_data_ref_copy (const DangBinaryData *binary_data);
-DangBinaryData *dang_binary_data_ref      (const DangBinaryData *binary_data);
+DangBinaryData *dang_binary_data_ref_copy (DangBinaryData       *binary_data);
+DangBinaryData *dang_binary_data_ref      (DangBinaryData       *binary_data);
 void            dang_binary_data_unref    (DangBinaryData       *binary_data);
 
 /* --- errors --- */

@@ -4,7 +4,7 @@
 #include "config.h"
 #include "gskrbtreemacros.h"
 
-#define IMPLEMENT_NUMERIC_COMPARE(func_name, ctype) \
+#define IMPLEMENT_NUMERIC_COMPARE(func_name, ctype)   \
 static DANG_VALUE_COMPARE_FUNC_DECLARE(func_name)     \
 {                                                     \
   ctype av = * (const ctype *) a;                     \
@@ -18,7 +18,7 @@ static DANG_VALUE_HASH_FUNC_DECLARE(func_name)        \
   DANG_UNUSED (type);                                 \
   return * (const ctype *) a;                         \
 }
-#define IMPLEMENT_NUMERIC_EQUAL(func_name, ctype)   \
+#define IMPLEMENT_NUMERIC_EQUAL(func_name, ctype)     \
 static DANG_VALUE_EQUAL_FUNC_DECLARE(func_name)       \
 {                                                     \
   DANG_UNUSED (type);                                 \
@@ -608,7 +608,7 @@ static DANG_VALUE_HASH_FUNC_DECLARE(binary_data_hash)
   DANG_UNUSED (type);
   if (sa == NULL)
     return 0;
-  return dang_binary_data_hash (sa->len, DANG_BINARY_DATA_PEEK_DATA (sa));
+  return dang_util_binary_data_hash (sa->len, DANG_BINARY_DATA_PEEK_DATA (sa));
 }
 static DANG_VALUE_EQUAL_FUNC_DECLARE(binary_data_equal)
 {
