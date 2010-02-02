@@ -31,7 +31,7 @@ int main()
 }
 EOF
 
-echo -n "Detecting system sizes... " 1>&2
+printf "Detecting system sizes... " 1>&2
 $CC -o conf-tmp-$$ conf-tmp-$$.c || {
   echo "error compiling configuration test." 1>&2
   exit 1
@@ -40,7 +40,7 @@ $CC -o conf-tmp-$$ conf-tmp-$$.c || {
 echo "done."
 
 # Detect gsl.
-echo -n "Detecting GSL... "
+printf "Detecting GSL... "
 have_gsl=no
 if test -z "$GSL_CONFIG" ; then
   GSL_CONFIG=`which gsl-config 2>/dev/null`
@@ -57,7 +57,7 @@ echo "$have_gsl."
 
 
 # Detect libreadline.
-echo -n "Checking for libreadline... "  1>&2
+printf "Checking for libreadline... "  1>&2
 have_readline=no
 LDFLAGS='-lreadline -lhistory' \
 test_compile_and_link '

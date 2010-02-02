@@ -542,7 +542,7 @@ binary_data_init_assign (DangValueType   *type,
                          void            *dst,
                          const void      *src)
 {
-  const DangBinaryData *bd = src;
+  const DangBinaryData *rhs = * (DangBinaryData **) src;
   DANG_UNUSED (type);
   if (rhs == NULL)
     * (DangBinaryData **) dst = NULL;

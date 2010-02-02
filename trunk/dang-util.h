@@ -201,7 +201,7 @@ void dang_util_array_clear      (DangUtilArray   *array);
 typedef struct _DangBinaryData DangBinaryData;
 struct _DangBinaryData
 {
-  unsigned length;
+  unsigned len;
   unsigned ref_count;
   /* data follows */
 };
@@ -211,6 +211,11 @@ struct _DangBinaryData
 #define DANG_BINARY_DATA_PEEK_DATA(binary_data) dang_binary_data_peek_data(binary_data)
 const uint8_t *dang_binary_data_peek_data (const DangBinaryData *);
 #endif
+DangBinaryData *dang_binary_data_new      (unsigned              len,
+                                           const uint8_t *       data);
+DangBinaryData *dang_binary_data_ref_copy (const DangBinaryData *binary_data);
+DangBinaryData *dang_binary_data_ref      (const DangBinaryData *binary_data);
+void            dang_binary_data_unref    (DangBinaryData       *binary_data);
 
 /* --- errors --- */
 typedef struct _DangError DangError;
