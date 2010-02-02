@@ -78,6 +78,7 @@ DangValueType *dang_value_type_double(void);
 DangValueType *dang_value_type_string(void);
 DangValueType *dang_value_type_char(void);
 DangValueType *dang_value_type_integer(void);
+DangValueType *dang_value_type_binary_data(void);
 DangValueType *dang_value_type_error(void);
 DangValueType *dang_value_type_void(void);
 
