@@ -49,6 +49,7 @@ char *dang_strdup   (const char *);
 void *dang_memdup   (const void *, size_t len);
 char *dang_strndup   (const char *, size_t len);
 uint32_t dang_str_hash (const char *str);
+uint32_t dang_binary_data_hash (size_t len, const uint8_t *data);
 #define dang_assert(condition)   assert(condition)
 #define dang_assert_not_reached() assert(0)
 char *dang_strdup_printf (const char *format,
@@ -195,6 +196,22 @@ void dang_util_array_clear      (DangUtilArray   *array);
   (((type*)((array)->data)) + (index))
 
 
+/* Binary-Data */
+/* immutable byte arrays */
+typedef struct _DangBinaryData DangBinaryData;
+struct _DangBinaryData
+{
+  unsigned length;
+  unsigned ref_count;
+  /* data follows */
+};
+#if !DANG_DEBUG
+#define DANG_BINARY_DATA_PEEK_DATA(binary_data) _DANG_BINARY_DATA_PEEK_DATA(binary_data)
+#else
+#define DANG_BINARY_DATA_PEEK_DATA(binary_data) dang_binary_data_peek_data(binary_data)
+const uint8_t *dang_binary_data_peek_data (const DangBinaryData *);
+#endif
+
 /* --- errors --- */
 typedef struct _DangError DangError;
 struct _DangError
@@ -235,3 +252,7 @@ void *dang_string_table_lookup (void *top_node,
 void  dang_string_table_insert (void **top_node,
                                 void  *tree_node,
                                 void **conflict_out);
+
+/* internals */
+#define _DANG_BINARY_DATA_PEEK_DATA(binary_data) \
+  (const uint8_t *) (((const DangBinaryData*)(binary_data)) + 1)
