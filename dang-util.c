@@ -485,6 +485,45 @@ void dang_string_buffer_append_repeated_char (DangStringBuffer *buffer,
   buffer->str[buffer->len] = 0;
 }
 
+/* binary-data */
+#define DANG_BINARY_DATA_FUNC_DEBUG(func_name, bd) \
+  { const uint8_t *bd_data = DANG_BINARY_DATA_PEEK_DATA (bd); \
+    char *bd_hex = dang_util_hex_escape (bd->len, bd_data); \
+    dang_warning ("%s: %p:%u: %s", func_name, bd, bd->ref_count, bd_hex); \
+    dang_free(bd_hex); }
+DangBinaryData *dang_binary_data_new  (unsigned        len,
+                                       const uint8_t  *data)
+{
+  DangBinaryData *rv = dang_malloc (sizeof (DangBinaryData) + len);
+  rv->ref_count = 1;
+  rv->len = len;
+  memcpy ((char*)DANG_BINARY_DATA_PEEK_DATA (rv), data, len);
+  return rv;
+}
+DangBinaryData *dang_binary_data_ref  (DangBinaryData *bd)
+{
+  DANG_BINARY_DATA_FUNC_DEBUG ("dang_binary_data_ref", bd);
+  ++(bd->ref_count);
+  return bd;
+}
+/* for debugging, copy the string when debugging, ref-count otherwise */
+DangBinaryData *dang_binary_data_ref_copy  (DangBinaryData *bd)
+{
+  DANG_BINARY_DATA_FUNC_DEBUG ("dang_binary_data_ref_copy", bd);
+#if defined(DANG_DEBUG)
+  bd = dang_binary_data_new (bd->len, DANG_BINARY_DATA_PEEK_DATA (bd));
+#else
+  ++(bd->ref_count);
+#endif
+  return bd;
+}
+void dang_binary_data_unref  (DangBinaryData *bd)
+{
+  DANG_BINARY_DATA_FUNC_DEBUG ("dang_binary_data_unref", bd);
+  if (--(bd->ref_count) == 0)
+    dang_free (bd);
+}
+
 /* --- arrays --- */
 void dang_util_array_init            (DangUtilArray   *array,
                                  size_t       elt_size)
