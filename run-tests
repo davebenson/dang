@@ -92,7 +92,7 @@ start_test "Running parse-error tests"
 for f in tests/parse-error*.dang ; do
   running_test "$f"
   set +e
-  ./dang $f >& /dev/null
+  ./dang $f > /dev/null 2>&1
   exit_status=$?
   set -e
 
@@ -139,6 +139,7 @@ run_test_set if
 run_test_set "string-interpolation tests" interpolation
 run_test_set tensor
 run_test_set array
+run_test_set hex_data
 run_test_set "do-while loop tests" "do-while"
 run_test_set "while loop tests" "while"
 run_test_set goto

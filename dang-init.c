@@ -856,9 +856,9 @@ restart:
           if (text[used] == hex_data->end_char)
             {
               DangVector *vector = dang_new (DangVector, 1);
+              vector->ref_count = 1;
               vector->data = hex_data->data;
               vector->len = hex_data->len;
-dang_warning ("creating vector len %u", vector->len);
               hex_data->data = NULL;
               *token_out
                 = dang_token_literal_take (dang_value_type_vector (dang_value_type_uint8 ()),
@@ -905,7 +905,6 @@ have_nibble:
           hex_data->alloced = new_alloced;
           hex_data->data = dang_realloc (hex_data->data, new_alloced);
         }
-dang_warning("adding bute 0x%02x to hex_data [old len %u]", (nib << 4) + nib2, hex_data->len);
       hex_data->data[hex_data->len++] = (nib << 4) + nib2;
     }
   return DANG_LITERAL_TOKENIZER_CONTINUE;
@@ -923,7 +922,7 @@ hex_data_state_clear (DangLiteralTokenizer *lit_tokenizer,
 static DangLiteralTokenizer hex_data_tokenizer =
 {
   "hex_data",
-  sizeof (DangArray),
+  sizeof (HexDataState),
   NULL,		/* no init function needed */
   hex_data_tokenize,
   hex_data_state_clear,
