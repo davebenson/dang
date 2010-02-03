@@ -1,0 +1,3 @@
+
+// hex_data must contain an even number of hex-digits
+var a = \hex_data{1};
