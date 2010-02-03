@@ -542,7 +542,7 @@ binary_data_init_assign (DangValueType   *type,
                          void            *dst,
                          const void      *src)
 {
-  const DangBinaryData *rhs = * (DangBinaryData **) src;
+  DangBinaryData *rhs = * (DangBinaryData **) src;
   DANG_UNUSED (type);
   if (rhs == NULL)
     * (DangBinaryData **) dst = NULL;
@@ -643,9 +643,9 @@ binary_data_to_string (DangValueType *type,
                    + 1;                 /* NUL */
       char *rv = dang_malloc (len);
       memcpy (rv, "\\hex_data{", 9);
-      dang_util_c_hex_encode_inplace (rv + 9,
-                                      str->len,
-                                      DANG_BINARY_DATA_PEEK_DATA (str));
+      dang_util_hex_escape_inplace (rv + 9,
+                                    str->len,
+                                    DANG_BINARY_DATA_PEEK_DATA (str));
       rv[8 + str->len * 2 + 1] = 0;
       return rv;
     }

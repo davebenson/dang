@@ -84,6 +84,18 @@ uint32_t dang_str_hash (const char *str)
     }
   return rv;
 }
+uint32_t dang_util_binary_data_hash (size_t len, const uint8_t *data)
+{
+  unsigned rv = 5003;
+  unsigned i;
+  for (i = 0; i < len; i++)
+    {
+      rv += *data++;
+      rv *= 33;
+    }
+  return rv;
+}
+
 char *dang_strdup_vprintf (const char *format,
                            va_list     args)
 {
@@ -282,6 +294,30 @@ char *dang_util_c_escape (unsigned len,
   if (include_quotes)
     dang_string_buffer_append (&buf, "\"");
   return buf.str;
+}
+
+char *dang_util_hex_escape (unsigned    len,
+                            const void *data)
+{
+  char *rv = dang_malloc (2 * len + 1);
+  dang_util_hex_escape_inplace (rv, len, data);
+  rv[2 * len] = 0;
+  return rv;
+}
+
+void
+dang_util_hex_escape_inplace (char *out,
+                              unsigned len,
+                              const void *data)
+{
+  static const char hex_digits[16] = "0123456789abcdef";
+  unsigned i;
+  for (i = 0; i < len; i++)
+    {
+      uint8_t c = ((const uint8_t *) data)[i];
+      out[2*i + 0] = hex_digits[c>>4];
+      out[2*i + 1] = hex_digits[c&15];
+    }
 }
 
 /* --- strings --- */

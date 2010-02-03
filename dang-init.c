@@ -1,4 +1,5 @@
 #include <math.h>
+#include <ctype.h>
 #include "dang.h"
 #include "config.h"
 #include <stdio.h>
@@ -779,6 +780,154 @@ try_sig__debug_string (DangMatchQuery *query, void *data, DangError **error)
   return rv;
 }
 
+
+static char
+get_end_char_for_start_char (char c)
+{
+  switch (c)
+    {
+    case '(': return ')';
+    case '[': return ']';
+    case '{': return '}';
+    default: return c;
+    }
+}
+
+typedef struct _HexDataState HexDataState;
+struct _HexDataState
+{
+  unsigned len, alloced;
+  uint8_t *data;
+  uint8_t has_nibble;
+  uint8_t nibble;
+  char end_char;
+};
+static DangTokenizerResult
+hex_data_tokenize (DangLiteralTokenizer *lit_tokenizer,
+		   void                 *state,
+		   unsigned              len,
+		   const char           *text,
+		   unsigned             *text_used_out,
+		   DangToken           **token_out,
+		   DangError           **error)
+{
+  HexDataState *hex_data = state;
+  uint8_t nib, nib2;
+  unsigned used = 0;
+  DANG_UNUSED (lit_tokenizer);
+  if (len == 0)
+    return DANG_LITERAL_TOKENIZER_CONTINUE;
+  if (hex_data->has_nibble)
+    {
+      nib = hex_data->nibble;
+      hex_data->has_nibble = 0;
+      goto have_nibble;
+    }
+  if (hex_data->end_char == 0)
+    {
+      while (used < len && isspace (text[used]))
+        used++;
+      if (used == len) 
+        return DANG_LITERAL_TOKENIZER_CONTINUE;
+      hex_data->end_char = get_end_char_for_start_char (text[used]);
+      used++;
+    }
+  while (used < len)
+    {
+restart:
+      switch (text[used])
+	{
+	case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+	  nib = 10 + (text[used] - 'a');
+	  break;
+	case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
+	  nib = 10 + (text[used] - 'A');
+	  break;
+	case '0': case '1': case '2': case '3': case '4':
+	case '5': case '6': case '7': case '8': case '9':
+	  nib = text[used] - '0';
+	  break;
+	case ' ': case '\t': case '\r': case '\n':
+	  used++;
+	  while (used < len && isspace (text[used]))
+	    used++;
+	  goto restart;
+        default:
+          if (text[used] == hex_data->end_char)
+            {
+              DangVector *vector = dang_new (DangVector, 1);
+              vector->data = hex_data->data;
+              vector->len = hex_data->len;
+              hex_data->data = NULL;
+              *token_out
+                = dang_token_literal_take (dang_value_type_vector (dang_value_type_uint8 ()),
+                                           dang_memdup (&vector, sizeof (void*)));
+              *text_used_out = used + 1;
+              return DANG_LITERAL_TOKENIZER_DONE;
+            }
+          else
+            {
+              dang_set_error (error, "bad character '%c' hex data", text[used]);
+              return DANG_LITERAL_TOKENIZER_ERROR;
+            }
+	}
+      used++;
+      if (used == len)
+	{
+	  /* store nibble */
+	  hex_data->has_nibble = 1;
+          hex_data->nibble = nib;
+          return DANG_LITERAL_TOKENIZER_CONTINUE;
+	}
+have_nibble:
+      switch (text[used])
+	{
+	case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+	  nib2 = 10 + (text[used] - 'a');
+	  break;
+	case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
+	  nib2 = 10 + (text[used] - 'A');
+	  break;
+	case '0': case '1': case '2': case '3': case '4':
+	case '5': case '6': case '7': case '8': case '9':
+	  nib2 = text[used] - '0';
+	  break;
+	default:
+	  dang_set_error (error, "bad character '%c' mid-byte in hex data",
+			  text[used]);
+	  return DANG_LITERAL_TOKENIZER_ERROR;
+	}
+      used++;
+      if (hex_data->len == hex_data->alloced)
+        {
+          unsigned new_alloced = hex_data->alloced ? hex_data->alloced * 2 : 16;
+          hex_data->alloced = new_alloced;
+          hex_data->data = dang_realloc (hex_data->data, new_alloced);
+        }
+      hex_data->data[hex_data->len++] = (nib << 4) + nib2;
+    }
+  return DANG_LITERAL_TOKENIZER_CONTINUE;
+}
+
+static void
+hex_data_state_clear (DangLiteralTokenizer *lit_tokenizer,
+                      void                 *state)
+{
+  HexDataState *hex_data = state;
+  DANG_UNUSED (lit_tokenizer);
+  dang_free (hex_data->data);
+}
+
+static DangLiteralTokenizer hex_data_tokenizer =
+{
+  "hex_data",
+  sizeof (DangArray),
+  NULL,		/* no init function needed */
+  hex_data_tokenize,
+  hex_data_state_clear,
+  DANG_LITERAL_TOKENIZER_INTERNALS_INIT
+};
+
 /* === various metafunctions === */
 
 static void
@@ -1273,6 +1422,7 @@ dang_namespace_default (void)
         dang_namespace_unref (file_ns);
       }
 
+      dang_literal_tokenizer_register (&hex_data_tokenizer);
     }
 
 #ifdef DANG_DEBUG

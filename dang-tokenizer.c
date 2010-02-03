@@ -4,9 +4,22 @@
 #include <ctype.h>
 #include <string.h>
 #include "dang.h"
+#include "gskrbtreemacros.h"
 
 #define LBRACE '{'
 #define RBRACE '}'
+
+/* Map from name => DangLiteralTokenizer */
+static DangLiteralTokenizer *literal_tokenizer_tree = NULL;
+#define COMPARE_LITERAL_TREE_NODES(a,b, rv) \
+  rv = strcmp ((a)->name, (b)->name)
+#define GET_LITERAL_TOKENIZER_TREE() \
+  literal_tokenizer_tree, DangLiteralTokenizer *, \
+  GSK_STD_GET_IS_RED, GSK_STD_SET_IS_RED, \
+  lt_parent, lt_left, lt_right, \
+  COMPARE_LITERAL_TREE_NODES
+#define COMPARE_STR_TO_LIT_TOKENIZER(str,b, rv) \
+  rv = strcmp ((str), (b)->name)
 
 struct _DangTokenizer
 {
@@ -25,6 +38,11 @@ struct _DangTokenizer
   DangUtilArray istring_buf;
   DangUtilArray istring_pieces;
   DangTokenizer *istring_subtokenizer;
+
+  /* For when parsing a literal token using a specialized tokenizer */
+  DangLiteralTokenizer *lit_tokenizer;
+  void *lit_tokenizer_state;
+  DangCodePosition lit_tokenizer_cp;
 };
 
 DangTokenizer *dang_tokenizer_new       (DangString     *filename)
@@ -42,6 +60,8 @@ DangTokenizer *dang_tokenizer_new       (DangString     *filename)
   rv->in_trailing_comment = 0;
   rv->in_c_comment = 0;
 
+  rv->lit_tokenizer_state = NULL;
+  rv->lit_tokenizer = NULL;
   rv->in_interpolated_string = 0;
   rv->istring_subtokenizer = NULL;
 
@@ -920,6 +940,52 @@ restart:
       parse_at += 2;
       tokenizer->in_c_comment = 0;
     }
+  else if (tokenizer->lit_tokenizer != NULL)
+    {
+      DangLiteralTokenizer *lit_tok = tokenizer->lit_tokenizer;
+      void *lit_tok_state = tokenizer->lit_tokenizer_state;
+      unsigned used_out;
+      DangToken *token;
+      switch (lit_tok->tokenize (lit_tok,
+                                 lit_tok_state,
+                                 parse_end - parse_at, 
+                                 parse_at,
+                                 &used_out,
+                                 &token,
+                                 error))
+        {
+        case DANG_LITERAL_TOKENIZER_DONE:
+          /* push token */
+          dang_code_position_copy (&token->any.code_position,
+                                   &tokenizer->lit_tokenizer_cp);
+          push_token (tokenizer, token);
+
+          /* free state */
+          if (lit_tok->destruct_state)
+	    (*lit_tok->destruct_state) (lit_tok, lit_tok_state);
+          dang_free (lit_tok_state);
+          dang_code_position_clear (&tokenizer->lit_tokenizer_cp);
+          tokenizer->lit_tokenizer = NULL;
+          tokenizer->lit_tokenizer_state = NULL;
+
+          /* advance parse_at */
+          parse_at += used_out;
+          if (parse_at == parse_end)
+            goto done;
+
+          goto restart;
+
+        case DANG_LITERAL_TOKENIZER_CONTINUE:
+          goto done;
+
+        case DANG_LITERAL_TOKENIZER_ERROR:
+          dang_error_add_suffix (*error,
+                                 "(in \\%s began at " DANG_CP_FORMAT ")",
+                                 tokenizer->lit_tokenizer->name,
+                                 DANG_CP_ARGS (tokenizer->lit_tokenizer_cp));
+          return FALSE;
+        }
+    }
   while (parse_at < parse_end && isspace (*parse_at))
     {
       if (*parse_at == '\n')
@@ -973,6 +1039,50 @@ restart:
           parse_at = end_bareword;
           goto restart;
         }
+    }
+  else if (*parse_at == '\\')
+    {
+      char *at;
+      char *name;
+      DangLiteralTokenizer *lit_tokenizer;
+      void *state;
+      at = parse_at + 1;
+      while (at < parse_end && (isalnum (*at) || *at == '_'))
+        at++;
+      if (at == parse_end)
+        goto done;
+      name = dang_strndup (parse_at + 1, at - (parse_at + 1));
+      GSK_RBTREE_LOOKUP_COMPARATOR (GET_LITERAL_TOKENIZER_TREE (),
+				    name,
+				    COMPARE_STR_TO_LIT_TOKENIZER,
+				    lit_tokenizer);
+      dang_free (name);
+      if (lit_tokenizer == NULL)
+	{
+	  dang_set_error (error, "%s:%u: unknown tokenizer magic %s",
+			  tokenizer->cp.filename->str,
+			  tokenizer->cp.line,
+			  (char*) tokenizer->istring_buf.data);
+	  return FALSE;
+	}
+
+      /* save literal-tokenizer */
+      tokenizer->lit_tokenizer = lit_tokenizer;
+
+      /* prepare literal-tokenizer state */
+      state = dang_malloc0 (lit_tokenizer->sizeof_state);
+      tokenizer->lit_tokenizer_state = state;
+      if (lit_tokenizer->init_state != NULL)
+	lit_tokenizer->init_state (lit_tokenizer, state);
+
+      /* note the position that the literal token begins at */
+      dang_code_position_copy (&tokenizer->lit_tokenizer_cp, &tokenizer->cp);
+ 
+      /* skip past magic */
+      parse_at = at;
+
+      /* resume tokenizing (XXX: could just goto the appropriate place!) */
+      goto restart;
     }
   else if (ispunct (*parse_at) && *parse_at != '"' && *parse_at != '\'')
     {
@@ -1101,5 +1211,20 @@ void           dang_tokenizer_free      (DangTokenizer  *tokenizer)
   dang_free (tokenizer->token_queue);
   dang_util_array_clear (&tokenizer->data);
   dang_code_position_clear (&tokenizer->cp);
+  if (tokenizer->lit_tokenizer != NULL)
+    {
+      dang_code_position_clear (&tokenizer->lit_tokenizer_cp);
+      if (tokenizer->lit_tokenizer->destruct_state)
+        tokenizer->lit_tokenizer->destruct_state (tokenizer->lit_tokenizer,
+                                                  tokenizer->lit_tokenizer_state);
+      dang_free (tokenizer->lit_tokenizer_state);
+    }
   dang_free (tokenizer);
+}
+
+void dang_literal_tokenizer_register  (DangLiteralTokenizer *lit_tokenizer)
+{
+  DangLiteralTokenizer *conflict;
+  GSK_RBTREE_INSERT (GET_LITERAL_TOKENIZER_TREE (), lit_tokenizer, conflict);
+  dang_assert (conflict == NULL);
 }
