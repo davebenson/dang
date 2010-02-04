@@ -4,9 +4,18 @@ typedef dsk_boolean (*DskHookFunc)    (void       *object,
 typedef void        (*DskHookDestroy) (void       *callback_data);
 typedef void        (*DskHookSetPoll) (void       *object,
                                        dsk_boolean is_trapped);
+typedef void        (*DskHookObjectFunc) (void *object);
+
 
 typedef struct _DskHookTrap DskHookTrap;
 typedef struct _DskHook DskHook;
+
+struct _DskHookFuncs
+{
+  DskHookObjectFunc ref;
+  DskHookObjectFunc unref;
+  DskHookSetPoll set_poll;
+};
 
 struct _DskHookTrap
 {
@@ -24,20 +33,24 @@ struct _DskHookTrap
 struct _DskHook
 {
   void *object;
-  unsigned is_idle_notify : 1;
-  unsigned is_destroyed : 1;
-  unsigned is_notifying : 1;
+  unsigned char is_idle_notify : 1;
+  unsigned char is_destroyed : 1;
+  unsigned char is_notifying : 1;
+  unsigned char magic;
   unsigned short trap_count;
   DskHookTrap trap;
   DskHook *idle_prev, *idle_next;
-  DskHookSetPoll set_poll_func;
+  DskHookFuncs *funcs;
 };
+
+#define DSK_HOOK_MAGIC          0x81
 
 DSK_INLINE_FUNC dsk_boolean  dsk_hook_is_trapped   (DskHook       *hook);
 DSK_INLINE_FUNC DskHookTrap *dsk_hook_trap         (DskHook       *hook,
                                                     DskHookFunc    func,
 						    void          *hook_data,
 						    DskHookDestroy destroy);
+                void         dsk_hook_trap_destroy (DskHookTrap   *trap);
 DSK_INLINE_FUNC void         dsk_hook_trap_block   (DskHookTrap   *trap);
 DSK_INLINE_FUNC void         dsk_hook_trap_unblock (DskHookTrap   *trap);
 
@@ -49,7 +62,8 @@ DSK_INLINE_FUNC void         dsk_hook_set_poll_func(DskHook       *hook,
                                                     DskHookSetPoll set_poll);
 DSK_INLINE_FUNC void         dsk_hook_set_idle_notify(DskHook       *hook,
                                                       dsk_boolean    idle_notify);
-DSK_INLINE_FUNC void         dsk_hook_notify       (DskHook       *hook);
+                void         dsk_hook_notify       (DskHook       *hook);
+                void         dsk_hook_destroy      (DskHook       *hook);
 
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC dsk_boolean dsk_hook_is_trapped (DskHook *hook)
@@ -66,6 +80,14 @@ DSK_INLINE_FUNC void _dsk_hook_decr_trap_count         (DskHook       *hook)
   if (--(hook->trap_count) == 0)
     _dsk_hook_trap_count_zero (hook);
 } 
+
+DSK_INLINE_FUNC DskHook     *dsk_hook_new          (void          *object)
+{
+  DskHook *rv = dsk_mem_pool_fixed_alloc0 (&dsk_hook_pool);
+  rv->object = object;
+  rv->magic = DSK_HOOK_MAGIC;
+  return rv;
+}
 
 DSK_INLINE_FUNC DskHookTrap *dsk_hook_trap         (DskHook       *hook,
                                                     DskHookFunc    func,
