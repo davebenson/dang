@@ -51,6 +51,7 @@ dang_boolean         dang_imports_lookup_global
                                            DangNamespace **ns_out,
                                            unsigned    *ns_offset_out,
                                            DangValueType **type_out,
+                                           dang_boolean  *is_constant_out,
                                            unsigned      *n_names_used_out);
 
 DangValueType *     dang_imports_lookup_type

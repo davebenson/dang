@@ -193,6 +193,8 @@ _dang_math_init (DangNamespace *ns)
 {
   DangSignature *sig;
   DangFunctionParam params[2];
+  double pi_double = M_PI;
+  unsigned off;
   dang_namespace_add_simple_c_from_params (ns, "rand", do_rand,
                                            dang_value_type_double (),
                                            0);
@@ -207,5 +209,7 @@ _dang_math_init (DangNamespace *ns)
   dang_namespace_add_simple_c (ns, "exp", sig, do_exp, NULL);
   dang_namespace_add_simple_c (ns, "log", sig, do_log, NULL);
   dang_namespace_add_simple_c (ns, "sqrt", sig, do_sqrt, NULL);
+  dang_namespace_add_const_global (ns, "pi", dang_value_type_double (),
+                                   &pi_double, &off, NULL);
   dang_signature_unref (sig);
 }

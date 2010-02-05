@@ -1,0 +1,4 @@
+// TEST: pi
+
+abs(math.tan(math.pi * 0.25) - 1.0);
+

@@ -28,6 +28,24 @@ do_assert         (void      **args,
   return TRUE;
 }
 
+#define WRITE_ABS_FUNCTION(func_name, zero, ctype) \
+static dang_boolean \
+func_name         (void      **args, \
+                   void       *rv_out, \
+                   void       *func_data, \
+                   DangError **error) \
+{ \
+  ctype f = * (ctype *) args[0]; \
+  * (ctype *) rv_out = f < zero ? -f : f; \
+  DANG_UNUSED (func_data); DANG_UNUSED (error); \
+  return TRUE; \
+}
+WRITE_ABS_FUNCTION(do_abs_int8, 0, int8_t)
+WRITE_ABS_FUNCTION(do_abs_int16, 0, int16_t)
+WRITE_ABS_FUNCTION(do_abs_int32, 0, int32_t)
+WRITE_ABS_FUNCTION(do_abs_int64, 0, int64_t)
+WRITE_ABS_FUNCTION(do_abs_float, 0.0, float)
+WRITE_ABS_FUNCTION(do_abs_double, 0.0, double)
 static dang_boolean
 do_system_println (void      **args,
                    void       *rv_out,
@@ -1010,6 +1028,24 @@ dang_namespace_default (void)
       add_simple (the_ns, "assert", do_assert, NULL,
                   1,
                   DANG_FUNCTION_PARAM_IN, "cond", dang_value_type_boolean ());
+      add_simple (the_ns, "abs", do_abs_float, dang_value_type_float (),
+                  1,
+                  DANG_FUNCTION_PARAM_IN, "val", dang_value_type_float ());
+      add_simple (the_ns, "abs", do_abs_double, dang_value_type_double (),
+                  1,
+                  DANG_FUNCTION_PARAM_IN, "val", dang_value_type_double ());
+      add_simple (the_ns, "abs", do_abs_int64, dang_value_type_uint64 (),
+                  1,
+                  DANG_FUNCTION_PARAM_IN, "val", dang_value_type_int64 ());
+      add_simple (the_ns, "abs", do_abs_int32, dang_value_type_uint32 (),
+                  1,
+                  DANG_FUNCTION_PARAM_IN, "val", dang_value_type_int32 ());
+      add_simple (the_ns, "abs", do_abs_int16, dang_value_type_uint16 (),
+                  1,
+                  DANG_FUNCTION_PARAM_IN, "val", dang_value_type_int16 ());
+      add_simple (the_ns, "abs", do_abs_int8, dang_value_type_uint8 (),
+                  1,
+                  DANG_FUNCTION_PARAM_IN, "val", dang_value_type_int8 ());
       add_simple (the_ns, "operator_not", do_operator_not,
                   dang_value_type_boolean (),
                   1,
