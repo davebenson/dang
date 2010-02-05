@@ -4853,6 +4853,7 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__bareword)
   unsigned offset;
   DangValueType *type;
   DangCompileFlags my_flags = DANG_COMPILE_FLAGS_RVALUE_PERMISSIVE;
+  dang_boolean is_constant;
 
   my_flags.must_be_lvalue = flags->must_be_lvalue;
   my_flags.must_be_rvalue = flags->must_be_rvalue;
@@ -4892,9 +4893,16 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__bareword)
     }
   else if (dang_imports_lookup_global (builder->imports,
                                        1, &expr->bareword.name,
-                                       &ns, &offset, &type,
+                                       &ns, &offset, &type, &is_constant,
                                        &n_names_used))
     {
+      if (is_constant && flags->must_be_lvalue)
+        {
+          dang_compile_result_set_error (result, &expr->any.code_position,
+                                         "constant global %s not assignable",
+                                         expr->bareword.name);
+          return;
+        }
       dang_compile_result_init_global (result, type,
                                        ns, offset,
                                        flags->must_be_lvalue,

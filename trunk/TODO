@@ -1,6 +1,7 @@
 _ built-in compare and hash functions
 _ ability to set mutable methods
   _ tests
+_ BUG:  accessing math.pi gives assertion failure
 _ BUG:
   >>>> int i;
   [int32] = 0

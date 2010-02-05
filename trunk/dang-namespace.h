@@ -16,6 +16,7 @@ struct _DangNamespaceSymbol
     struct {
       DangValueType *type;
       unsigned offset;
+      dang_boolean is_constant;
     } global;
     struct {
       DangValueType *type;
@@ -89,6 +90,12 @@ dang_boolean  dang_namespace_check_function(DangNamespace    *ns,
 
 /* globals */
 dang_boolean  dang_namespace_add_global   (DangNamespace *ns,
+                                           const char    *name,
+                                           DangValueType *type,
+                                           const void    *value,
+                                           unsigned      *ns_offset_out,
+                                           DangError        **error);
+dang_boolean  dang_namespace_add_const_global(DangNamespace *ns,
                                            const char    *name,
                                            DangValueType *type,
                                            const void    *value,

@@ -270,10 +270,11 @@ define_unique (DangNamespace     *ns,
     }
 }
 
-dang_boolean
-dang_namespace_add_global   (DangNamespace *ns,
+static dang_boolean
+namespace_add_global_internal(DangNamespace *ns,
                              const char    *name,
                              DangValueType *type,
+                             dang_boolean   is_constant,
                              const void    *value,
                              unsigned      *offset_out,
                              DangError    **error)
@@ -308,10 +309,33 @@ dang_namespace_add_global   (DangNamespace *ns,
 
   n->symbol.info.global.type = type;
   n->symbol.info.global.offset = offset;
+  n->symbol.info.global.is_constant = is_constant;
   if (offset_out)
     *offset_out = offset;
   return TRUE;
 }
+dang_boolean
+dang_namespace_add_global   (DangNamespace *ns,
+                             const char    *name,
+                             DangValueType *type,
+                             const void    *value,
+                             unsigned      *offset_out,
+                             DangError    **error)
+{
+  return namespace_add_global_internal (ns, name, type, FALSE, value, offset_out, error);
+}
+
+dang_boolean
+dang_namespace_add_const_global(DangNamespace *ns,
+                             const char    *name,
+                             DangValueType *type,
+                             const void    *value,
+                             unsigned      *offset_out,
+                             DangError    **error)
+{
+  return namespace_add_global_internal (ns, name, type, TRUE, value, offset_out, error);
+}
+
 
 dang_boolean
 dang_namespace_add_namespace (DangNamespace *ns,

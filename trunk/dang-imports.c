@@ -187,6 +187,7 @@ dang_imports_lookup_global  (DangImports *imports,
                              DangNamespace **ns_out,
                              unsigned    *ns_offset_out,
                              DangValueType **type_out,
+                             dang_boolean  *is_constant_out,
                              unsigned      *n_names_used_out)
 {
   unsigned i;
@@ -218,6 +219,7 @@ dang_imports_lookup_global  (DangImports *imports,
               *ns_out = ns;
               *ns_offset_out = symbol->info.global.offset;
               *type_out = symbol->info.global.type;
+              *is_constant_out = symbol->info.global.is_constant;
               *n_names_used_out = n_used + 1;
               return TRUE;
             }
