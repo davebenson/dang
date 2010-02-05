@@ -73,7 +73,7 @@ struct _FDMap
 typedef struct _FDMapNode FDMapNode;
 struct _FDMapNode
 {
-  Dsk_FD fd;
+  DskFileDescriptor fd;
   FDMapNode *left, *right, *parent;
   dsk_boolean is_red;
   FDMap map;
@@ -175,11 +175,11 @@ DskDispatch *dsk_dispatch_new (DskAllocator *allocator)
   struct timeval tv;
   rv->base.n_changes = 0;
   rv->notifies_desired_alloced = 8;
-  rv->base.notifies_desired = ALLOC (sizeof (Dsk_FDNotify) * rv->notifies_desired_alloced);
+  rv->base.notifies_desired = ALLOC (sizeof (DskFileDescriptorNotify) * rv->notifies_desired_alloced);
   rv->base.n_notifies_desired = 0;
   rv->callbacks = ALLOC (sizeof (Callback) * rv->notifies_desired_alloced);
   rv->changes_alloced = 8;
-  rv->base.changes = ALLOC (sizeof (Dsk_FDNotify) * rv->changes_alloced);
+  rv->base.changes = ALLOC (sizeof (DskFileDescriptorNotify) * rv->changes_alloced);
 #if HAVE_SMALL_FDS
   rv->fd_map_size = 16;
   rv->fd_map = ALLOC (sizeof (FDMap) * rv->fd_map_size);
@@ -299,9 +299,9 @@ allocate_notifies_desired_index (RealDispatch *d)
   if (rv == d->notifies_desired_alloced)
     {
       unsigned new_size = d->notifies_desired_alloced * 2;
-      Dsk_FDNotify *n = ALLOC (new_size * sizeof (Dsk_FDNotify));
+      DskFileDescriptorNotify *n = ALLOC (new_size * sizeof (DskFileDescriptorNotify));
       Callback *c = ALLOC (new_size * sizeof (Callback));
-      memcpy (n, d->base.notifies_desired, d->notifies_desired_alloced * sizeof (Dsk_FDNotify));
+      memcpy (n, d->base.notifies_desired, d->notifies_desired_alloced * sizeof (DskFileDescriptorNotify));
       FREE (d->base.notifies_desired);
       memcpy (c, d->callbacks, d->notifies_desired_alloced * sizeof (Callback));
       FREE (d->callbacks);
@@ -322,8 +322,8 @@ allocate_change_index (RealDispatch *d)
     {
       DskAllocator *allocator = d->allocator;
       unsigned new_size = d->changes_alloced * 2;
-      Dsk_FDNotifyChange *n = ALLOC (new_size * sizeof (Dsk_FDNotifyChange));
-      memcpy (n, d->base.changes, d->changes_alloced * sizeof (Dsk_FDNotifyChange));
+      DskFileDescriptorNotifyChange *n = ALLOC (new_size * sizeof (DskFileDescriptorNotifyChange));
+      memcpy (n, d->base.changes, d->changes_alloced * sizeof (DskFileDescriptorNotifyChange));
       FREE (d->base.changes);
       d->base.changes = n;
       d->changes_alloced = new_size;
@@ -332,7 +332,7 @@ allocate_change_index (RealDispatch *d)
 }
 
 static inline FDMap *
-get_fd_map (RealDispatch *d, Dsk_FD fd)
+get_fd_map (RealDispatch *d, DskFileDescriptor fd)
 {
 #if HAVE_SMALL_FDS
   if ((unsigned)fd >= d->fd_map_size)
@@ -346,7 +346,7 @@ get_fd_map (RealDispatch *d, Dsk_FD fd)
 #endif
 }
 static inline FDMap *
-force_fd_map (RealDispatch *d, Dsk_FD fd)
+force_fd_map (RealDispatch *d, DskFileDescriptor fd)
 {
 #if HAVE_SMALL_FDS
   ensure_fd_map_big_enough (d, fd);
@@ -376,7 +376,7 @@ deallocate_change_index (RealDispatch *d,
 {
   unsigned ch_ind = fm->change_index;
   unsigned from = d->base.n_changes - 1;
-  Dsk_FD from_fd;
+  DskFileDescriptor from_fd;
   if (ch_ind == from)
     {
       d->base.n_changes--;
@@ -390,12 +390,12 @@ deallocate_change_index (RealDispatch *d,
 
 static void
 deallocate_notify_desired_index (RealDispatch *d,
-                                 Dsk_FD  fd,
+                                 DskFileDescriptor  fd,
                                  FDMap        *fm)
 {
   unsigned nd_ind = fm->notify_desired_index;
   unsigned from = d->base.n_notifies_desired - 1;
-  Dsk_FD from_fd;
+  DskFileDescriptor from_fd;
   (void) fd;
 #if DEBUG_DISPATCH_INTERNALS
   fprintf (stderr, "deallocate_notify_desired_index: fd=%d, nd_ind=%u\n",fd,nd_ind);
@@ -494,7 +494,7 @@ dsk_dispatch_close_fd (DskDispatch *dispatch,
 
 void
 dsk_dispatch_fd_closed(DskDispatch *dispatch,
-                              Dsk_FD        fd)
+                              DskFileDescriptor        fd)
 {
   RealDispatch *d = (RealDispatch *) dispatch;
   FDMap *fm;
@@ -520,7 +520,7 @@ free_timer (DskDispatchTimer *timer)
 void
 dsk_dispatch_dispatch (DskDispatch *dispatch,
                               size_t              n_notifies,
-                              Dsk_FDNotify *notifies)
+                              DskFileDescriptorNotify *notifies)
 {
   RealDispatch *d = (RealDispatch *) dispatch;
   unsigned fd_max;
@@ -640,7 +640,7 @@ dsk_dispatch_run (DskDispatch *dispatch)
   DskAllocator *allocator = d->allocator;
   unsigned i;
   int timeout;
-  Dsk_FDNotify *events;
+  DskFileDescriptorNotify *events;
   if (dispatch->n_notifies_desired < 128)
     fds = alloca (sizeof (struct pollfd) * dispatch->n_notifies_desired);
   else
@@ -701,9 +701,9 @@ dsk_dispatch_run (DskDispatch *dispatch)
     if (fds[i].revents)
       n_events++;
   if (n_events < 128)
-    events = alloca (sizeof (Dsk_FDNotify) * n_events);
+    events = alloca (sizeof (DskFileDescriptorNotify) * n_events);
   else
-    to_free2 = events = ALLOC (sizeof (Dsk_FDNotify) * n_events);
+    to_free2 = events = ALLOC (sizeof (DskFileDescriptorNotify) * n_events);
   n_events = 0;
   for (i = 0; i < dispatch->n_notifies_desired; i++)
     if (fds[i].revents)
