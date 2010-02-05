@@ -1,0 +1,4 @@
+// TEST: constant globals not assignable
+
+// this ain't Indiana... http://en.wikipedia.org/wiki/Indiana_Pi_Bill
+math.pi = 3.0;

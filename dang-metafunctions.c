@@ -144,15 +144,21 @@ dang_mf_annotate_index_info   (DangAnnotations *annotations,
 void
 dang_mf_annotate_from_namespace_symbol (DangAnnotations     *annotations,
                                       DangExpr            *expr,
+                                      DangNamespace       *ns,
                                       DangNamespaceSymbol *symbol)
 {
+  DangExprNamespaceSymbol *nsym = dang_new (DangExprNamespaceSymbol, 1);
+  dang_expr_annotation_init (annotations, expr, DANG_EXPR_ANNOTATION_NAMESPACE_SYMBOL, nsym);
+  nsym->ns = ns;
+  nsym->symbol = symbol;
   switch (symbol->type)
     {
     case DANG_NAMESPACE_SYMBOL_FUNCTIONS:
       dang_mf_annotate_function_family (annotations, expr, symbol->info.functions);
       break;
     case DANG_NAMESPACE_SYMBOL_GLOBAL:
-      dang_mf_annotate_value (annotations, expr, symbol->info.global.type, TRUE, TRUE);
+      dang_mf_annotate_value (annotations, expr, symbol->info.global.type,
+                              !symbol->info.global.is_constant, TRUE);
       break;
     case DANG_NAMESPACE_SYMBOL_NAMESPACE:
       dang_mf_annotate_ns (annotations, expr, symbol->info.ns);
@@ -362,6 +368,18 @@ static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__assign)
     {
       dang_set_error (error, "unexpected tag as first arg to '$assign' (got %s) (%s:%u)",
                       dang_expr_tag_type_name (rhs_tag->tag_type),
+                      DANG_CP_EXPR_ARGS (expr->function.args[1]));
+      return FALSE;
+    }
+  if (!lhs_tag->info.value.is_lvalue)
+    {
+      dang_set_error (error, "left-hand side of '=' not an lvalue ("DANG_CP_FORMAT")",
+                      DANG_CP_EXPR_ARGS (expr->function.args[0]));
+      return FALSE;
+    }
+  if (!rhs_tag->info.value.is_rvalue)
+    {
+      dang_set_error (error, "right-hand side of '=' not an rvalue ("DANG_CP_FORMAT")",
                       DANG_CP_EXPR_ARGS (expr->function.args[1]));
       return FALSE;
     }
@@ -3409,7 +3427,7 @@ static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__operator_dot)
                             DANG_CP_EXPR_ARGS (expr));
             return FALSE;
           }
-        dang_mf_annotate_from_namespace_symbol (annotations, expr, sym);
+        dang_mf_annotate_from_namespace_symbol (annotations, expr, container_tag->info.ns, sym);
         return TRUE;
       }
     case DANG_EXPR_TAG_TYPE:
@@ -3479,43 +3497,66 @@ static DANG_METAFUNCTION_COMPILE_FUNC_DECLARE(compile__operator_dot)
 
   member_info = dang_expr_get_annotation (builder->annotations, expr,
                                           DANG_EXPR_ANNOTATION_MEMBER);
-  dang_assert (member_info != NULL);
-  if (member_info->dereference)
+  if (member_info != NULL)
     {
-      lflags.must_be_lvalue = FALSE;
-      lflags.must_be_rvalue = TRUE;
+      if (member_info->dereference)
+        {
+          lflags.must_be_lvalue = FALSE;
+          lflags.must_be_rvalue = TRUE;
+        }
+      else
+        {
+          if (lflags.must_be_lvalue)
+            lflags.must_be_rvalue = TRUE;
+        }
+      dang_compile (expr->function.args[0], builder, &lflags, &cur_res);
+      if (cur_res.type == DANG_COMPILE_RESULT_ERROR)
+        {
+          *result = cur_res;
+          return;
+        }
+      element = dang_value_type_lookup_element (cur_res.any.return_type, expr->function.args[1]->bareword.name, TRUE, &base_type);
+      if (element == NULL)
+        {
+          dang_compile_result_set_error (result, &expr->any.code_position,
+                                         "attempt to access non-member of %s",
+                                         cur_res.any.return_type->full_name,
+                                         expr->function.args[1]->bareword.name);
+          return;
+        }
+      if (element->element_type != DANG_VALUE_ELEMENT_TYPE_MEMBER)
+        {
+          dang_compile_result_set_error (result, &expr->any.code_position,
+                                         "attempt to access %s %s of %s as though it were a member",
+                                         dang_value_element_type_name (element->element_type),
+                                         expr->function.args[1]->bareword.name,
+                                         cur_res.any.return_type->full_name);
+          return;
+        }
+      dang_compile_member_access (builder, &cur_res, base_type, element->name, &element->info.member,
+                                  flags, result);
+      return;
     }
   else
     {
-      if (lflags.must_be_lvalue)
-        lflags.must_be_rvalue = TRUE;
+      DangExprNamespaceSymbol *nsym;
+      nsym = dang_expr_get_annotation (builder->annotations,
+                                       expr,
+                                       DANG_EXPR_ANNOTATION_NAMESPACE_SYMBOL);
+      if (nsym != NULL && nsym->symbol->type == DANG_NAMESPACE_SYMBOL_GLOBAL)
+        {
+          dang_compile_result_init_global (result,
+                                           nsym->symbol->info.global.type,
+                                           nsym->ns,
+                                           nsym->symbol->info.global.offset,
+                                           !nsym->symbol->info.global.is_constant,
+                                           TRUE);
+          dang_compile_obey_flags (builder, flags, result);
+          return;
+        }
     }
-  dang_compile (expr->function.args[0], builder, &lflags, &cur_res);
-  if (cur_res.type == DANG_COMPILE_RESULT_ERROR)
-    {
-      *result = cur_res;
-      return;
-    }
-  element = dang_value_type_lookup_element (cur_res.any.return_type, expr->function.args[1]->bareword.name, TRUE, &base_type);
-  if (element == NULL)
-    {
-      dang_compile_result_set_error (result, &expr->any.code_position,
-                                     "attempt to access non-member of %s",
-                                     cur_res.any.return_type->full_name,
-                                     expr->function.args[1]->bareword.name);
-      return;
-    }
-  if (element->element_type != DANG_VALUE_ELEMENT_TYPE_MEMBER)
-    {
-      dang_compile_result_set_error (result, &expr->any.code_position,
-                                     "attempt to access %s %s of %s as though it were a member",
-                                     dang_value_element_type_name (element->element_type),
-                                     expr->function.args[1]->bareword.name,
-                                     cur_res.any.return_type->full_name);
-      return;
-    }
-  dang_compile_member_access (builder, &cur_res, base_type, element->name, &element->info.member,
-                              flags, result);
+  dang_compile_result_set_error (result, &expr->any.code_position,
+                                 "operator_dot on non-value or namespace global");
 }
 
 DANG_BUILTIN_METAFUNCTION(operator_dot);
@@ -4824,7 +4865,7 @@ static DANG_METAFUNCTION_ANNOTATE_FUNC_DECLARE(annotate__bareword)
         if (symbol != NULL)
           {
             /* global, namespace, or function-family */
-            dang_mf_annotate_from_namespace_symbol (annotations, expr, symbol);
+            dang_mf_annotate_from_namespace_symbol (annotations, expr, ns, symbol);
             return TRUE;
           }
       }

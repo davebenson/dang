@@ -8,7 +8,8 @@ typedef enum
   DANG_EXPR_ANNOTATION_VAR_ID,
   DANG_EXPR_ANNOTATION_TENSOR_SIZES,
   DANG_EXPR_ANNOTATION_MEMBER,
-  DANG_EXPR_ANNOTATION_INDEX_INFO
+  DANG_EXPR_ANNOTATION_INDEX_INFO,
+  DANG_EXPR_ANNOTATION_NAMESPACE_SYMBOL
 } DangExprAnnotationType;
 
 #define DANG_EXPR_ANNOTATION_TYPE_IS_VALID(t) \
@@ -124,6 +125,15 @@ struct _DangExprIndexInfo
   DangExprAnnotation base;
   DangValueIndexInfo *index_info;
 };
+
+typedef struct _DangExprNamespaceSymbol DangExprNamespaceSymbol;
+struct _DangExprNamespaceSymbol
+{
+  DangExprAnnotation base;
+  DangNamespace *ns;
+  DangNamespaceSymbol *symbol;
+};
+
 
 dang_boolean dang_expr_annotate_types (DangAnnotations *annotations,
                                        DangExpr    *expr,
