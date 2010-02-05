@@ -1,4 +1,5 @@
 
+#include "dsk-util.h"
 #include "dsk-object.h"
 #include "dsk-octet-io.h"
 #include "dsk-dns-client.h"
