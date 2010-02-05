@@ -766,11 +766,10 @@ dsk_dispatch_add_timer(DskDispatch *dispatch,
 }
 
 DskDispatchTimer *
-dsk_dispatch_add_timer_millis
-                             (DskDispatch *dispatch,
-                              unsigned            millis,
-                              DskDispatchTimerFunc func,
-                              void               *func_data)
+dsk_dispatch_add_timer_millis (DskDispatch         *dispatch,
+                               unsigned             millis,
+                               DskDispatchTimerFunc func,
+                               void                *func_data)
 {
   unsigned tsec = dispatch->last_dispatch_secs;
   unsigned tusec = dispatch->last_dispatch_usecs;
@@ -812,9 +811,9 @@ void  dsk_dispatch_remove_timer (DskDispatchTimer *timer)
     }
 }
 DskDispatchIdle *
-dsk_dispatch_add_idle (DskDispatch *dispatch,
-                              DskDispatchIdleFunc func,
-                              void               *func_data)
+dsk_dispatch_add_idle (DskDispatch        *dispatch,
+                       DskDispatchIdleFunc func,
+                       void               *func_data)
 {
   RealDispatch *d = (RealDispatch *) dispatch;
   DskDispatchIdle *rv;
@@ -846,7 +845,8 @@ dsk_dispatch_remove_idle (DskDispatchIdle *idle)
       d->recycled_idles = idle;
     }
 }
-void dsk_dispatch_destroy_default (void)
+void
+dsk_dispatch_destroy_default (void)
 {
   if (def)
     {
