@@ -13,9 +13,12 @@ dsk_object_finalize (DskObject *object)
   dsk_assert (object->ref_count == 0);
 }
 
-DskObjectClass dsk_object_class = DSK_OBJECT_CLASS_DEFINE(DskObject, NULL, dsk_object_init, dsk_object_finalize);
+DskObjectClass dsk_object_class =
+DSK_OBJECT_CLASS_DEFINE(DskObject, NULL, dsk_object_init, dsk_object_finalize);
 
-dsk_boolean dsk_object_is_a (void *object, void *isa_class)
+dsk_boolean
+dsk_object_is_a (void *object,
+                 void *isa_class)
 {
   DskObject *o = object;
   DskObjectClass *c;
@@ -35,6 +38,7 @@ dsk_boolean dsk_object_is_a (void *object, void *isa_class)
     }
   return DSK_FALSE;
 }
+
 static inline const char *
 dsk_object_get_class_name (void *object)
 {
@@ -47,10 +51,11 @@ dsk_object_get_class_name (void *object)
   return o->object_class->name;
 }
 
-DSK_INLINE_FUNCS void       *dsk_object_cast (void *object,
-                                              void *isa_class,
-                                              const char *filename,
-                                              unsigned line)
+void *
+dsk_object_cast (void       *object,
+                 void       *isa_class,
+                 const char *filename,
+                 unsigned    line)
 {
   if (!dsk_object_is_a (object, isa_class))
     {
@@ -61,10 +66,11 @@ DSK_INLINE_FUNCS void       *dsk_object_cast (void *object,
     }
   return object;
 }
-DSK_INLINE_FUNCS void       *dsk_object_cast_get_class (void *object,
-                                              void *isa_class,
-                                              const char *filename,
-                                              unsigned line)
+void *
+dsk_object_cast_get_class (void       *object,
+                           void       *isa_class,
+                           const char *filename,
+                           unsigned    line)
 {
   if (!dsk_object_is_a (object, isa_class))
     {
