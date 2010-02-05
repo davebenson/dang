@@ -1,14 +1,19 @@
 #include "dsk-object.h"
 
 static void
+dsk_object_init (DskObject *object)
+{
+  dsk_assert (object->object_class->magic == DSK_OBJECT_CLASS_MAGIC);
+}
+
+static void
 dsk_object_finalize (DskObject *object)
 {
   dsk_assert (object->object_class->magic == DSK_OBJECT_CLASS_MAGIC);
   dsk_assert (object->ref_count == 0);
-  dsk_free (object);
 }
 
-DskObjectClass dsk_object_class = DSK_OBJECT_CLASS_DEFINE(DskObject, NULL, dsk_object_finalize);
+DskObjectClass dsk_object_class = DSK_OBJECT_CLASS_DEFINE(DskObject, NULL, dsk_object_init, dsk_object_finalize);
 
 dsk_boolean dsk_object_is_a (void *object, void *isa_class)
 {
@@ -54,4 +59,19 @@ DSK_INLINE_FUNCS void       *dsk_object_cast (void *object,
                    dsk_object_class_get_name (isa_class),
                    filename, line);
     }
+  return object;
+}
+DSK_INLINE_FUNCS void       *dsk_object_cast_get_class (void *object,
+                                              void *isa_class,
+                                              const char *filename,
+                                              unsigned line)
+{
+  if (!dsk_object_is_a (object, isa_class))
+    {
+      dsk_warning ("attempt to get-class for object %p (type %s) to %s invalid (%s:%u)",
+                   object, dsk_object_get_class_name (object),
+                   dsk_object_class_get_name (isa_class),
+                   filename, line);
+    }
+  return ((DskObject*)object)->object_class;
 }
