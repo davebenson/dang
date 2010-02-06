@@ -4,17 +4,17 @@ set -e
 d=gcov.$$
 echo "output in $d/"
 mkdir $d
-make clean  >& $d/make-clean.log
-make EXTRA_CFLAGS="-fprofile-arcs -ftest-coverage" EXTRA_LDFLAGS="-fprofile-arcs -ftest-coverage" >& $d/make.log
-./run-tests >& $d/run-tests.log
-./run-tests -v --debug-all >& $d/run-tests--debug-all.log 2>&1
+make clean  > $d/make-clean.log 2>&1
+make EXTRA_CFLAGS="-fprofile-arcs -ftest-coverage" EXTRA_LDFLAGS="-fprofile-arcs -ftest-coverage" > $d/make.log 2>&1
+./run-tests > $d/run-tests.log 2>&1
+./run-tests -v --debug-all > $d/run-tests--debug-all.log 2>&1
 for a in *.c ; do
   echo --- $a --- >> $d/gcov.output
   gcov $a >> $d/gcov.output 2>&1
 done
 mv *.c.gcov $d
 rm *.gcda *.gcno
-make clean >& /dev/null
+make clean > /dev/null 2>&1
 
 perl -e 'my $total = 0; my $executed = 0;
 while (<STDIN>) { if (/Lines executed:\s*(\d*\.\d\d)% of (\d+)/) {
