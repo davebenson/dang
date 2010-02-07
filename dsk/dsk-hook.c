@@ -16,7 +16,8 @@ dsk_hook_notify (DskHook *hook)
   if (hook->trap.callback != NULL && hook->trap.block_count == 0)
     {
       void *data = hook->trap.callback_data;
-      if (!hook->trap.callback (hook->object, data))
+      hook->trap.is_notifying = 1;
+      if (!hook->trap.callback (hook->object, data) || hook->trap.destroy_in_notify)
         {
           DskHookDestroy destroy = hook->trap.callback_data_destroy;
           hook->trap.callback = NULL;
@@ -24,29 +25,51 @@ dsk_hook_notify (DskHook *hook)
           hook->trap.callback_data_destroy = NULL;
           if (destroy)
             destroy (data);
+          hook->trap.destroy_in_notify = 0;
         }
+      hook->trap.is_notifying = 0;
     }
-  for (trap = hook->trap.next;
-       trap != NULL && !hook->destroy_in_notify;
-       trap = trap->next)
+  if (DSK_UNLIKELY (hook->trap.next != NULL))
     {
-      if (!trap->callback (hook->object, data))
+      DskHookTrap *trap;
+      dsk_boolean must_prune = DSK_FALSE;
+      for (trap = hook->trap.next;
+           trap != NULL && !hook->destroy_in_notify;
+           trap = trap->next)
         {
-          DskHookDestroy destroy = trap->callback_data_destroy;
-          if (trap->block_count == 0 && trap->callback != NULL)
+          trap->is_notifying = 1;
+          if (!trap->callback (hook->object, data) || trap->destroy_in_notify)
             {
-              if (--(hook->trap_count) == 0)
-                _dsk_hook_trap_count_zero (trap->owner);
+              DskHookDestroy destroy = trap->callback_data_destroy;
+              if (trap->block_count == 0 && trap->callback != NULL)
+                {
+                  if (--(hook->trap_count) == 0)
+                    _dsk_hook_trap_count_zero (trap->owner);
+                }
+              trap->callback = NULL;
+              trap->callback_data = NULL;
+              trap->callback_data_destroy = NULL;
+              if (destroy)
+                destroy (data);
+              must_prune = TRUE;
             }
-          trap->callback = NULL;
-          trap->callback_data = NULL;
-          trap->callback_data_destroy = NULL;
-          if (destroy)
-            destroy (data);
-          must_prune = TRUE;
+          trap->is_notifying = 0;
         }
-      else if (trap->callback == NULL)
-        must_prune = TRUE;
+      if (must_prune)
+        {
+          DskHookTrap **ptrap = &hook->trap.next;
+          while (*ptrap)
+            {
+              if ((*ptrap)->callback == NULL)
+                {
+                  DskHookTrap *to_free = *ptrap;
+                  *ptrap = to_free->next;
+                  dsk_mem_pool_fixed_free (&dsk_hook_trap_pool, to_free);
+                }
+              else
+                ptrap = &((*ptrap)->next);
+            }
+        }
     }
   hook->is_notifying = 0;
   if (hook->destroy_in_notify)
@@ -57,6 +80,15 @@ dsk_hook_notify (DskHook *hook)
 void
 dsk_hook_trap_destroy (DskHookTrap   *trap)
 {
+  /* If the trap itself is notifying, we handle it in dsk_hook_notify() */
+  if (trap->is_notifying)
+    {
+      trap->destroy_in_notify = 1;
+      return;
+    }
+
+  /* If the trap is active, we should decrement the trap count,
+   * possibly disabling notification. */
   if (trap->block_count == 0 && trap->callback)
     {
       if (--(trap->owner->trap_count) == 0)
@@ -67,14 +99,12 @@ dsk_hook_trap_destroy (DskHookTrap   *trap)
   trap->callback = NULL;
   trap->callback_data = NULL;
   trap->callback_data_destroy = NULL;
-  if (!trap->owner->is_notifying
-   && (&trap->owner->trap) != trap)
+  if (&(trap->owner->trap) != trap)
     {
       /* remove from list and free */
       DskHookTrap **pt;
       for (pt = &trap->owner->trap.next; *pt != trap; pt = &((*pt)->next))
-        {
-        }
+        dsk_assert (*pt != NULL);
       *pt = trap->next;
       dsk_mem_pool_fixed_free (&dsk_hook_trap_pool, trap);
     }

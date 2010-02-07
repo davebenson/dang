@@ -25,7 +25,6 @@ struct _DskHookTrap
   DskHook *owner;
   DskHookTrap *next;
   unsigned is_notifying : 1;
-  unsigned notify_in_notify : 1;
   unsigned destroy_in_notify : 1;
   unsigned short block_count;
 };
@@ -118,6 +117,21 @@ DSK_INLINE_FUNC DskHookTrap *dsk_hook_trap         (DskHook       *hook,
   _dsk_hook_incr_trap_count (hook);
 
   return trap;
+}
+DSK_INLINE_FUNC void         dsk_hook_trap_block   (DskHookTrap   *trap)
+{
+  dsk_assert (trap->callback != NULL);
+  dsk_assert (trap->block_count != 0xffff);
+  if (++(trap->block_count) == 1)
+    _dsk_hook_decr_trap_count (trap->owner);
+}
+
+DSK_INLINE_FUNC void         dsk_hook_trap_unblock (DskHookTrap   *trap)
+{
+  dsk_assert (trap->callback != NULL);
+  dsk_assert (trap->block_count != 0);
+  if (--(trap->block_count) == 0)
+    _dsk_hook_incr_trap_count (trap->owner);
 }
 
 #endif
