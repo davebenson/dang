@@ -9,11 +9,14 @@ struct _DskObjectClass
   void (*init) (DskObject *object);
   void (*finalize) (DskObject *object);
 };
+typedef void (*DskObjectInitFunc) (DskObject *object);
+typedef void (*DskObjectFinalizeFunc) (DskObject *object);
 #define DSK_OBJECT_CLASS_MAGIC          0x159daf3f
 #define DSK_OBJECT_CLASS_DEFINE(name, parent_class, init_func, finalize_func) \
        { #name, (DskObjectClass *) parent_class, \
          sizeof (name ## Class), sizeof (name), \
-         DSK_OBJECT_CLASS_MAGIC, init_func, finalize_func }
+         DSK_OBJECT_CLASS_MAGIC, \
+         (DskObjectInitFunc) init_func, (DskObjectFinalizeFunc) finalize_func }
 
 
 struct _DskObject

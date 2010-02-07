@@ -54,7 +54,7 @@ struct _DskClientStream
 
   /* for idle-timeout */
   DskDispatchTimer *idle_disconnect_timer;
-  int max_idle_time_ms;
+  int idle_disconnect_time_ms;
 
   /* private, mostly */
   unsigned char is_numeric_name : 1;
