@@ -11,12 +11,6 @@ typedef enum
   DSK_EVENT_WRITABLE = (1<<1)
 } Dsk_Events;
 
-#ifdef WIN32
-typedef SOCKET DskFileDescriptor;
-#else
-typedef int DskFileDescriptor;
-#endif
-
 /* Create or destroy a Dispatch */
 DskDispatch        *dsk_dispatch_new (void);
 void                dsk_dispatch_free(DskDispatch *dispatch);
