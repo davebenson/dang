@@ -3,12 +3,12 @@
 set -e
 d=gcov.$$
 echo "output in $d/"
-mkdir $d
+mkdir $d $d/builtin-functions
 make clean  > $d/make-clean.log 2>&1
 make EXTRA_CFLAGS="-fprofile-arcs -ftest-coverage" EXTRA_LDFLAGS="-fprofile-arcs -ftest-coverage" > $d/make.log 2>&1
 ./run-tests > $d/run-tests.log 2>&1
 ./run-tests -v --debug-all > $d/run-tests--debug-all.log 2>&1
-for a in *.c ; do
+for a in *.c builtin-functions/*.c ; do
   echo --- $a --- >> $d/gcov.output
   gcov $a >> $d/gcov.output 2>&1
 done
