@@ -81,3 +81,15 @@ dsk_object_cast_get_class (void       *object,
     }
   return ((DskObject*)object)->object_class;
 }
+
+void *
+dsk_object_ref_f (void *object)
+{
+  return dsk_object_ref (object);
+}
+
+void
+dsk_object_unref_f (void *object)
+{
+  dsk_object_unref (object);
+}
