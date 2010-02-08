@@ -38,6 +38,11 @@ DSK_INLINE_FUNCS DskObject *dsk_object_ref   (void *object);
                                               void *isa_class,
                                               const char *filename,
                                               unsigned line);
+
+/* non-inline versions of dsk_object_{ref,unref} */
+                 void       dsk_object_unref_f (void *object);
+                 void       dsk_object_ref_f (void *object);
+
 #ifdef DSK_DISABLE_CAST_CHECKS
 #define DSK_OBJECT_CAST(type, object, isa_class) ((type*)(object))
 #define DSK_OBJECT_CAST_GET_CLASS(type, object, isa_class) ((type##Class*)(((DskObject*)(object))->object_class))

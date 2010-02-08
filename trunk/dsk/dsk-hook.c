@@ -2,13 +2,20 @@
 
 static DskDispatchIdle *idle_handler = NULL;
 
+DskHookFuncs dsk_hook_funcs_default =
+{
+  (DskHookObjectFunc) dsk_object_ref_f,
+  (DskHookObjectFunc) dsk_object_unref_f,
+  NULL
+};
+
 void
 dsk_hook_notify (DskHook *hook)
 {
   void *object = hook->object;
   DskHookFuncs *funcs = hook->funcs;
   dsk_assert (hook->magic == DSK_HOOK_MAGIC);
-  if (hook->is_notifying || hook->is_destroyed)
+  if (hook->is_notifying || hook->is_cleared)
     return;
   hook->is_notifying = 1;
   if (funcs->ref != NULL)
@@ -58,7 +65,7 @@ dsk_hook_notify (DskHook *hook)
       if (must_prune)
         {
           DskHookTrap **ptrap = &hook->trap.next;
-          while (*ptrap)
+          while (*ptrap != NULL)
             {
               if ((*ptrap)->callback == NULL)
                 {
@@ -72,11 +79,12 @@ dsk_hook_notify (DskHook *hook)
         }
     }
   hook->is_notifying = 0;
-  if (hook->destroy_in_notify)
-    dsk_hook_destroy (hook);
+  if (hook->clear_in_notify)
+    dsk_hook_clear (hook);
   if (funcs->unref != NULL)
     funcs->unref (object);
 }
+
 void
 dsk_hook_trap_destroy (DskHookTrap   *trap)
 {
@@ -186,16 +194,18 @@ void _dsk_hook_trap_count_zero (DskHook *hook)
 }
 
 void
-dsk_hook_destroy      (DskHook       *hook)
+dsk_hook_clear      (DskHook       *hook)
 {
   DskHookTrap *trap;
-  dsk_assert (!hook->is_destroyed);
+  dsk_assert (!hook->is_cleared);
+  dsk_assert (hook->magic == DSK_HOOK_MAGIC);
   if (hook->is_notifying)
     {
-      hook->destroy_in_notify = 1;
+      hook->clear_in_notify = 1;
       return;
     }
-  hook->is_destroyed = 1;
+  hook->is_cleared = 1;
+  hook->magic = 1;
   if (hook->trap.destroy)
     hook->trap.destroy (hook->trap.data);
   trap = hook->trap.next
@@ -204,8 +214,7 @@ dsk_hook_destroy      (DskHook       *hook)
       DskHookTrap *next = trap->next;
       if (trap->destroy != NULL)
         trap->destroy (trap->data);
-      dsk_mem_pool_fixed_free (&dsk_hook_pool, trap);
+      dsk_mem_pool_fixed_free (&dsk_hook_trap_pool, trap);
       trap = next;
     }
-  dsk_mem_pool_fixed_free (&dsk_hook_pool, hook);
 }
