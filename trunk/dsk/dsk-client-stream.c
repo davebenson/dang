@@ -68,26 +68,108 @@ dsk_client_stream_set_max_idle_time  (DskClientStream *client,
 
 /* --- connecting & dns lookups --- */
 static void
+stream_set_last_error (DskClientStream *stream,
+                       const char      *format,
+                       ...)
+{
+  va_list args;
+  va_start (args, format);
+  if (stream->last_error)
+    dsk_error_unref (stream->last_error);
+  stream->last_error = dsk_error_new_valist (stream, format, args);
+  va_end (args);
+}
+
+int
+dsk_errno_from_fd (int fd)
+{
+  socklen_t size_int = sizeof (int);
+  int value = EINVAL;
+  if (getsockopt (fd, SOL_SOCKET, SO_ERROR, &value, &size_int) < 0)
+    {
+      /* Note: this behavior is vaguely hypothetically broken,
+       *       in terms of ignoring getsockopt's error;
+       *       however, this shouldn't happen, and EINVAL is ok if it does.
+       *       Furthermore some broken OS's return an error code when
+       *       fetching SO_ERROR!
+       */
+      return value;
+    }
+
+  return value;
+}
+
+static void
+handle_fd_connected (DskClientStream *stream)
+{
+  int events = 0;
+  if (dsk_hook_is_trapped (stream->readable_hook))
+    events |= DSK_EVENT_READABLE;
+  if (dsk_hook_is_trapped (stream->writable_hook))
+    events |= DSK_EVENT_WRITABLE;
+  dsk_dispatch_watch_fd (dsk_dispatch_default (), fd, events,
+                         handle_fd_events, stream);
+}
+
+static void
+handle_fd_connecting (DskFileDescriptor   fd,
+                      unsigned            events,
+                      void               *callback_data)
+{
+  int err = dsk_errno_from_fd (fd);
+  if (err == 0)
+    {
+      stream->is_connecting = DSK_FALSE;
+      stream->is_connected = DSK_TRUE;
+      handle_fd_connected (stream);             /* sets the watch on the fd */
+      return;
+    }
+
+  if (err != EINTR && err != EAGAIN)
+    {
+      if (stream->last_error)
+        dsk_error_unref (stream->last_error);
+      stream->last_error = dsk_error_new ("error finishing connection to %s: %s",
+                                          stream->name, strerror (err));
+      dsk_dispatch_close_fd (dsk_dispatch_default (), stream->fd);
+      stream->fd = -1;
+      stream->is_connecting = DSK_FALSE;
+      maybe_set_autoreconnect_timer (stream);
+      return;
+    }
+
+  /* wait for another notification */
+  return;
+}
+
+static void
 begin_connecting_sockaddr (DskClientStream *stream,
                            unsigned          addr_len,
                            struct sockaddr_t *addr)
 {
   int fd;
+  dsk_assert (stream->fd == -1);
 retry_sys_socket:
   fd = socket (addr->sa_family, SOCK_STREAM, 0);
   if (fd < 0)
     {
-      if (errno == EINTR)
+      int e = errno;
+      if (e == EINTR)
+        goto retry_sys_socket;
+      if (dsk_fd_creation_failed (e))
         goto retry_sys_socket;
 
       /* set error */
-      ...
+      stream_set_last_error (stream,
+                             "error invoking socket(2) system-call: %s",
+                             strerror (errno));
 
-      goto error;
+      goto handle_error;
     }
 
   /* set non-blocking */
-  ...
+  dsk_fd_set_nonblocking (fd);
+  dsk_fd_set_close_on_exec (fd);
 
   /* call connect() */
 retry_sys_connect:
@@ -108,26 +190,20 @@ retry_sys_connect:
         }
 
       /* set error */
-      ...
-
-      goto error;
+      close (fd);
+      stream_set_last_error (stream,
+                             "error connecting to %s: %s",
+                             stream->name, strerror (e));
+      goto handle_error;
     }
 
   stream->is_connected = 1;
   stream->fd = fd;
-  events = 0;
-  if (dsk_hook_is_trapped (stream->readable_hook))
-    events |= DSK_EVENT_READABLE;
-  if (dsk_hook_is_trapped (stream->writable_hook))
-    events |= DSK_EVENT_WRITABLE;
-  dsk_dispatch_watch_fd (dsk_dispatch_default (), fd, events,
-                         handle_fd_events, stream);
+  handle_fd_connected (stream);
   return;
 
 error:
-  /* notify error hook */
-  ...
-
+  dsk_hook_notify (stream->error_hook);
   maybe_set_autoreconnect_timer (stream);
   return;
 }

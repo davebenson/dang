@@ -1,4 +1,7 @@
 
+#include "dsk-common.h"
+#include "dsk-fd.h"
+#include "dsk-dispatch.h"
 #include "dsk-util.h"
 #include "dsk-object.h"
 #include "dsk-octet-io.h"
