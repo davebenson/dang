@@ -244,12 +244,7 @@ got_type_specifier:
     }
   else if (*at == 'U')
     {
-      if (is_float)
-        {
-          dang_set_error (error,
-                          "qualifier 'U' not allowed on floating-point number");
-          return TOKENIZE_RESULT_ERROR;
-        }
+      dang_assert (!is_float);
       at++;
       ENSURE_HAS_MORE_DATA ();
       if (*at == 'T')
@@ -282,48 +277,28 @@ got_type_specifier:
     }
   else if (*at == 'T')
     {
-      if (is_float)
-        {
-          dang_set_error (error,
-                          "qualifier 'T' not allowed on floating-point number");
-          return TOKENIZE_RESULT_ERROR;
-        }
+      dang_assert (!is_float);
       force_type = dang_value_type_int8 ();
       at++;
       goto handle_int;
     }
   else if (*at == 'S')
     {
-      if (is_float)
-        {
-          dang_set_error (error,
-                          "qualifier 'S' not allowed on floating-point number");
-          return TOKENIZE_RESULT_ERROR;
-        }
+      dang_assert (!is_float);
       force_type = dang_value_type_int16 ();
       at++;
       goto handle_int;
     }
   else if (*at == 'I')
     {
-      if (is_float)
-        {
-          dang_set_error (error,
-                          "qualifier 'I' not allowed on floating-point number");
-          return TOKENIZE_RESULT_ERROR;
-        }
+      dang_assert (!is_float);
       force_type = dang_value_type_int32 ();
       at++;
       goto handle_int;
     }
   else if (*at == 'L')
     {
-      if (is_float)
-        {
-          dang_set_error (error,
-                          "qualifier 'L' not allowed on floating-point number");
-          return TOKENIZE_RESULT_ERROR;
-        }
+      dang_assert (!is_float);
       force_type = dang_value_type_int64 ();
       at++;
       goto handle_int;
