@@ -1,3 +1,4 @@
+#include <stdio.h>              // DEBUG
 #include <string.h>
 #include "dang.h"
 #include "magic.h"

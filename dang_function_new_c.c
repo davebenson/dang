@@ -127,6 +127,7 @@ dang_function_new_c        (DangSignature   *sig,
   rv->base.stack_info = stack_info;
   stack_info->first_step = rv->base.steps + 0;
   stack_info->last_step = rv->base.steps + 1;
+  stack_info->n_vars = 1;
   stack_info->vars = dang_new (DangFunctionStackVarInfo, 1);
   /* XXX: variable liveness non-inclusive... this is weird */
   stack_info->vars[0].start = rv->base.steps + 0;

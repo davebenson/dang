@@ -30,6 +30,7 @@ for dir in $dirs ; do
       rm $base_no_ext.gcda
       rm $base_no_ext.gcno
       rm $base
+      mv $base.gcov $dir
     else
       ### This would work, if gcov's output always used the full path names
       ### consistently...
