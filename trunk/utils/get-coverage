@@ -1,6 +1,8 @@
 #! /bin/sh
 
-set -e
+
+dirs="builtin-functions"
+set -x
 d=gcov.$$
 echo "output in $d/"
 mkdir $d $d/builtin-functions
@@ -8,12 +10,41 @@ make clean  > $d/make-clean.log 2>&1
 make EXTRA_CFLAGS="-fprofile-arcs -ftest-coverage" EXTRA_LDFLAGS="-fprofile-arcs -ftest-coverage" > $d/make.log 2>&1
 ./run-tests > $d/run-tests.log 2>&1
 ./run-tests -v --debug-all > $d/run-tests--debug-all.log 2>&1
-for a in *.c builtin-functions/*.c ; do
+for a in *.c ; do
   echo --- $a --- >> $d/gcov.output
   gcov $a >> $d/gcov.output 2>&1
 done
+for dir in $dirs ; do
+  for a in $dir/*.c ; do
+    echo --- $a --- >> $d/gcov.output
+
+    if true; then
+      ### HACK!!!!  gcov needs certain files to be in '.' but not all of them
+      no_ext=`echo $a | sed -e 's/\\.c$//'`
+      base_no_ext=`basename $no_ext`
+      base=`basename $a`
+      ln -s $no_ext.gcda .
+      ln -s $no_ext.gcno .
+      ln -s $a .
+      gcov $a >> $d/gcov.output 2>&1
+      rm $base_no_ext.gcda
+      rm $base_no_ext.gcno
+      rm $base
+    else
+      ### This would work, if gcov's output always used the full path names
+      ### consistently...
+      gcov $a >> $d/gcov.output 2>&1
+    fi
+      
+  done
+done
 mv *.c.gcov $d
 rm *.gcda *.gcno
+for dir in $dirs ; do
+  mv $dir/*.c.gcov $d/$dir
+  rm $dir/*.gcda $dir/*.gcno
+done
+
 make clean > /dev/null 2>&1
 
 perl -e 'my $total = 0; my $executed = 0;
