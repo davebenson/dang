@@ -21,6 +21,16 @@ assert((1U <=> 2U) == -1);
 assert((2U <=> 1U) == 1);
 assert((1U <=> 1U) == 0);
 
+assert(1.0e1 == 10.0);
+assert(1.0e1F == 10.0F);
+assert(1.0e1D == 10.0D);
+assert(1.0e+1 == 10.0);
+assert(1.0e+1F == 10.0F);
+assert(1.0e+1D == 10.0D);
+assert(1.0e+2 == 100.0);
+assert(1.0e+2F == 100.0F);
+assert(1.0e+2D == 100.0D);
+
 assert(-1S == -1S);
 assert(2S == 2S);
 assert(2S != 1S);
@@ -64,6 +74,8 @@ assert(1UL <= 2UL);
 assert((1UL <=> 2UL) == -1);
 assert((2UL <=> 1UL) == 1);
 assert((1UL <=> 1UL) == 0);
+
+assert(-0x80000001 == -(0x80000001L));
 
 
 assert(2*8+1 == 17);
