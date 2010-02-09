@@ -89,6 +89,8 @@ DANG_C_FUNC_DECLARE (do_tensor_map)
       unsigned i, d;
       DangValueType *elt_type = md->output_type;
       DangTensor **inputs = dang_newa (DangTensor *, n_inputs);
+      rd->output_type = elt_type;
+      rd->output_size = elt_type->sizeof_instance;
       for (i = 0; i < n_inputs; i++)
         {
           inputs[i] = *(DangTensor**)(args[i]);

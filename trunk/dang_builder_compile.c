@@ -380,6 +380,7 @@ allocate_stack__first_fit (Builder *builder,
             actions[i].var->offset = off;
             *frame_size_inout = off + type->sizeof_instance;
           }
+        //dang_warning ("allocate %s: %u", actions[i].var->type->full_name, actions[i].var->offset);
       }
     else
       {
@@ -434,6 +435,7 @@ allocate_stack__first_fit (Builder *builder,
             tmp.size = var_size;
             dang_util_array_insert (&free_blocks, 1, &tmp, f);
           }
+        //dang_warning ("deallocate %s: %u", actions[i].var->type->full_name, actions[i].var->offset);
       }
 
   /* Clean up */

@@ -140,7 +140,7 @@ DangValueType *dang_value_type_new_struct (char *name,
   rv->base_type.to_string = to_string__struct;
 
   for (i = 0; i < n_members; i++)
-    if (members[i].name)
+    if (members[i].name != NULL)
       {
         dang_value_type_add_simple_member (&rv->base_type,
                                            members[i].name,

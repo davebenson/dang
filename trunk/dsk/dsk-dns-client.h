@@ -16,12 +16,6 @@ struct _DskDnsAddress
   uint8_t address[16];          /* enough for ipv4 or ipv6 */
 };
   
-struct _DskDnsEntry
-{
-  unsigned timeout;
-  unsigned n_addresses;         /* if 0, then this indicates a negative entry */
-  DskDnsAddress *addresses;
-};
 
 typedef enum
 {
@@ -34,7 +28,7 @@ typedef enum
 struct _DskDnsLookupResult
 {
   DskDnsLookupResultType type;
-  DskDnsEntry *entry;           /* for FOUND/NOT_FOUND */
+  DskDnsAddress *addr;          /* if found */
   const char *message;          /* for all other types */
 };
 
@@ -45,3 +39,31 @@ void    dsk_dns_lookup (const char       *name,
                         DskDnsLookupFunc  callback,
                         void             *callback_data);
 
+typedef enum
+{
+  DSK_DNS_CACHE_ENTRY_IN_PROGRESS,
+  DSK_DNS_CACHE_ENTRY_BAD_RESPONSE,
+  DSK_DNS_CACHE_ENTRY_NEGATIVE,
+  DSK_DNS_CACHE_ENTRY_CNAME,
+  DSK_DNS_CACHE_ENTRY_ADDR,
+} DskDnsCacheEntryType;
+
+struct _DskDnsCacheEntry
+{
+  unsigned expire_time;
+  DskDnsCacheEntryType type;
+  union {
+    DskDnsCacheEntryJob *in_progress;
+    struct { char *message; } bad_response;
+    char *cname;
+    struct { unsigned n; DskDnsAddress *addresses; } addr;
+  } info;
+
+  DskDnsCacheEntry *expire_left, *expire_right, *expire_parent;
+  dsk_boolean is_red;
+};
+typedef void (*DskDnsCacheEntryFunc) (DskDnsCacheEntry *entry,
+                                      void             *callback_data);
+DskDnsCacheEntry *dsk_dns_lookup_cache_entry (const char       *name,
+                                    DskDnsCacheEntryFunc callback,
+                                    void             *callback_data);

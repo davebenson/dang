@@ -52,3 +52,6 @@ Fri Feb 5 16:15:50 PST 2010: Executed 11241 lines of 14704 (76.44%).
 Mon Feb 8 15:46:07 PST 2010: Executed 11266 lines of 14704 (76.61%).
 [updated get-coverage to look inside 'builtin-functions']
 Mon Feb 8 16:08:52 PST 2010: Executed 11532 lines of 14993 (76.91%).
+Tue Feb 9 11:11:28 PST 2010: Executed 11449 lines of 14902 (76.82%).
+Tue Feb 9 13:10:10 PST 2010: Executed 11467 lines of 14905 (76.93%).
+Tue Feb 9 13:13:55 PST 2010: Executed 11467 lines of 14905 (76.93%).
