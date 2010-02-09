@@ -5,3 +5,9 @@ function print_42()
 {
   system.println("42");
 }
+
+struct Foo
+{
+  int x;
+  int y;
+};
