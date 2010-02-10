@@ -5,6 +5,7 @@ dsk_octet_source_init (DskOctetSource *source)
 {
   source->readable_hook = dsk_hook_new (source);
 }
+
 static void
 dsk_octet_source_finalize (DskOctetSource *source)
 {
@@ -14,11 +15,13 @@ dsk_octet_source_finalize (DskOctetSource *source)
       source->readable_hook = NULL;
     }
 }
+
 static void
 dsk_octet_sink_init (DskOctetSink *sink)
 {
   sink->writable_hook = dsk_hook_new (sink);
 }
+
 static void
 dsk_octet_sink_finalize (DskOctetSink *sink)
 {

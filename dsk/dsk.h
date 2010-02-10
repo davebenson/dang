@@ -9,3 +9,5 @@
 #include "dsk-client-stream.h"
 #include "dsk-http-client-stream.h"
 #include "dsk-http-client.h"
+
+#undef _dsk_inline_assert

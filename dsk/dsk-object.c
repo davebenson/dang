@@ -82,6 +82,22 @@ dsk_object_cast_get_class (void       *object,
   return ((DskObject*)object)->object_class;
 }
 
+void
+dsk_object_handle_last_unref (DskObject *o)
+{
+  DskObjectClass *c = o->object_class;
+  dsk_assert (c->magic == DSK_OBJECT_CLASS_MAGIC);
+  do
+    {
+      if (c->finalize != NULL)
+        c->finalize (o);
+      c = c->parent_class;
+    }
+  while (c != NULL);
+  dsk_free (o);
+}
+
+
 void *
 dsk_object_ref_f (void *object)
 {
