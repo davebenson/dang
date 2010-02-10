@@ -56,7 +56,48 @@ void
 dsk_client_stream_set_reconnect_time (DskClientStream *client,
                                       int              millis)
 {
-  ...
+  /* short-circuit no-op cases */
+  if (millis < 0)
+    {
+      if (client->reconnect_time_ms == -1)
+        return;
+      millis = -1;
+    }
+  else if (client->reconnect_time_ms == millis)
+    return;
+
+  /* if we have a valid file-descriptor or we are resolving the name,
+     there then the reconnect_time_ms is not currently relevant:
+     set it and go */
+  if (client->fd != -1 || client->is_resolving_name)
+    {
+      client->reconnect_time_ms = millis;
+      return;
+    }
+
+  if (millis == -1)
+    {
+      /* handle timer removal */
+      if (client->reconnect_timer)
+        {
+          ...
+        }
+      else
+        dsk_soft_should_not_happen ("no reconnect timer?");
+    }
+  else if (client->reconnect_time_ms >= 0)
+    {
+      /* adjust existing timer */
+      dsk_assert (client->reconnect_timer != NULL);
+      ...
+    }
+  else
+    {
+      /* handle timer creation */
+      dsk_assert (client->reconnect_timer == NULL);
+      ...
+    }
+
 }
 
 void
@@ -226,11 +267,31 @@ begin_connecting (DskClientStream *stream)
 {
   if (stream->is_local_socket)
     {
-      ...
+      struct sockaddr_un addr;
+      unsigned len = strlen (stream->name);
+      if (len > sizeof (addr.sun_path))
+        {
+          /* name too long */
+          ...
+
+          /* TODO: catch this in constructor */
+
+          return;
+        }
+      addr.sun_family = AF_LOCAL;
+      memcpy (addr.sun_path, stream->name,
+              len == sizeof (addr.sun_path) ? len : len + 1);
+      begin_connecting_sockaddr (stream, sizeof (addr), (struct sockaddr *) &addr);
     }
   else if (stream->is_numeric_name)
     {
+      struct sockaddr_storage addr;
+      unsigned addr_len;
+
+      /* parse name into addr/addr_len */
       ...
+
+      begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
     }
   else
     {

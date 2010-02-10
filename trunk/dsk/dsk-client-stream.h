@@ -81,4 +81,3 @@ void             dsk_client_stream_set_max_idle_time  (DskClientStream *client,
                                                        int              millis);
 
 
-void             dsk_client_stream_set_max_idle_time  (DskClientStream *client,
