@@ -4,7 +4,8 @@
 static void begin_connecting           (DskClientStream *stream);
 
 /* Create the barebones client-stream objects. */
-static DskClientStream *create_raw_client_stream (void)
+static DskClientStream *
+create_raw_client_stream (void)
 {
   DskClientStream *rv = dsk_object_new (&dsk_client_stream_class);
   rv->sink = dsk_object_new (&dsk_client_stream_sink_class);
@@ -42,7 +43,8 @@ dsk_client_stream_new_addr  (DskDnsAddress *addr,
   return rv;
 }
 
-DskClientStream *dsk_client_stream_new_local (const char *path)
+DskClientStream *
+dsk_client_stream_new_local (const char *path)
 {
   DskClientStream *rv = create_raw_client_stream ();
   rv->is_local_socket = 1;
@@ -80,24 +82,24 @@ dsk_client_stream_set_reconnect_time (DskClientStream *client,
       /* handle timer removal */
       if (client->reconnect_timer)
         {
-          ...
+          dsk_dispatch_remove_timer (client->reconnect_timer);
+          client->reconnect_timer = NULL;
         }
       else
         dsk_soft_should_not_happen ("no reconnect timer?");
     }
-  else if (client->reconnect_time_ms >= 0)
-    {
-      /* adjust existing timer */
-      dsk_assert (client->reconnect_timer != NULL);
-      ...
-    }
   else
     {
-      /* handle timer creation */
-      dsk_assert (client->reconnect_timer == NULL);
-      ...
+      if (client->reconnect_time_ms >= 0)
+        dsk_dispatch_remove_timer (client->reconnect_timer);
+      else
+        dsk_assert (client->reconnect_timer == NULL);
+      client->reconnect_timer
+        = dsk_dispatch_add_timer_millis (dsk_dispatch_default (),
+                                         millis,
+                                         handle_reconnect_timer_expired,
+                                         client);
     }
-
 }
 
 void
