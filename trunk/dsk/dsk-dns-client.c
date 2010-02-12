@@ -10,6 +10,18 @@ struct _LookupData
   void *callback_data;
 };
 
+
+/* TODO: plugable random number generator.  or mersenne twister import */
+static unsigned
+random_int (unsigned n)
+{
+  dsk_assert (n > 0);
+  if (n == 1)
+    return 0;
+  else
+    return rand () / (RAND_MAX / n + 1);
+}
+
 static void
 handle_cache_entry_lookup (DskDnsCacheEntry *entry,
                            void             *data)
@@ -37,8 +49,38 @@ handle_cache_entry_lookup (DskDnsCacheEntry *entry,
       lookup_data->callback (&result, lookup_data->callback_data);
       dsk_free (lookup_data);
       return;
-    case DSK_DNS_CACHE_ENTRY_CNAME,
-    case DSK_DNS_CACHE_ENTRY_ADDR,
+    case DSK_DNS_CACHE_ENTRY_CNAME:
+      {
+        unsigned i;
+        char *cname;
+        /* check existing cname list for circular references */
+        for (i = 0; i < lookup_data->n_cnames; i++)
+          if (strcmp (lookup_data->cnames[i], entry->info.cname) == 0)
+            {
+              result.type = DSK_DNS_LOOKUP_RESULT_BAD_RESPONSE;
+              result.addr = NULL;
+              result.message = "circular cname loop";
+              /* CONSIDER: adding cname chain somewhere */
+              lookup_data->callback (&result, lookup_data->callback_data);
+              dsk_free (lookup_data);
+              return;
+            }
+      
+        /* add to cname list */
+        cname = dsk_strdup (entry->info.cname);
+        dsk_dns_lookup_cache_entry (cname, handle_cache_entry_lookup, data);
+        return;
+      }
+    case DSK_DNS_CACHE_ENTRY_ADDR:
+      result.type = DSK_DNS_LOOKUP_RESULT_FOUND;
+      result.addr = entry->info.addr.addresses
+                  + random_int (entry->info.addr.n);
+      result.message = NULL;
+      lookup_data->callback (&result, lookup_data->callback_data);
+      dsk_free (lookup_data);
+      return;
+    }
+}
 
 void    dsk_dns_lookup (const char       *name,
                         DskDnsLookupFunc  callback,
@@ -51,3 +93,100 @@ void    dsk_dns_lookup (const char       *name,
   lookup_data->callback_data = callback_data;
   dsk_dns_lookup_cache_entry (name, handle_cache_entry_lookup, lookup_data);
 } 
+
+
+/* --- low-level ---*/
+typedef enum
+{
+  DSK_DNS_SECTION_QUESTION      = 0x01,
+  DSK_DNS_SECTION_ANSWER        = 0x02,
+  DSK_DNS_SECTION_AUTHORITY     = 0x04,
+  DSK_DNS_SECTION_ADDITIONAL    = 0x08,
+
+  DSK_DNS_SECTION_ALL           = 0x0f
+} DskDnsSectionCode;
+
+
+typedef enum
+{
+  DSK_DNS_CLASS_IN      = 1,
+  DSK_DNS_CLASS_ANY     = 255
+} DskDnsClassCode;
+
+
+typedef enum
+{
+  DSK_DNS_TYPE_A         = 1,
+  DSK_DNS_TYPE_NS        = 2,
+  DSK_DNS_TYPE_CNAME     = 5,
+  DSK_DNS_TYPE_SOA       = 6,
+  DSK_DNS_TYPE_PTR       = 12,
+  DSK_DNS_TYPE_MX        = 15,
+  DSK_DNS_TYPE_TXT       = 16,
+  DSK_DNS_TYPE_AAAA      = 28,
+  DSK_DNS_TYPE_SRV       = 33,
+  DSK_DNS_TYPE_SPF       = 99,
+
+  DSK_DNS_TYPE_ALL       = 255
+} DskDnsTypeCode;
+
+
+typedef enum
+{
+  DSK_DNS_OP_QUERY  = 0,
+  DSK_DNS_OP_IQUERY = 1,
+  DSK_DNS_OP_STATUS = 2,
+  DSK_DNS_OP_NOTIFY = 4,
+  DSK_DNS_OP_UPDATE = 5,
+} DskDnsOpcode;
+
+
+typedef enum
+{
+  DSK_DNS_RCODE_NOERROR    = 0,
+  DSK_DNS_RCODE_FORMERR    = 1,
+  DSK_DNS_RCODE_SERVFAIL   = 2,
+  DSK_DNS_RCODE_NXDOMAIN   = 3,
+  DSK_DNS_RCODE_NOTIMP     = 4,
+  DSK_DNS_RCODE_REFUSED    = 5,
+  DSK_DNS_RCODE_YXDOMAIN   = 6,
+  DSK_DNS_RCODE_YXRRSET    = 7,
+  DSK_DNS_RCODE_NXRRSET    = 8,
+  DSK_DNS_RCODE_NOTAUTH    = 9,
+  DSK_DNS_RCODE_NOTZONE    = 10,
+} DskDnsRcode;
+
+
+typedef struct _DskDnsHeader DskDnsHeader;
+struct _DskDnsHeader
+{
+  unsigned qid:16;
+
+#if BYTE_ORDER == BIG_ENDIAN
+  unsigned qr:1;
+  unsigned opcode:4;
+  unsigned aa:1;
+  unsigned tc:1;
+  unsigned rd:1;
+
+  unsigned ra:1;
+  unsigned unused:3;
+  unsigned rcode:4;
+#else
+  unsigned rd:1;
+  unsigned tc:1;
+  unsigned aa:1;
+  unsigned opcode:4;
+  unsigned qr:1;
+
+  unsigned rcode:4;
+  unsigned unused:3;
+  unsigned ra:1;
+#endif
+
+  unsigned qdcount:16;
+  unsigned ancount:16;
+  unsigned nscount:16;
+  unsigned arcount:16;
+};
+
