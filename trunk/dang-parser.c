@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #include "dang.h"
 #include "default-parser.h"
 
@@ -15,6 +16,7 @@ void DangDefaultParser_Free(
   void *p,                    /* The parser to be deleted */
   void (*freeProc)(void*)     /* Function used to reclaim memory */
 );
+void DangDefaultParser_Trace(FILE *TraceFILE, char *zTracePrompt);
 
 
 DangParser *
@@ -140,6 +142,13 @@ maybe_flush_bareword_dot_arr (DangParserDefault *def,
         {
           unsigned subtag = (i % 2) ? DANG_DEFAULTPARSER_TOKEN_DOT
                                     : DANG_DEFAULTPARSER_TOKEN_BAREWORD;
+#if 0
+          {
+            char *str = bd_arr[i] ? dang_token_make_string (bd_arr[i], TRUE) : dang_strdup_printf ("null token");
+            dang_warning ("[flush bareword] parse: tag=%u: %s", subtag, str);
+            dang_free (str);
+          }
+#endif
           DangDefaultParser_ (def->lemon_parser, subtag, bd_arr[i], def);
           if (def->errors.len > 0)
             {
@@ -406,6 +415,7 @@ default_parse           (DangParser *parser,
                   names = dang_new (char *, n_names);
                 for (i = 0; i < n_names; i++)
                   names[i] = bd_arr[2*i]->v_bareword.name;
+                //dang_warning ("calling dang_imports_lookup_type: n_names=%u, names[%u] = %s, names[%u] = %s", n_names, 0, names[0], n_names-1, names[n_names-1]);
                 type = dang_imports_lookup_type (def->base.imports, n_names, names);
                 if (type != NULL)
                   {
@@ -488,6 +498,14 @@ default_create_parser (DangParserFactory *factory,
 {
   DangParserDefault *rv = dang_new (DangParserDefault, 1);
   unsigned start_tag = 0;
+#if 0
+  static dang_boolean inited = 0;
+  if (!inited)
+    {
+      inited = 1;
+      DangDefaultParser_Trace(stderr, "<default-parser>");
+    }
+#endif
   DANG_UNUSED (factory);
   DANG_UNUSED (error);
   dang_parser_base_init (&rv->base);

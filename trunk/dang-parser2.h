@@ -83,6 +83,7 @@ typedef enum
   DANG_PATTERN_PIECE_BRACKETED
 } DangPatternPieceType;
 
+#if 0
 typedef struct _DangPatternPiece DangPatternPiece;
 struct _DangPatternPiece
 {
@@ -101,6 +102,7 @@ void dang_parser_nonterminal_set_func        (DangParserNonterminal nt,
                                               DangParserFunc        func,
                                               void                 *func_data,
                                               DangDestroyNotify     destroy);
+#endif
 
 
 /* public api */

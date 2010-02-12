@@ -116,6 +116,7 @@ DangNamespace *dang_namespace_force  (unsigned       n_names,
         {
           char *n = dang_util_join_with_dot (i+1, names);
           DangNamespace *new = dang_namespace_new (n);
+          dang_warning ("registering %s under %s as %s", n, at->full_name, names[i]);
           dang_free (n);
           if (!dang_namespace_add_namespace (at, names[i], new, error))
             return NULL;                /* can't happen */
