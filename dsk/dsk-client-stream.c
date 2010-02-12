@@ -349,7 +349,27 @@ dsk_client_stream_sink_write  (DskOctetSink   *sink,
                                const void     *data_out,
                                DskError      **error)
 {
-  ...
+  int wrote;
+  if (sink->fd < 0)
+    {
+      dsk_set_error (error, "no file-descriptor");
+      return -1;
+    }
+  if (sink->is_connecting)
+    {
+      dsk_set_error (error, "file-descriptor %d not connected yet", sink->fd);
+      return -1;
+    }
+  wrote = write (sink->fd, data_out, max_len);
+  if (wrote < 0)
+    {
+      if (errno == EINTR || errno == EAGAIN)
+        return 0;
+      dsk_set_error (error, "error writing to client stream (fd %d): %s",
+                     sink->fd, strerror (errno));
+      return -1;
+    }
+  return wrote;
 }
 
 static int
