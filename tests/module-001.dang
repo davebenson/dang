@@ -1,3 +1,6 @@
 use Test;
 
+/// XXX: works if you include this!
+///int y;
+
 Test.Foo x;
