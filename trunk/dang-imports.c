@@ -1,9 +1,10 @@
 #include <string.h>
 #include "dang.h"
 
-DangImports         *dang_imports_new    (unsigned n_imports,
-                                          DangImportedNamespace *imports,
-                                          DangNamespace *default_definition_namespace)
+DangImports *
+dang_imports_new    (unsigned               n_imports,
+                     DangImportedNamespace *imports,
+                     DangNamespace         *default_definition_namespace)
 {
   DangImports *rv = dang_new (DangImports, 1);
   DangImportedNamespace *ins;
