@@ -13,6 +13,7 @@ create_raw_client_stream (void)
   rv->sink->owner = rv->source->owner = rv;
   rv->reconnect_time_ms = -1;
   rv->idle_disconnect_time_ms = -1;
+  rv->fd = -1;
   return rv;
 }
 
@@ -105,7 +106,44 @@ static dsk_boolean
 parse_numeric_ip (const char *str,
                   DskDnsAddress *out)
 {
-  ...
+  if (strchr (str, '.') == NULL)
+    {
+      out->type = DSK_DNS_ADDRESS_IPV6;
+      while (*str)
+        {
+          if (*str == ':')
+            str++;
+          if (*str == 0)
+            break;
+          v = strtoul (str, &end, 16);
+          if (n == 16)
+            return DSK_FALSE;
+          out->address[n++] = v>>8;
+          out->address[n++] = v;
+          str = end;
+        }
+      while (n < 16)
+        out->address[n++] = 0;
+    }
+  else
+    {
+      /* dotted quad notation */
+      out->type = DSK_DNS_ADDRESS_IPV4;
+      out->address[0] = strtoul (str, &end, 10);
+      if (*end != '.')
+        return DSK_FALSE;
+      str = end + 1;
+      out->address[1] = strtoul (str, &end, 10);
+      if (*end != '.')
+        return DSK_FALSE;
+      str = end + 1;
+      out->address[2] = strtoul (str, &end, 10);
+      if (*end != '.')
+        return DSK_FALSE;
+      str = end + 1;
+      out->address[3] = strtoul (str, &end, 10);
+    }
+  return DSK_TRUE;
 }
 
 /* use -1 to disable these timeouts */
@@ -419,8 +457,9 @@ begin_connecting (DskClientStream *stream)
       DskDnsAddress address;
 
       /* parse name into addr/addr_len */
-      parse_numeric_ip (stream->name, &address);
-      dns_address_to_sock_addr (&address, &addr, &addr_len);
+      if (!parse_numeric_ip (stream->name, &address))
+        dsk_die ("parse_numeric_ip failed on %s", stream->name);
+      dns_address_to_sock_addr (&address, stream->port, &addr, &addr_len);
       begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
     }
   else
@@ -460,7 +499,14 @@ dsk_client_stream_source_read_buffer  (DskOctetSource *source,
 static void
 dsk_client_stream_source_shutdown (DskOctetSource *source)
 {
-  ...
+  DskClientStream *stream = ((DskClientStreamSource*)source)->stream;
+  if (stream == NULL)
+    return;
+  if (stream->fd >= 0)
+    shutdown (stream->fd, SHUT_RD);
+
+  stream->shutdown_read = 1;
+  dsk_hook_clear (&source->readable_hook);
 }
 
 
@@ -482,6 +528,12 @@ dsk_client_stream_sink_write  (DskOctetSink   *sink,
                                DskError      **error)
 {
   int wrote;
+  DskClientStream *stream = ((DskClientStreamSink*)sink)->owner;
+  if (stream == NULL)
+    {
+      dsk_set_error (error, "write to dead client stream");
+      return -1;
+    }
   if (sink->fd < 0)
     {
       dsk_set_error (error, "no file-descriptor");
@@ -509,13 +561,41 @@ dsk_client_stream_sink_write_buffer  (DskOctetSink   *sink,
                                       DskBuffer      *write_buffer,
                                       DskError      **error)
 {
-  ...
+  int rv;
+  DskClientStream *stream = ((DskClientStreamSink*)sink)->stream;
+  if (stream == NULL)
+    {
+      dsk_set_error (error, "write to dead stream");
+      return -1;
+    }
+  if (stream->fd < 0)
+    {
+      dsk_set_error (error, "write to stream with no file-descriptor");
+      return -1;
+    }
+  rv = dsk_buffer_writev (stream->fd, write_buffer);
+  if (rv < 0)
+    {
+      if (errno == EINTR || errno == EAGAIN)
+        return 0;
+      dsk_set_error (error, "error writing data to fd %u: %s",
+                     stream->fd, strerror (errno));
+      return -1;
+    }
+  return rv;
 }
 
 static void
 dsk_client_stream_sink_shutdown   (DskOctetSink   *sink)
 {
-  ...
+  DskClientStream *stream = ((DskClientStreamSink*)sink)->stream;
+  if (stream == NULL)
+    return;
+  if (stream->fd >= 0)
+    shutdown (stream->fd, SHUT_WR);
+
+  stream->shutdown_write = 1;
+  dsk_hook_clear (&sink->writable_hook);
 }
 
 DskClientStreamSinkClass dsk_client_stream_sink_class =
