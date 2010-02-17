@@ -66,6 +66,8 @@ struct _DskClientStream
   unsigned char is_resolving_name : 1;
   unsigned char is_connecting : 1;
   unsigned char is_connected : 1;
+  unsigned char shutdown_read : 1;
+  unsigned char shutdown_write : 1;
 };
 
 extern DskClientStreamSourceClass dsk_client_stream_source_class;
