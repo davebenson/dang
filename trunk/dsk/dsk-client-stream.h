@@ -48,6 +48,10 @@ struct _DskClientStream
   /* May be used directly. */
   DskHook *connect_hook;
 
+  /* Invoked whenever a new error occurs */
+  DskHook *error_hook;
+  DskError *latest_error;
+
   /* for autoreconnect */
   DskDispatchTimer *reconnect_timer;
   int reconnect_time_ms;

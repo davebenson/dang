@@ -22,7 +22,7 @@ dsk_client_stream_new       (const char *name,
                              DskError  **error)
 {
   DskClientStream *rv = create_raw_client_stream ();
-  if (dsk_hostname_looks_numeric (name))
+  if (hostname_looks_numeric (name))
     rv->is_numeric_name = 1;
   rv->name = dsk_strdup (name);
   rv->port = port;
@@ -51,6 +51,61 @@ dsk_client_stream_new_local (const char *path)
   rv->name = dsk_strdup (path);
   begin_connecting (rv);
   return rv;
+}
+
+/* numeric hostnames */
+static dsk_boolean
+hostname_looks_numeric (const char *str)
+{
+  const char *at;
+
+  at = str;
+  SKIP_WHITESPACE (at);
+  for (i = 0; i < 3; i++)
+    {
+      if (!ascii_is_digit (*at))
+        goto is_not_ipv4;
+      while (ascii_is_digit (*at))
+        at++;
+      SKIP_WHITESPACE (at);
+      if (*at != '.')
+        goto is_not_ipv4;
+      at++;
+      SKIP_WHITESPACE (at);
+    }
+  if (!ascii_is_digit (*at))
+    goto is_not_ipv4;
+  while (ascii_is_digit (*at))
+    at++;
+  SKIP_WHITESPACE (at);
+  if (*at != 0)
+    goto is_not_ipv4;
+  return DSK_TRUE;              /* ipv4 */
+
+is_not_ipv4:
+  for (i = 0; i < 4; i++)
+    {
+      for (j = 0; j < 4; j++)
+        {
+          if (!ascii_is_xdigit (*at))
+            goto is_not_ipv6;
+          at++;
+        }
+      if (*at != ':')
+        goto is_not_ipv6;
+      at++;
+    }
+  return DSK_TRUE;
+
+is_not_ipv6:
+  return DSK_FALSE;
+}
+
+static dsk_boolean
+parse_numeric_ip (const char *str,
+                  DskDnsAddress *out)
+{
+  ...
 }
 
 /* use -1 to disable these timeouts */
@@ -263,6 +318,79 @@ begin_connecting_dns_entry (DskClientStream *stream,
   begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
 }
 #endif
+static void
+dns_address_to_sock_addr (DskDnsAddress *address,
+                          unsigned port,
+                          struct sockaddr_storage *out,
+                          unsigned *out_len);
+{
+  /* necessary? probably not for ipv4 */
+  memset (out, 0, sizeof (struct sockaddr_storage));
+
+  switch (address->type)
+    {
+    case DSK_DNS_ADDRESS_IPV4:
+      {
+        struct sockaddr_in *a = (struct sockaddr_in *) out;
+        a->sin_family = PF_INET;
+        a->sin_port = htons (port);
+        memcpy (&a->sin_addr, address->info.address, 4);
+        break;
+      }
+    case DSK_DNS_ADDRESS_IPV6:
+      {
+        struct sockaddr_in6 *a = (struct sockaddr_in6 *) out;
+        a->sin6_family = PF_INET6;
+        a->sin6_port = htons (port);
+        memcpy (&a->sin6_addr, address->info.address, 16);
+        break;
+      }
+    default:
+      dsk_assert_not_reached ();
+    }
+}
+
+static void
+handle_dns_done (DskDnsLookupResult *result,
+                 void               *callback_data)
+{
+  DskClientStream *stream = callback_data;
+
+  result->is_resolving_name = 0;
+  switch (result->type)
+    {
+    case DSK_DNS_LOOKUP_RESULT_FOUND:
+      {
+        struct sockaddr_storage addr;
+        unsigned addr_len;
+        dns_address_to_sock_addr (result->addr, stream->port, &addr, &addr_len);
+        begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
+      }
+      break;
+    case DSK_DNS_LOOKUP_RESULT_NOT_FOUND:
+      stream_set_last_error (stream,
+                             "dns entry for %s not found",
+                             stream->name);
+      maybe_set_autoreconnect_timer (stream);
+      break;
+    case DSK_DNS_LOOKUP_RESULT_TIMEOUT:
+      stream_set_last_error (stream,
+                             "dns lookup for %s timed out",
+                             stream->name);
+      maybe_set_autoreconnect_timer (stream);
+      break;
+    case DSK_DNS_LOOKUP_RESULT_BAD_RESPONSE:
+      stream_set_last_error (stream,
+                             "dns lookup for %s failed: %s",
+                             stream->name, result->message);
+      maybe_set_autoreconnect_timer (stream);
+      break;
+    default:
+      dsk_assert_not_reached ();
+    }
+
+  dsk_object_unref (stream);
+}
 
 static void
 begin_connecting (DskClientStream *stream)
@@ -274,9 +402,8 @@ begin_connecting (DskClientStream *stream)
       if (len > sizeof (addr.sun_path))
         {
           /* name too long */
-          ...
-
           /* TODO: catch this in constructor */
+          stream_set_last_error (stream, "name too long for local socket");
 
           return;
         }
@@ -289,16 +416,19 @@ begin_connecting (DskClientStream *stream)
     {
       struct sockaddr_storage addr;
       unsigned addr_len;
+      DskDnsAddress address;
 
       /* parse name into addr/addr_len */
-      ...
-
+      parse_numeric_ip (stream->name, &address);
+      dns_address_to_sock_addr (&address, &addr, &addr_len);
       begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
     }
   else
     {
       /* begin dns lookup */
-      ...
+      stream->is_resolving_name = 1;
+      dsk_object_ref (stream);
+      dsk_dns_lookup (stream->name, handle_dns_done, stream);
     }
 }
 
