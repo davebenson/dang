@@ -66,6 +66,7 @@ dsk_object_cast (void       *object,
     }
   return object;
 }
+
 void *
 dsk_object_cast_get_class (void       *object,
                            void       *isa_class,
