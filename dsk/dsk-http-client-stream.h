@@ -12,10 +12,22 @@ struct _DskHttpClientStream
   DskObject base_instance;
   DskOctetSink *sink;
   DskOctetSource *source;
+  DskBuffer incoming_data;
+  DskBuffer outcoming_data;
   DskHttpClientStreamTransfer *first_transfer, *last_transfer;
+  DskHttpClientStreamTransfer *incoming_data_transfer, *outgoing_data_transfer;
 };
 
 /* internals */
+typedef enum
+{
+  DSK_HTTP_CLIENT_STREAM_READ_NEED_HEADER,
+  DSK_HTTP_CLIENT_STREAM_READ_IN_BODY,
+  DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF,
+  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER,
+  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK,
+  DSK_HTTP_CLIENT_STREAM_READ_DONE
+} DskHttpClientStreamReadState;
 struct _DskHttpClientStreamTransfer
 {
   DskHttpClientStream *owner;
@@ -25,6 +37,20 @@ struct _DskHttpClientStreamTransfer
   DskHttpClientStreamTransfer *next;
   DskHttpClientStreamFuncs *funcs;
   void *user_data;
+  DskHttpClientStreamReadState read_state;
+  /* branch of union depends on 'read_state' */
+  union {
+    /* number of bytes we've already checked for end of header. */
+    struct { unsigned checked; } need_header;
+
+    /* number of bytes remaining in content-length */
+    struct { uint64_t remaining; } in_body;
+
+    /* number of bytes remaining in current chunk */
+    struct { uint64_t remaining; } in_xfer_chunk;
+
+    /* no data for IN_XFER_CHUNKED_HEADER, DONE */
+  } read_info;
 };
 
 DskHttpClientStream *
