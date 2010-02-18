@@ -43,9 +43,10 @@ DSK_INLINE_FUNCS DskObject *dsk_object_ref   (void *object);
                                               void *isa_class,
                                               const char *filename,
                                               unsigned line);
-/* non-inline versions of dsk_object_{ref,unref} */
+/* non-inline versions of dsk_object_{ref,unref}
+   (useful when you need a function pointer) */
                  void       dsk_object_unref_f (void *object);
-                 void       dsk_object_ref_f (void *object);
+                 void    *  dsk_object_ref_f (void *object);
 
 /* debugging and non-debugging implementations of the various
    cast macros.  */
