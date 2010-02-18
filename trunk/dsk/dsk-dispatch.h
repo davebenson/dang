@@ -47,6 +47,10 @@ DskDispatchTimer *
                                     unsigned           milliseconds,
                                     DskDispatchTimerFunc func,
                                     void               *func_data);
+void  dsk_dispatch_adjust_timer    (DskDispatchTimer *timer,
+                                    unsigned          milliseconds);
+void  dsk_dispatch_adjust_timer_millis (DskDispatchTimer *timer,
+                                        unsigned          milliseconds);
 void  dsk_dispatch_remove_timer (DskDispatchTimer *);
 
 /* Idle functions */

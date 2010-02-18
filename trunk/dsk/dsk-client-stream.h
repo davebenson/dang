@@ -43,13 +43,13 @@ struct _DskClientStream
 
   /* A hook that notifies when the stream is disconnected.
      May be used directly. */
-  DskHook *disconnect_hook;
+  DskHook disconnect_hook;
 
   /* May be used directly. */
-  DskHook *connect_hook;
+  DskHook connect_hook;
 
   /* Invoked whenever a new error occurs */
-  DskHook *error_hook;
+  DskHook error_hook;
   DskError *latest_error;
 
   /* for autoreconnect */

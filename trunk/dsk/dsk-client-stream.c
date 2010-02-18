@@ -199,7 +199,21 @@ void
 dsk_client_stream_set_max_idle_time  (DskClientStream *client,
                                       int              millis)
 {
-  ...
+  if (millis < 0)
+    millis = -1;
+  if (millis == client->idle_disconnect_time_ms)
+    return;
+  if (client->idle_disconnect_timer != NULL)
+    {
+      dsk_dispatch_remove_timer (client->idle_disconnect_timer);
+      client->idle_disconnect_timer = NULL;
+    }
+  if (millis >= 0
+   && client->is_connected)
+    client->idle_disconnect_timer = dsk_dispatch_add_timer_millis (dsk_dispatch_default (),
+                                                                   millis,
+                                                                   handle_idle_too_long);
+  client->idle_disconnect_time_ms = millis;
 }
 
 /* --- connecting & dns lookups --- */
@@ -245,6 +259,21 @@ handle_fd_connected (DskClientStream *stream)
     events |= DSK_EVENT_WRITABLE;
   dsk_dispatch_watch_fd (dsk_dispatch_default (), fd, events,
                          handle_fd_events, stream);
+  dsk_assert (stream->idle_disconnect_timer == NULL);
+  if (stream->idle_disconnect_time_ms >= 0)
+    stream->idle_disconnect_timer = dsk_dispatch_add_timer_millis (dsk_dispatch_default (),
+                                                                   stream->idle_disconnect_time_ms,
+                                                                   handle_idle_too_long,
+                                                                   stream);
+}
+
+static void
+ping_idle_disconnect_timer (DskClientStream *stream)
+{
+  if (stream->idle_disconnect_time_ms >= 0
+   && stream->is_connected)
+    dsk_dispatch_adjust_timer_millis (stream->idle_disconnect_timer,
+                                      stream->idle_disconnect_time_ms);
 }
 
 static void
@@ -285,6 +314,8 @@ begin_connecting_sockaddr (DskClientStream *stream,
 {
   int fd;
   dsk_assert (stream->fd == -1);
+  dsk_assert (!stream->is_connecting);
+  dsk_assert (!stream->is_connected);
 retry_sys_socket:
   fd = socket (addr->sa_family, SOCK_STREAM, 0);
   if (fd < 0)
@@ -317,7 +348,7 @@ retry_sys_connect:
       
       if (e == EAGAIN)
         {
-          stream->is_connecting = 1;
+          stream->is_connecting = DSK_TRUE;
           stream->fd = fd;
           dsk_dispatch_watch_fd (dsk_dispatch_default (), fd,
                                  DSK_EVENT_WRITABLE|DSK_EVENT_READABLE,
@@ -333,7 +364,7 @@ retry_sys_connect:
       goto handle_error;
     }
 
-  stream->is_connected = 1;
+  stream->is_connected = DSK_TRUE;
   stream->fd = fd;
   handle_fd_connected (stream);
   return;
@@ -471,6 +502,28 @@ begin_connecting (DskClientStream *stream)
     }
 }
 
+static void
+dsk_client_stream_finalize (DskClientStream *stream)
+{
+  dsk_hook_clear (&stream->sink.base_instance.writable_hook);
+  stream->sink->owner = NULL;
+  dsk_object_unref (stream->sink);
+  dsk_hook_clear (&stream->source.base_instance.readable_hook);
+  stream->source->owner = NULL;
+  dsk_object_unref (stream->source);
+  dsk_hook_clear (&stream->disconnect_hook);
+  dsk_hook_clear (&stream->connect_hook);
+  dsk_hook_clear (&stream->error_hook);
+  if (stream->latest_error)
+    dsk_error_unref (stream->latest_error);
+  if (stream->idle_disconnect_timer)
+    dsk_dispatch_remove_timer (stream->idle_disconnect_timer);
+  if (stream->reconnect_timer)
+    dsk_dispatch_remove_timer (stream->reconnect_timer);
+  dsk_free (stream->name);
+}
+
+
 DskClientStreamClass dsk_client_stream_class =
 {
   DSK_OBJECT_CLASS_DEFINE(DskClientStream, &dsk_object_class,
@@ -485,7 +538,33 @@ dsk_client_stream_source_read (DskOctetSource *source,
                                void           *data_out,
                                DskError      **error)
 {
-  ...
+  int n_read;
+  DskClientStream *stream = ((DskClientStreamSource*)source)->owner;
+  if (stream == NULL)
+    {
+      dsk_set_error (error, "write to dead client stream");
+      return -1;
+    }
+  if (stream->fd < 0)
+    {
+      dsk_set_error (error, "no file-descriptor");
+      return -1;
+    }
+  if (stream->is_connecting)
+    {
+      dsk_set_error (error, "file-descriptor %d not connected yet", stream->fd);
+      return -1;
+    }
+  n_read = read (stream->fd, data_out, max_len);
+  if (n_read < 0)
+    {
+      if (errno == EINTR || errno == EAGAIN)
+        return 0;
+      dsk_set_error (error, "error reading from client stream (fd %d): %s",
+                     stream->fd, strerror (errno));
+      return -1;
+    }
+  return n_read;
 }
 
 static int
@@ -493,7 +572,28 @@ dsk_client_stream_source_read_buffer  (DskOctetSource *source,
                                        DskBuffer      *read_buffer,
                                        DskError      **error)
 {
-  ...
+  int rv;
+  DskClientStream *stream = ((DskClientStreamSource*)source)->stream;
+  if (stream == NULL)
+    {
+      dsk_set_error (error, "read from dead stream");
+      return -1;
+    }
+  if (stream->fd < 0)
+    {
+      dsk_set_error (error, "read from stream with no file-descriptor");
+      return -1;
+    }
+  rv = dsk_buffer_readv (stream->fd, read_buffer);
+  if (rv < 0)
+    {
+      if (errno == EINTR || errno == EAGAIN)
+        return 0;
+      dsk_set_error (error, "error reading data from fd %u: %s",
+                     stream->fd, strerror (errno));
+      return -1;
+    }
+  return rv;
 }
 
 static void
