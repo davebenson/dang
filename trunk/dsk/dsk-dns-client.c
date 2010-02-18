@@ -190,3 +190,64 @@ struct _DskDnsHeader
   unsigned arcount:16;
 };
 
+static GskDnsMessage *
+dsk_dns_parse_buffer_internal (const uint8_t *data,
+			       guint        *num_bytes_parsed)
+{
+  DskDnsHeader header;
+  guint i;
+  guint question_count;
+  guint answer_count;
+  guint auth_count;
+  guint addl_count;
+  GskDnsMessage *message = NULL;
+  GskBufferIterator iterator;
+
+  dsk_assert (sizeof (header) == 12);
+  memcpy (&header, data, 12);
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+  header.qid = htons (header.qid);
+  header.qdcount = htons (header.qdcount);
+  header.ancount = htons (header.ancount);
+  header.nscount = htons (header.nscount);
+  header.arcount = htons (header.arcount);
+#endif
+
+  /* question section */
+  for (i = 0; i < header.qdcount; i++)
+    {
+      DskDnsQuestion *question = parse_question (&iterator, message);
+      if (question == NULL)
+	{
+	  PARSE_FAIL ("question section");
+	  goto fail;
+	}
+      message->questions = g_slist_prepend (message->questions, question);
+    }
+  message->questions = g_slist_reverse (message->questions);
+
+  /* the other three sections are the same: a list of resource-records */
+  if (!parse_resource_record_list (&iterator, answer_count,
+				   &message->answers, "answer", message))
+    goto fail;
+  if (!parse_resource_record_list (&iterator, auth_count,
+				   &message->authority, "authority", message))
+    goto fail;
+  if (!parse_resource_record_list (&iterator, addl_count,
+				   &message->additional, "additional", message))
+    goto fail;
+
+  g_assert (g_slist_length (message->questions) == question_count);
+  g_assert (g_slist_length (message->answers) == answer_count);
+  g_assert (g_slist_length (message->authority) == auth_count);
+  g_assert (g_slist_length (message->additional) == addl_count);
+
+  if (num_bytes_parsed != NULL)
+    *num_bytes_parsed = gsk_buffer_iterator_offset (&iterator);
+  return message;
+
+fail:
+  if (message != NULL)
+    gsk_dns_message_unref (message);
+  return NULL;
