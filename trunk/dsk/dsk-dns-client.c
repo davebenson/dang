@@ -190,18 +190,84 @@ struct _DskDnsHeader
   unsigned arcount:16;
 };
 
-static GskDnsMessage *
-dsk_dns_parse_buffer_internal (const uint8_t *data,
-			       guint        *num_bytes_parsed)
+struct _DskDnsMessage
 {
   DskDnsHeader header;
-  guint i;
-  guint question_count;
-  guint answer_count;
-  guint auth_count;
-  guint addl_count;
-  GskDnsMessage *message = NULL;
-  GskBufferIterator iterator;
+  DskDnsQuestion *questions;
+  DskDnsResourceRecord *answers;
+  DskDnsResourceRecord *authority;
+  DskDnsResourceRecord *additional;
+};
+
+struct _StrInfo
+{
+  uint16_t offset;
+  uint16_t length;
+  uint16_t flags;
+};
+struct _UsedStr
+{
+  unsigned offset;
+  char *str;
+};
+typedef enum
+{
+  STR_INFO_FLAG_USED = 1,
+  STR_INFO_FLAG_COMPUTING_LENGTH = 2
+} StrInfoFlags;
+
+static dsk_boolean
+compute_length (unsigned n_str_info,
+                StrInfo *str_info,
+                const uint8_t *data,
+                unsigned i,
+                const char **msg)
+{
+  str_info[i].flags |= STR_INFO_FLAG_COMPUTING_LENGTH;
+  at = data + str_info[i].offset;
+  len = 0;
+  while (*at != 0 && (*at & 0xc0) == 0)
+    {
+      unsigned L = *at;
+      len += L + 1;
+      at += L + 1;
+    }
+  if (*at != 0)
+    {
+      if ((*at & 0xc0) != 0xc0)
+        {
+          ...
+        }
+      new_offset = ((*at - 0xc0) << 8) + at[1];
+
+      /* bsearch new offset */
+      ...
+
+      /* check for circular loop */
+      ...
+
+      if (!compute_length (n_str_info, str_info, data, new_i, msg))
+        return DSK_FALSE;
+      len += str_info[i].length + 1;
+    }
+
+  str_info[i].length = len ? (len - 1) : 0;
+  str_info[i].flags &= ~STR_INFO_FLAG_COMPUTING_LENGTH;
+  str_info[i].flags |= STR_INFO_FLAG_HAS_LENGTH;
+  return DSK_TRUE;
+}
+
+static DskDnsMessage *
+parse_message (unsigned       len,
+               const uint8_t *data,
+               DskError     **error)
+{
+  DskDnsHeader header;
+  if (len < 12)
+    {
+      dsk_set_error (error, "dns packet too short (<12 bytes)");
+      return NULL;
+    }
 
   dsk_assert (sizeof (header) == 12);
   memcpy (&header, data, 12);
@@ -214,40 +280,137 @@ dsk_dns_parse_buffer_internal (const uint8_t *data,
   header.arcount = htons (header.arcount);
 #endif
 
-  /* question section */
+  /* obtain a list of offsets to strings.
+     each name may lead to N offsets,
+     but that list should be exhaustive and unique,
+     b/c strings can only appear in places we recognize.
+     distinguish the offset that are used from those that aren't. */
+  str_info = alloca (sizeof (StrInfo) * N_INIT_STR_INFO);
+  n_str_info = 0;
+  str_info_alloced = N_INIT_STR_INFO;
+  used = 12;
   for (i = 0; i < header.qdcount; i++)
     {
-      DskDnsQuestion *question = parse_question (&iterator, message);
-      if (question == NULL)
-	{
-	  PARSE_FAIL ("question section");
-	  goto fail;
-	}
-      message->questions = g_slist_prepend (message->questions, question);
+      if (!gather_names (len, data, &used, &n_str_info, &str_info,
+                         &str_info_alloced, error))
+        goto cleanup;
+      used += 4;
     }
-  message->questions = g_slist_reverse (message->questions);
+  total_rr = header.ancount + header.nscount + header.arcount;
+  for (i = 0; i < total_rr; i++)
+    {
+      if (!gather_names_resource_record (len, data,
+                                         &used, &n_str_info, &str_info,
+                                         &str_info_alloced, error))
+        goto cleanup;
+    }
 
-  /* the other three sections are the same: a list of resource-records */
-  if (!parse_resource_record_list (&iterator, answer_count,
-				   &message->answers, "answer", message))
-    goto fail;
-  if (!parse_resource_record_list (&iterator, auth_count,
-				   &message->authority, "authority", message))
-    goto fail;
-  if (!parse_resource_record_list (&iterator, addl_count,
-				   &message->additional, "additional", message))
-    goto fail;
+  /* compute the length of each offset, detecting cycles. */
+  if (n_str_info > 0)
+    {
+      unsigned o;
+      GSK_QSORT (...);
+      for (i = 1, o = 0;
+           i < n_str_info;
+           i++)
+        {
+          if (str_info[o].offset == str_info[i].offset)
+            {
+              str_info[o].flags |= str_info[i].flags;
+            }
+          else
+            {
+              str_info[++o] = str_info[i];
+            }
+        }
+      n_str_info = o + 1;
+      for (i = 0; i < n_str_info; i++)
+        if ((str_info[i].flags & STR_INFO_FLAG_HAS_LENGTH) == 0
+         && !compute_length (n_str_info, str_info, data, i, &msg))
+          {
+            dsk_set_error (error, "error decompressing name: %s", msg);
+            goto cleanup;
+          }
+    }
 
-  g_assert (g_slist_length (message->questions) == question_count);
-  g_assert (g_slist_length (message->answers) == answer_count);
-  g_assert (g_slist_length (message->authority) == auth_count);
-  g_assert (g_slist_length (message->additional) == addl_count);
+  /* figure the length of string-space needed */
+  for (i = 0; i < n_str_info; i++)
+    if (str_info[i].flags & STR_INFO_FLAG_USED)
+      {
+        str_space += str_info[i].length + 1;
+        n_used_strs++;
+      }
 
-  if (num_bytes_parsed != NULL)
-    *num_bytes_parsed = gsk_buffer_iterator_offset (&iterator);
-  return message;
+  /* allocate space for the message */
+  message = dsk_malloc (sizeof (DskDnsMessage)
+                        + sizeof (DskDnsQuestion) * header.qdcount
+                        + sizeof (DskDnsResourceRecord) * total_rr
+                        + str_space);
+  message->n_questions = header.qdcount;
+  message->questions = (DskDnsQuestion *) (message + 1);
+  message->n_answer_rr = header.ancount;
+  message->answer_rr = (DskDnsResourceRecord *) (message->questions + message->n_questions);
+  message->n_ns_rr = header.nscount;
+  message->ns_rr = message->answer_rr + message->n_answer_rr;
+  message->n_authority_rr = header.aucount;
+  message->authority_rr = message->ns_rr + message->n_ns_rr;
+  str_heap = (char*) (message->authority_rr + message->n_authority_rr);
 
-fail:
-  if (message != NULL)
-    gsk_dns_message_unref (message);
-  return NULL;
+  /* reserve space for the 4 sections; then build the needed
+     strings, making a map 'offset' to 'char*' */
+  used_strs = alloca (sizeof (UsedStr) * n_used_strs);
+  str_heap_at = str_heap;
+  n_used_strs = 0;
+  for (i = 0; i < n_str_info; i++)
+    if (str_info[i].flags & STR_INFO_FLAG_USED)
+      {
+        used_strs[n_used_strs].offset = str_info[i].offset;
+        used_strs[n_used_strs].str = str_heap_at;
+        decompress_str (data, str_info[i].offset, &str_heap_at);
+        n_used_strs++;
+      }
+
+  /* parse the four sections */
+  used = 12;
+  for (i = 0; i < header.qdcount; i++)
+    if (!parse_question (...))
+      goto cleanup;
+
+////  /* question section */
+////  used = 12;
+////  for (i = 0; i < header.qdcount; i++)
+////    {
+////      DskDnsQuestion *question = parse_question (&iterator, message);
+////      if (question == NULL)
+////	{
+////	  PARSE_FAIL ("question section");
+////	  goto fail;
+////	}
+////      message->questions = g_slist_prepend (message->questions, question);
+////    }
+////  message->questions = g_slist_reverse (message->questions);
+////
+////  /* the other three sections are the same: a list of resource-records */
+////  if (!parse_resource_record_list (&iterator, answer_count,
+////				   &message->answers, "answer", message))
+////    goto fail;
+////  if (!parse_resource_record_list (&iterator, auth_count,
+////				   &message->authority, "authority", message))
+////    goto fail;
+////  if (!parse_resource_record_list (&iterator, addl_count,
+////				   &message->additional, "additional", message))
+////    goto fail;
+////
+////  g_assert (g_slist_length (message->questions) == question_count);
+////  g_assert (g_slist_length (message->answers) == answer_count);
+////  g_assert (g_slist_length (message->authority) == auth_count);
+////  g_assert (g_slist_length (message->additional) == addl_count);
+////
+////  if (num_bytes_parsed != NULL)
+////    *num_bytes_parsed = gsk_buffer_iterator_offset (&iterator);
+////  return message;
+////
+////fail:
+////  if (message != NULL)
+////    gsk_dns_message_unref (message);
+////  return NULL;
