@@ -1,6 +1,4 @@
 
-
-
 /* Used for binary packing/unpacking */
 typedef struct _DskDnsHeader DskDnsHeader;
 struct _DskDnsHeader
@@ -54,6 +52,19 @@ typedef enum
   STR_INFO_FLAG_COMPUTING_LENGTH = 2
 } StrInfoFlags;
 
+static int compare_str_info (const void *a, const void *b)
+{
+  const StrInfo *A = a;
+  const StrInfo *B = b;
+  if (A->offset < B->offset)
+    return -1;
+  else if (A->offset > B->offset)
+    return 1;
+  else
+    return 0;
+}
+
+
 static dsk_boolean
 compute_length (unsigned n_str_info,
                 StrInfo *str_info,
@@ -72,20 +83,35 @@ compute_length (unsigned n_str_info,
     }
   if (*at != 0)
     {
+      StrInfo dummy;
       if ((*at & 0xc0) != 0xc0)
         {
-          ...
+          *msg = "bad pointer";
+          return DSK_FALSE;
         }
-      new_offset = ((*at - 0xc0) << 8) + at[1];
+      dummy.offset = ((*at - 0xc0) << 8) + at[1];
 
       /* bsearch new offset */
-      ...
+      dst = bsearch (&dummy, str_info, n_str_info, sizeof (StrInfo),
+                     compare_str_info);
+      if (dst == NULL)
+        {
+          *msg = "invalid offset";
+          return DSK_FALSE;
+        }
+      if ((dst->flags & STR_INFO_FLAG_HAS_LENGTH) == 0)
+        {
+          if (dst->flags & STR_INFO_FLAG_COMPUTING_LENGTH)
+            {
+              *msg = "circular name compression";
+              return DSK_FALSE;
+            }
+          if (!compute_length (n_str_info, str_info, 
+                               data, dst - str_info,
+                               msg))
+            return DSK_FALSE;
+        }
 
-      /* check for circular loop */
-      ...
-
-      if (!compute_length (n_str_info, str_info, data, new_i, msg))
-        return DSK_FALSE;
       len += str_info[i].length + 1;
     }
 
@@ -170,23 +196,6 @@ gather_names (unsigned       len,
   return DSK_TRUE;
 }
 
-/* b == any byte
-   s == any string */
-static dsk_boolean
-gather_names_generic (const char *code,
-                      unsigned       len,
-                      const uint8_t *data,
-                      unsigned       rdlength,
-                      unsigned      *used_inout, 
-                      unsigned      *n_str_info_inout,
-                      StrInfo      **str_info_inout,
-                      unsigned      *str_info_alloced_inout,
-                      DskError     **error)
-{
-  unsigned old_used = *used_inout;
-  ....
-}
-
 
 static dsk_boolean
 gather_names_resource_record (unsigned       len,
@@ -198,6 +207,7 @@ gather_names_resource_record (unsigned       len,
                               DskError     **error)
 {
   const char *code;
+  uint8_t header[10];
   /* owner */
   if (!gather_names (len, data, used_inout,
                      n_str_info_inout, str_info_inout, str_info_alloced_inout,
@@ -205,7 +215,8 @@ gather_names_resource_record (unsigned       len,
     return DSK_FALSE;
   if (*used_inout + 10 > len)
     {
-      ...
+      dsk_set_error (error, "truncated resource-record");
+      return DSK_FALSE;
     }
   memcpy (header, data + *used_inout, 10);
   *used_inout += 10;
@@ -213,7 +224,8 @@ gather_names_resource_record (unsigned       len,
   rdlength = ((guint16)header[8] << 8)  | ((guint16)header[9] << 0);
   if (*used_inout + rdlength > len)
     {
-      ...
+      dsk_set_error (error, "truncated resource-data");
+      return DSK_FALSE;
     }
   rddata = data + *used_inout;
   switch (type)
@@ -288,7 +300,85 @@ truncated:
   return DSK_FALSE;
 }
 
+static dsk_boolean
+parse_question (unsigned          len,
+                const uint8_t    *data,
+                unsigned         *used_inout,
+                DskDnsQuestion   *question,
+                unsigned          n_used_strs,
+                UsedStr          *used_strs,
+                DskError        **error)
+{
+  const char *name;
+  uint16_t array[2];
+  name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+  if (*used_inout + 4 > len)
+    {
+      dsk_set_error (error, "data truncated in question");
+      return DSK_FALSE;
+    }
+  memcpy (array, data + *used_inout, 4);
+  *used_inout += 4;
+  question->name = name;
+  question->type = htons (qarray[0]);
+  question->question_class = htons (qarray[0]);
+  return DSK_TRUE;
+}
 
+static dsk_boolean
+parse_resource_record (unsigned              len,
+                       const uint8_t        *data,
+                       unsigned             *used_inout,
+                       DskDnsResourceRecord *rr,
+                       unsigned              n_used_strs,
+                       UsedStr              *used_strs,
+                       DskError            **error)
+{
+  const char *name;
+  uint8_t header[10];
+  uint16_t type;
+  uint16_t class;
+  uint32_t ttl;
+  uint16_t rdlength;
+  rr->name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+  if (*used_inout + 4 > len)
+    {
+      dsk_set_error (error, "data truncated in resource-record header");
+      return DSK_FALSE;
+    }
+  type     = ((uint16_t)header[0] << 8)  | ((uint16_t)header[1] << 0);
+  class    = ((uint16_t)header[2] << 8)  | ((uint16_t)header[3] << 0);
+  ttl      = ((uint32_t)header[4] << 24) | ((uint32_t)header[5] << 16)
+           | ((uint32_t)header[6] << 8)  | ((uint32_t)header[7] << 0);
+  rdlength = ((uint16_t)header[8] << 8)  | ((uint16_t)header[9] << 0);
+  switch (type)
+    {
+    case DSK_DNS_RR_HOST_ADDRESS:
+      ...
+    case DSK_DNS_RR_HOST_ADDRESS_IPV6:
+      ...
+    case DSK_DNS_RR_NAME_SERVER:
+      ...
+    case DSK_DNS_RR_CANONICAL_NAME:
+      ...
+    case DSK_DNS_RR_HOST_INFO:
+      ...
+    case DSK_DNS_RR_MAIL_EXCHANGE:
+      ...
+    case DSK_DNS_RR_POINTER:
+      ...
+    case DSK_DNS_RR_START_OF_AUTHORIT:
+      ...
+    case DSK_DNS_RR_TEX:
+      ...
+    case DSK_DNS_RR_WELL_KNOWN_SERVIC:
+      ...
+    default:
+      dsk_set_error (error, "invalid type %u of resource-record", type);
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
 
 DskDnsMessage *
 dsk_dns_message_parse (unsigned       len,
@@ -342,7 +432,7 @@ dsk_dns_message_parse (unsigned       len,
   if (n_str_info > 0)
     {
       unsigned o;
-      DSK_QSORT (...);
+      qsort (str_info, n_str_info, sizeof (StrInfo), compare_str_info);
       for (i = 1, o = 0;
            i < n_str_info;
            i++)
@@ -406,50 +496,41 @@ dsk_dns_message_parse (unsigned       len,
   /* parse the four sections */
   used = 12;
   for (i = 0; i < header.qdcount; i++)
-    if (!parse_question (len - used, data + used,
+    if (!parse_question (len, data, &used,
                          &message->questions[i],
                          n_used_strs, used_strs,
                          error))
       goto cleanup;
   for (i = 0; i < total_rr; i++)
-    if (!parse_rr (...)
-    }
+    if (!parse_resource_record (len, data, &used,
+                                &message->answer_rr[i],
+                                n_used_strs, used_strs,
+                                error))
+      goto cleanup;
 
-////  /* question section */
-////  used = 12;
-////  for (i = 0; i < header.qdcount; i++)
-////    {
-////      DskDnsQuestion *question = parse_question (&iterator, message);
-////      if (question == NULL)
-////	{
-////	  PARSE_FAIL ("question section");
-////	  goto fail;
-////	}
-////      message->questions = g_slist_prepend (message->questions, question);
-////    }
-////  message->questions = g_slist_reverse (message->questions);
-////
-////  /* the other three sections are the same: a list of resource-records */
-////  if (!parse_resource_record_list (&iterator, answer_count,
-////				   &message->answers, "answer", message))
-////    goto fail;
-////  if (!parse_resource_record_list (&iterator, auth_count,
-////				   &message->authority, "authority", message))
-////    goto fail;
-////  if (!parse_resource_record_list (&iterator, addl_count,
-////				   &message->additional, "additional", message))
-////    goto fail;
-////
-////  g_assert (g_slist_length (message->questions) == question_count);
-////  g_assert (g_slist_length (message->answers) == answer_count);
-////  g_assert (g_slist_length (message->authority) == auth_count);
-////  g_assert (g_slist_length (message->additional) == addl_count);
-////
-////  if (num_bytes_parsed != NULL)
-////    *num_bytes_parsed = gsk_buffer_iterator_offset (&iterator);
-////  return message;
-////
-////fail:
-////  if (message != NULL)
-////    gsk_dns_message_unref (message);
-////  return NULL;
+  if (str_info_alloced > N_INIT_STR_INFO)
+    dsk_free (str_info);
+  return message;
+
+cleanup:
+  if (str_info_alloced > N_INIT_STR_INFO)
+    dsk_free (str_info);
+  return NULL;
+}
+
+/* === dsk_dns_message_serialize === */
+uint8_t *
+dsk_dns_message_serialize (DskDnsMessage *message,
+                           unsigned      *length_out)
+{
+  /* build tree of strings */
+  ...
+
+  /* scan through figuring out how long the packed data will be. */
+  ...
+
+  /* pack the message */
+  ...
+
+  return rv;
+}
