@@ -192,6 +192,9 @@ struct _DskDnsMessage
   DskDnsResourceRecord *additional;
 };
 
-DskDnsMessage *dsk_dns_message_parse (unsigned       len,
-                                      const uint8_t *data,
-                                      DskError     **error);
+DskDnsMessage *dsk_dns_message_parse     (unsigned       len,
+                                          const uint8_t *data,
+                                          DskError     **error);
+uint8_t *      dsk_dns_message_serialize (DskDnsMessage *message,
+                                          unsigned      *length_out);
+
