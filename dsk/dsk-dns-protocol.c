@@ -519,15 +519,74 @@ cleanup:
 }
 
 /* === dsk_dns_message_serialize === */
+struct _StrTreeNode
+{
+  unsigned offset;
+  const char *str;
+
+  /* Tree for the next word */
+  StrTreeNode *subtree;
+
+  /* child nodes */
+  StrTreeNode *left, *right, *parent;
+  unsigned is_red;
+};
+
+static unsigned 
+get_name_size (DskDnsQuestion *question,
+               StrTreeNode   **p_top,
+               StrTreeNode   **p_heap)
+{
+  ...
+}
+
+static unsigned 
+get_question_size (DskDnsQuestion *question,
+                   StrTreeNode   **p_top,
+                   StrTreeNode   **p_heap)
+{
+  return get_name_size (question->name, p_top, p_heap) + 4;
+}
+static unsigned
+get_rr_size (DskDnsResourceRecord *rr,
+             StrTreeNode         **p_top,
+             StrTreeNode         **p_heap)
+{
+  ...
+}
+
 uint8_t *
 dsk_dns_message_serialize (DskDnsMessage *message,
                            unsigned      *length_out)
 {
-  /* build tree of strings */
-  ...
+  unsigned max_str_nodes = 1;
+  StrTreeNode *nodes;
+  StrTreeNode *nodes_at;                /* next node to us */
+  StrTreeNode *top = NULL;
+  unsigned i;
+
+  for (i = 0; i < message->n_questions; i++)
+    max_str_nodes += get_question_n_components (message->questions + i);
+  for (i = 0; i < message->n_answer_rr; i++)
+    max_str_nodes += get_rr_n_components (message->answer_rr + i);
+  for (i = 0; i < message->n_ns_rr; i++)
+    max_str_nodes += get_rr_n_components (message->ns_rr + i);
+  for (i = 0; i < message->n_authority_rr; i++)
+    max_str_nodes += get_rr_n_components (message->authority_rr + i);
 
   /* scan through figuring out how long the packed data will be. */
-  ...
+  nodes = alloca (sizeof (StrTreeNode) * max_str_nodes);
+  nodes_at = nodes;
+  size = 12;
+  for (i = 0; i < message->n_questions; i++)
+    size += get_question_size (message->questions + i, &top, &nodes_at);
+  for (i = 0; i < message->n_answer_rr; i++)
+    size += get_rr_size (message->answer_rr + i, &top, &nodes_at);
+  for (i = 0; i < message->n_ns_rr; i++)
+    size += get_rr_size (message->ns_rr + i, &top, &nodes_at);
+  for (i = 0; i < message->n_authority_rr; i++)
+    size += get_rr_size (message->authority_rr + i, &top, &nodes_at);
+  dsk_assert (nodes_at - nodes <= max_str_nodes);
 
   /* pack the message */
   ...
