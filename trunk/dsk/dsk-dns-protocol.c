@@ -532,12 +532,136 @@ struct _StrTreeNode
   unsigned is_red;
 };
 
+static unsigned get_name_n_components (const char *str)
+{
+  unsigned rv = 0;
+  if (*str == '.')
+    str++;
+  while (*str)
+    {
+      if (*str == '.')
+        {
+          if (str[1] == 0)
+            break;
+          rv++;
+        }
+      str++;
+    }
+  return rv;
+}
+static unsigned
+get_question_n_components (DskDnsQuestion *question)
+{
+  return get_name_n_components (question->name)
+}
+static unsigned
+get_rr_n_components (DskDnsResourceRecord *rr)
+{
+  unsigned rv = get_name_n_components (rr->owner);
+  switch (rr->type)
+    {
+    case DSK_DNS_RR_NAME_SERVER:
+    case DSK_DNS_RR_CANONICAL_NAME:
+    case DSK_DNS_RR_POINTER:
+      rv += get_name_n_components (rr->rdata.domain_name);
+      break;
+    case DSK_DNS_RR_MAIL_EXCHANGE:
+      rv += get_name_n_components (rr->rdata.mx.mail_exchange_host_name);
+      break;
+    case DSK_DNS_RR_START_OF_AUTHORITY:
+      rv += get_name_n_components (rr->rdata.soa.mname);
+      break;
+    default:
+      break;
+    }
+  return rv;
+}
+
+static int
+compare_dot_terminated_strs (const char *a,
+                             const char *b)
+{
+#define IS_END_CHAR(c)  ((c) == 0 || (c) == '.')
+  char ca, cb;
+  while (!IS_END_CHAR (*a) && !IS_END_CHAR (*b))
+    {
+      if (*a < *b) return -1;
+      else if (*a > *b) return 1;
+      a++, b++;
+    }
+  ca = (*a == '.') ? 0 : *a;
+  cb = (*b == '.') ? 0 : *b;
+  return (ca < cb) ? -1 : (ca > cb) ? 1 : 0;
+#undef IS_END_CHAR
+}
+
+#define COMPARE_STR_TREE_NODES(a,b, rv) \
+         rv = compare_dot_terminated_strs (a->str, b->str)
+#define COMPARE_STR_TO_TREE_NODE(a,b, rv) \
+         rv = compare_dot_terminated_strs (a, b->str)
+
+#define STR_NODE_GET_TREE(p_top) \
+  (*p_top), StrTreeNode*,  \
+  GSK_STD_GET_IS_RED, GSK_STD_SET_IS_RED, \
+  parent, left, right, \
+  COMPARE_STR_TREE_NODES
+
 static unsigned 
-get_name_size (DskDnsQuestion *question,
+get_name_size (const char     *name,
                StrTreeNode   **p_top,
                StrTreeNode   **p_heap)
 {
-  ...
+  const char *end = strchr (name, 0);
+  StrTreeNode *p_at = p_top;
+  dsk_boolean is_first = DSK_TRUE;
+  dsk_boolean use_ptr = DSK_FALSE;
+  unsigned str_size = 0;
+  if (end == name)
+    return 1;
+  for (;;)
+    {
+      const char *cstart;
+      StrTreeNode *child;
+      while (end >= name && end[-1] == '.')
+        end--;
+      if (end == name)
+        break;
+      cstart = end;
+      while (cstart >= name && cstart[-1] != '.')
+        cstart--;
+      if (*p_at != NULL)
+        /* lookup child with this name */
+        GSK_RBTREE_LOOKUP_COMPARATOR (STR_NODE_GET_TREE (p_at),
+                                      cstart, COMPARE_STR_TO_TREE_NODE,
+                                      child);
+      else
+        child = NULL;
+      if (is_first)
+        {
+          use_ptr = (child != NULL);
+          is_first = DSK_FALSE;
+        }
+      if (child == NULL)
+        {
+          /* create new node */
+          child = *p_heap++;
+          memset (child, 0, sizeof (StrTreeNode));
+
+          /* insert node */
+          GSK_RBTREE_INSERT (STR_NODE_GET_TREE (p_at), 
+                             child, conflict);
+          dsk_assert (conflict == NULL);
+
+          /* increase size */
+          str_size += (end - cstart) + 1;
+        }
+      p_at = &child->subtree;
+
+      if (cstart == name)
+        break;
+      end = cstart - 1;
+    }
+  return str_size + (use_ptr ? 2 : 1);
 }
 
 static unsigned 
@@ -552,7 +676,35 @@ get_rr_size (DskDnsResourceRecord *rr,
              StrTreeNode         **p_top,
              StrTreeNode         **p_heap)
 {
-  ...
+  unsigned rv = get_name_size (rr->owner) + 10;
+  switch (rr->type)
+    {
+    case DSK_DNS_RR_HOST_ADDRESS:
+      rv += 4;
+      break;
+    case DSK_DNS_RR_NAME_SERVER:
+    case DSK_DNS_RR_CANONICAL_NAME:
+    case DSK_DNS_RR_POINTER:
+      rv += get_name_size (rr->rdata.domain_name);
+      break;
+    case DSK_DNS_RR_HOST_INFO:
+      ???
+      break;
+    case DSK_DNS_RR_MAIL_EXCHANGE:
+      ???
+      break;
+    case DSK_DNS_RR_START_OF_AUTHORITY:
+      ???
+      break;
+    case DSK_DNS_RR_TEXT:
+      ???
+      break;
+    case DSK_DNS_RR_HOST_ADDRESS_IPV6:
+      rv += 16;
+      break;
+    default:
+      dsk_assert_not_reached ();
+    }
 }
 
 uint8_t *
