@@ -341,37 +341,43 @@ parse_resource_record (unsigned              len,
   uint32_t ttl;
   uint16_t rdlength;
   rr->name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
-  if (*used_inout + 4 > len)
+  if (*used_inout + 10 > len)
     {
       dsk_set_error (error, "data truncated in resource-record header");
       return DSK_FALSE;
     }
+  memcpy (header, data + *used_inout, 10);
+  *used_inout += 10;
   type     = ((uint16_t)header[0] << 8)  | ((uint16_t)header[1] << 0);
   class    = ((uint16_t)header[2] << 8)  | ((uint16_t)header[3] << 0);
   ttl      = ((uint32_t)header[4] << 24) | ((uint32_t)header[5] << 16)
            | ((uint32_t)header[6] << 8)  | ((uint32_t)header[7] << 0);
   rdlength = ((uint16_t)header[8] << 8)  | ((uint16_t)header[9] << 0);
+  rr->type = type;
+  rr->class_code = class;
+  rr->time_to_live = ttl;
   switch (type)
     {
     case DSK_DNS_RR_HOST_ADDRESS:
-      ...
+      memcpy (rr->rdata.a.ip_address, data + *used_inout, 4);
+      *used_inout += 4;
+      break;
     case DSK_DNS_RR_HOST_ADDRESS_IPV6:
-      ...
+      memcpy (rr->rdata.aaaa.address, data + *used_inout, 16);
+      *used_inout += 16;
+      break;
     case DSK_DNS_RR_NAME_SERVER:
-      ...
     case DSK_DNS_RR_CANONICAL_NAME:
-      ...
+    case DSK_DNS_RR_POINTER:
+      rr->rdata.domain_name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+      break;
     case DSK_DNS_RR_HOST_INFO:
       ...
     case DSK_DNS_RR_MAIL_EXCHANGE:
       ...
-    case DSK_DNS_RR_POINTER:
+    case DSK_DNS_RR_START_OF_AUTHORITT:
       ...
-    case DSK_DNS_RR_START_OF_AUTHORIT:
-      ...
-    case DSK_DNS_RR_TEX:
-      ...
-    case DSK_DNS_RR_WELL_KNOWN_SERVIC:
+    case DSK_DNS_RR_TEXT:
       ...
     default:
       dsk_set_error (error, "invalid type %u of resource-record", type);
@@ -577,6 +583,21 @@ get_rr_n_components (DskDnsResourceRecord *rr)
   return rv;
 }
 
+static unsigned
+get_max_str_nodes (DskDnsMessage *message)
+{
+  unsigned max_str_nodes = 1;
+  for (i = 0; i < message->n_questions; i++)
+    max_str_nodes += get_question_n_components (message->questions + i);
+  for (i = 0; i < message->n_answer_rr; i++)
+    max_str_nodes += get_rr_n_components (message->answer_rr + i);
+  for (i = 0; i < message->n_ns_rr; i++)
+    max_str_nodes += get_rr_n_components (message->ns_rr + i);
+  for (i = 0; i < message->n_authority_rr; i++)
+    max_str_nodes += get_rr_n_components (message->authority_rr + i);
+  return max_str_nodes;
+}
+
 static int
 compare_dot_terminated_strs (const char *a,
                              const char *b)
@@ -676,7 +697,7 @@ get_rr_size (DskDnsResourceRecord *rr,
              StrTreeNode         **p_top,
              StrTreeNode         **p_heap)
 {
-  unsigned rv = get_name_size (rr->owner) + 10;
+  unsigned rv = get_name_size (rr->owner, p_top, p_heap) + 10;
   switch (rr->type)
     {
     case DSK_DNS_RR_HOST_ADDRESS:
@@ -685,19 +706,22 @@ get_rr_size (DskDnsResourceRecord *rr,
     case DSK_DNS_RR_NAME_SERVER:
     case DSK_DNS_RR_CANONICAL_NAME:
     case DSK_DNS_RR_POINTER:
-      rv += get_name_size (rr->rdata.domain_name);
+      rv += get_name_size (rr->rdata.domain_name, p_top, p_heap);
       break;
     case DSK_DNS_RR_HOST_INFO:
-      ???
+      rv += 4;
       break;
     case DSK_DNS_RR_MAIL_EXCHANGE:
-      ???
+      rv += get_name_size (rr->rdata.mx.mail_exchange_host_name, p_top, p_heap);
+      rv += 2;
       break;
     case DSK_DNS_RR_START_OF_AUTHORITY:
-      ???
+      rv += get_name_size (rr->rdata.soa.mname, p_top, p_heap);
+      rv += get_name_size (rr->rdata.soa.rname, p_top, p_heap);
+      rv += 20;
       break;
     case DSK_DNS_RR_TEXT:
-      ???
+      rv += strlen (rr->rdata.text) + 1;
       break;
     case DSK_DNS_RR_HOST_ADDRESS_IPV6:
       rv += 16;
@@ -707,24 +731,36 @@ get_rr_size (DskDnsResourceRecord *rr,
     }
 }
 
+
+static void
+pack_question (DskDnsQuestion *question,
+               uint8_t        *data_start,      /* for computing offsets */
+               uint8_t       **data_inout,
+               StrTreeNode    *top)
+{
+  ...
+}
+
+static void
+pack_rr       (DskDnsResourceRecord *rr,
+               uint8_t        *data_start,      /* for computing offsets */
+               uint8_t       **data_inout,
+               StrTreeNode    *top)
+{
+  ...
+}
+
 uint8_t *
 dsk_dns_message_serialize (DskDnsMessage *message,
                            unsigned      *length_out)
 {
-  unsigned max_str_nodes = 1;
+  unsigned max_str_nodes = get_max_str_nodes (message);
   StrTreeNode *nodes;
   StrTreeNode *nodes_at;                /* next node to us */
   StrTreeNode *top = NULL;
   unsigned i;
-
-  for (i = 0; i < message->n_questions; i++)
-    max_str_nodes += get_question_n_components (message->questions + i);
-  for (i = 0; i < message->n_answer_rr; i++)
-    max_str_nodes += get_rr_n_components (message->answer_rr + i);
-  for (i = 0; i < message->n_ns_rr; i++)
-    max_str_nodes += get_rr_n_components (message->ns_rr + i);
-  for (i = 0; i < message->n_authority_rr; i++)
-    max_str_nodes += get_rr_n_components (message->authority_rr + i);
+  unsigned size;
+  uint8_t *rv, *at;
 
   /* scan through figuring out how long the packed data will be. */
   nodes = alloca (sizeof (StrTreeNode) * max_str_nodes);
@@ -741,7 +777,19 @@ dsk_dns_message_serialize (DskDnsMessage *message,
   dsk_assert (nodes_at - nodes <= max_str_nodes);
 
   /* pack the message */
-  ...
+  rv = dsk_malloc (size);
+  at = rv;
+  pack_message_header (message, &at);
+  for (i = 0; i < message->n_questions; i++)
+    pack_question (message->questions + i, rv, &at, top);
+  for (i = 0; i < message->n_answer_rr; i++)
+    pack_rr (message->answer_rr + i, rv, &at, top);
+  for (i = 0; i < message->n_ns_rr; i++)
+    pack_rr (message->ns_rr + i, rv, &at, top);
+  for (i = 0; i < message->n_authority_rr; i++)
+    pack_rr (message->authority_rr + i, rv, &at, top);
+  dsk_assert ((unsigned)(at - rv) == size);
+  *length_out = size;
 
   return rv;
 }
