@@ -65,5 +65,5 @@ struct _DskDnsCacheEntry
 typedef void (*DskDnsCacheEntryFunc) (DskDnsCacheEntry *entry,
                                       void             *callback_data);
 DskDnsCacheEntry *dsk_dns_lookup_cache_entry (const char       *name,
-                                    DskDnsCacheEntryFunc callback,
-                                    void             *callback_data);
+                                              DskDnsCacheEntryFunc callback,
+                                              void             *callback_data);
