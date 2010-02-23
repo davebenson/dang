@@ -332,6 +332,7 @@ parse_resource_record (unsigned              len,
                        DskDnsResourceRecord *rr,
                        unsigned              n_used_strs,
                        UsedStr              *used_strs,
+                       char                **extra_str_space_inout,
                        DskError            **error)
 {
   const char *name;
@@ -372,13 +373,35 @@ parse_resource_record (unsigned              len,
       rr->rdata.domain_name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
       break;
     case DSK_DNS_RR_HOST_INFO:
-      ...
+      rr->rdata.hinfo.cpu = parse_length_prefixed_string (len, data, used_inout, extra_str_space_inout);
+      rr->rdata.hinfo.os = parse_length_prefixed_string (len, data, used_inout, extra_str_space_inout);
+      break;
     case DSK_DNS_RR_MAIL_EXCHANGE:
-      ...
-    case DSK_DNS_RR_START_OF_AUTHORITT:
-      ...
+      {
+        uint16_t pv;
+        memcpy (&pv, data + *used_inout, 2);
+        rr->rdata.mx.preference_value = htons (pv);
+        *used_inout += 2;
+      }
+      rr->rdata.mx.mail_exchange_host_name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+      break;
+    case DSK_DNS_RR_START_OF_AUTHORITY:
+      rr->rdata.soa.mname = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+      rr->rdata.soa.rname = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+      {
+        uint32_t intervals[5];
+        memcpy (intervals, data + *used_inout, 20);
+	rr->rdata.soa.serial = htonl (intervals[0]);
+	rr->rdata.soa.refresh_time = htonl (intervals[1]);
+	rr->rdata.soa.retry_time = htonl (intervals[2]);
+	rr->rdata.soa.expire_time = htonl (intervals[3]);
+	rr->rdata.soa.minimum_time = htonl (intervals[4]);
+        *used_inout += 20;
+      }
+      break;
     case DSK_DNS_RR_TEXT:
-      ...
+      rr->rdata.text = parse_length_prefixed_string (len, data, used_inout, extra_str_space_inout);
+      break;
     default:
       dsk_set_error (error, "invalid type %u of resource-record", type);
       return DSK_FALSE;
