@@ -318,6 +318,18 @@ truncated:
   return DSK_FALSE;
 }
 
+static char *
+parse_domain_name     (unsigned              len,
+                       const uint8_t        *data,
+                       unsigned             *used_inout,
+                       unsigned              n_used_strs,
+                       UsedStr              *used_strs,
+                       char                **extra_str_space_inout,
+                       DskError            **error)
+{
+  ...
+}
+
 static dsk_boolean
 parse_question (unsigned          len,
                 const uint8_t    *data,
@@ -329,7 +341,7 @@ parse_question (unsigned          len,
 {
   const char *name;
   uint16_t array[2];
-  name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+  name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs, error);
   if (*used_inout + 4 > len)
     {
       dsk_set_error (error, "data truncated in question");
@@ -343,17 +355,6 @@ parse_question (unsigned          len,
   return DSK_TRUE;
 }
 
-static char *
-parse_domain_name     (unsigned              len,
-                       const uint8_t        *data,
-                       unsigned             *used_inout,
-                       unsigned              n_used_strs,
-                       UsedStr              *used_strs,
-                       char                **extra_str_space_inout,
-                       DskError            **error)
-{
-  ...
-}
 static dsk_boolean
 parse_resource_record (unsigned              len,
                        const uint8_t        *data,
