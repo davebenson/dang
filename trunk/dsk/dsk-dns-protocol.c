@@ -1,3 +1,11 @@
+#include <stdlib.h>
+#include <string.h>
+#include "dsk-common.h"
+#include "dsk-object.h"
+#include "dsk-error.h"
+#include "dsk-dns-protocol.h"
+
+#define N_INIT_STR_INFO         64
 
 /* Used for binary packing/unpacking */
 typedef struct _DskDnsHeader DskDnsHeader;
@@ -35,12 +43,14 @@ struct _DskDnsHeader
 
 
 /* === parsing a binary message === */
+typedef struct _StrInfo StrInfo;
 struct _StrInfo
 {
   uint16_t offset;
   uint16_t length;
   uint16_t flags;
 };
+typedef struct _UsedStr UsedStr;
 struct _UsedStr
 {
   unsigned offset;
@@ -49,7 +59,8 @@ struct _UsedStr
 typedef enum
 {
   STR_INFO_FLAG_USED = 1,
-  STR_INFO_FLAG_COMPUTING_LENGTH = 2
+  STR_INFO_FLAG_COMPUTING_LENGTH = 2,
+  STR_INFO_FLAG_HAS_LENGTH = 4
 } StrInfoFlags;
 
 static int compare_str_info (const void *a, const void *b)
@@ -72,6 +83,9 @@ compute_length (unsigned n_str_info,
                 unsigned i,
                 const char **msg)
 {
+  const uint8_t *at;
+  unsigned len;
+  StrInfo *dst;
   str_info[i].flags |= STR_INFO_FLAG_COMPUTING_LENGTH;
   at = data + str_info[i].offset;
   len = 0;
@@ -220,13 +234,16 @@ gather_names_resource_record (unsigned       len,
     }
   memcpy (header, data + *used_inout, 10);
   *used_inout += 10;
-  type = ((guint16)header[0] << 8) | ((guint16)header[1] << 0);
-  rdlength = ((guint16)header[8] << 8)  | ((guint16)header[9] << 0);
+  DskDnsResourceRecordType type;
+  unsigned rdlength;
+  type = ((uint16_t)header[0] << 8) | ((uint16_t)header[1] << 0);
+  rdlength = ((uint16_t)header[8] << 8)  | ((uint16_t)header[9] << 0);
   if (*used_inout + rdlength > len)
     {
       dsk_set_error (error, "truncated resource-data");
       return DSK_FALSE;
     }
+  const uint8_t *rddata;
   rddata = data + *used_inout;
   switch (type)
     {
@@ -244,12 +261,13 @@ gather_names_resource_record (unsigned       len,
     case DSK_DNS_RR_ZONE_TRANSFER:
     case DSK_DNS_RR_ZONE_MAILB:
       dsk_set_error ("unimplemented resource-record type %u", type);
-      return NULL;
+      return DSK_FALSE;
     default:
       dsk_set_error ("unknown resource-record type %u", type);
-      return NULL;
+      return DSK_FALSE;
     }
 
+  unsigned init_used;
   init_used = *used_inout;
   while (*code)
     {
@@ -325,6 +343,17 @@ parse_question (unsigned          len,
   return DSK_TRUE;
 }
 
+static char *
+parse_domain_name     (unsigned              len,
+                       const uint8_t        *data,
+                       unsigned             *used_inout,
+                       unsigned              n_used_strs,
+                       UsedStr              *used_strs,
+                       char                **extra_str_space_inout,
+                       DskError            **error)
+{
+  ...
+}
 static dsk_boolean
 parse_resource_record (unsigned              len,
                        const uint8_t        *data,
@@ -601,7 +630,7 @@ validate_name (const char *domain_name)
             return DSK_FALSE;
           domain_name++;
           n_non_dot++;
-          if (n_non_dot > 255)
+          if (n_non_dot > 63)
             return DSK_FALSE;
         }
     }
@@ -729,8 +758,8 @@ compare_dot_terminated_strs (const char *a,
 #define COMPARE_STR_TO_TREE_NODE(a,b, rv) \
          rv = compare_dot_terminated_strs (a, b->str)
 
-#define STR_NODE_GET_TREE(p_top) \
-  (*p_top), StrTreeNode*,  \
+#define STR_NODE_GET_TREE(top) \
+  (top), StrTreeNode*,  \
   GSK_STD_GET_IS_RED, GSK_STD_SET_IS_RED, \
   parent, left, right, \
   COMPARE_STR_TREE_NODES
@@ -760,7 +789,7 @@ get_name_size (const char     *name,
         cstart--;
       if (*p_at != NULL)
         /* lookup child with this name */
-        GSK_RBTREE_LOOKUP_COMPARATOR (STR_NODE_GET_TREE (p_at),
+        GSK_RBTREE_LOOKUP_COMPARATOR (STR_NODE_GET_TREE (*p_at),
                                       cstart, COMPARE_STR_TO_TREE_NODE,
                                       child);
       else
@@ -860,6 +889,17 @@ pack_message_header (DskDnsMessage *message,
   dsk_assert (sizeof (DskDnsHeader) == 12);
   memcpy (out, &header, 12);
 }
+static void
+write_pointer (uint8_t **data_inout,
+               unsigned offset)
+{
+  /* write pointer */
+  uint8_t bytes[2];
+  bytes[0] = 0xc0 | (up->offset >> 8);
+  bytes[1] = up->offset;
+  memcpy (*data_inout, bytes, 2);
+  *data_inout += 2;
+}
 
 static void
 pack_domain_name  (const char     *name,
@@ -869,7 +909,9 @@ pack_domain_name  (const char     *name,
 {
   StrTreeNode *up = NULL;
 
-  if (name[0] == 0 || strcmp (name, ".") == 0)
+  if (name[0] == '.')
+    name++;
+  if (name[0] == 0)
     {
       **data_inout = 0;
       *data_inout += 1;
@@ -884,10 +926,54 @@ pack_domain_name  (const char     *name,
      or until we run out of components */
   while (name < end)
     {
-      ...
+      const char *beg = end;
+      StrTreeNode *cur;
+      while (beg > name && *beg != '.')
+        beg--;
+      GSK_RBTREE_LOOKUP_COMPARATOR (STR_NODE_GET_TREE (top),
+                                    beg, COMPARE_STR_TO_TREE_NODE,
+                                    cur);
+      dsk_assert (cur != NULL);
+      if (cur->offset == 0)
+        {
+          /* write remaining strings -- first calculate the size
+             then start at the end. */
+          unsigned packed_str_size = (end + 1) - name;
+          char *at = *data_inout + packed_str_size;
+          while (end != name)
+            {
+              const char *beg = end;
+              while (beg > name && *beg != '.')
+                beg--;
+              at -= (end-beg);
+              memcpy (at, beg, end - beg);
+              at--;
+              *at = (end-beg);
+              end = beg;
+              if (end > name)
+                end--;          /* skip . */
+            }
+          dsk_assert (at == *data_inout);
+          *data_inout += packed_str_size;
+
+          if (up != NULL)
+            write_pointer (data_inout, up->offset);
+          else
+            {
+              /* write 0 */
+              **data_inout = 0;
+              *data_inout += 1;
+            }
+          return;
+        }
+      end = beg;
+      if (end > name)
+        end--;
+      up = top;
+      top = cur->subtree;
     }
 
-  ...      
+  write_pointer (data_inout, up->offset);
 }
 
 static void

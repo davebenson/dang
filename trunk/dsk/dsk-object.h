@@ -1,4 +1,6 @@
 
+typedef struct _DskObjectClass DskObjectClass;
+typedef struct _DskObject DskObject;
 struct _DskObjectClass
 {
   const char *name;
@@ -27,8 +29,8 @@ struct _DskObject
 
 /* The object interface */
                  void      *dsk_object_new   (void *object_class);
-DSK_INLINE_FUNCS void       dsk_object_unref (void *object);
-DSK_INLINE_FUNCS DskObject *dsk_object_ref   (void *object);
+DSK_INLINE_FUNC void       dsk_object_unref (void *object);
+DSK_INLINE_FUNC DskObject *dsk_object_ref   (void *object);
                  dsk_boolean dsk_object_is_a (void *object,
                                               void *isa_class);
            dsk_boolean dsk_object_class_is_a (void *object_class,
@@ -67,7 +69,7 @@ DSK_INLINE_FUNCS DskObject *dsk_object_ref   (void *object);
 void dsk_object_handle_last_unref (DskObject *o);
 
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
-DSK_INLINE_FUNCS void      *dsk_object_new   (void *object_class)
+DSK_INLINE_FUNC  void      *dsk_object_new   (void *object_class)
 {
   DskObjectClass *c = object_class;
   DskObject *rv;
@@ -86,7 +88,7 @@ DSK_INLINE_FUNCS void      *dsk_object_new   (void *object_class)
   return rv;
 }
 
-DSK_INLINE_FUNCS void       dsk_object_unref (void *object)
+DSK_INLINE_FUNC  void       dsk_object_unref (void *object)
 {
   DskObject *o = object;
   _dsk_inline_assert (o != NULL);
@@ -96,7 +98,7 @@ DSK_INLINE_FUNCS void       dsk_object_unref (void *object)
     dsk_object_handle_last_unref (o);
 }
 
-DSK_INLINE_FUNCS void      *dsk_object_ref   (void *object)
+DSK_INLINE_FUNC  void      *dsk_object_ref   (void *object)
 {
   DskObject *o = object;
   _dsk_inline_assert (o->ref_count > 0);

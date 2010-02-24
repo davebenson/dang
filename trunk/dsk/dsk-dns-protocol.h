@@ -75,6 +75,7 @@ typedef enum
   DSK_DNS_OP_UPDATE = 5,
 } DskDnsOpcode;
 
+typedef struct _DskDnsQuestion DskDnsQuestion;
 struct _DskDnsQuestion
 {
   /* The domain name for which information is being requested. */
@@ -84,9 +85,7 @@ struct _DskDnsQuestion
   DskDnsResourceRecordType  query_type;
 
   /* The domain where the query applies. */
-  DskDnsResourceClassCode       query_class;
-
-
+  DskDnsClassCode query_class;
 };
 
 
@@ -105,6 +104,7 @@ typedef enum
   DSK_DNS_RCODE_NOTZONE    = 10,
 } DskDnsRcode;
 
+typedef struct _DskDnsResourceRecord DskDnsResourceRecord;
 struct _DskDnsResourceRecord
 {
   DskDnsResourceRecordType  type;
@@ -118,7 +118,7 @@ struct _DskDnsResourceRecord
     /* For DSK_DNS_RR_HOST_ADDRESS and DSK_DNS_CLASS_INTERNET */
     struct
     {
-      guint8 ip_address[4];
+      uint8_t ip_address[4];
     } a;
 
 		/* unsupported */
@@ -126,7 +126,7 @@ struct _DskDnsResourceRecord
     struct
     {
       char *chaos_name;
-      guint16 chaos_address;
+      uint16_t chaos_address;
     } a_chaos;
 
     /* For DSK_DNS_RR_CNAME, DSK_DNS_RR_POINTER, DSK_DNS_RR_NAME_SERVER */
@@ -135,7 +135,7 @@ struct _DskDnsResourceRecord
     /* For DSK_DNS_RR_MAIL_EXCHANGE */
     struct
     {
-      guint preference_value; /* "lower is better" */
+      unsigned preference_value; /* "lower is better" */
 
       char *mail_exchange_host_name;
     } mx;
@@ -169,33 +169,34 @@ struct _DskDnsResourceRecord
 	 of the zone.  Zone transfers preserve this value.  This
 	 value wraps and should be compared using sequence space
 	 arithmetic. */
-      guint32 serial;
+      uint32_t serial;
 
       /* A 32 bit time interval before the zone should be
 	 refreshed. (cf 1034, 4.3.5) [in seconds] */
-      guint32 refresh_time;
+      uint32_t refresh_time;
 
       /* A 32 bit time interval that should elapse before a
 	 failed refresh should be retried. [in seconds] */
-      guint32 retry_time;
+      uint32_t retry_time;
 
       /* A 32 bit time value that specifies the upper limit on
 	 the time interval that can elapse before the zone is no
 	 longer authoritative. [in seconds] */
-      guint32 expire_time;
+      uint32_t expire_time;
 
       /* The unsigned 32 bit minimum TTL field that should be
 	 exported with any RR from this zone. [in seconds] */
-      guint32 minimum_time;
+      uint32_t minimum_time;
     } soa;
 
     struct {
-      guint8 address[16];
+      uint8_t address[16];
     } aaaa;
   } rdata;
 };
 
 
+typedef struct _DskDnsMessage DskDnsMessage;
 struct _DskDnsMessage
 {
   unsigned n_questions;
