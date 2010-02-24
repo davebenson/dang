@@ -566,6 +566,27 @@ struct _StrTreeNode
   unsigned is_red;
 };
 
+static dsk_boolean
+validate_name (const char *domain_name)
+{
+  ...
+}
+
+static dsk_boolean
+validate_question (DskDnsQuestion *question)
+{
+  if (!validate_name (question->name))
+    return DSK_FALSE;
+  ...
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+validate_resource_record (DskDnsResourceRecord *rr)
+{
+  ...
+}
+
 static unsigned get_name_n_components (const char *str)
 {
   unsigned rv = 0;
@@ -787,7 +808,14 @@ pack_domain_name  (const char     *name,
                    uint8_t       **data_inout,
                    StrTreeNode    *top)
 {
+  StrTreeNode *up = NULL;
+
+  /* find last component */
   ...
+
+  /* scan up tree until we find one with offset==0;
+     or until we run out of components */
+  ...      
 }
 
 static void
@@ -810,9 +838,20 @@ pack_resource_record (DskDnsResourceRecord *rr,
                       uint8_t       **data_inout,
                       StrTreeNode    *top)
 {
+  uint8_t *generic;
+  unsigned rdata_len;
   pack_domain_name (rr->owner, data_start, data_inout, top);
+
+  /* reserve space for generic part of resource-record */
+  generic = *data_inout;
+  *data_inout += 10;
+
+  /* pack type-specific rdata */
   ...
-  rr->name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+
+  /* write generic resource-code info */
+  rdata_len = *data_inout - generic;
+  ...
 }
 
 uint8_t *
