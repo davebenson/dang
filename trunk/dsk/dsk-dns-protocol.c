@@ -318,16 +318,49 @@ truncated:
   return DSK_FALSE;
 }
 
-static char *
+static const char *
 parse_domain_name     (unsigned              len,
                        const uint8_t        *data,
                        unsigned             *used_inout,
                        unsigned              n_used_strs,
                        UsedStr              *used_strs,
-                       char                **extra_str_space_inout,
                        DskError            **error)
 {
-  ...
+  char name[MAX_DOMAIN_NAME_LENGTH+1];
+  UsedStr *rv;
+  while (data[*used_inout] != 0
+      && (data[*used_inout] & 0xc0) == 0)
+    {
+      ...
+    }
+  if (data[*used_inout] == 0)
+    {
+      *used_inout += 1;
+    }
+  else
+    {
+      unsigned at = (data[*used_inout] & ~0xc0) << 8
+                  | (data[*used_inout+1]);
+      while (data[at] != 0)
+        {
+          if ((data[at] & 0xc0) == 0xc0)
+            {
+              /* pointer to new location */
+              ...
+            }
+          else
+            {
+              /* new length-prefixed name component */
+              ...
+            }
+        }
+    }
+
+  dummy.str = name;
+  rv = bsearch (&dummy, used_strs, n_used_strs, sizeof (UsedStr),
+                compare_used_strs);
+  dsk_assert (rv != NULL);
+  return rv->str;
 }
 
 static dsk_boolean
