@@ -869,11 +869,24 @@ pack_domain_name  (const char     *name,
 {
   StrTreeNode *up = NULL;
 
-  /* find last component */
-  ...
+  if (name[0] == 0 || strcmp (name, ".") == 0)
+    {
+      **data_inout = 0;
+      *data_inout += 1;
+      return;
+    }
+  end = strchr (name, 0);
+  end--;
+  if (*end == '.')
+    end--;
 
   /* scan up tree until we find one with offset==0;
      or until we run out of components */
+  while (name < end)
+    {
+      ...
+    }
+
   ...      
 }
 
