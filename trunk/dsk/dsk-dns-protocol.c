@@ -498,15 +498,20 @@ dsk_dns_message_parse (unsigned       len,
                         + sizeof (DskDnsQuestion) * header.qdcount
                         + sizeof (DskDnsResourceRecord) * total_rr
                         + str_space);
+  message->id = header.qid;
+  message->is_query = header.qr ^ 1;
+  message->is_authoritative = header.aa;
+  message->recursion_desired = header.rd;
+  message->recursion_available = header.ra;
   message->n_questions = header.qdcount;
   message->questions = (DskDnsQuestion *) (message + 1);
   message->n_answer_rr = header.ancount;
   message->answer_rr = (DskDnsResourceRecord *) (message->questions + message->n_questions);
-  message->n_ns_rr = header.nscount;
-  message->ns_rr = message->answer_rr + message->n_answer_rr;
-  message->n_authority_rr = header.aucount;
-  message->authority_rr = message->ns_rr + message->n_ns_rr;
-  str_heap = (char*) (message->authority_rr + message->n_authority_rr);
+  message->n_authority_rr = header.nscount;
+  message->authority_rr = message->answer_rr + message->n_answer_rr;
+  message->n_additional_rr = header.arcount;
+  message->additional_rr = message->authority_rr + message->n_authority_rr;
+  str_heap = (char*) (message->additional_rr + message->n_additional_rr);
 
   /* reserve space for the 4 sections; then build the needed
      strings, making a map 'offset' to 'char*' */
@@ -614,10 +619,10 @@ get_max_str_nodes (DskDnsMessage *message)
     max_str_nodes += get_question_n_components (message->questions + i);
   for (i = 0; i < message->n_answer_rr; i++)
     max_str_nodes += get_rr_n_components (message->answer_rr + i);
-  for (i = 0; i < message->n_ns_rr; i++)
-    max_str_nodes += get_rr_n_components (message->ns_rr + i);
   for (i = 0; i < message->n_authority_rr; i++)
     max_str_nodes += get_rr_n_components (message->authority_rr + i);
+  for (i = 0; i < message->n_additional_rr; i++)
+    max_str_nodes += get_rr_n_components (message->additional_rr + i);
   return max_str_nodes;
 }
 
@@ -754,6 +759,36 @@ get_rr_size (DskDnsResourceRecord *rr,
     }
 }
 
+static void
+pack_message_header (DskDnsMessage *message,
+                     uint8_t       *out)
+{
+  DskDnsHeader header;
+  header.qid = htons (message->id);
+  header.qr = 1 ^ message->is_query;
+  header.opcode = 0;
+  header.aa = message->is_authoritative;
+  header.tc = 0;        //message->is_truncated;
+  header.rd = message->recursion_desired;
+  header.ra = message->recursion_available;
+  header.unused = 0;
+  header.rcode = message->error_code;
+  header.qdcount = htons (message->n_questions);
+  header.ancount = htons (message->n_answer_rr);
+  header.nscount = htons (message->n_authority_rr);
+  header.arcount = htons (message->n_additional_rr);
+  dsk_assert (sizeof (DskDnsHeader) == 12);
+  memcpy (out, &header, 12);
+}
+
+static void
+pack_domain_name  (const char     *name,
+                   uint8_t        *data_start,      /* for computing offsets */
+                   uint8_t       **data_inout,
+                   StrTreeNode    *top)
+{
+  ...
+}
 
 static void
 pack_question (DskDnsQuestion *question,
@@ -761,29 +796,62 @@ pack_question (DskDnsQuestion *question,
                uint8_t       **data_inout,
                StrTreeNode    *top)
 {
-  ...
+  uint16_t qarray[2];
+  pack_domain_name (question->name, data_start, data_inout, top);
+  qarray[0] = htons (question->type);
+  qarray[1] = htons (question->question_class);
+  memcpy (*data_inout, qarray, 4);
+  *data_inout += 4;
 }
 
 static void
-pack_rr       (DskDnsResourceRecord *rr,
-               uint8_t        *data_start,      /* for computing offsets */
-               uint8_t       **data_inout,
-               StrTreeNode    *top)
+pack_resource_record (DskDnsResourceRecord *rr,
+                      uint8_t        *data_start, /* for computing offsets */
+                      uint8_t       **data_inout,
+                      StrTreeNode    *top)
 {
+  pack_domain_name (rr->owner, data_start, data_inout, top);
   ...
+  rr->name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
 }
 
 uint8_t *
 dsk_dns_message_serialize (DskDnsMessage *message,
                            unsigned      *length_out)
 {
-  unsigned max_str_nodes = get_max_str_nodes (message);
+  unsigned max_str_nodes;
   StrTreeNode *nodes;
   StrTreeNode *nodes_at;                /* next node to us */
   StrTreeNode *top = NULL;
   unsigned i;
   unsigned size;
   uint8_t *rv, *at;
+
+  /* check message contents:
+     - string bounds
+     - opcode / errcode validity
+     - lowercased domain-names (?)
+     - n_questions, etc must be less than 1<<16
+   */
+  if (message->n_questions > 0xffff
+   || message->n_answer_rr > 0xffff
+   || message->n_authority_rr > 0xffff
+   || message->n_additional_rr > 0xffff)
+    return NULL;
+  for (i = 0; i < message->n_questions; i++)
+    if (!validate_question (message->questions + i))
+      return NULL;
+  for (i = 0; i < message->n_answer_rr; i++)
+    if (!validate_resource_record (message->answer_rr + i))
+      return NULL;
+  for (i = 0; i < message->n_authority_rr; i++)
+    if (!validate_resource_record (message->authority_rr + i))
+      return NULL;
+  for (i = 0; i < message->n_additional_rr; i++)
+    if (!validate_resource_record (message->additional_rr + i))
+      return NULL;
+
+  max_str_nodes = get_max_str_nodes (message);
 
   /* scan through figuring out how long the packed data will be. */
   nodes = alloca (sizeof (StrTreeNode) * max_str_nodes);
@@ -793,10 +861,10 @@ dsk_dns_message_serialize (DskDnsMessage *message,
     size += get_question_size (message->questions + i, &top, &nodes_at);
   for (i = 0; i < message->n_answer_rr; i++)
     size += get_rr_size (message->answer_rr + i, &top, &nodes_at);
-  for (i = 0; i < message->n_ns_rr; i++)
-    size += get_rr_size (message->ns_rr + i, &top, &nodes_at);
   for (i = 0; i < message->n_authority_rr; i++)
     size += get_rr_size (message->authority_rr + i, &top, &nodes_at);
+  for (i = 0; i < message->n_additional_rr; i++)
+    size += get_rr_size (message->additional_rr + i, &top, &nodes_at);
   dsk_assert (nodes_at - nodes <= max_str_nodes);
 
   /* pack the message */
@@ -807,10 +875,10 @@ dsk_dns_message_serialize (DskDnsMessage *message,
     pack_question (message->questions + i, rv, &at, top);
   for (i = 0; i < message->n_answer_rr; i++)
     pack_rr (message->answer_rr + i, rv, &at, top);
-  for (i = 0; i < message->n_ns_rr; i++)
-    pack_rr (message->ns_rr + i, rv, &at, top);
   for (i = 0; i < message->n_authority_rr; i++)
     pack_rr (message->authority_rr + i, rv, &at, top);
+  for (i = 0; i < message->n_additional_rr; i++)
+    pack_rr (message->additional_rr + i, rv, &at, top);
   dsk_assert ((unsigned)(at - rv) == size);
   *length_out = size;
 
