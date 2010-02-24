@@ -185,11 +185,33 @@ struct _DskDnsResourceRecord
 
 struct _DskDnsMessage
 {
-  DskDnsHeader header;
+  unsigned n_questions;
   DskDnsQuestion *questions;
+  unsigned n_answer_rr;
   DskDnsResourceRecord *answers;
+  unsigned n_authority_rr;
   DskDnsResourceRecord *authority;
+  unsigned n_additional_rr;
   DskDnsResourceRecord *additional;
+
+  uint16_t id;     /* used by requestor to match queries and replies */
+
+  /* Is this a query or a response? */
+  uint16_t is_query : 1;
+
+  uint16_t is_authoritative : 1;
+  uint16_t is_truncated : 1;
+
+  /* [Responses only] the `RA bit': whether the server is willing to provide
+   *                                recursive services. (cf 1034, 4.3.1)
+   */
+  uint16_t recursion_available : 1;
+
+  /* [Queries only] the `RD bit': whether the requester wants recursive
+   *                              service for this queries. (cf 1034, 4.3.1)
+   */
+  uint16_t recursion_desired : 1;
+
 };
 
 DskDnsMessage *dsk_dns_message_parse     (unsigned       len,
