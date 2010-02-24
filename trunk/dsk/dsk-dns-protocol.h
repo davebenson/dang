@@ -17,7 +17,6 @@ typedef enum
 } DskDnsClassCode;
 
 
-
 /* DskDnsResourceRecordType: AKA RTYPE: 
  *       Types of `RR's or `ResourceRecord's (values match RFC 1035, 3.2.2)
  */
@@ -75,6 +74,20 @@ typedef enum
   DSK_DNS_OP_NOTIFY = 4,
   DSK_DNS_OP_UPDATE = 5,
 } DskDnsOpcode;
+
+struct _DskDnsQuestion
+{
+  /* The domain name for which information is being requested. */
+  char *name;
+
+  /* The type of query we are asking. */
+  GskDnsResourceRecordType  query_type;
+
+  /* The domain where the query applies. */
+  GskDnsResourceClassCode       query_class;
+
+
+};
 
 
 typedef enum
@@ -211,6 +224,9 @@ struct _DskDnsMessage
    *                              service for this queries. (cf 1034, 4.3.1)
    */
   uint16_t recursion_desired : 1;
+
+  uint8_t /*DskDnsOpcode*/ opcode;
+  uint8_t /*DskDnsRcode*/ rcode;
 
 };
 

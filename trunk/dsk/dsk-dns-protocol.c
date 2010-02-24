@@ -431,6 +431,16 @@ dsk_dns_message_parse (unsigned       len,
   header.nscount = htons (header.nscount);
   header.arcount = htons (header.arcount);
 #endif
+  if (!validate_rcode (header.rcode))
+    {
+      dsk_set_error (error, "dns message had invalid 'rcode'");
+      return NULL;
+    }
+  if (!validate_opcode (header.opcode))
+    {
+      dsk_set_error (error, "dns message had invalid 'opcode'");
+      return NULL;
+    }
 
   /* obtain a list of offsets to strings.
      each name may lead to N offsets,
@@ -453,7 +463,8 @@ dsk_dns_message_parse (unsigned       len,
     {
       if (!gather_names_resource_record (len, data,
                                          &used, &n_str_info, &str_info,
-                                         &str_info_alloced, error))
+                                         &str_info_alloced, &extra_space,
+                                         error))
         goto cleanup;
     }
 
@@ -511,6 +522,9 @@ dsk_dns_message_parse (unsigned       len,
   message->authority_rr = message->answer_rr + message->n_answer_rr;
   message->n_additional_rr = header.arcount;
   message->additional_rr = message->authority_rr + message->n_authority_rr;
+  message->rcode = header.rcode;
+  message->opcode = header.opcode;
+
   str_heap = (char*) (message->additional_rr + message->n_additional_rr);
 
   /* reserve space for the 4 sections; then build the needed
@@ -538,7 +552,7 @@ dsk_dns_message_parse (unsigned       len,
   for (i = 0; i < total_rr; i++)
     if (!parse_resource_record (len, data, &used,
                                 &message->answer_rr[i],
-                                n_used_strs, used_strs,
+                                n_used_strs, used_strs, &str_heap,
                                 error))
       goto cleanup;
 
@@ -569,7 +583,29 @@ struct _StrTreeNode
 static dsk_boolean
 validate_name (const char *domain_name)
 {
-  ...
+  unsigned n_non_dot = 0;
+  if (*domain_name == '.')
+    ++domain_name;
+  while (*domain_name == 0)
+    {
+      if (*domain_name == '.')
+        {
+          if (n_non_dot == 0)
+            return DSK_FALSE;
+          n_non_dot = 0;
+        }
+      else
+        {
+          if (!('a' <= *domain_name && *domain_name <= 'z')
+               && *domain_name != '-' && *domain_name != '_')
+            return DSK_FALSE;
+          domain_name++;
+          n_non_dot++;
+          if (n_non_dot > 255)
+            return DSK_FALSE;
+        }
+    }
+  return DSK_TRUE;
 }
 
 static dsk_boolean
@@ -577,14 +613,37 @@ validate_question (DskDnsQuestion *question)
 {
   if (!validate_name (question->name))
     return DSK_FALSE;
-  ...
+  /* TODO: consider validating class/rr-type */
   return DSK_TRUE;
 }
 
 static dsk_boolean
 validate_resource_record (DskDnsResourceRecord *rr)
 {
-  ...
+  if (!validate_name (rr->owner))
+    return DSK_FALSE;
+  switch (rr->type)
+    {
+    case DSK_DNS_RR_NAME_SERVER:
+    case DSK_DNS_RR_CANONICAL_NAME:
+    case DSK_DNS_RR_POINTER:
+      return validate_name (rr->rdata.domain_name);
+    case DSK_DNS_RR_HOST_INFO:
+      return rr->rdata.hinfo.cpu != NULL
+          && rr->rdata.hinfo.os != NULL
+    case DSK_DNS_RR_MAIL_EXCHANGE:
+      return validate_name (rr->rdata.mx.mail_exchange_host_name);
+    case DSK_DNS_RR_START_OF_AUTHORITY:
+      return validate_name (rr->rdata.soa.mname)
+          && validate_name (rr->rdata.soa.rname);
+    case DSK_DNS_RR_TEXT:
+    case DSK_DNS_RR_HOST_ADDRESS:
+    case DSK_DNS_RR_HOST_ADDRESS_IPV6:
+      return DSK_TRUE;
+    case DSK_DNS_RR_WELL_KNOWN_SERVICE:
+    default:
+      return DSK_FALSE;
+    }
 }
 
 static unsigned get_name_n_components (const char *str)
@@ -787,13 +846,13 @@ pack_message_header (DskDnsMessage *message,
   DskDnsHeader header;
   header.qid = htons (message->id);
   header.qr = 1 ^ message->is_query;
-  header.opcode = 0;
+  header.opcode = message->opcode;
   header.aa = message->is_authoritative;
   header.tc = 0;        //message->is_truncated;
   header.rd = message->recursion_desired;
   header.ra = message->recursion_available;
   header.unused = 0;
-  header.rcode = message->error_code;
+  header.rcode = message->rcode;
   header.qdcount = htons (message->n_questions);
   header.ancount = htons (message->n_answer_rr);
   header.nscount = htons (message->n_authority_rr);
@@ -833,6 +892,17 @@ pack_question (DskDnsQuestion *question,
 }
 
 static void
+pack_len_prefixed_string (const char *str,
+                          uint8_t   **data_inout)
+{
+  unsigned len = strlen (str);
+  **data_inout = len;
+  *data_inout += 1;
+  memcpy (*data_inout, str, len);
+  *data_inout += len;
+}
+
+static void
 pack_resource_record (DskDnsResourceRecord *rr,
                       uint8_t        *data_start, /* for computing offsets */
                       uint8_t       **data_inout,
@@ -847,11 +917,64 @@ pack_resource_record (DskDnsResourceRecord *rr,
   *data_inout += 10;
 
   /* pack type-specific rdata */
-  ...
+  switch (rr->type)
+    {
+    case DSK_DNS_RR_HOST_ADDRESS:
+      memcpy (*data_inout, rr->rdata.a.ip_address, 4);
+      *data_inout += 4;
+      break;
+    case DSK_DNS_RR_HOST_ADDRESS_IPV6:
+      memcpy (*data_inout, rr->rdata.aaaa.address, 16);
+      *data_inout += 16;
+      break;
+    case DSK_DNS_RR_NAME_SERVER:
+    case DSK_DNS_RR_CANONICAL_NAME:
+    case DSK_DNS_RR_POINTER:
+      pack_domain_name (rr->rdata.domain_name, data_start, data_inout, top);
+      break;
+    case DSK_DNS_RR_MAIL_EXCHANGE:
+      {
+        uint16_t pv_be = htons (rr->rdata.mx.preference_value);
+        memcpy (*data_inout, &pv_be, 2);
+        *data_inout += 2;
+      }
+      pack_domain_name (rr->rdata.mx.mail_exchange_host_name, data_start, data_inout, top);
+      break;
+    case DSK_DNS_RR_HOST_INFO:
+      pack_len_prefixed_string (rr->rdata.hinfo.cpu, data_inout);
+      pack_len_prefixed_string (rr->rdata.hinfo.os, data_inout);
+      break;
+    case DSK_DNS_RR_START_OF_AUTHORITY:
+      pack_domain_name (rr->rdata.soa.mname, data_start, data_inout, top);
+      pack_domain_name (rr->rdata.soa.rname, data_start, data_inout, top);
+      {
+        uint32_t intervals[5];
+	intervals[0] = htonl (rr->rdata.soa.serial);
+	intervals[1] = htonl (rr->rdata.soa.refresh_time);
+	intervals[2] = htonl (rr->rdata.soa.retry_time);
+	intervals[3] = htonl (rr->rdata.soa.expire_time);
+	intervals[4] = htonl (rr->rdata.soa.minimum_time);
+        memcpy (*data_inout, intervals, 20);
+        *data_inout += 20;
+      }
+      break;
+    case DSK_DNS_RR_TEXT:
+      pack_len_prefixed_string (rr->rdata.text, data_inout);
+      break;
+    default:
+      /* This should not happen, because validate_resource_record()
+         returned TRUE, */
+      dsk_assert_not_reached ();
+    }
 
   /* write generic resource-code info */
   rdata_len = *data_inout - generic;
-  ...
+  data[0] = htons (rr->type);
+  data[1] = htons (rr->record_class);
+  data[2] = htons (rr->time_to_live >> 16);
+  data[3] = htons (rr->time_to_live);
+  data[4] = htons (rdata_len);
+  memcpy (generic, data, 10);
 }
 
 uint8_t *
@@ -876,6 +999,9 @@ dsk_dns_message_serialize (DskDnsMessage *message,
    || message->n_answer_rr > 0xffff
    || message->n_authority_rr > 0xffff
    || message->n_additional_rr > 0xffff)
+    return NULL;
+  if (!validate_rcode (message->rcode)
+   || !validate_opcode (message->opcode))
     return NULL;
   for (i = 0; i < message->n_questions; i++)
     if (!validate_question (message->questions + i))
