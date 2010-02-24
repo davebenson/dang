@@ -63,7 +63,7 @@ typedef enum
   /* A `*' record:  matches anything. */
   DSK_DNS_RR_WILDCARD = 255
 
-} GskDnsResourceRecordType;
+} DskDnsResourceRecordType;
 
 
 typedef enum
@@ -81,10 +81,10 @@ struct _DskDnsQuestion
   char *name;
 
   /* The type of query we are asking. */
-  GskDnsResourceRecordType  query_type;
+  DskDnsResourceRecordType  query_type;
 
   /* The domain where the query applies. */
-  GskDnsResourceClassCode       query_class;
+  DskDnsResourceClassCode       query_class;
 
 
 };
