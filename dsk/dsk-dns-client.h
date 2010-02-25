@@ -48,6 +48,8 @@ typedef enum
   DSK_DNS_CACHE_ENTRY_ADDR,
 } DskDnsCacheEntryType;
 
+typedef struct _DskDnsCacheEntryJob DskDnsCacheEntryJob;
+typedef struct _DskDnsCacheEntry DskDnsCacheEntry;
 struct _DskDnsCacheEntry
 {
   unsigned expire_time;

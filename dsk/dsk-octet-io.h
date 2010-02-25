@@ -59,7 +59,7 @@ DSK_INLINE_FUNC int dsk_octet_source_read (void         *octet_source,
                                            DskError    **error);
 DSK_INLINE_FUNC int dsk_octet_source_read_buffer (void           *octet_source,
                                                   DskBuffer      *read_buffer,
-                                                  DskError      **error)
+                                                  DskError      **error);
 DSK_INLINE_FUNC void dsk_octet_source_shutdown   (void           *octet_source);
 DSK_INLINE_FUNC int dsk_octet_sink_write  (void         *octet_sink,
                                            unsigned      max_len,
@@ -71,6 +71,9 @@ DSK_INLINE_FUNC int dsk_octet_sink_write_buffer  (void           *octet_sink,
 DSK_INLINE_FUNC void dsk_octet_sink_shutdown     (void           *octet_sink);
 
 
+
+extern DskOctetSourceClass dsk_octet_source_class;
+extern DskOctetSinkClass dsk_octet_sink_class;
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC int dsk_octet_source_read (void         *octet_source,
                                            unsigned      max_len,
@@ -95,6 +98,3 @@ DSK_INLINE_FUNC void dsk_octet_source_shutdown (void           *octet_source)
 }
 
 #endif
-
-extern DskOctetSourceClass dsk_octet_source_class;
-extern DskOctetSinkClass dsk_octet_sink_class;

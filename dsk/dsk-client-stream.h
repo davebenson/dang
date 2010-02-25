@@ -1,21 +1,36 @@
 
+typedef struct _DskClientStreamSourceClass DskClientStreamSourceClass;
 typedef struct _DskClientStreamSource DskClientStreamSource;
+typedef struct _DskClientStreamSinkClass DskClientStreamSinkClass;
 typedef struct _DskClientStreamSink DskClientStreamSink;
+typedef struct _DskClientStreamClass DskClientStreamClass;
 typedef struct _DskClientStream DskClientStream;
 
 
+struct _DskClientStreamSourceClass
+{
+  DskOctetSourceClass base_class;
+};
 struct _DskClientStreamSource
 {
   DskOctetSource base_instance;
   DskClientStream *owner;
 };
 
+struct _DskClientStreamSinkClass
+{
+  DskOctetSinkClass base_class;
+};
 struct _DskClientStreamSink
 {
   DskOctetSink base_instance;
   DskClientStream *owner;
 };
 
+struct _DskClientStreamClass
+{
+  DskObjectClass base_class;
+};
 struct _DskClientStream
 {
   DskObject base_instance;
@@ -24,7 +39,7 @@ struct _DskClientStream
   /* Hostname for normal (DNS-based) clients,
    * or path for local (ie unix-domain) clients.*/
   char *name;
-  `
+
   /* IP port on the given host.  actually a uint16 for IPv4 and IPv6;
      always 0 for local (unix-domain) clients. */
   unsigned port;
