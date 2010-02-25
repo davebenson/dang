@@ -3,7 +3,7 @@ typedef struct _DskHttpClient DskHttpClient;
 
 void dsk_http_client_request       (DskHttpClient *client,
                                     DskHttpRequest *request,
-				    DskOctetStream *post_data,
+				    DskOctetSource *post_data,
 				    DskHttpRequestOptions *options,
 				    DskHttpRequestFunc func,
 				    void              *func_data,
