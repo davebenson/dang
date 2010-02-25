@@ -33,7 +33,7 @@ struct _DskHttpClientStreamTransfer
   DskHttpClientStream *owner;
   DskHttpRequest *request;
   DskHttpResponse *response;
-  DskMemoryBufferSource *content;      
+  DskMemorySource *content;      
   DskHttpClientStreamTransfer *next;
   DskHttpClientStreamFuncs *funcs;
   void *user_data;
