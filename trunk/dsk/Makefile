@@ -3,4 +3,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o
 	ar cru $@ $^
 
 %.o: %.c
-	gcc -c -O2 $^
+	gcc -g -c -O2 $^
+
+clean:
+	rm *.o libdsk.a
