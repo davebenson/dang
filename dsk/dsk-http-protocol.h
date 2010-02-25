@@ -54,7 +54,7 @@ typedef enum
   DSK_HTTP_STATUS_SERVICE_UNAVAILABLE           = 503,
   DSK_HTTP_STATUS_GATEWAY_TIMEOUT               = 504,
   DSK_HTTP_STATUS_UNSUPPORTED_VERSION           = 505
-} GskHttpStatus;
+} DskHttpStatus;
 
 /*
  * The Verb is the first text transmitted
@@ -70,13 +70,13 @@ typedef enum
   DSK_HTTP_VERB_DELETE,
   DSK_HTTP_VERB_TRACE,
   DSK_HTTP_VERB_CONNECT
-} GskHttpVerb;
+} DskHttpVerb;
 
 typedef enum {
   DSK_HTTP_CONTENT_ENCODING_IDENTITY,
   DSK_HTTP_CONTENT_ENCODING_GZIP,
   DSK_HTTP_CONTENT_ENCODING_COMPRESS
-} GskHttpContentEncoding;
+} DskHttpContentEncoding;
 
 /*
  * The Transfer-Encoding field of HTTP/1.1.
@@ -93,7 +93,7 @@ typedef enum {
   DSK_HTTP_TRANSFER_ENCODING_NONE    = 0,
   DSK_HTTP_TRANSFER_ENCODING_CHUNKED = 1,
   DSK_HTTP_TRANSFER_ENCODING_UNRECOGNIZED = 0x100
-} GskHttpTransferEncoding;
+} DskHttpTransferEncoding;
 
 /*
  * The Connection: header enables or disables http-keepalive.
@@ -111,13 +111,14 @@ typedef enum
   DSK_HTTP_CONNECTION_NONE,
   DSK_HTTP_CONNECTION_CLOSE,
   DSK_HTTP_CONNECTION_KEEPALIVE
-} GskHttpConnection;
+} DskHttpConnection;
 
 /*
  * The Cache-Control response directive.
  * See RFC 2616, Section 14.9 (cache-response-directive)
  */
-struct _GskHttpResponseCacheDirective
+typedef struct _DskHttpResponseCacheDirective DskHttpResponseCacheDirective;
+struct _DskHttpResponseCacheDirective
 {
   /*< public (read/write) >*/
   /* the http is `public' and `private'; is_ is added
@@ -146,7 +147,8 @@ struct _GskHttpResponseCacheDirective
  * The Cache-Control request directive.
  * See RFC 2616, Section 14.9 (cache-request-directive)
  */
-struct _GskHttpRequestCacheDirective
+typedef struct _DskHttpRequestCacheDirective DskHttpRequestCacheDirective;
+struct _DskHttpRequestCacheDirective
 {
   uint8_t no_cache : 1;
   uint8_t no_store : 1;
@@ -163,7 +165,7 @@ struct _GskHttpRequestCacheDirective
   *		     -1 set no arg
   *		     >0 set with arg.	  
   */
-  gint  max_stale;
+  int  max_stale;
 
   /* TODO: what about cache-extensions? */
 };
@@ -176,15 +178,13 @@ struct _GskHttpRequestCacheDirective
  *
  * TODO: support level= accept-extension.
  */
-struct _GskHttpMediaTypeSet
+typedef struct _DskHttpMediaOption DskHttpMediaOption;
+struct _DskHttpMediaOption
 {
   /*< public: read-only >*/
   char                 *type;
   char                 *subtype;
-  gfloat                quality;                /* -1 if not present */
-
-  /*< private >*/
-  GskHttpMediaTypeSet  *next;
+  float                 quality;                /* -1 if not present */
 };
 
 
@@ -193,69 +193,38 @@ struct _GskHttpMediaTypeSet
  *
  * See RFC 2616, Section 14.2.
  */
-struct _GskHttpCharSet
+typedef struct _DskHttpCharsetOption DskHttpCharsetOption;
+struct _DskHttpCharsetOption
 {
   /*< public: read-only >*/
   char                 *charset_name;
-  gfloat                quality;                /* -1 if not present */
-
-  /*< private >*/
-  GskHttpCharSet       *next;
+  float                 quality;                /* -1 if not present */
 };
-GskHttpCharSet       *gsk_http_char_set_new (const char *charset_name,
-                                             gfloat      quality);
-void                  gsk_http_char_set_free(GskHttpCharSet *char_set);
 
 /*
  * The Accept-Encoding: request-header.
  *
  * See RFC 2616, Section 14.3.
  */
-struct _GskHttpContentEncodingSet
+typedef struct _DskHttpContentEncodingOption DskHttpContentEncodingOption;
+struct _DskHttpContentEncodingOption
 {
   /*< public: read-only >*/
-  GskHttpContentEncoding       encoding;
-  gfloat                       quality;       /* -1 if not present */
-
-  /*< private >*/
-  GskHttpContentEncodingSet   *next;
+  DskHttpContentEncoding       encoding;
+  float                        quality;       /* -1 if not present */
 };
-GskHttpContentEncodingSet *
-gsk_http_content_encoding_set_new (GskHttpContentEncoding encoding,
-				   gfloat                 quality);
-void
-gsk_http_content_encoding_set_free(GskHttpContentEncodingSet *encoding_set);
-
 /*
  * for the TE: request-header.
  *
  * See RFC 2616, Section 14.39.
  */
-struct _GskHttpTransferEncodingSet
+typedef struct _DskHttpTransferEncodingOption DskHttpTransferEncodingOption;
+struct _DskHttpTransferEncodingOption
 {
   /*< public: read-only >*/
-  GskHttpTransferEncoding      encoding;
-  gfloat                       quality;       /* -1 if not present */
-
-  /*< private >*/
-  GskHttpTransferEncodingSet   *next;
+  DskHttpTransferEncoding      encoding;
+  float                        quality;       /* -1 if not present */
 };
-GskHttpTransferEncodingSet *
-gsk_http_transfer_encoding_set_new (GskHttpTransferEncoding     encoding,
-				    gfloat                      quality);
-void
-gsk_http_transfer_encoding_set_free(GskHttpTransferEncodingSet *encoding_set);
-
-struct _GskHttpRangeSet
-{
-  /*< public: read-only >*/
-  GskHttpRange          range_type;
-
-  /*< private >*/
-  GskHttpRangeSet   *next;
-};
-GskHttpRangeSet *gsk_http_range_set_new (GskHttpRange range_type);
-void             gsk_http_range_set_free(GskHttpRangeSet *set);
 
 
 /*
@@ -263,27 +232,22 @@ void             gsk_http_range_set_free(GskHttpRangeSet *set);
  *
  * See RFC 2616, Section 14.4.
  */
-struct _GskHttpLanguageSet
+typedef struct _DskHttpLanguageOption DskHttpLanguageOption;
+struct _DskHttpLanguageOption
 {
   /*< public: read-only >*/
 
   /* these give a language (with optional dialect specifier) */
   char                 *language;
-  gfloat                quality;                /* -1 if not present */
-
-  /*< private >*/
-  GskHttpLanguageSet   *next;
+  float                 quality;                /* -1 if not present */
 };
-GskHttpLanguageSet *gsk_http_language_set_new (const char *language,
-                                               gfloat      quality);
-void                gsk_http_language_set_free(GskHttpLanguageSet *set);
 
 typedef enum
 {
   GSK_HTTP_AUTH_MODE_UNKNOWN,
   GSK_HTTP_AUTH_MODE_BASIC,
   GSK_HTTP_AUTH_MODE_DIGEST
-} GskHttpAuthMode;
+} DskHttpAuthMode;
 
 /* HTTP Authentication.
    
@@ -300,9 +264,10 @@ typedef enum
      Then the client tries again: but this time with an appropriate Authorization.
      If the server is satified, it will presumably give you the content.
  */
-struct _GskHttpAuthenticate
+typedef struct _DskHttpAuthenticate DskHttpAuthenticate;
+struct _DskHttpAuthenticate
 {
-  GskHttpAuthMode mode;
+  DskHttpAuthMode mode;
   char           *auth_scheme_name;
   char           *realm;
   union
@@ -318,15 +283,15 @@ struct _GskHttpAuthenticate
       char                   *domain;
       char                   *nonce;
       char                   *opaque;
-      gboolean                is_stale;
+      dsk_boolean             is_stale;
       char                   *algorithm;
     } digest;
   } info;
-  guint           ref_count;            /*< private >*/
 };
-struct _GskHttpAuthorization
+typedef struct _DskHttpAuthorization DskHttpAuthorization;
+struct _DskHttpAuthorization
 {
-  GskHttpAuthMode mode;
+  DskHttpAuthMode mode;
   char           *auth_scheme_name;
   union
   {
@@ -349,25 +314,26 @@ struct _GskHttpAuthorization
       char                   *entity_digest;
     } digest;
   } info;
-  guint           ref_count;            /*< private >*/
 };
 
 /* an update to an existing authentication,
    to verify that we're talking to the same host. */
-struct _GskHttpAuthenticateInfo
+typedef struct _DskHttpAuthenticateInfo DskHttpAuthenticateInfo;
+struct _DskHttpAuthenticateInfo
 {
   char *next_nonce;
   char *response_digest;
   char *cnonce;
-  guint has_nonce_count;
-  guint32 nonce_count;
+  unsigned has_nonce_count;
+  uint32_t nonce_count;
 };
 
 /* A single `Cookie' or `Set-Cookie' header.
  *
  * See RFC 2109, HTTP State Management Mechanism 
  */
-struct _GskHttpCookie
+typedef struct _DskHttpCookie DskHttpCookie;
+struct _DskHttpCookie
 {
   /*< public: read-only >*/
   char                   *key;
@@ -377,56 +343,36 @@ struct _GskHttpCookie
   char                   *expire_date;
   char                   *comment;
   int                     max_age;
-  gboolean                secure;               /* default is FALSE */
-  guint                   version;              /* default is 0, unspecified */
+  dsk_boolean             secure;               /* default is FALSE */
+  unsigned                version;              /* default is 0, unspecified */
 };
-GskHttpCookie  *gsk_http_cookie_new              (const char     *key,
-                                                  const char     *value,
-                                                  const char     *path,
-                                                  const char     *domain,
-                                                  const char     *expire_date,
-                                                  const char     *comment,
-                                                  int             max_age);
-GskHttpCookie  *gsk_http_cookie_copy             (const GskHttpCookie *orig);
-void            gsk_http_cookie_free             (GskHttpCookie *orig);
 
-
-
-
-typedef struct _GskHttpContentTypeInfo GskHttpContentTypeInfo;
-struct _GskHttpContentTypeInfo
+typedef struct _DskHttpHeaderMisc DskHttpHeaderMisc;
+struct _DskHttpHeaderMisc
 {
-  const char *type_start;
-  guint type_len;
-  const char *subtype_start;
-  guint subtype_len;
-  const char *charset_start;
-  guint charset_len;
-  guint max_additional;         /* unimplemented */
-  guint n_additional;           /* unimplemented */
-  const char **additional_starts; /* unimplemented */
-  guint *additional_lens;         /* unimplemented */
+  char *key;            /* lowercased */
+  char *value;
 };
-
 
 struct _DskHttpRequestClass
 {
   DskObjectClass base_class;
 };
+
 struct _DskHttpRequest
 {
   DskObject base_object;
 
-  GskHttpConnection             connection_type;
+  DskHttpConnection             connection_type;
 
-  GskHttpTransferEncoding       transfer_encoding_type;
-  GskHttpContentEncoding        content_encoding_type;
+  DskHttpTransferEncoding       transfer_encoding_type;
+  DskHttpContentEncoding        content_encoding_type;
 
   unsigned accept_range_bytes : 1; /* Accept-Ranges */
   unsigned has_date : 1;           /* Date (see date member) */
 
   /*< public >*/
-  GskHttpContentEncoding content_encoding;     /* Content-Encoding */
+  DskHttpContentEncoding content_encoding;     /* Content-Encoding */
 
   char *content_type;             /* Content-Type */
   char *content_subtype;
@@ -448,18 +394,23 @@ struct _DskHttpRequest
 
   /*< public >*/
   /* the command: GET, PUT, POST, HEAD, etc */
-  GskHttpVerb                   verb;
+  DskHttpVerb                   verb;
 
   /* Note that HTTP/1.1 servers must accept the entire
    * URL being included in `path'! (maybe including http:// ... */
   char                         *path;
 
-  DskHttpCharSet           *accept_charsets;              /* Accept-CharSet */
-  DskHttpContentEncodingSet*accept_content_encodings;     /* Accept-Encoding */
-  DskHttpTransferEncodingSet*accept_transfer_encodings;   /* TE */
-  DskHttpMediaTypeSet      *accept_media_types;           /* Accept */
+  unsigned                  n_charset_options;
+  DskHttpCharsetOption     *charset_options;              /* Accept-CharSet */
+  unsigned n_content_encoding_options;
+  DskHttpContentEncodingOption*content_encoding_options;     /* Accept-Encoding */
+  unsigned n_transfer_encoding_options;
+  DskHttpTransferEncodingOption*transfer_encodings_options;  /* TE */
+  unsigned                  n_accept_options;
+  DskHttpMediaOption      *accept_options;           /* Accept */
   DskHttpAuthorization     *authorization;                /* Authorization */
-  DskHttpLanguageSet       *accept_languages;             /* Accept-Languages */
+  unsigned                  n_language_options;
+  DskHttpLanguageOption    *languages_options;             /* Accept-Languages */
   char                     *host;                         /* Host */
 
   dsk_boolean               had_if_match;
@@ -472,9 +423,10 @@ struct _DskHttpRequest
   char                     *from;      /* The From: header (sect 14.22) */
 
   /* List of Cookie: headers. */
-  GSList                   *cookies;
+  unsigned                  n_cookies;
+  DskHttpCookie            *cookies;
 
-  GskHttpAuthorization     *proxy_authorization;
+  DskHttpAuthorization     *proxy_authorization;
 
   int                       keep_alive_seconds;   /* -1 if not used */
 
@@ -491,7 +443,7 @@ struct _DskHttpRequest
   char                     *ua_cpu;
   char                     *ua_language;
 
-  GskHttpRequestCacheDirective *cache_control;        /* Cache-Control */
+  DskHttpRequestCacheDirective *cache_control;        /* Cache-Control */
 };
 
 struct _DskHttpResponseClass
@@ -504,16 +456,16 @@ struct _DskHttpResponse
 
   uint8_t http_major_version;             /* always 1 */
   uint8_t http_minor_version;
-  GskHttpConnection connection_type;
+  DskHttpConnection connection_type;
 
-  GskHttpTransferEncoding transfer_encoding_type;
-  GskHttpContentEncoding content_encoding_type;
+  DskHttpTransferEncoding transfer_encoding_type;
+  DskHttpContentEncoding content_encoding_type;
 
   unsigned accept_range_bytes : 1; /* Accept-Ranges */
   unsigned has_date : 1;           /* Date (see date member) */
 
   /* Content-Encoding */
-  GskHttpContentEncoding content_encoding;
+  DskHttpContentEncoding content_encoding;
 
   /* Content-Type */
   char *content_type;
@@ -534,7 +486,51 @@ struct _DskHttpResponse
   unsigned n_misc_header;
   DskHttpHeaderMisc *misc_headers;
   
-  ...
+  /* initially allowed_verbs == 0;
+   * since it is an error not to allow any verbs;
+   * otherwise it is a bitwise-OR: (1 << GSK_HTTP_VERB_*)
+   */
+  unsigned                  allowed_verbs;
+
+  DskHttpResponseCacheDirective *cache_control;        /* Cache-Control */
+
+  unsigned                  has_md5sum : 1;
+  unsigned char             md5sum[16];           /* Content-MD5 (14.15) */
+
+  /* List of Set-Cookie: headers. */
+  unsigned                  n_set_cookies;
+  DskHttpCookie            *set_cookies;
+
+  /* The `Location' to redirect to. */
+  char                     *location;
+
+  /* -1 for no expiration */
+  dsk_time_t                expires;
+
+  /* The ``Entity-Tag'', cf RFC 2616, Sections 14.24, 14.26, 14.44. */
+  char                     *etag;
+
+  DskHttpAuthenticate      *proxy_authenticate;
+
+  /* This is the WWW-Authenticate: header line. */
+  DskHttpAuthenticate      *authenticate;
+
+  /* If `retry_after_relative', the retry_after is the number 
+   * of seconds to wait before retrying; otherwise,
+   * it is a unix-time indicting when to retry.
+   *
+   * (Corresponding to the `Retry-After' header, cf RFC 2616, 14.37)
+   */
+  unsigned                  has_retry_after : 1;
+  dsk_boolean               retry_after_relative;
+  long                      retry_after;
+
+  /* The Last-Modified header.  If != -1, this is the unix-time
+   * the message-body-contents were last modified. (RFC 2616, section 14.29)
+   */
+  long                      last_modified;
+
+  char                     *server;        /* The Server: header */
 };
 extern DskHttpRequestClass dsk_http_request_class;
 extern DskHttpResponseClass dsk_http_response_class;
