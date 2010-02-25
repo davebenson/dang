@@ -21,19 +21,19 @@ struct _DskHttpServerStream
 /* internals */
 typedef enum
 {
-  DSK_HTTP_CLIENT_STREAM_READ_NEED_HEADER,
-  DSK_HTTP_CLIENT_STREAM_READ_IN_BODY,
-  DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF,
-  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER,
-  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK,
-  DSK_HTTP_CLIENT_STREAM_READ_DONE
+  DSK_HTTP_SERVER_STREAM_READ_NEED_HEADER,
+  DSK_HTTP_SERVER_STREAM_READ_IN_BODY,
+  DSK_HTTP_SERVER_STREAM_READ_IN_BODY_EOF,
+  DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNKED_HEADER,
+  DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNK,
+  DSK_HTTP_SERVER_STREAM_READ_DONE
 } DskHttpServerStreamReadState;
 struct _DskHttpServerStreamTransfer
 {
   DskHttpServerStream *owner;
   DskHttpRequest *request;
   DskHttpResponse *response;
-  DskMemoryBufferSource *content;      
+  DskMemorySource *content;      
   DskHttpServerStreamTransfer *next;
   DskHttpServerStreamFuncs *funcs;
   void *user_data;
@@ -54,14 +54,14 @@ struct _DskHttpServerStreamTransfer
 };
 
 DskHttpServerStream *
-dsk_http_client_stream_new     (DskOctetSink        *sink,
+dsk_http_server_stream_new     (DskOctetSink        *sink,
                                 DskOctetSource      *source);
 
 typedef enum
 {
-  DSK_HTTP_CLIENT_STREAM_ERROR_PREMATURE_SHUTDOWN,
-  DSK_HTTP_CLIENT_STREAM_ERROR_BAD_HEADER,
-  DSK_HTTP_CLIENT_STREAM_ERROR_BAD_CONTENT,
+  DSK_HTTP_SERVER_STREAM_ERROR_PREMATURE_SHUTDOWN,
+  DSK_HTTP_SERVER_STREAM_ERROR_BAD_HEADER,
+  DSK_HTTP_SERVER_STREAM_ERROR_BAD_CONTENT,
 } DskHttpServerStreamError;
 
 struct _DskHttpServerStreamFuncs
@@ -79,15 +79,4 @@ struct _DskHttpServerStreamFuncs
   /* always called exactly once after all other functions done */
   void (*destroy)                 (DskHttpServerStreamTransfer *transfer);
 };
-
-/* note that 'funcs' must exist for the duration of the request.
- * usually this is done by having a static DskHttpServerStreamFuncs.
- * You could also free 'funcs' in the 'destroy' method.
- */
-DskHttpServerStreamTransfer *
-dsk_http_client_stream_request (DskHttpServerStream      *stream,
-                                DskHttpRequest           *request,
-				DskOctetSource           *post_data,
-				DskHttpServerStreamFuncs *funcs,
-				void                     *user_data);
 
