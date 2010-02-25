@@ -28,13 +28,13 @@ struct _DskBuffer
 void     dsk_buffer_init                (DskBuffer       *buffer);
 
 unsigned dsk_buffer_read                (DskBuffer    *buffer,
-                                         gpointer      data,
-                                         guint         max_length);
+                                         void         *data,
+                                         unsigned      max_length);
 unsigned dsk_buffer_peek                (const DskBuffer* buffer,
-                                         gpointer      data,
-                                         guint         max_length);
+                                         void         *data,
+                                         unsigned      max_length);
 int      dsk_buffer_discard             (DskBuffer    *buffer,
-                                         guint         max_discard);
+                                         unsigned      max_discard);
 char    *dsk_buffer_read_line           (DskBuffer    *buffer);
 
 char    *dsk_buffer_parse_string0       (DskBuffer    *buffer);
@@ -46,15 +46,15 @@ int      dsk_buffer_read_char           (DskBuffer    *buffer);
  * Appending to the buffer.
  */
 void     dsk_buffer_append              (DskBuffer    *buffer, 
-                                         gconstpointer data,
-                                         guint         length);
+                                         const void   *data,
+                                         unsigned      length);
 void     dsk_buffer_append_string       (DskBuffer    *buffer, 
                                          const char   *string);
 void     dsk_buffer_append_byte         (DskBuffer    *buffer, 
                                          uint8_t       character);
 void     dsk_buffer_append_repeated_byte(DskBuffer    *buffer, 
                                          uint8_t       character,
-                                         gsize         count);
+                                         unsigned      count);
 #define dsk_buffer_append_zeros(buffer, count) \
   dsk_buffer_append_repeated_byte ((buffer), 0, (count))
 
@@ -63,10 +63,10 @@ void     dsk_buffer_append_string0      (DskBuffer    *buffer,
                                          const char   *string);
 
 void     dsk_buffer_append_foreign      (DskBuffer    *buffer,
-                                         gconstpointer data,
+                                         const void   *data,
 					 int           length,
 					 DskDestroyNotify destroy,
-					 gpointer      destroy_data);
+					 void         *destroy_data);
 
 void     dsk_buffer_printf              (DskBuffer    *buffer,
 					 const char   *format,
@@ -78,13 +78,13 @@ void     dsk_buffer_vprintf             (DskBuffer    *buffer,
 /* Take all the contents from src and append
  * them to dst, leaving src empty.
  */
-guint    dsk_buffer_drain               (DskBuffer    *dst,
+unsigned dsk_buffer_drain               (DskBuffer    *dst,
                                          DskBuffer    *src);
 
 /* Like `drain', but only transfers some of the data. */
-guint    dsk_buffer_transfer            (DskBuffer    *dst,
+unsigned dsk_buffer_transfer            (DskBuffer    *dst,
                                          DskBuffer    *src,
-					 guint         max_transfer);
+					 unsigned      max_transfer);
 
 /* file-descriptor mucking */
 int      dsk_buffer_writev              (DskBuffer       *read_from,
@@ -99,5 +99,3 @@ void     dsk_buffer_clear               (DskBuffer    *to_destroy);
 /* Free all unused buffer fragments. */
 void     dsk_buffer_cleanup_recycling_bin ();
 
-
-#endif

@@ -10,6 +10,7 @@ typedef void        (*DskHookObjectFunc) (void *object);
 typedef struct _DskHookTrap DskHookTrap;
 typedef struct _DskHook DskHook;
 
+typedef struct _DskHookFuncs DskHookFuncs;
 struct _DskHookFuncs
 {
   DskHookObjectFunc ref;
@@ -70,6 +71,7 @@ DSK_INLINE_FUNC void         dsk_hook_set_idle_notify(DskHook       *hook,
                 void         dsk_hook_clear        (DskHook       *hook);
 
 extern DskHookFuncs dsk_hook_funcs_default;
+extern DskMemPoolFixed dsk_hook_trap_pool;
 
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC dsk_boolean
@@ -95,22 +97,22 @@ _dsk_hook_decr_trap_count         (DskHook       *hook)
 DSK_INLINE_FUNC void         dsk_hook_init         (DskHook       *hook,
                                                     void          *object)
 {
-  memset ((void**)hook + 2, 0, sizeof (DskHook) - sizeof(void*)*2);
+  dsk_bzero_pointers ((void**)hook + 2, sizeof (DskHook)/sizeof(void*) - 2);
   hook->object = object;
   hook->funcs = &dsk_hook_funcs_default;
   hook->magic = DSK_HOOK_MAGIC;
-  return rv;
 }
 
 DSK_INLINE_FUNC DskHookTrap *
 dsk_hook_trap         (DskHook       *hook,
                        DskHookFunc    func,
-                       void          *hook_data,
+                       void          *data,
                        DskHookDestroy destroy)
 {
+  DskHookTrap *trap;
   _dsk_inline_assert (hook->magic == DSK_HOOK_MAGIC);
   _dsk_inline_assert (func != NULL);
-  if (hook->trap.func == NULL)
+  if (hook->trap.callback == NULL)
     {
       trap = &hook->trap;
     }
@@ -124,9 +126,9 @@ dsk_hook_trap         (DskHook       *hook,
       trap->next = NULL;
     }
   
-  trap->callback = callback;
-  trap->callback_data = callback_data;
-  trap->callback_data_destroy = callback_data_destroy;
+  trap->callback = func;
+  trap->callback_data = data;
+  trap->callback_data_destroy = destroy;
   trap->owner = hook;
   trap->is_notifying = 0;
   trap->block_count = 0;
@@ -137,7 +139,7 @@ dsk_hook_trap         (DskHook       *hook,
 DSK_INLINE_FUNC void
 dsk_hook_trap_block   (DskHookTrap   *trap)
 {
-  _dsk_inline_assert (trap->hook->magic == DSK_HOOK_MAGIC);
+  _dsk_inline_assert (trap->owner->magic == DSK_HOOK_MAGIC);
   _dsk_inline_assert (trap->callback != NULL);
   _dsk_inline_assert (trap->block_count != 0xffff);
   if (++(trap->block_count) == 1)
@@ -147,7 +149,7 @@ dsk_hook_trap_block   (DskHookTrap   *trap)
 DSK_INLINE_FUNC void
 dsk_hook_trap_unblock (DskHookTrap   *trap)
 {
-  _dsk_inline_assert (trap->hook->magic == DSK_HOOK_MAGIC);
+  _dsk_inline_assert (trap->owner->magic == DSK_HOOK_MAGIC);
   _dsk_inline_assert (trap->callback != NULL);
   _dsk_inline_assert (trap->block_count != 0);
   if (--(trap->block_count) == 0)

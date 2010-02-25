@@ -30,8 +30,8 @@ dsk_boolean dsk_date_parse   (const char *str,
    whose year fits in an unsigned integer. (therefore, no B.C. dates)
  */
 /* dsk_unixtime_to_date() always sets the date_out->zone_offset to 0 (ie GMT) */
-gint64      dsk_date_to_unixtime (DskDate *date);
-void        dsk_unixtime_to_date (gint64   unixtime,
+dsk_time_t  dsk_date_to_unixtime (DskDate *date);
+void        dsk_unixtime_to_date (dsk_time_t unixtime,
                                   DskDate *date_out);
 
 /* we recognise: UT, UTC, GMT; EST EDT CST CDT MST MDT PST PDT [A-Z]
@@ -46,8 +46,8 @@ dsk_boolean dsk_date_parse_timezone (const char *at,
    Which is too much work for a feature we basically don't need. */
 DskTimezone *dsk_timezone_get  (const char *name,
                                 DskError  **error);
-void        dsk_timezone_query (DskTimezone *timezone,
-                                gint64       unixtime,
+dsk_boolean dsk_timezone_query (DskTimezone *timezone,
+                                dsk_time_t   unixtime,
                                 int         *minutes_offset_out,
                                 const char **timezone_name_out,
                                 DskError   **error);
