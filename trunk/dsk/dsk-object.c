@@ -1,15 +1,19 @@
+#include "dsk-common.h"
 #include "dsk-object.h"
+
+#define ASSERT_OBJECT_CLASS_MAGIC(class) \
+  dsk_assert ((class)->object_class_magic == DSK_OBJECT_CLASS_MAGIC)
 
 static void
 dsk_object_init (DskObject *object)
 {
-  dsk_assert (object->object_class->magic == DSK_OBJECT_CLASS_MAGIC);
+  ASSERT_OBJECT_CLASS_MAGIC (object->object_class);
 }
 
 static void
 dsk_object_finalize (DskObject *object)
 {
-  dsk_assert (object->object_class->magic == DSK_OBJECT_CLASS_MAGIC);
+  ASSERT_OBJECT_CLASS_MAGIC (object->object_class);
   dsk_assert (object->ref_count == 0);
 }
 
@@ -25,11 +29,11 @@ dsk_object_is_a (void *object,
   DskObjectClass *ic = isa_class;
   if (o == NULL)
     return DSK_FALSE;
-  dsk_assert (ic->magic == DSK_OBJECT_CLASS_MAGIC);
+  ASSERT_OBJECT_CLASS_MAGIC (ic);
   /* Deliberately ignore ref_count, since we want to be able to cast during
      finalization, i guess */
   c = o->object_class;
-  dsk_assert (c->magic == DSK_OBJECT_CLASS_MAGIC);
+  ASSERT_OBJECT_CLASS_MAGIC (c);
   while (c != NULL)
     {
       if (c == ic)
@@ -46,9 +50,18 @@ dsk_object_get_class_name (void *object)
   if (o == NULL)
     return "*null*";
   if (o->object_class == NULL
-   || o->object_class->magic != DSK_OBJECT_CLASS_MAGIC)
+   || o->object_class->object_class_magic != DSK_OBJECT_CLASS_MAGIC)
     return "invalid-object";
   return o->object_class->name;
+}
+
+static const char *
+dsk_object_class_get_name (DskObjectClass *class)
+{
+  if (class->object_class_magic == DSK_OBJECT_CLASS_MAGIC)
+    return class->name;
+  else
+    return "*invalid-object-class*";
 }
 
 void *
@@ -87,7 +100,7 @@ void
 dsk_object_handle_last_unref (DskObject *o)
 {
   DskObjectClass *c = o->object_class;
-  dsk_assert (c->magic == DSK_OBJECT_CLASS_MAGIC);
+  ASSERT_OBJECT_CLASS_MAGIC (c);
   do
     {
       if (c->finalize != NULL)

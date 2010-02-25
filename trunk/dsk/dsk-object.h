@@ -7,6 +7,7 @@ struct _DskObjectClass
   DskObjectClass *parent_class;
   size_t sizeof_class;
   size_t sizeof_instance;
+  unsigned pointers_after_base;
   unsigned object_class_magic;
   void (*init) (DskObject *object);
   void (*finalize) (DskObject *object);
@@ -17,6 +18,7 @@ typedef void (*DskObjectFinalizeFunc) (DskObject *object);
 #define DSK_OBJECT_CLASS_DEFINE(name, parent_class, init_func, finalize_func) \
        { #name, (DskObjectClass *) parent_class, \
          sizeof (name ## Class), sizeof (name), \
+         (sizeof (name ## Class) - sizeof (DskObjectClass)) / sizeof(void*), \
          DSK_OBJECT_CLASS_MAGIC, \
          (DskObjectInitFunc) init_func, (DskObjectFinalizeFunc) finalize_func }
 
@@ -28,9 +30,9 @@ struct _DskObject
 };
 
 /* The object interface */
-                 void      *dsk_object_new   (void *object_class);
+DSK_INLINE_FUNC void      *dsk_object_new   (void *object_class);
 DSK_INLINE_FUNC void       dsk_object_unref (void *object);
-DSK_INLINE_FUNC DskObject *dsk_object_ref   (void *object);
+DSK_INLINE_FUNC void      *dsk_object_ref   (void *object);
                  dsk_boolean dsk_object_is_a (void *object,
                                               void *isa_class);
            dsk_boolean dsk_object_class_is_a (void *object_class,
@@ -73,15 +75,15 @@ DSK_INLINE_FUNC  void      *dsk_object_new   (void *object_class)
 {
   DskObjectClass *c = object_class;
   DskObject *rv;
-  _dsk_inline_assert (c->magic == DSK_OBJECT_CLASS_MAGIC);
+  _dsk_inline_assert (c->object_class_magic == DSK_OBJECT_CLASS_MAGIC);
   rv = dsk_malloc (c->sizeof_instance);
   rv->object_class = object_class;
   rv->ref_count = 1;
   dsk_bzero_pointers (rv + 1, c->pointers_after_base);
   do
     {
-      if (c->init_func != NULL)
-        c->init_func (rv);
+      if (c->init != NULL)
+        c->init (rv);
       c = c->parent_class;
     }
   while (c != NULL);
@@ -93,7 +95,7 @@ DSK_INLINE_FUNC  void       dsk_object_unref (void *object)
   DskObject *o = object;
   _dsk_inline_assert (o != NULL);
   _dsk_inline_assert (o->ref_count > 0);
-  _dsk_inline_assert (o->object_class->magic == DSK_OBJECT_CLASS_MAGIC);
+  _dsk_inline_assert (o->object_class->object_class_magic == DSK_OBJECT_CLASS_MAGIC);
   if (--(o->ref_count) == 0)
     dsk_object_handle_last_unref (o);
 }
@@ -102,7 +104,7 @@ DSK_INLINE_FUNC  void      *dsk_object_ref   (void *object)
 {
   DskObject *o = object;
   _dsk_inline_assert (o->ref_count > 0);
-  _dsk_inline_assert (o->object_class->magic == DSK_OBJECT_CLASS_MAGIC);
+  _dsk_inline_assert (o->object_class->object_class_magic == DSK_OBJECT_CLASS_MAGIC);
   o->ref_count += 1;
   return o;
 }

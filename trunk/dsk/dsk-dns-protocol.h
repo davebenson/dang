@@ -79,7 +79,7 @@ typedef struct _DskDnsQuestion DskDnsQuestion;
 struct _DskDnsQuestion
 {
   /* The domain name for which information is being requested. */
-  char *name;
+  const char *name;
 
   /* The type of query we are asking. */
   DskDnsResourceRecordType  query_type;
@@ -108,7 +108,7 @@ typedef struct _DskDnsResourceRecord DskDnsResourceRecord;
 struct _DskDnsResourceRecord
 {
   DskDnsResourceRecordType  type;
-  char                     *owner;     /* where the resource_record is found */
+  const char               *owner;     /* where the resource_record is found */
   uint32_t                  time_to_live;
   DskDnsClassCode           class_code;
 
@@ -125,29 +125,29 @@ struct _DskDnsResourceRecord
     /* For DSK_DNS_RR_HOST_ADDRESS and DSK_DNS_CLASS_CHAOS */
     struct
     {
-      char *chaos_name;
+      const char *chaos_name;
       uint16_t chaos_address;
     } a_chaos;
 
     /* For DSK_DNS_RR_CNAME, DSK_DNS_RR_POINTER, DSK_DNS_RR_NAME_SERVER */
-    char *domain_name;
+    const char *domain_name;
 
     /* For DSK_DNS_RR_MAIL_EXCHANGE */
     struct
     {
       unsigned preference_value; /* "lower is better" */
 
-      char *mail_exchange_host_name;
+      const char *mail_exchange_host_name;
     } mx;
 
     /* For DSK_DNS_RR_TEXT */
-    char *txt;
+    const char *txt;
 
     /* For DSK_DNS_RR_HOST_INFO */
     struct
     {
-      char *cpu;
-      char *os;
+      const char *cpu;
+      const char *os;
     } hinfo;
 
 
@@ -159,11 +159,11 @@ struct _DskDnsResourceRecord
     {
       /* The domain-name of the name server that was the
 	 original or primary source of data for this zone. */
-      char *mname;
+      const char *mname;
 
       /* specifies the mailbox of the
 	 person responsible for this zone. */
-      char *rname;
+      const char *rname;
 
       /* The unsigned 32 bit version number of the original copy
 	 of the zone.  Zone transfers preserve this value.  This
@@ -202,11 +202,11 @@ struct _DskDnsMessage
   unsigned n_questions;
   DskDnsQuestion *questions;
   unsigned n_answer_rr;
-  DskDnsResourceRecord *answers;
+  DskDnsResourceRecord *answer_rr;
   unsigned n_authority_rr;
-  DskDnsResourceRecord *authority;
+  DskDnsResourceRecord *authority_rr;
   unsigned n_additional_rr;
-  DskDnsResourceRecord *additional;
+  DskDnsResourceRecord *additional_rr;
 
   uint16_t id;     /* used by requestor to match queries and replies */
 
