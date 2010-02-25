@@ -1,11 +1,15 @@
 #include <stdlib.h>
 #include <string.h>
+#include "../gskrbtreemacros.h"
 #include "dsk-common.h"
 #include "dsk-object.h"
 #include "dsk-error.h"
 #include "dsk-dns-protocol.h"
 
 #define N_INIT_STR_INFO         64
+
+/* TODO: provide citation */
+#define MAX_DOMAIN_NAME_LENGTH  1024
 
 /* Used for binary packing/unpacking */
 typedef struct _DskDnsHeader DskDnsHeader;
@@ -218,6 +222,7 @@ gather_names_resource_record (unsigned       len,
                               unsigned      *n_str_info_inout,
                               StrInfo      **str_info_inout,
                               unsigned      *str_info_alloced_inout,
+                              unsigned      *extra_space_inout,
                               DskError     **error)
 {
   const char *code;
@@ -291,6 +296,7 @@ gather_names_resource_record (unsigned       len,
             if (c + 1 + *used_inout > len)
               goto truncated;
             *used_inout += c + 1;
+            *extra_space_inout += c + 1;
             break;
           }
         case 'n':
@@ -318,6 +324,48 @@ truncated:
   return DSK_FALSE;
 }
 
+static int compare_used_strs (const void *a, const void *b)
+{
+
+  const UsedStr *A = a;
+  const UsedStr *B = b;
+  return strcmp (A->str, B->str);
+}
+
+static dsk_boolean
+decompress_str (const uint8_t  *data,
+                unsigned        offset,
+                char          **inout)
+{
+  dsk_boolean is_first = DSK_TRUE;
+  while (data[offset] != 0)
+    {
+      if ((data[offset] & 0xc0) == 0xc0)
+        {
+          /* follow pointer */
+          offset = ((data[offset] & ~0xc0) << 8) | data[offset + 1];
+        }
+      else
+        {
+          /* append length-prefixed string */
+          unsigned part_len;
+          if (is_first)
+            {
+              **inout = '.';
+              *inout += 1;
+              is_first = DSK_FALSE;
+            }
+          part_len = data[offset];
+          memcpy (*inout, data + offset + 1, part_len);
+          *inout += part_len;
+          offset += part_len + 1;
+        }
+    }
+  **inout = 0;
+  *inout += 1;
+  return DSK_TRUE;
+}
+
 static const char *
 parse_domain_name     (unsigned              len,
                        const uint8_t        *data,
@@ -327,11 +375,34 @@ parse_domain_name     (unsigned              len,
                        DskError            **error)
 {
   char name[MAX_DOMAIN_NAME_LENGTH+1];
+  unsigned name_len = 0;
   UsedStr *rv;
-  while (data[*used_inout] != 0
+  UsedStr dummy;
+  while (*used_inout < len
+      && data[*used_inout] != 0
       && (data[*used_inout] & 0xc0) == 0)
     {
-      ...
+      unsigned part_len = data[*used_inout];
+      *used_inout += 1;
+      dsk_assert (*used_inout + part_len < len);
+      if (name_len > 0)
+        {
+          if (name_len + 1 + part_len > MAX_DOMAIN_NAME_LENGTH)
+            {
+              dsk_set_error (error, "domain-name too long");
+              return DSK_FALSE;
+            }
+          name[name_len++] = '.';
+        }
+      memcpy (name + name_len, data + *used_inout, part_len);
+      name_len += part_len;
+      *used_inout += part_len;
+    }
+  if (*used_inout == len)
+    {
+      /* truncated */
+      dsk_set_error (error, "truncated in domain name");
+      return DSK_FALSE;
     }
   if (data[*used_inout] == 0)
     {
@@ -346,21 +417,52 @@ parse_domain_name     (unsigned              len,
           if ((data[at] & 0xc0) == 0xc0)
             {
               /* pointer to new location */
-              ...
+              const uint8_t *addr = data + at;
+              at = ((addr[0] & ~0xc0) << 8) | (addr[1]);
             }
           else
             {
               /* new length-prefixed name component */
-              ...
+              unsigned part_len = data[at++];
+              dsk_assert (*used_inout + part_len < len);
+              if (name_len > 0)
+                {
+                  if (name_len + 1 + part_len > MAX_DOMAIN_NAME_LENGTH)
+                    {
+                      dsk_set_error (error, "domain-name too long");
+                      return DSK_FALSE;
+                    }
+                  name[name_len++] = '.';
+                }
+              memcpy (name + name_len, data + at, part_len);
+              name_len += part_len;
+              *used_inout += part_len;
             }
         }
     }
 
+  name[name_len] = 0;
   dummy.str = name;
   rv = bsearch (&dummy, used_strs, n_used_strs, sizeof (UsedStr),
                 compare_used_strs);
   dsk_assert (rv != NULL);
   return rv->str;
+}
+
+static const char *
+parse_length_prefixed_string (unsigned len,
+                              const uint8_t *data,
+                              unsigned      *used_inout,
+                              char         **extra_space_inout)
+{
+  unsigned part_len = data[*used_inout];
+  char *rv;
+  *used_inout += 1;
+  rv = *extra_space_inout;
+  memcpy (rv, data + *used_inout, part_len);
+  rv[part_len] = 0;
+  *extra_space_inout += (part_len + 1);
+  return rv;
 }
 
 static dsk_boolean
@@ -383,8 +485,9 @@ parse_question (unsigned          len,
   memcpy (array, data + *used_inout, 4);
   *used_inout += 4;
   question->name = name;
-  question->type = htons (qarray[0]);
-  question->question_class = htons (qarray[0]);
+  question->query_type = htons (array[0]);
+  question->query_class = htons (array[1]);
+  /* TODO: validate query_type and query_class */
   return DSK_TRUE;
 }
 
@@ -404,7 +507,9 @@ parse_resource_record (unsigned              len,
   uint16_t class;
   uint32_t ttl;
   uint16_t rdlength;
-  rr->name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+  rr->owner = parse_domain_name (len, data, used_inout, n_used_strs, used_strs, error);
+  if (rr->owner == NULL)
+    return DSK_FALSE;
   if (*used_inout + 10 > len)
     {
       dsk_set_error (error, "data truncated in resource-record header");
@@ -433,7 +538,9 @@ parse_resource_record (unsigned              len,
     case DSK_DNS_RR_NAME_SERVER:
     case DSK_DNS_RR_CANONICAL_NAME:
     case DSK_DNS_RR_POINTER:
-      rr->rdata.domain_name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+      rr->rdata.domain_name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs, error);
+      if (rr->rdata.domain_name == NULL)
+        return DSK_FALSE;
       break;
     case DSK_DNS_RR_HOST_INFO:
       rr->rdata.hinfo.cpu = parse_length_prefixed_string (len, data, used_inout, extra_str_space_inout);
@@ -446,11 +553,13 @@ parse_resource_record (unsigned              len,
         rr->rdata.mx.preference_value = htons (pv);
         *used_inout += 2;
       }
-      rr->rdata.mx.mail_exchange_host_name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+      if ((rr->rdata.mx.mail_exchange_host_name = parse_domain_name (len, data, used_inout, n_used_strs, used_strs, error)) == NULL)
+       return DSK_FALSE;
       break;
     case DSK_DNS_RR_START_OF_AUTHORITY:
-      rr->rdata.soa.mname = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
-      rr->rdata.soa.rname = parse_domain_name (len, data, used_inout, n_used_strs, used_strs);
+      if ((rr->rdata.soa.mname = parse_domain_name (len, data, used_inout, n_used_strs, used_strs, error)) == NULL
+       || (rr->rdata.soa.rname = parse_domain_name (len, data, used_inout, n_used_strs, used_strs, error)) == NULL)
+       return DSK_FALSE;
       {
         uint32_t intervals[5];
         memcpy (intervals, data + *used_inout, 20);
@@ -463,7 +572,7 @@ parse_resource_record (unsigned              len,
       }
       break;
     case DSK_DNS_RR_TEXT:
-      rr->rdata.text = parse_length_prefixed_string (len, data, used_inout, extra_str_space_inout);
+      rr->rdata.txt = parse_length_prefixed_string (len, data, used_inout, extra_str_space_inout);
       break;
     default:
       dsk_set_error (error, "invalid type %u of resource-record", type);
@@ -472,12 +581,30 @@ parse_resource_record (unsigned              len,
   return DSK_TRUE;
 }
 
+static dsk_boolean
+validate_opcode (DskDnsOpcode opcode)
+{
+  return opcode <= 5;
+}
+static dsk_boolean
+validate_rcode (DskDnsRcode rcode)
+{
+  return rcode <= 10;
+}
+
 DskDnsMessage *
 dsk_dns_message_parse (unsigned       len,
                        const uint8_t *data,
-                       DskError     **error);
+                       DskError     **error)
 {
   DskDnsHeader header;
+  StrInfo *str_info;
+  unsigned n_str_info;
+  unsigned used;
+  unsigned str_info_alloced;
+  unsigned i;
+  unsigned total_rr;
+  unsigned extra_space = 0;
   if (len < 12)
     {
       dsk_set_error (error, "dns packet too short (<12 bytes)");
@@ -550,6 +677,7 @@ dsk_dns_message_parse (unsigned       len,
             }
         }
       n_str_info = o + 1;
+      const char *msg = NULL;
       for (i = 0; i < n_str_info; i++)
         if ((str_info[i].flags & STR_INFO_FLAG_HAS_LENGTH) == 0
          && !compute_length (n_str_info, str_info, data, i, &msg))
@@ -560,6 +688,10 @@ dsk_dns_message_parse (unsigned       len,
     }
 
   /* figure the length of string-space needed */
+  unsigned str_space;
+  unsigned n_used_strs;
+  str_space = 0;
+  n_used_strs = 0;
   for (i = 0; i < n_str_info; i++)
     if (str_info[i].flags & STR_INFO_FLAG_USED)
       {
@@ -568,10 +700,12 @@ dsk_dns_message_parse (unsigned       len,
       }
 
   /* allocate space for the message */
+  DskDnsMessage *message;
   message = dsk_malloc (sizeof (DskDnsMessage)
                         + sizeof (DskDnsQuestion) * header.qdcount
                         + sizeof (DskDnsResourceRecord) * total_rr
-                        + str_space);
+                        + str_space
+                        + extra_space);
   message->id = header.qid;
   message->is_query = header.qr ^ 1;
   message->is_authoritative = header.aa;
@@ -588,6 +722,9 @@ dsk_dns_message_parse (unsigned       len,
   message->rcode = header.rcode;
   message->opcode = header.opcode;
 
+  char *str_heap;
+  char *str_heap_at;
+  UsedStr *used_strs;
   str_heap = (char*) (message->additional_rr + message->n_additional_rr);
 
   /* reserve space for the 4 sections; then build the needed
@@ -615,7 +752,7 @@ dsk_dns_message_parse (unsigned       len,
   for (i = 0; i < total_rr; i++)
     if (!parse_resource_record (len, data, &used,
                                 &message->answer_rr[i],
-                                n_used_strs, used_strs, &str_heap,
+                                n_used_strs, used_strs, &str_heap_at,
                                 error))
       goto cleanup;
 
@@ -630,6 +767,7 @@ cleanup:
 }
 
 /* === dsk_dns_message_serialize === */
+typedef struct _StrTreeNode StrTreeNode;
 struct _StrTreeNode
 {
   unsigned offset;
@@ -693,7 +831,9 @@ validate_resource_record (DskDnsResourceRecord *rr)
       return validate_name (rr->rdata.domain_name);
     case DSK_DNS_RR_HOST_INFO:
       return rr->rdata.hinfo.cpu != NULL
+          && strlen (rr->rdata.hinfo.cpu) <= 255
           && rr->rdata.hinfo.os != NULL
+          && strlen (rr->rdata.hinfo.os) <= 255;
     case DSK_DNS_RR_MAIL_EXCHANGE:
       return validate_name (rr->rdata.mx.mail_exchange_host_name);
     case DSK_DNS_RR_START_OF_AUTHORITY:
@@ -729,7 +869,7 @@ static unsigned get_name_n_components (const char *str)
 static unsigned
 get_question_n_components (DskDnsQuestion *question)
 {
-  return get_name_n_components (question->name)
+  return get_name_n_components (question->name);
 }
 static unsigned
 get_rr_n_components (DskDnsResourceRecord *rr)
@@ -758,6 +898,7 @@ static unsigned
 get_max_str_nodes (DskDnsMessage *message)
 {
   unsigned max_str_nodes = 1;
+  unsigned i;
   for (i = 0; i < message->n_questions; i++)
     max_str_nodes += get_question_n_components (message->questions + i);
   for (i = 0; i < message->n_answer_rr; i++)
@@ -804,7 +945,7 @@ get_name_size (const char     *name,
                StrTreeNode   **p_heap)
 {
   const char *end = strchr (name, 0);
-  StrTreeNode *p_at = p_top;
+  StrTreeNode **p_at = p_top;
   dsk_boolean is_first = DSK_TRUE;
   dsk_boolean use_ptr = DSK_FALSE;
   unsigned str_size = 0;
@@ -835,12 +976,13 @@ get_name_size (const char     *name,
         }
       if (child == NULL)
         {
+          StrTreeNode *conflict;
           /* create new node */
           child = *p_heap++;
           memset (child, 0, sizeof (StrTreeNode));
 
           /* insert node */
-          GSK_RBTREE_INSERT (STR_NODE_GET_TREE (p_at), 
+          GSK_RBTREE_INSERT (STR_NODE_GET_TREE (*p_at), 
                              child, conflict);
           dsk_assert (conflict == NULL);
 
@@ -892,7 +1034,7 @@ get_rr_size (DskDnsResourceRecord *rr,
       rv += 20;
       break;
     case DSK_DNS_RR_TEXT:
-      rv += strlen (rr->rdata.text) + 1;
+      rv += strlen (rr->rdata.txt) + 1;
       break;
     case DSK_DNS_RR_HOST_ADDRESS_IPV6:
       rv += 16;
@@ -929,8 +1071,8 @@ write_pointer (uint8_t **data_inout,
 {
   /* write pointer */
   uint8_t bytes[2];
-  bytes[0] = 0xc0 | (up->offset >> 8);
-  bytes[1] = up->offset;
+  bytes[0] = 0xc0 | (offset >> 8);
+  bytes[1] = offset;
   memcpy (*data_inout, bytes, 2);
   *data_inout += 2;
 }
@@ -942,6 +1084,7 @@ pack_domain_name  (const char     *name,
                    StrTreeNode    *top)
 {
   StrTreeNode *up = NULL;
+  const char *end;
 
   if (name[0] == '.')
     name++;
@@ -973,7 +1116,7 @@ pack_domain_name  (const char     *name,
           /* write remaining strings -- first calculate the size
              then start at the end. */
           unsigned packed_str_size = (end + 1) - name;
-          char *at = *data_inout + packed_str_size;
+          uint8_t *at = *data_inout + packed_str_size;
           while (end != name)
             {
               const char *beg = end;
@@ -1018,8 +1161,8 @@ pack_question (DskDnsQuestion *question,
 {
   uint16_t qarray[2];
   pack_domain_name (question->name, data_start, data_inout, top);
-  qarray[0] = htons (question->type);
-  qarray[1] = htons (question->question_class);
+  qarray[0] = htons (question->query_type);
+  qarray[1] = htons (question->query_class);
   memcpy (*data_inout, qarray, 4);
   *data_inout += 4;
 }
@@ -1092,7 +1235,7 @@ pack_resource_record (DskDnsResourceRecord *rr,
       }
       break;
     case DSK_DNS_RR_TEXT:
-      pack_len_prefixed_string (rr->rdata.text, data_inout);
+      pack_len_prefixed_string (rr->rdata.txt, data_inout);
       break;
     default:
       /* This should not happen, because validate_resource_record()
@@ -1102,8 +1245,9 @@ pack_resource_record (DskDnsResourceRecord *rr,
 
   /* write generic resource-code info */
   rdata_len = *data_inout - generic;
+  uint16_t data[5];
   data[0] = htons (rr->type);
-  data[1] = htons (rr->record_class);
+  data[1] = htons (DSK_DNS_CLASS_IN);
   data[2] = htons (rr->time_to_live >> 16);
   data[3] = htons (rr->time_to_live);
   data[4] = htons (rdata_len);
@@ -1168,15 +1312,16 @@ dsk_dns_message_serialize (DskDnsMessage *message,
   /* pack the message */
   rv = dsk_malloc (size);
   at = rv;
-  pack_message_header (message, &at);
+  pack_message_header (message, at);
+  at += sizeof (DskDnsHeader);
   for (i = 0; i < message->n_questions; i++)
     pack_question (message->questions + i, rv, &at, top);
   for (i = 0; i < message->n_answer_rr; i++)
-    pack_rr (message->answer_rr + i, rv, &at, top);
+    pack_resource_record (message->answer_rr + i, rv, &at, top);
   for (i = 0; i < message->n_authority_rr; i++)
-    pack_rr (message->authority_rr + i, rv, &at, top);
+    pack_resource_record (message->authority_rr + i, rv, &at, top);
   for (i = 0; i < message->n_additional_rr; i++)
-    pack_rr (message->additional_rr + i, rv, &at, top);
+    pack_resource_record (message->additional_rr + i, rv, &at, top);
   dsk_assert ((unsigned)(at - rv) == size);
   *length_out = size;
 

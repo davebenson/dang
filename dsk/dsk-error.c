@@ -1,4 +1,6 @@
-#include "dsk.h"
+#include "dsk-common.h"
+#include "dsk-object.h"
+#include "dsk-error.h"
 
 static void dsk_error_finalize (DskError *error)
 {
@@ -43,10 +45,25 @@ DskError *dsk_error_new_literal(const char *message)
   return rv;
 }
 
+void dsk_set_error (DskError **error,
+                    const char *format,
+                    ...)
+{
+  va_list args;
+  if (error == NULL)
+    return;
+
+  dsk_assert (*error == NULL);
+
+  va_start (args, format);
+  *error = dsk_error_new_valist (format, args);
+  va_end (args);
+}
+
 DskError *dsk_error_ref        (DskError   *error)
 {
   dsk_assert (dsk_object_is_a (error, &dsk_error_class));
-  return dsk_object_ref (error);
+  return (DskError *) dsk_object_ref (error);
 }
 
 void      dsk_error_unref      (DskError   *error)
