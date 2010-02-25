@@ -180,6 +180,7 @@ gather_names (unsigned       len,
         }
       str_info[n_str_info].offset = used;
       str_info[n_str_info].flags = flags;
+      n_str_info++;
       flags = 0;
 
       unsigned adv = data[used] + 1;
@@ -350,10 +351,11 @@ decompress_str (const uint8_t  *data,
           /* append length-prefixed string */
           unsigned part_len;
           if (is_first)
+            is_first = DSK_FALSE;
+          else
             {
               **inout = '.';
               *inout += 1;
-              is_first = DSK_FALSE;
             }
           part_len = data[offset];
           memcpy (*inout, data + offset + 1, part_len);
@@ -395,6 +397,7 @@ parse_domain_name     (unsigned              len,
           name[name_len++] = '.';
         }
       memcpy (name + name_len, data + *used_inout, part_len);
+      dsk_warning ("parse_domain_name: adding part %.*s: %.*s", part_len,data+*used_inout, name_len+part_len,name);
       name_len += part_len;
       *used_inout += part_len;
     }
@@ -412,6 +415,7 @@ parse_domain_name     (unsigned              len,
     {
       unsigned at = (data[*used_inout] & ~0xc0) << 8
                   | (data[*used_inout+1]);
+      *used_inout += 2;
       while (data[at] != 0)
         {
           if ((data[at] & 0xc0) == 0xc0)
@@ -424,27 +428,30 @@ parse_domain_name     (unsigned              len,
             {
               /* new length-prefixed name component */
               unsigned part_len = data[at++];
-              dsk_assert (*used_inout + part_len < len);
+              dsk_assert (at + part_len < len);
               if (name_len > 0)
                 {
                   if (name_len + 1 + part_len > MAX_DOMAIN_NAME_LENGTH)
                     {
                       dsk_set_error (error, "domain-name too long");
-                      return DSK_FALSE;
+                      return NULL;
                     }
                   name[name_len++] = '.';
                 }
               memcpy (name + name_len, data + at, part_len);
+      dsk_warning ("parse_domain_name: adding part %.*s: %.*s", part_len,data+at, name_len+part_len,name);
               name_len += part_len;
-              *used_inout += part_len;
+              at += part_len;
             }
         }
     }
 
   name[name_len] = 0;
+  dsk_warning("decompress_str: result %s", name);
   dummy.str = name;
   rv = bsearch (&dummy, used_strs, n_used_strs, sizeof (UsedStr),
                 compare_used_strs);
+  dsk_warning("bsearch for %s returned %p", name, rv);
   dsk_assert (rv != NULL);
   return rv->str;
 }
@@ -522,6 +529,8 @@ parse_resource_record (unsigned              len,
   ttl      = ((uint32_t)header[4] << 24) | ((uint32_t)header[5] << 16)
            | ((uint32_t)header[6] << 8)  | ((uint32_t)header[7] << 0);
   rdlength = ((uint16_t)header[8] << 8)  | ((uint16_t)header[9] << 0);
+  dsk_warning ("parse rr: type=%u, class=%u, ttl=%u, rdlength=%u",
+               type,class,ttl,rdlength);
   rr->type = type;
   rr->class_code = class;
   rr->time_to_live = ttl;
@@ -678,6 +687,7 @@ dsk_dns_message_parse (unsigned       len,
         }
       n_str_info = o + 1;
       const char *msg = NULL;
+      /* XXX: could probably just report length for the "used" section */
       for (i = 0; i < n_str_info; i++)
         if ((str_info[i].flags & STR_INFO_FLAG_HAS_LENGTH) == 0
          && !compute_length (n_str_info, str_info, data, i, &msg))
@@ -693,11 +703,16 @@ dsk_dns_message_parse (unsigned       len,
   str_space = 0;
   n_used_strs = 0;
   for (i = 0; i < n_str_info; i++)
-    if (str_info[i].flags & STR_INFO_FLAG_USED)
-      {
-        str_space += str_info[i].length + 1;
-        n_used_strs++;
-      }
+    {
+      dsk_warning("str_info[%u]:  flags=%x, offset=%u, length=%u",
+                  i, str_info[i].flags, str_info[i].offset, str_info[i].length);
+      if (str_info[i].flags & STR_INFO_FLAG_USED)
+        {
+          str_space += str_info[i].length + 1;
+          n_used_strs++;
+        }
+    }
+  dsk_warning ("n_used_strs=%u",n_used_strs);
 
   /* allocate space for the message */
   DskDnsMessage *message;
@@ -738,8 +753,10 @@ dsk_dns_message_parse (unsigned       len,
         used_strs[n_used_strs].offset = str_info[i].offset;
         used_strs[n_used_strs].str = str_heap_at;
         decompress_str (data, str_info[i].offset, &str_heap_at);
+        dsk_warning ("used_strs[%u] = %s", n_used_strs, used_strs[n_used_strs].str);
         n_used_strs++;
       }
+  qsort (used_strs, n_used_strs, sizeof (UsedStr), compare_used_strs);
 
   /* parse the four sections */
   used = 12;
