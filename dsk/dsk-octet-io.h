@@ -9,11 +9,12 @@ struct _DskOctetSourceClass
   DskObjectClass base_class;
 
   /* returns -1 on error */
-  int         (*read)        (DskOctetSource *source,
+  DskIOResult (*read)        (DskOctetSource *source,
                               unsigned        max_len,
                               void           *data_out,
+                              unsigned       *bytes_read_out,
                               DskError      **error);
-  int         (*read_buffer) (DskOctetSource *source,
+  DskIOResult (*read_buffer) (DskOctetSource *source,
                               DskBuffer      *read_buffer,
                               DskError      **error);
 
@@ -32,11 +33,12 @@ struct _DskOctetSinkClass
   DskObjectClass base_class;
 
   /* returns -1 on error */
-  int         (*write)        (DskOctetSink   *sink,
+  DskIOResult (*write)        (DskOctetSink   *sink,
                                unsigned        max_len,
                                const void     *data_out,
+                               unsigned       *n_written_out,
                                DskError      **error);
-  int         (*write_buffer) (DskOctetSink   *sink,
+  DskIOResult (*write_buffer) (DskOctetSink   *sink,
                                DskBuffer      *write_buffer,
                                DskError      **error);
 

@@ -16,6 +16,14 @@ typedef int64_t dsk_time_t;
 
 typedef void (*DskDestroyNotify) (void *data);
 
+typedef enum
+{
+  DSK_IO_RESULT_SUCCESS,
+  DSK_IO_RESULT_AGAIN,
+  DSK_IO_RESULT_EOF,            /* only for read operations */
+  DSK_IO_RESULT_ERROR
+} DskIOResult;
+
 #define dsk_assert(x)  assert(x)
 #define dsk_assert_not_reached()   \
   dsk_error("should not get here: %s:%u", __FILE__, __LINE__)
