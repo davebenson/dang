@@ -153,16 +153,16 @@ gather_name_length_resource_record (unsigned       len,
   rddata = data + *used_inout;
   switch (type)
     {
-    case DSK_DNS_RR_HOST_ADDRESS: code = "d"; break;
-    case DSK_DNS_RR_HOST_ADDRESS_IPV6: code = "dddd"; break;
-    case DSK_DNS_RR_NAME_SERVER: code = "n"; break;
-    case DSK_DNS_RR_CANONICAL_NAME: code = "n"; break;
-    case DSK_DNS_RR_POINTER: code = "n"; break;
-    case DSK_DNS_RR_MAIL_EXCHANGE: code = "bbn"; break;
-    case DSK_DNS_RR_HOST_INFO: code = "ss"; break;
-    case DSK_DNS_RR_START_OF_AUTHORITY: "nnddddd"; break;
-    case DSK_DNS_RR_TEXT: code = "ss"; break;
-    case DSK_DNS_RR_WILDCARD: code = ""; break;
+    case DSK_DNS_RR_HOST_ADDRESS:       code = "d"; break;
+    case DSK_DNS_RR_HOST_ADDRESS_IPV6:  code = "dddd"; break;
+    case DSK_DNS_RR_NAME_SERVER:        code = "n"; break;
+    case DSK_DNS_RR_CANONICAL_NAME:     code = "n"; break;
+    case DSK_DNS_RR_POINTER:            code = "n"; break;
+    case DSK_DNS_RR_MAIL_EXCHANGE:      code = "bbn"; break;
+    case DSK_DNS_RR_HOST_INFO:          code = "ss"; break;
+    case DSK_DNS_RR_START_OF_AUTHORITY: code = "nnddddd"; break;
+    case DSK_DNS_RR_TEXT:               code = "ss"; break;
+    case DSK_DNS_RR_WILDCARD:           code = ""; break;
     case DSK_DNS_RR_WELL_KNOWN_SERVICE:
     case DSK_DNS_RR_ZONE_TRANSFER:
     case DSK_DNS_RR_ZONE_MAILB:
@@ -1098,4 +1098,177 @@ dsk_dns_message_serialize (DskDnsMessage *message,
   *length_out = size;
 
   return rv;
+}
+
+
+/* --- debugging --- */
+static const char *
+dsk_dns_resource_record_type_name (DskDnsResourceRecordType type)
+{
+
+  switch (type)
+    {
+#define WRITE_CASE(shortname)  case DSK_DNS_RR_##shortname: return #shortname
+    WRITE_CASE (HOST_ADDRESS);
+    WRITE_CASE (NAME_SERVER);
+    WRITE_CASE (CANONICAL_NAME);
+    WRITE_CASE (HOST_INFO);
+    WRITE_CASE (MAIL_EXCHANGE);
+    WRITE_CASE (POINTER);
+    WRITE_CASE (START_OF_AUTHORITY);
+    WRITE_CASE (TEXT);
+    WRITE_CASE (WELL_KNOWN_SERVICE);
+    WRITE_CASE (HOST_ADDRESS_IPV6);
+    WRITE_CASE (ZONE_TRANSFER);
+    WRITE_CASE (ZONE_MAILB);
+    WRITE_CASE (WILDCARD);
+    default: return "*unknown-rr-type*";
+#undef WRITE_CASE
+    }
+}
+
+static const char *
+dsk_dns_class_name (DskDnsClassCode code)
+{
+
+  switch (code)
+    {
+#define WRITE_CASE(shortname)  case DSK_DNS_CLASS_##shortname: return #shortname
+    WRITE_CASE (IN);
+    WRITE_CASE (ANY);
+    default: return "*unknown-class*";
+#undef WRITE_CASE
+    }
+}
+static const char *
+dsk_dns_rcode_name (DskDnsRcode code)
+{
+
+  switch (code)
+    {
+#define WRITE_CASE(shortname)  case DSK_DNS_RCODE_##shortname: return #shortname
+    WRITE_CASE (NOERROR);
+    WRITE_CASE (FORMERR);
+    WRITE_CASE (SERVFAIL);
+    WRITE_CASE (NXDOMAIN);
+    WRITE_CASE (NOTIMP);
+    WRITE_CASE (REFUSED);
+    WRITE_CASE (YXDOMAIN);
+    WRITE_CASE (YXRRSET);
+    WRITE_CASE (NXRRSET);
+    WRITE_CASE (NOTAUTH);
+    WRITE_CASE (NOTZONE);
+    default: return "*unknown-rcode*";
+#undef WRITE_CASE
+    }
+}
+static const char *
+dsk_dns_opcode_name (DskDnsOpcode code)
+{
+
+  switch (code)
+    {
+#define WRITE_CASE(shortname)  case DSK_DNS_OP_##shortname: return #shortname
+    WRITE_CASE (QUERY);
+    WRITE_CASE (IQUERY);
+    WRITE_CASE (STATUS);
+    WRITE_CASE (NOTIFY);
+    WRITE_CASE (UPDATE);
+    default: return "*unknown-opcode*";
+#undef WRITE_CASE
+    }
+}
+
+#include <stdio.h>
+static void 
+print_rr (DskDnsResourceRecord *rr)
+{
+  unsigned i;
+  printf ("  %s  %s", rr->owner, dsk_dns_resource_record_type_name (rr->type));
+  switch (rr->type)
+    {
+    case DSK_DNS_RR_HOST_ADDRESS:
+      printf (" %u.%u.%u.%u\n",
+              rr->rdata.a.ip_address[0],
+              rr->rdata.a.ip_address[1],
+              rr->rdata.a.ip_address[2],
+              rr->rdata.a.ip_address[3]);
+      break;
+    case DSK_DNS_RR_CANONICAL_NAME:
+    case DSK_DNS_RR_POINTER:
+    case DSK_DNS_RR_NAME_SERVER:
+      printf (" %s\n", rr->rdata.domain_name);
+      break;
+
+    case DSK_DNS_RR_MAIL_EXCHANGE:
+      printf (" %u %s\n", rr->rdata.mx.preference_value, rr->rdata.mx.mail_exchange_host_name);
+      break;
+
+    case DSK_DNS_RR_TEXT:
+      printf (" %s\n", rr->rdata.txt);
+      break;
+    case DSK_DNS_RR_HOST_INFO:
+      printf (" %s   %s\n", rr->rdata.hinfo.cpu,rr->rdata.hinfo.os);
+      break;
+
+
+    case DSK_DNS_RR_START_OF_AUTHORITY:
+      printf (" %s %s %u %u %u %u %u\n",
+              rr->rdata.soa.mname,
+              rr->rdata.soa.rname,
+              rr->rdata.soa.serial,
+              rr->rdata.soa.refresh_time,
+              rr->rdata.soa.retry_time,
+              rr->rdata.soa.expire_time,
+              rr->rdata.soa.minimum_time);
+      break;
+    case DSK_DNS_RR_HOST_ADDRESS_IPV6:
+      printf (" %x", rr->rdata.aaaa.address[0]);
+      for (i = 1; i < 16; i++)
+        printf (":%x", rr->rdata.aaaa.address[i]);
+      printf ("\n");
+    default:
+      dsk_assert_not_reached ();
+    }
+}
+
+void
+dsk_dns_message_dump (DskDnsMessage *message)
+{
+  unsigned i;
+  printf ("id: %u\n"
+          "is_query: %u\n"
+          "is_authoritative: %u\n"
+          "is_truncated: %u\n"
+          "recursion_available: %u\n"
+          "recursion_desired: %u\n"
+          "result code: %s\n"
+          "opcode: %s\n",
+          message->id,
+          message->is_query,
+          message->is_authoritative,
+          message->is_truncated,
+          message->recursion_available,
+          message->recursion_desired,
+          dsk_dns_rcode_name (message->rcode),
+          dsk_dns_opcode_name (message->opcode));
+  printf ("QUESTIONS:\n");
+  for (i = 0; i < message->n_questions; i++)
+    {
+      printf ("  name: %s\n"
+              "  type: %s\n"
+              "  class: %s\n",
+              message->questions[i].name,
+              dsk_dns_resource_record_type_name (message->questions[i].query_type),
+              dsk_dns_class_name (message->questions[i].query_class));
+    }
+  printf ("ANSWERS:\n");
+  for (i = 0; i < message->n_answer_rr; i++)
+    print_rr (message->answer_rr + i);
+  printf ("AUTHORITY:\n");
+  for (i = 0; i < message->n_authority_rr; i++)
+    print_rr (message->authority_rr + i);
+  printf ("ADDITIONAL:\n");
+  for (i = 0; i < message->n_additional_rr; i++)
+    print_rr (message->additional_rr + i);
 }
