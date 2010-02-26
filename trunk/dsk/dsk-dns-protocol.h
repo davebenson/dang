@@ -111,6 +111,8 @@ struct _DskDnsResourceRecord
   const char               *owner;     /* where the resource_record is found */
   uint32_t                  time_to_live;
   DskDnsClassCode           class_code;
+  DskDnsRcode               result_code;
+  DskDnsOpcode              opcode;
 
   /* rdata: record type specific data */
   union
@@ -237,3 +239,6 @@ DskDnsMessage *dsk_dns_message_parse     (unsigned       len,
 uint8_t *      dsk_dns_message_serialize (DskDnsMessage *message,
                                           unsigned      *length_out);
 
+
+/* diagnostics */
+void dsk_dns_message_dump (DskDnsMessage *);
