@@ -36,8 +36,27 @@ typedef void (*DskDnsLookupFunc) (DskDnsLookupResult *result,
                                   void               *callback_data);
 
 void    dsk_dns_lookup (const char       *name,
+                        dsk_boolean       is_ipv6,
                         DskDnsLookupFunc  callback,
                         void             *callback_data);
+
+
+/* non-blocking lookups only hit the cache */
+typedef enum
+{
+  DSK_DNS_LOOKUP_NONBLOCKING_NOT_FOUND,
+  DSK_DNS_LOOKUP_NONBLOCKING_MUST_BLOCK,
+  DSK_DNS_LOOKUP_NONBLOCKING_FOUND,
+  DSK_DNS_LOOKUP_NONBLOCKING_ERROR
+} DskDnsLookupNonblockingResult;
+
+DskDnsLookupNonblockingResult
+       dsk_dns_lookup_nonblocking (const char *name,
+                                   DskDnsAddress *out,
+                                   dsk_boolean    is_ipv6,
+                                   DskError     **error);
+
+
 
 typedef enum
 {
@@ -52,6 +71,8 @@ typedef struct _DskDnsCacheEntryJob DskDnsCacheEntryJob;
 typedef struct _DskDnsCacheEntry DskDnsCacheEntry;
 struct _DskDnsCacheEntry
 {
+  char *name;
+  dsk_boolean is_ipv6;
   unsigned expire_time;
   DskDnsCacheEntryType type;
   union {
@@ -67,5 +88,19 @@ struct _DskDnsCacheEntry
 typedef void (*DskDnsCacheEntryFunc) (DskDnsCacheEntry *entry,
                                       void             *callback_data);
 DskDnsCacheEntry *dsk_dns_lookup_cache_entry (const char       *name,
+                                              dsk_boolean       is_ipv6,
                                               DskDnsCacheEntryFunc callback,
                                               void             *callback_data);
+
+
+/* --- interfacing with system-level sockaddr structures --- */
+/* 'out' should be a pointer to a 'struct sockaddr_storage'.
+ */
+void dsk_dns_address_to_sockaddr (DskDnsAddress *address,
+                                  unsigned       port,
+                                  void          *out,
+                                  unsigned      *out_len);
+dsk_boolean dsk_sockaddr_to_dns_address (unsigned addr_len,
+                                         const void *addr,
+                                         DskDnsAddress *out,
+                                         unsigned      *port_out);

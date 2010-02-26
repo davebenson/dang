@@ -1,4 +1,8 @@
 
+/* true configuration */
+#define DSK_HAVE_IPV6  1
+
+
 #include <assert.h>
 #include <inttypes.h>
 #include <stddef.h>

@@ -387,10 +387,10 @@ begin_connecting_dns_entry (DskClientStream *stream,
   begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
 }
 #endif
-static void
-dns_address_to_sock_addr (DskDnsAddress *address,
+void
+dsk_dns_address_to_sock_addr (DskDnsAddress *address,
                           unsigned port,
-                          struct sockaddr_storage *out,
+                          void *out,
                           unsigned *out_len);
 {
   /* necessary? probably not for ipv4 */
@@ -432,7 +432,7 @@ handle_dns_done (DskDnsLookupResult *result,
       {
         struct sockaddr_storage addr;
         unsigned addr_len;
-        dns_address_to_sock_addr (result->addr, stream->port, &addr, &addr_len);
+        dsk_dns_address_to_sock_addr (result->addr, stream->port, &addr, &addr_len);
         begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
       }
       break;
@@ -490,7 +490,7 @@ begin_connecting (DskClientStream *stream)
       /* parse name into addr/addr_len */
       if (!parse_numeric_ip (stream->name, &address))
         dsk_die ("parse_numeric_ip failed on %s", stream->name);
-      dns_address_to_sock_addr (&address, stream->port, &addr, &addr_len);
+      dsk_dns_address_to_sock_addr (&address, stream->port, &addr, &addr_len);
       begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
     }
   else
