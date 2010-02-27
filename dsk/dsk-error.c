@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "dsk-common.h"
 #include "dsk-object.h"
 #include "dsk-error.h"
