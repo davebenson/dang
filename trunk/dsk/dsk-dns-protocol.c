@@ -1,3 +1,4 @@
+#include <arpa/inet.h>                  /* htonl and htons */
 #include <stdlib.h>
 #include <string.h>
 #include "../gskrbtreemacros.h"
@@ -166,10 +167,10 @@ gather_name_length_resource_record (unsigned       len,
     case DSK_DNS_RR_WELL_KNOWN_SERVICE:
     case DSK_DNS_RR_ZONE_TRANSFER:
     case DSK_DNS_RR_ZONE_MAILB:
-      dsk_set_error ("unimplemented resource-record type %u", type);
+      dsk_set_error (error, "unimplemented resource-record type %u", type);
       return DSK_FALSE;
     default:
-      dsk_set_error ("unknown resource-record type %u", type);
+      dsk_set_error (error, "unknown resource-record type %u", type);
       return DSK_FALSE;
     }
 
@@ -229,7 +230,6 @@ parse_domain_name     (unsigned              len,
                        char                **str_heap_at,
                        DskError            **error)
 {
-  unsigned name_len = 0;
   const char *rv = *str_heap_at;
   while (*used_inout < len
       && data[*used_inout] != 0
@@ -293,8 +293,7 @@ parse_domain_name     (unsigned              len,
 }
 
 static const char *
-parse_length_prefixed_string (unsigned len,
-                              const uint8_t *data,
+parse_length_prefixed_string (const uint8_t *data,
                               unsigned      *used_inout,
                               char         **extra_space_inout)
 {
@@ -341,7 +340,6 @@ parse_resource_record (unsigned              len,
                        char                **str_heap_at,
                        DskError            **error)
 {
-  const char *name;
   uint8_t header[10];
   uint16_t type;
   uint16_t class;
@@ -383,8 +381,8 @@ parse_resource_record (unsigned              len,
         return DSK_FALSE;
       break;
     case DSK_DNS_RR_HOST_INFO:
-      rr->rdata.hinfo.cpu = parse_length_prefixed_string (len, data, used_inout, str_heap_at);
-      rr->rdata.hinfo.os = parse_length_prefixed_string (len, data, used_inout, str_heap_at);
+      rr->rdata.hinfo.cpu = parse_length_prefixed_string (data, used_inout, str_heap_at);
+      rr->rdata.hinfo.os = parse_length_prefixed_string (data, used_inout, str_heap_at);
       break;
     case DSK_DNS_RR_MAIL_EXCHANGE:
       {
@@ -412,7 +410,7 @@ parse_resource_record (unsigned              len,
       }
       break;
     case DSK_DNS_RR_TEXT:
-      rr->rdata.txt = parse_length_prefixed_string (len, data, used_inout, str_heap_at);
+      rr->rdata.txt = parse_length_prefixed_string (data, used_inout, str_heap_at);
       break;
     default:
       dsk_set_error (error, "invalid type %u of resource-record", type);
@@ -814,6 +812,7 @@ get_rr_size (DskDnsResourceRecord *rr,
     default:
       dsk_assert_not_reached ();
     }
+  return rv;
 }
 
 static void
@@ -873,10 +872,11 @@ pack_domain_name  (const char     *name,
 
   /* scan up tree until we find one with offset==0;
      or until we run out of components */
+  const char *beg = NULL;
+  StrTreeNode *cur = NULL;
   while (name < end)
     {
-      const char *beg = end;
-      StrTreeNode *cur;
+      beg = end;
       while (beg > name && *beg != '.')
         beg--;
       GSK_RBTREE_LOOKUP_COMPARATOR (STR_NODE_GET_TREE (top),
@@ -884,37 +884,7 @@ pack_domain_name  (const char     *name,
                                     cur);
       dsk_assert (cur != NULL);
       if (cur->offset == 0)
-        {
-          /* write remaining strings -- first calculate the size
-             then start at the end. */
-          unsigned packed_str_size = (end + 1) - name;
-          uint8_t *at = *data_inout + packed_str_size;
-          while (end != name)
-            {
-              const char *beg = end;
-              while (beg > name && *beg != '.')
-                beg--;
-              at -= (end-beg);
-              memcpy (at, beg, end - beg);
-              at--;
-              *at = (end-beg);
-              end = beg;
-              if (end > name)
-                end--;          /* skip . */
-            }
-          dsk_assert (at == *data_inout);
-          *data_inout += packed_str_size;
-
-          if (up != NULL)
-            write_pointer (data_inout, up->offset);
-          else
-            {
-              /* write 0 */
-              **data_inout = 0;
-              *data_inout += 1;
-            }
-          return;
-        }
+        break;
       end = beg;
       if (end > name)
         end--;
@@ -922,6 +892,48 @@ pack_domain_name  (const char     *name,
       top = cur->subtree;
     }
 
+  if (name < end)
+    {
+      /* write remaining strings -- first calculate the size
+         then start at the end. */
+      unsigned packed_str_size = (end + 1) - name;
+      uint8_t *at = *data_inout + packed_str_size;
+      while (end != name)
+        {
+          at -= (end-beg);
+          memcpy (at, beg, end - beg);
+          at--;
+          *at = (end-beg);
+
+          cur->offset = (at - data_start);
+          top = cur->subtree;
+
+          end = beg;
+          if (end > name)
+            {
+              end--;          /* skip . */
+              beg = end;
+              while (beg > name && *beg != '.')
+                beg--;
+              GSK_RBTREE_LOOKUP_COMPARATOR (STR_NODE_GET_TREE (top),
+                                    beg, COMPARE_STR_TO_TREE_NODE,
+                                    cur);
+              dsk_assert (cur != NULL);
+            }
+        }
+      dsk_assert (at == *data_inout);
+      *data_inout += packed_str_size;
+
+      if (up != NULL)
+        write_pointer (data_inout, up->offset);
+      else
+        {
+          /* write 0 */
+          **data_inout = 0;
+          *data_inout += 1;
+        }
+      return;
+    }
   write_pointer (data_inout, up->offset);
 }
 
@@ -1079,7 +1091,7 @@ dsk_dns_message_serialize (DskDnsMessage *message,
     size += get_rr_size (message->authority_rr + i, &top, &nodes_at);
   for (i = 0; i < message->n_additional_rr; i++)
     size += get_rr_size (message->additional_rr + i, &top, &nodes_at);
-  dsk_assert (nodes_at - nodes <= max_str_nodes);
+  dsk_assert ((unsigned)(nodes_at - nodes) <= max_str_nodes);
 
   /* pack the message */
   rv = dsk_malloc (size);

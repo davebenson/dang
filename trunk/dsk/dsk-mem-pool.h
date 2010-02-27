@@ -127,7 +127,7 @@ DSK_INLINE_FUNC void     dsk_mem_pool_clear     (DskMemPool     *pool)
   while (slab)
     {
       void * new_slab = _DSK_MEM_POOL_SLAB_GET_NEXT_PTR (slab);
-      g_free (slab);
+      dsk_free (slab);
       slab = new_slab;
     }
 }

@@ -1,8 +1,16 @@
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <string.h>
+#include <unistd.h>
 #include "dsk-common.h"
+#include "dsk-mem-pool.h"
 #include "dsk-hook.h"
 #include "dsk-object.h"
+#include "dsk-error.h"
 #include "dsk-dns-client.h"
+#include "dsk-fd.h"
+#include "dsk-udp-socket.h"
 
 static void
 dsk_udp_socket_init (DskUdpSocket *socket)
@@ -57,9 +65,11 @@ dsk_udp_socket_new     (dsk_boolean  is_ipv6,
 }
 static inline DskIOResult
 handle_truncated (unsigned rv,
-                  unsigned len)
+                  unsigned len,
+                  DskError **error)
 {
-  dsk_set_error ("data truncated sending udp packet (%u of %u bytes sent)",
+  dsk_set_error (error,
+                 "data truncated sending udp packet (%u of %u bytes sent)",
                  (unsigned) rv, (unsigned) len);
   return DSK_IO_RESULT_ERROR;
 }
@@ -81,11 +91,11 @@ dsk_udp_socket_send    (DskUdpSocket  *socket,
     {
       if (errno == EINTR || errno == EAGAIN)
         return DSK_IO_RESULT_AGAIN;
-      dsk_set_error ("error sending udp packet: %s", strerror (errno));
+      dsk_set_error (error, "error sending udp packet: %s", strerror (errno));
       return DSK_IO_RESULT_ERROR;
     }
   if ((size_t) rv < len)
-    return handle_truncated (error, rv, len);
+    return handle_truncated (rv, len, error);
   return DSK_IO_RESULT_SUCCESS;
 }
 
@@ -99,6 +109,7 @@ dsk_udp_socket_send_to_address (DskUdpSocket  *socket,
 {
   struct sockaddr_storage addr;
   unsigned addr_len;
+  ssize_t rv;
   dsk_dns_address_to_sockaddr (address, port, &addr, &addr_len);
   rv = sendto (socket->fd, data, len, 0,
                (struct sockaddr *) &addr, addr_len);
@@ -111,9 +122,18 @@ dsk_udp_socket_send_to_address (DskUdpSocket  *socket,
       return DSK_IO_RESULT_ERROR;
     }
   if ((unsigned) rv < len)
-    return handle_truncated (error, rv, len);
+    return handle_truncated (rv, len, error);
   return DSK_IO_RESULT_SUCCESS;
 }
+
+typedef struct _SendBlockingDnsData SendBlockingDnsData;
+struct _SendBlockingDnsData
+{
+  DskUdpSocket *socket;
+  unsigned port;
+  unsigned len;
+  uint8_t *send_data;
+};
 
 static void
 handle_send_blocking_dns_data (DskDnsLookupResult *result,
@@ -122,7 +142,7 @@ handle_send_blocking_dns_data (DskDnsLookupResult *result,
   SendBlockingDnsData *sbdd = callback_data;
   if (result->type == DSK_DNS_LOOKUP_RESULT_FOUND)
     {
-      dsk_udp_socket_send_to_address (sbdd->socket, result->address,
+      dsk_udp_socket_send_to_address (sbdd->socket, result->addr,
                                       sbdd->port, sbdd->len, sbdd->send_data,
                                       NULL);
     }
@@ -143,6 +163,7 @@ dsk_udp_socket_send_to (DskUdpSocket  *socket,
                         const uint8_t *data,
                         DskError     **error)
 {
+  DskDnsAddress address;
   switch (dsk_dns_lookup_nonblocking (name, &address, socket->is_ipv6, error))
     {
     case DSK_DNS_LOOKUP_NONBLOCKING_NOT_FOUND:
@@ -154,10 +175,10 @@ dsk_udp_socket_send_to (DskUdpSocket  *socket,
         dsk_object_ref (socket);
         sbdd->port = port;
         sbdd->len = len;
-        sbdd->send_data = sbdd + 1;
+        sbdd->send_data = (uint8_t*)(sbdd + 1);
         memcpy (sbdd->send_data, data, len);
         sbdd->socket = socket;
-        dsk_dns_lookup (name, is_ipv6, handle_send_blocking_dns_data, sbdd);
+        dsk_dns_lookup (name, socket->is_ipv6, handle_send_blocking_dns_data, sbdd);
         return DSK_IO_RESULT_SUCCESS;
       }
     case DSK_DNS_LOOKUP_NONBLOCKING_FOUND:
@@ -196,8 +217,9 @@ dsk_udp_socket_receive (DskUdpSocket  *socket,
                         uint8_t      **data_out,
                         DskError     **error)
 {
-  void * buf = socket->recv_slab;
+  void *buf = socket->recv_slab;
   unsigned len = socket->recv_slab_len;
+  ssize_t rv;
   if (buf == NULL)
     {
       int value;
@@ -213,6 +235,9 @@ dsk_udp_socket_receive (DskUdpSocket  *socket,
       buf = dsk_malloc (value);
       len = value;
     }
+  struct sockaddr_storage sysaddr;
+  struct msghdr msg;
+  struct iovec iov;
   if (addr_out != NULL || port_out != NULL)
     {
       msg.msg_name = &sysaddr;

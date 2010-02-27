@@ -19,6 +19,9 @@ struct _DskUdpSocket
 
   DskDnsAddress bound_address;
   DskDnsAddress connect_address;
+
+  uint8_t *recv_slab;
+  unsigned recv_slab_len;
 };
 
 
@@ -38,7 +41,7 @@ dsk_boolean    dsk_udp_socket_bind    (DskUdpSocket  *socket,
                                        DskDnsAddress *bind_addr,
 				       unsigned       port,
 			               DskError     **error);
-dsk_boolean    dsk_udp_socket_receive (DskUdpSocket  *socket,
+DskIOResult    dsk_udp_socket_receive (DskUdpSocket  *socket,
                                        DskDnsAddress *addr_out,
 			               unsigned      *port_out,
 			               unsigned      *len_out,

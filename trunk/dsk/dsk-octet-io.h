@@ -55,19 +55,21 @@ struct _DskOctetSink
 #define DSK_OCTET_SOURCE_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetSource, object, &dsk_octet_source_class)
 #define DSK_OCTET_SINK_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetSink, object, &dsk_octet_sink_class)
 
-DSK_INLINE_FUNC int dsk_octet_source_read (void         *octet_source,
-                                           unsigned      max_len,
-                                           void         *data_out,
-                                           DskError    **error);
-DSK_INLINE_FUNC int dsk_octet_source_read_buffer (void           *octet_source,
+DSK_INLINE_FUNC DskIOResult dsk_octet_source_read (void         *octet_source,
+                                                   unsigned      max_len,
+                                                   void         *data_out,
+                                                   unsigned     *n_read_out,
+                                                   DskError    **error);
+DSK_INLINE_FUNC DskIOResult dsk_octet_source_read_buffer (void           *octet_source,
                                                   DskBuffer      *read_buffer,
                                                   DskError      **error);
 DSK_INLINE_FUNC void dsk_octet_source_shutdown   (void           *octet_source);
-DSK_INLINE_FUNC int dsk_octet_sink_write  (void         *octet_sink,
-                                           unsigned      max_len,
-                                           const void   *data,
-                                           DskError    **error);
-DSK_INLINE_FUNC int dsk_octet_sink_write_buffer  (void           *octet_sink,
+DSK_INLINE_FUNC DskIOResult dsk_octet_sink_write (void           *octet_sink,
+                                                  unsigned        max_len,
+                                                  const void     *data,
+                                                  unsigned       *n_written_out,
+                                                  DskError      **error);
+DSK_INLINE_FUNC DskIOResult dsk_octet_sink_write_buffer  (void           *octet_sink,
                                                   DskBuffer      *write_buffer,
                                                   DskError      **error);
 DSK_INLINE_FUNC void dsk_octet_sink_shutdown     (void           *octet_sink);
@@ -77,15 +79,16 @@ DSK_INLINE_FUNC void dsk_octet_sink_shutdown     (void           *octet_sink);
 extern DskOctetSourceClass dsk_octet_source_class;
 extern DskOctetSinkClass dsk_octet_sink_class;
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
-DSK_INLINE_FUNC int dsk_octet_source_read (void         *octet_source,
+DSK_INLINE_FUNC DskIOResult dsk_octet_source_read (void         *octet_source,
                                            unsigned      max_len,
                                            void         *data_out,
+                                           unsigned     *n_read_out,
                                            DskError    **error)
 {
   DskOctetSourceClass *c = DSK_OCTET_SOURCE_GET_CLASS (octet_source);
-  return c->read (octet_source, max_len, data_out, error);
+  return c->read (octet_source, max_len, data_out, n_read_out, error);
 }
-DSK_INLINE_FUNC int dsk_octet_source_read_buffer (void           *octet_source,
+DSK_INLINE_FUNC DskIOResult dsk_octet_source_read_buffer (void           *octet_source,
                                                   DskBuffer      *read_buffer,
                                                   DskError      **error)
 {
@@ -97,6 +100,28 @@ DSK_INLINE_FUNC void dsk_octet_source_shutdown (void           *octet_source)
   DskOctetSourceClass *c = DSK_OCTET_SOURCE_GET_CLASS (octet_source);
   if (c->shutdown != NULL)
     c->shutdown (octet_source);
+}
+DSK_INLINE_FUNC DskIOResult dsk_octet_sink_write (void           *octet_sink,
+                                                  unsigned        max_len,
+                                                  const void     *data,
+                                                  unsigned       *n_written_out,
+                                                  DskError      **error)
+{
+  DskOctetSinkClass *c = DSK_OCTET_SINK_GET_CLASS (octet_sink);
+  return c->write (octet_sink, max_len, data, n_written_out, error);
+}
+DSK_INLINE_FUNC DskIOResult dsk_octet_sink_write_buffer  (void           *octet_sink,
+                                                  DskBuffer      *write_buffer,
+                                                  DskError      **error)
+{
+  DskOctetSinkClass *c = DSK_OCTET_SINK_GET_CLASS (octet_sink);
+  return c->write_buffer (octet_sink, write_buffer, error);
+}
+DSK_INLINE_FUNC void dsk_octet_sink_shutdown     (void           *octet_sink)
+{
+  DskOctetSinkClass *c = DSK_OCTET_SINK_GET_CLASS (octet_sink);
+  if (c->shutdown != NULL)
+    c->shutdown (octet_sink);
 }
 
 #endif

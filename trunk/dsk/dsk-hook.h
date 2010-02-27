@@ -63,8 +63,8 @@ DSK_INLINE_FUNC void         dsk_hook_trap_unblock (DskHookTrap   *trap);
  */
 DSK_INLINE_FUNC void         dsk_hook_init         (DskHook       *hook,
                                                     void          *object);
-DSK_INLINE_FUNC void         dsk_hook_set_poll_func(DskHook       *hook,
-                                                    DskHookSetPoll set_poll);
+DSK_INLINE_FUNC void         dsk_hook_set_funcs    (DskHook       *hook,
+                                                    DskHookFuncs  *static_funcs);
 DSK_INLINE_FUNC void         dsk_hook_set_idle_notify(DskHook       *hook,
                                                       dsk_boolean    idle_notify);
                 void         dsk_hook_notify       (DskHook       *hook);
@@ -72,6 +72,11 @@ DSK_INLINE_FUNC void         dsk_hook_set_idle_notify(DskHook       *hook,
 
 extern DskHookFuncs dsk_hook_funcs_default;
 extern DskMemPoolFixed dsk_hook_trap_pool;
+
+void _dsk_hook_trap_count_nonzero (DskHook *);
+void _dsk_hook_trap_count_zero (DskHook *);
+void _dsk_hook_add_to_idle_notify_list (DskHook *hook);
+void _dsk_hook_remove_from_idle_notify_list (DskHook *hook);
 
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC dsk_boolean
@@ -156,6 +161,31 @@ dsk_hook_trap_unblock (DskHookTrap   *trap)
     _dsk_hook_incr_trap_count (trap->owner);
 }
 
+DSK_INLINE_FUNC void
+dsk_hook_set_idle_notify(DskHook       *hook,
+                         dsk_boolean    idle_notify)
+{
+  _dsk_inline_assert (hook->magic == DSK_HOOK_MAGIC);
+  if (idle_notify)
+    idle_notify = 1;
+  if (idle_notify == hook->is_idle_notify)
+    return;
+  hook->is_idle_notify = idle_notify;
+  if (hook->trap_count > 0)
+    {
+      if (idle_notify)
+        _dsk_hook_add_to_idle_notify_list (hook);
+      else
+        _dsk_hook_remove_from_idle_notify_list (hook);
+    }
+}
+
+DSK_INLINE_FUNC void
+dsk_hook_set_funcs    (DskHook       *hook,
+                       DskHookFuncs  *static_funcs)
+{
+  hook->funcs = static_funcs;
+}
 #endif
 
 

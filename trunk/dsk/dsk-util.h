@@ -10,6 +10,9 @@ void dsk_bzero_pointers (void *ptr,
 
 void dsk_out_of_memory (void);
 
+dsk_boolean dsk_parse_boolean (const char *str,
+                               dsk_boolean *out);
+
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC void *dsk_malloc (size_t size)
 {

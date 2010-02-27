@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "dsk-common.h"
-void dsk_error(const char *format, ...)
+
+void
+dsk_error(const char *format, ...)
 {
   va_list args;
   fprintf (stderr, "ERROR: ");
@@ -12,7 +14,8 @@ void dsk_error(const char *format, ...)
   fprintf (stderr, "\n");
   abort ();
 }
-void dsk_warning(const char *format, ...)
+void
+dsk_warning(const char *format, ...)
 {
   va_list args;
   fprintf (stderr, "WARNING: ");
@@ -22,7 +25,8 @@ void dsk_warning(const char *format, ...)
   fprintf (stderr, "\n");
 }
 
-void *dsk_malloc (size_t size)
+void *
+dsk_malloc (size_t size)
 {
   void *rv;
   if (size == 0)
@@ -32,7 +36,8 @@ void *dsk_malloc (size_t size)
     dsk_error ("out-of-memory allocating %u bytes", (unsigned) size);
   return rv;
 }
-void *dsk_malloc0 (size_t size)
+void *
+dsk_malloc0 (size_t size)
 {
   void *rv;
   if (size == 0)
@@ -43,12 +48,14 @@ void *dsk_malloc0 (size_t size)
   memset (rv, 0, size);
   return rv;
 }
-void  dsk_free (void *ptr)
+void
+dsk_free (void *ptr)
 {
   if (ptr)
     free (ptr);
 }
-void *dsk_realloc (void *ptr, size_t size)
+void *
+dsk_realloc (void *ptr, size_t size)
 {
   if (ptr == NULL)
     return dsk_malloc (size);
@@ -66,7 +73,8 @@ void *dsk_realloc (void *ptr, size_t size)
     }
 }
 
-char *dsk_strdup (const char *str)
+char *
+dsk_strdup (const char *str)
 {
   if (str == NULL)
     return NULL;
@@ -78,9 +86,37 @@ char *dsk_strdup (const char *str)
       return rv;
     }
 }
-void dsk_bzero_pointers (void *ptrs, unsigned n_ptrs)
+void
+dsk_bzero_pointers (void *ptrs,
+                    unsigned n_ptrs)
 {
   void **at = ptrs;
   while (n_ptrs--)
     *at++ = NULL;
+}
+
+dsk_boolean
+dsk_parse_boolean (const char *str,
+                   dsk_boolean *out)
+{
+  switch (str[0])
+    {
+    case '0': if (strcmp (str, "0") == 0) goto is_false; break;
+    case '1': if (strcmp (str, "1") == 0) goto is_true; break;
+    case 'n': if (strcmp (str, "no") == 0) goto is_false; break;
+    case 'y': if (strcmp (str, "yes") == 0) goto is_true; break;
+    case 'N': if (strcmp (str, "NO") == 0) goto is_false; break;
+    case 'Y': if (strcmp (str, "YES") == 0) goto is_true; break;
+    case 'f': if (strcmp (str, "false") == 0) goto is_false; break;
+    case 't': if (strcmp (str, "true") == 0) goto is_true; break;
+    case 'F': if (strcmp (str, "FALSE") == 0) goto is_false; break;
+    case 'T': if (strcmp (str, "TRUE") == 0) goto is_true; break;
+    default: return DSK_FALSE;
+    }
+is_true:
+  *out = DSK_TRUE;
+  return DSK_TRUE;
+is_false:
+  *out = DSK_FALSE;
+  return DSK_TRUE;
 }

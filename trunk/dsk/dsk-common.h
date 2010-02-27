@@ -13,6 +13,11 @@ typedef int dsk_boolean;
 #define DSK_FALSE		0
 #define DSK_TRUE		1
 
+/* branch-hinting macros */
+#define DSK_LIKELY(condition)     (condition)
+#define DSK_UNLIKELY(condition)   (condition)
+#define DSK_UNUSED(var)           ((void)(var))
+
 /* Seconds since 1970 GMT (aka the epoch).
    Note that many platforms define time_t as a 32-bit quantity--
    it is always 64-bit in dsk. */
@@ -56,5 +61,9 @@ void *dsk_malloc0 (size_t);
 void  dsk_free (void *);
 void *dsk_realloc (void *, size_t);
 char *dsk_strdup (const char *str);
+void *dsk_memdup (size_t, const void *);
 
 void dsk_bzero_pointers (void *ptrs, unsigned n_ptrs);
+
+
+dsk_boolean dsk_parse_boolean (const char *str, dsk_boolean *out);
