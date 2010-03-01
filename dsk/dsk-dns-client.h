@@ -83,15 +83,28 @@ struct _DskDnsCacheEntry
   } info;
 
   DskDnsCacheEntry *expire_left, *expire_right, *expire_parent;
-  dsk_boolean is_red;
+  dsk_boolean expire_is_red;
+  DskDnsCacheEntry *name_type_left, *name_type_right, *name_type_parent;
+  dsk_boolean name_type_is_red;
 };
 typedef void (*DskDnsCacheEntryFunc) (DskDnsCacheEntry *entry,
                                       void             *callback_data);
-DskDnsCacheEntry *dsk_dns_lookup_cache_entry (const char       *name,
+void              dsk_dns_lookup_cache_entry (const char       *name,
                                               dsk_boolean       is_ipv6,
                                               DskDnsCacheEntryFunc callback,
                                               void             *callback_data);
 
+
+typedef enum
+{
+  DSK_DNS_CONFIG_USE_RESOLV_CONF_SEARCHPATH = (1<<0),
+  DSK_DNS_CONFIG_USE_RESOLV_CONF_NS = (1<<1),
+  DSK_DNS_CONFIG_USE_ETC_HOSTS = (1<<2)
+} DskDnsConfigFlags;
+#define DSK_DNS_CONFIG_FLAGS_DEFAULT \
+  (DSK_DNS_CONFIG_USE_RESOLV_CONF_SEARCHPATH| \
+   DSK_DNS_CONFIG_USE_RESOLV_CONF_NS| \
+   DSK_DNS_CONFIG_USE_ETC_HOSTS)
 
 /* --- interfacing with system-level sockaddr structures --- */
 /* 'out' should be a pointer to a 'struct sockaddr_storage'.

@@ -94,4 +94,35 @@ void    dsk_dns_lookup (const char       *name,
   dsk_dns_lookup_cache_entry (name, handle_cache_entry_lookup, lookup_data);
 } 
 
+/* --- configuration --- */
+static unsigned n_resolv_conf_ns = 0;
+static DskDnsAddress *resolv_conf_ns = NULL;
+static unsigned n_resolv_conf_search_paths = 0;
+static char **resolv_conf_search_paths = NULL;
+static DskDnsCacheEntry *etc_hosts_tree = NULL;
+static DskDnsConfigFlags config_flags = DSK_DNS_CONFIG_FLAGS_DEFAULT;
+static dsk_boolean dns_initialized = DSK_FALSE;
+
+/* --- handling system files (resolv.conf and hosts) --- */
+
+static dsk_boolean
+dsk_dns_try_init (DskError **error)
+{
+  /* parse /etc/hosts */
+  ...
+
+  /* parse /etc/resolv.conf */
+  ...
+}
+
 /* --- low-level ---*/
+DskDnsLookupNonblockingResult
+dsk_dns_lookup_nonblocking (const char *name,
+                           DskDnsAddress *out,
+                           dsk_boolean    is_ipv6,
+                           DskError     **error);
+
+void              dsk_dns_lookup_cache_entry (const char       *name,
+                                              dsk_boolean       is_ipv6,
+                                              DskDnsCacheEntryFunc callback,
+                                              void             *callback_data);
