@@ -71,6 +71,8 @@ void  dsk_dispatch_remove_idle (DskDispatchIdle *);
  */
 void  dsk_dispatch_run      (DskDispatch *dispatch);
 
+#define dsk_main_run_once()  dsk_dispatch_run(dsk_dispatch_default())
+
 
 /* --- API for those who want to embed a dispatch into their own main-loop --- */
 typedef struct {
