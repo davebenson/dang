@@ -79,7 +79,7 @@ struct _DskDnsCacheEntry
     DskDnsCacheEntryJob *in_progress;
     struct { char *message; } bad_response;
     char *cname;
-    struct { unsigned n; DskDnsAddress *addresses; } addr;
+    struct { unsigned n; DskDnsAddress *addresses; unsigned last_used; } addr;
   } info;
 
   DskDnsCacheEntry *expire_left, *expire_right, *expire_parent;
