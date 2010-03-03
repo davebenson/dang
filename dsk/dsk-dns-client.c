@@ -96,7 +96,7 @@ void    dsk_dns_lookup (const char       *name,
 
 /* --- configuration --- */
 static unsigned n_resolv_conf_ns = 0;
-static DskDnsAddress *resolv_conf_ns = NULL;
+static DskIpAddress *resolv_conf_ns = NULL;
 static unsigned n_resolv_conf_search_paths = 0;
 static char **resolv_conf_search_paths = NULL;
 static DskDnsCacheEntry *etc_hosts_tree = NULL;
@@ -118,7 +118,7 @@ dsk_dns_try_init (DskError **error)
 /* --- low-level ---*/
 DskDnsLookupNonblockingResult
 dsk_dns_lookup_nonblocking (const char *name,
-                           DskDnsAddress *out,
+                           DskIpAddress *out,
                            dsk_boolean    is_ipv6,
                            DskError     **error)
 {

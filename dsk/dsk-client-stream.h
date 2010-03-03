@@ -46,7 +46,7 @@ struct _DskClientStream
 
   /* The actual ip address (ipv4 or ipv6) that we are connecting to.
    * Only valid if !is_resolving_name. */
-  DskDnsAddress connect_addr;			/* if !is_resolving_name */
+  DskIpAddress connect_addr;			/* if !is_resolving_name */
 
   /* An octet stream of data coming from the remote side.
      May be used directly. */
@@ -91,7 +91,7 @@ extern DskClientStreamClass dsk_client_stream_class;
 
 DskClientStream *dsk_client_stream_new       (const char *name,
                                               unsigned    port);
-DskClientStream *dsk_client_stream_new_addr  (DskDnsAddress *addr,
+DskClientStream *dsk_client_stream_new_addr  (DskIpAddress *addr,
                                               unsigned    port);
 DskClientStream *dsk_client_stream_new_local (const char *path);
 

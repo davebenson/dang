@@ -8,6 +8,7 @@
 #include "dsk-hook.h"
 #include "dsk-object.h"
 #include "dsk-error.h"
+#include "dsk-ip-address.h"
 #include "dsk-dns-client.h"
 #include "dsk-fd.h"
 #include "dsk-udp-socket.h"
@@ -101,7 +102,7 @@ dsk_udp_socket_send    (DskUdpSocket  *socket,
 
 DskIOResult
 dsk_udp_socket_send_to_address (DskUdpSocket  *socket,
-                                DskDnsAddress *address,
+                                DskIpAddress *address,
                                 unsigned       port,
                                 unsigned       len,
                                 const uint8_t *data,
@@ -110,7 +111,7 @@ dsk_udp_socket_send_to_address (DskUdpSocket  *socket,
   struct sockaddr_storage addr;
   unsigned addr_len;
   ssize_t rv;
-  dsk_dns_address_to_sockaddr (address, port, &addr, &addr_len);
+  dsk_ip_address_to_sockaddr (address, port, &addr, &addr_len);
   rv = sendto (socket->fd, data, len, 0,
                (struct sockaddr *) &addr, addr_len);
   if (rv < 0)
@@ -163,7 +164,7 @@ dsk_udp_socket_send_to (DskUdpSocket  *socket,
                         const uint8_t *data,
                         DskError     **error)
 {
-  DskDnsAddress address;
+  DskIpAddress address;
   switch (dsk_dns_lookup_nonblocking (name, &address, socket->is_ipv6, error))
     {
     case DSK_DNS_LOOKUP_NONBLOCKING_NOT_FOUND:
@@ -193,13 +194,13 @@ dsk_udp_socket_send_to (DskUdpSocket  *socket,
 
 dsk_boolean
 dsk_udp_socket_bind    (DskUdpSocket  *socket,
-                        DskDnsAddress *bind_addr,
+                        DskIpAddress *bind_addr,
                         unsigned       port,
                         DskError     **error)
 {
   struct sockaddr_storage addr;
   unsigned addr_len;
-  dsk_dns_address_to_sockaddr (bind_addr, port, &addr, &addr_len);
+  dsk_ip_address_to_sockaddr (bind_addr, port, &addr, &addr_len);
   if (bind (socket->fd, (struct sockaddr *) &addr, addr_len) < 0)
     {
       dsk_set_error (error, "error binding: %s", strerror (errno));
@@ -211,7 +212,7 @@ dsk_udp_socket_bind    (DskUdpSocket  *socket,
 
 DskIOResult
 dsk_udp_socket_receive (DskUdpSocket  *socket,
-                        DskDnsAddress *addr_out,
+                        DskIpAddress *addr_out,
                         unsigned      *port_out,
                         unsigned      *len_out,
                         uint8_t      **data_out,

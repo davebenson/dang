@@ -9,6 +9,7 @@
 #include "dsk-buffer.h"
 #include "dsk-octet-io.h"
 #include "dsk-memory.h"
+#include "dsk-ip-address.h"
 #include "dsk-dns-client.h"
 
 #include "dsk-dns-protocol.h"

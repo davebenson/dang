@@ -17,8 +17,8 @@ struct _DskUdpSocket
   unsigned is_ipv6 : 1;
   DskFileDescriptor fd;
 
-  DskDnsAddress bound_address;
-  DskDnsAddress connect_address;
+  DskIpAddress bound_address;
+  DskIpAddress connect_address;
 
   uint8_t *recv_slab;
   unsigned recv_slab_len;
@@ -38,11 +38,11 @@ DskIOResult    dsk_udp_socket_send_to (DskUdpSocket  *socket,
 			               const uint8_t *data,
 			               DskError     **error);
 dsk_boolean    dsk_udp_socket_bind    (DskUdpSocket  *socket,
-                                       DskDnsAddress *bind_addr,
+                                       DskIpAddress *bind_addr,
 				       unsigned       port,
 			               DskError     **error);
 DskIOResult    dsk_udp_socket_receive (DskUdpSocket  *socket,
-                                       DskDnsAddress *addr_out,
+                                       DskIpAddress *addr_out,
 			               unsigned      *port_out,
 			               unsigned      *len_out,
 			               uint8_t      **data_out,
