@@ -7,22 +7,13 @@
  *  * windows port (yeah, right, volunteers are DEFINITELY needed for this one...)
  */
 #include <assert.h>
-#if HAVE_ALLOCA_H
-# include <alloca.h>
-#elif HAVE_MALLOC_H
-# include <malloc.h>
-#endif
+#include <alloca.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
-#if HAVE_SYS_POLL_H
-# include <sys/poll.h>
-# define USE_POLL              1
-#elif HAVE_SYS_SELECT_H
-# include <sys/select.h>
-# define USE_POLL              0
-#endif
+#include <sys/poll.h>
+#define USE_POLL              1
 
 /* windows annoyances:  use select, use a full-fledges map for fds */
 #ifdef WIN32
@@ -33,9 +24,11 @@
 #include <limits.h>
 #include <errno.h>
 #include <signal.h>
-#include "protobuf-c-dispatch.h"
-#include "gskrbtreemacros.h"
-#include "gsklistmacros.h"
+#include "dsk-common.h"
+#include "dsk-fd.h"
+#include "dsk-dispatch.h"
+#include "../gskrbtreemacros.h"
+#include "../gsklistmacros.h"
 
 #define DEBUG_DISPATCH_INTERNALS  0
 #define DEBUG_DISPATCH            0
@@ -43,16 +36,6 @@
 #ifndef HAVE_SMALL_FDS
 # define HAVE_SMALL_FDS           1
 #endif
-
-#define dsk_assert(condition) assert(condition)
-
-#define ALLOC_WITH_ALLOCATOR(allocator, size) ((allocator)->alloc ((allocator)->allocator_data, (size)))
-#define FREE_WITH_ALLOCATOR(allocator, ptr)   ((allocator)->free ((allocator)->allocator_data, (ptr)))
-
-/* macros that assume you have a DskAllocator* named
-   allocator in scope */
-#define ALLOC(size)   ALLOC_WITH_ALLOCATOR((allocator), size)
-#define FREE(ptr)     FREE_WITH_ALLOCATOR((allocator), ptr)
 
 typedef struct _Callback Callback;
 struct _Callback
@@ -97,7 +80,6 @@ struct _RealDispatch
 
 
   DskDispatchTimer *timer_tree;
-  DskAllocator *allocator;
   DskDispatchTimer *recycled_timeouts;
 
   DskDispatchIdle *first_idle, *last_idle;
@@ -132,8 +114,6 @@ struct _DskDispatchIdle
   void *func_data;
 };
 /* Define the tree of timers, as per gskrbtreemacros.h */
-#define TIMER_GET_IS_RED(n)      ((n)->is_red)
-#define TIMER_SET_IS_RED(n,v)    ((n)->is_red = (v))
 #define TIMERS_COMPARE(a,b, rv) \
   if (a->timeout_secs < b->timeout_secs) rv = -1; \
   else if (a->timeout_secs > b->timeout_secs) rv = 1; \
@@ -144,7 +124,7 @@ struct _DskDispatchIdle
   else rv = 0;
 #define GET_TIMER_TREE(d) \
   (d)->timer_tree, DskDispatchTimer *, \
-  TIMER_GET_IS_RED, TIMER_SET_IS_RED, \
+  GSK_STD_GET_IS_RED, GSK_STD_SET_IS_RED, \
   parent, left, right, \
   TIMERS_COMPARE
 
@@ -169,25 +149,24 @@ struct _DskDispatchIdle
   DskDispatchIdle *, d->first_idle, d->last_idle, prev, next
 
 /* Create or destroy a Dispatch */
-DskDispatch *dsk_dispatch_new (DskAllocator *allocator)
+DskDispatch *dsk_dispatch_new (void)
 {
-  RealDispatch *rv = ALLOC (sizeof (RealDispatch));
+  RealDispatch *rv = dsk_malloc (sizeof (RealDispatch));
   struct timeval tv;
   rv->base.n_changes = 0;
   rv->notifies_desired_alloced = 8;
-  rv->base.notifies_desired = ALLOC (sizeof (DskFileDescriptorNotify) * rv->notifies_desired_alloced);
+  rv->base.notifies_desired = dsk_malloc (sizeof (DskFileDescriptorNotify) * rv->notifies_desired_alloced);
   rv->base.n_notifies_desired = 0;
-  rv->callbacks = ALLOC (sizeof (Callback) * rv->notifies_desired_alloced);
+  rv->callbacks = dsk_malloc (sizeof (Callback) * rv->notifies_desired_alloced);
   rv->changes_alloced = 8;
-  rv->base.changes = ALLOC (sizeof (DskFileDescriptorNotify) * rv->changes_alloced);
+  rv->base.changes = dsk_malloc (sizeof (DskFileDescriptorNotify) * rv->changes_alloced);
 #if HAVE_SMALL_FDS
   rv->fd_map_size = 16;
-  rv->fd_map = ALLOC (sizeof (FDMap) * rv->fd_map_size);
+  rv->fd_map = dsk_malloc (sizeof (FDMap) * rv->fd_map_size);
   memset (rv->fd_map, 255, sizeof (FDMap) * rv->fd_map_size);
 #else
   rv->fd_map_tree = NULL;
 #endif
-  rv->allocator = allocator;
   rv->timer_tree = NULL;
   rv->first_idle = rv->last_idle = NULL;
   rv->recycled_idles = NULL;
@@ -211,7 +190,7 @@ void free_fd_tree_recursive (DskAllocator *allocator,
     {
       free_fd_tree_recursive (allocator, node->left);
       free_fd_tree_recursive (allocator, node->right);
-      FREE (node);
+      dsk_free (node);
     }
 }
 #endif
@@ -221,36 +200,28 @@ void
 dsk_dispatch_free(DskDispatch *dispatch)
 {
   RealDispatch *d = (RealDispatch *) dispatch;
-  DskAllocator *allocator = d->allocator;
   while (d->recycled_timeouts != NULL)
     {
       DskDispatchTimer *t = d->recycled_timeouts;
       d->recycled_timeouts = t->right;
-      FREE (t);
+      dsk_free (t);
     }
   while (d->recycled_idles != NULL)
     {
       DskDispatchIdle *i = d->recycled_idles;
       d->recycled_idles = i->next;
-      FREE (i);
+      dsk_free (i);
     }
-  FREE (d->base.notifies_desired);
-  FREE (d->base.changes);
-  FREE (d->callbacks);
+  dsk_free (d->base.notifies_desired);
+  dsk_free (d->base.changes);
+  dsk_free (d->callbacks);
 
 #if HAVE_SMALL_FDS
-  FREE (d->fd_map);
+  dsk_free (d->fd_map);
 #else
   free_fd_tree_recursive (allocator, d->fd_map_tree);
 #endif
-  FREE (d);
-}
-
-DskAllocator *
-dsk_dispatch_peek_allocator (DskDispatch *dispatch)
-{
-  RealDispatch *d = (RealDispatch *) dispatch;
-  return d->allocator;
+  dsk_free (d);
 }
 
 /* TODO: perhaps thread-private dispatches make more sense? */
@@ -258,7 +229,7 @@ static DskDispatch *def = NULL;
 DskDispatch  *dsk_dispatch_default (void)
 {
   if (def == NULL)
-    def = dsk_dispatch_new (&dsk_default_allocator);
+    def = dsk_dispatch_new ();
   return def;
 }
 
@@ -269,15 +240,14 @@ enlarge_fd_map (RealDispatch *d,
 {
   size_t new_size = d->fd_map_size * 2;
   FDMap *new_map;
-  DskAllocator *allocator = d->allocator;
   while (fd >= new_size)
     new_size *= 2;
-  new_map = ALLOC (sizeof (FDMap) * new_size);
+  new_map = dsk_malloc (sizeof (FDMap) * new_size);
   memcpy (new_map, d->fd_map, d->fd_map_size * sizeof (FDMap));
   memset (new_map + d->fd_map_size,
           255,
           sizeof (FDMap) * (new_size - d->fd_map_size));
-  FREE (d->fd_map);
+  dsk_free (d->fd_map);
   d->fd_map = new_map;
   d->fd_map_size = new_size;
 }
@@ -295,16 +265,15 @@ static unsigned
 allocate_notifies_desired_index (RealDispatch *d)
 {
   unsigned rv = d->base.n_notifies_desired++;
-  DskAllocator *allocator = d->allocator;
   if (rv == d->notifies_desired_alloced)
     {
       unsigned new_size = d->notifies_desired_alloced * 2;
-      DskFileDescriptorNotify *n = ALLOC (new_size * sizeof (DskFileDescriptorNotify));
-      Callback *c = ALLOC (new_size * sizeof (Callback));
+      DskFileDescriptorNotify *n = dsk_malloc (new_size * sizeof (DskFileDescriptorNotify));
+      Callback *c = dsk_malloc (new_size * sizeof (Callback));
       memcpy (n, d->base.notifies_desired, d->notifies_desired_alloced * sizeof (DskFileDescriptorNotify));
-      FREE (d->base.notifies_desired);
+      dsk_free (d->base.notifies_desired);
       memcpy (c, d->callbacks, d->notifies_desired_alloced * sizeof (Callback));
-      FREE (d->callbacks);
+      dsk_free (d->callbacks);
       d->base.notifies_desired = n;
       d->callbacks = c;
       d->notifies_desired_alloced = new_size;
@@ -320,11 +289,10 @@ allocate_change_index (RealDispatch *d)
   unsigned rv = d->base.n_changes++;
   if (rv == d->changes_alloced)
     {
-      DskAllocator *allocator = d->allocator;
       unsigned new_size = d->changes_alloced * 2;
-      DskFileDescriptorNotifyChange *n = ALLOC (new_size * sizeof (DskFileDescriptorNotifyChange));
+      DskFileDescriptorNotifyChange *n = dsk_malloc (new_size * sizeof (DskFileDescriptorNotifyChange));
       memcpy (n, d->base.changes, d->changes_alloced * sizeof (DskFileDescriptorNotifyChange));
-      FREE (d->base.changes);
+      dsk_free (d->base.changes);
       d->base.changes = n;
       d->changes_alloced = new_size;
     }
@@ -357,7 +325,7 @@ force_fd_map (RealDispatch *d, DskFileDescriptor fd)
     DskAllocator *allocator = d->allocator;
     if (fm == NULL)
       {
-        FDMapNode *node = ALLOC (sizeof (FDMapNode));
+        FDMapNode *node = dsk_malloc (sizeof (FDMapNode));
         FDMapNode *conflict;
         node->fd = fd;
         memset (&node->map, 255, sizeof (FDMap));
@@ -637,14 +605,13 @@ dsk_dispatch_run (DskDispatch *dispatch)
   void *to_free = NULL, *to_free2 = NULL;
   size_t n_events;
   RealDispatch *d = (RealDispatch *) dispatch;
-  DskAllocator *allocator = d->allocator;
   unsigned i;
   int timeout;
   DskFileDescriptorNotify *events;
   if (dispatch->n_notifies_desired < 128)
     fds = alloca (sizeof (struct pollfd) * dispatch->n_notifies_desired);
   else
-    to_free = fds = ALLOC (sizeof (struct pollfd) * dispatch->n_notifies_desired);
+    to_free = fds = dsk_malloc (sizeof (struct pollfd) * dispatch->n_notifies_desired);
   for (i = 0; i < dispatch->n_notifies_desired; i++)
     {
       fds[i].fd = dispatch->notifies_desired[i].fd;
@@ -703,7 +670,7 @@ dsk_dispatch_run (DskDispatch *dispatch)
   if (n_events < 128)
     events = alloca (sizeof (DskFileDescriptorNotify) * n_events);
   else
-    to_free2 = events = ALLOC (sizeof (DskFileDescriptorNotify) * n_events);
+    to_free2 = events = dsk_malloc (sizeof (DskFileDescriptorNotify) * n_events);
   n_events = 0;
   for (i = 0; i < dispatch->n_notifies_desired; i++)
     if (fds[i].revents)
@@ -719,9 +686,9 @@ dsk_dispatch_run (DskDispatch *dispatch)
   dsk_dispatch_clear_changes (dispatch);
   dsk_dispatch_dispatch (dispatch, n_events, events);
   if (to_free)
-    FREE (to_free);
+    dsk_free (to_free);
   if (to_free2)
-    FREE (to_free2);
+    dsk_free (to_free2);
 }
 
 DskDispatchTimer *
@@ -743,7 +710,7 @@ dsk_dispatch_add_timer(DskDispatch *dispatch,
     }
   else
     {
-      rv = d->allocator->alloc (d->allocator, sizeof (DskDispatchTimer));
+      rv = dsk_malloc (sizeof (DskDispatchTimer));
     }
   rv->timeout_secs = timeout_secs;
   rv->timeout_usecs = timeout_usecs;
@@ -824,8 +791,7 @@ dsk_dispatch_add_idle (DskDispatch        *dispatch,
     }
   else
     {
-      DskAllocator *allocator = d->allocator;
-      rv = ALLOC (sizeof (DskDispatchIdle));
+      rv = dsk_malloc (sizeof (DskDispatchIdle));
     }
   GSK_LIST_APPEND (GET_IDLE_LIST (d), rv);
   rv->func = func;

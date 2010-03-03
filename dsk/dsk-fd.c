@@ -16,8 +16,8 @@ retry_get:
     {
       if (errno == EINTR)
         goto retry_get;
-      dsk_error ("error getting flags from file-descriptor %u: %s",
-                 (unsigned) fd, strerror (errno));
+      dsk_die ("error getting flags from file-descriptor %u: %s",
+               (unsigned) fd, strerror (errno));
     }
   if (set)
     flags |= flag;
@@ -28,8 +28,8 @@ retry_set:
     {
       if (errno == EINTR)
         goto retry_set;
-      dsk_error ("error setting flags for file-descriptor %u: %s",
-                 (unsigned) fd, strerror (errno));
+      dsk_die ("error setting flags for file-descriptor %u: %s",
+               (unsigned) fd, strerror (errno));
     }
 }
 

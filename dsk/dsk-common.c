@@ -4,7 +4,7 @@
 #include "dsk-common.h"
 
 void
-dsk_error(const char *format, ...)
+dsk_die(const char *format, ...)
 {
   va_list args;
   fprintf (stderr, "ERROR: ");
@@ -13,6 +13,17 @@ dsk_error(const char *format, ...)
   va_end (args);
   fprintf (stderr, "\n");
   abort ();
+}
+void
+dsk_error(const char *format, ...)
+{
+  va_list args;
+  fprintf (stderr, "ERROR: ");
+  va_start (args, format);
+  vfprintf (stderr, format, args);
+  va_end (args);
+  fprintf (stderr, "\n");
+  exit (1);
 }
 void
 dsk_warning(const char *format, ...)
