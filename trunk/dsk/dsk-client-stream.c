@@ -55,8 +55,8 @@ dsk_client_stream_new_local (const char *path)
 }
 
 /* numeric hostnames */
-static dsk_boolean
-hostname_looks_numeric (const char *str)
+dsk_boolean
+dsk_hostname_looks_numeric (const char *str)
 {
   const char *at;
 
@@ -102,9 +102,9 @@ is_not_ipv6:
   return DSK_FALSE;
 }
 
-static dsk_boolean
-parse_numeric_ip (const char *str,
-                  DskDnsAddress *out)
+dsk_boolean
+dsk_dns_address_parse_numeric (const char *str,
+                               DskDnsAddress *out)
 {
   if (strchr (str, '.') == NULL)
     {
@@ -488,8 +488,8 @@ begin_connecting (DskClientStream *stream)
       DskDnsAddress address;
 
       /* parse name into addr/addr_len */
-      if (!parse_numeric_ip (stream->name, &address))
-        dsk_die ("parse_numeric_ip failed on %s", stream->name);
+      if (!dsk_dns_address_parse_numeric (stream->name, &address))
+        dsk_die ("dsk_dns_address_parse_numeric failed on %s", stream->name);
       dsk_dns_address_to_sock_addr (&address, stream->port, &addr, &addr_len);
       begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
     }

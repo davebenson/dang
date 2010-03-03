@@ -91,7 +91,7 @@ add_option (const char *option_name)
   DskCmdlineArg *rv = try_option (option_name);
   DskCmdlineArg *conflict;
   if (rv != NULL)
-    dsk_error ("option %s added twice", option_name);
+    dsk_die ("option %s added twice", option_name);
   rv = dsk_malloc (sizeof (DskCmdlineArg));
   rv->option_name = option_name;
   rv->c = 0;

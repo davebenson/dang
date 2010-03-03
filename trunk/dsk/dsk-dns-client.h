@@ -16,6 +16,10 @@ struct _DskDnsAddress
   uint8_t address[16];          /* enough for ipv4 or ipv6 */
 };
   
+dsk_boolean dsk_hostname_looks_numeric (const char *str);
+dsk_boolean dsk_dns_address_parse_numeric (const char *str,
+                                           DskDnsAddress *out);
+char *dsk_dns_address_to_string (const DskDnsAddress *);
 
 typedef enum
 {
@@ -105,6 +109,9 @@ typedef enum
   (DSK_DNS_CONFIG_USE_RESOLV_CONF_SEARCHPATH| \
    DSK_DNS_CONFIG_USE_RESOLV_CONF_NS| \
    DSK_DNS_CONFIG_USE_ETC_HOSTS)
+void dsk_dns_client_config (DskDnsConfigFlags flags);
+void dsk_dns_client_add_nameserver (DskDnsAddress *addr);
+void dsk_dns_config_dump (void);
 
 /* --- interfacing with system-level sockaddr structures --- */
 /* 'out' should be a pointer to a 'struct sockaddr_storage'.
