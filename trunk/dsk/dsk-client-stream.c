@@ -32,13 +32,13 @@ dsk_client_stream_new       (const char *name,
 }
 
 DskClientStream *
-dsk_client_stream_new_addr  (DskDnsAddress *addr,
+dsk_client_stream_new_addr  (DskIpAddress *addr,
                              unsigned       port,
                              DskError     **error)
 {
   DskClientStream *rv = create_raw_client_stream ();
   rv->is_numeric_name = 1;
-  rv->name = dsk_dns_address_to_string (addr);
+  rv->name = dsk_ip_address_to_string (addr);
   rv->port = port;
   begin_connecting (rv);
   return rv;
@@ -55,97 +55,6 @@ dsk_client_stream_new_local (const char *path)
 }
 
 /* numeric hostnames */
-dsk_boolean
-dsk_hostname_looks_numeric (const char *str)
-{
-  const char *at;
-
-  at = str;
-  SKIP_WHITESPACE (at);
-  for (i = 0; i < 3; i++)
-    {
-      if (!ascii_is_digit (*at))
-        goto is_not_ipv4;
-      while (ascii_is_digit (*at))
-        at++;
-      SKIP_WHITESPACE (at);
-      if (*at != '.')
-        goto is_not_ipv4;
-      at++;
-      SKIP_WHITESPACE (at);
-    }
-  if (!ascii_is_digit (*at))
-    goto is_not_ipv4;
-  while (ascii_is_digit (*at))
-    at++;
-  SKIP_WHITESPACE (at);
-  if (*at != 0)
-    goto is_not_ipv4;
-  return DSK_TRUE;              /* ipv4 */
-
-is_not_ipv4:
-  for (i = 0; i < 4; i++)
-    {
-      for (j = 0; j < 4; j++)
-        {
-          if (!ascii_is_xdigit (*at))
-            goto is_not_ipv6;
-          at++;
-        }
-      if (*at != ':')
-        goto is_not_ipv6;
-      at++;
-    }
-  return DSK_TRUE;
-
-is_not_ipv6:
-  return DSK_FALSE;
-}
-
-dsk_boolean
-dsk_dns_address_parse_numeric (const char *str,
-                               DskDnsAddress *out)
-{
-  if (strchr (str, '.') == NULL)
-    {
-      out->type = DSK_DNS_ADDRESS_IPV6;
-      while (*str)
-        {
-          if (*str == ':')
-            str++;
-          if (*str == 0)
-            break;
-          v = strtoul (str, &end, 16);
-          if (n == 16)
-            return DSK_FALSE;
-          out->address[n++] = v>>8;
-          out->address[n++] = v;
-          str = end;
-        }
-      while (n < 16)
-        out->address[n++] = 0;
-    }
-  else
-    {
-      /* dotted quad notation */
-      out->type = DSK_DNS_ADDRESS_IPV4;
-      out->address[0] = strtoul (str, &end, 10);
-      if (*end != '.')
-        return DSK_FALSE;
-      str = end + 1;
-      out->address[1] = strtoul (str, &end, 10);
-      if (*end != '.')
-        return DSK_FALSE;
-      str = end + 1;
-      out->address[2] = strtoul (str, &end, 10);
-      if (*end != '.')
-        return DSK_FALSE;
-      str = end + 1;
-      out->address[3] = strtoul (str, &end, 10);
-    }
-  return DSK_TRUE;
-}
-
 /* use -1 to disable these timeouts */
 void
 dsk_client_stream_set_reconnect_time (DskClientStream *client,
@@ -377,18 +286,18 @@ error:
 #if 0
 static void
 begin_connecting_dns_entry (DskClientStream *stream,
-                            DskDnsAddress   *address,
+                            DskIpAddress   *address,
                             unsigned         port)
 {
   unsigned addr_len;
   struct sockaddr_storage addr;
   stream->is_connecting = 1;
-  dsk_dns_address_to_sockaddr (address, port, &addr_len, &addr);
+  dsk_ip_address_to_sockaddr (address, port, &addr_len, &addr);
   begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
 }
 #endif
 void
-dsk_dns_address_to_sock_addr (DskDnsAddress *address,
+dsk_ip_address_to_sock_addr (DskIpAddress *address,
                           unsigned port,
                           void *out,
                           unsigned *out_len);
@@ -398,7 +307,7 @@ dsk_dns_address_to_sock_addr (DskDnsAddress *address,
 
   switch (address->type)
     {
-    case DSK_DNS_ADDRESS_IPV4:
+    case DSK_IP_ADDRESS_IPV4:
       {
         struct sockaddr_in *a = (struct sockaddr_in *) out;
         a->sin_family = PF_INET;
@@ -406,7 +315,7 @@ dsk_dns_address_to_sock_addr (DskDnsAddress *address,
         memcpy (&a->sin_addr, address->info.address, 4);
         break;
       }
-    case DSK_DNS_ADDRESS_IPV6:
+    case DSK_IP_ADDRESS_IPV6:
       {
         struct sockaddr_in6 *a = (struct sockaddr_in6 *) out;
         a->sin6_family = PF_INET6;
@@ -432,7 +341,7 @@ handle_dns_done (DskDnsLookupResult *result,
       {
         struct sockaddr_storage addr;
         unsigned addr_len;
-        dsk_dns_address_to_sock_addr (result->addr, stream->port, &addr, &addr_len);
+        dsk_ip_address_to_sock_addr (result->addr, stream->port, &addr, &addr_len);
         begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
       }
       break;
@@ -485,12 +394,12 @@ begin_connecting (DskClientStream *stream)
     {
       struct sockaddr_storage addr;
       unsigned addr_len;
-      DskDnsAddress address;
+      DskIpAddress address;
 
       /* parse name into addr/addr_len */
-      if (!dsk_dns_address_parse_numeric (stream->name, &address))
-        dsk_die ("dsk_dns_address_parse_numeric failed on %s", stream->name);
-      dsk_dns_address_to_sock_addr (&address, stream->port, &addr, &addr_len);
+      if (!dsk_ip_address_parse_numeric (stream->name, &address))
+        dsk_die ("dsk_ip_address_parse_numeric failed on %s", stream->name);
+      dsk_ip_address_to_sock_addr (&address, stream->port, &addr, &addr_len);
       begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
     }
   else

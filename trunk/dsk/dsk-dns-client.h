@@ -1,25 +1,7 @@
 
 
-typedef struct _DskDnsAddress DskDnsAddress;
 typedef struct _DskDnsLookupResult DskDnsLookupResult;
 typedef struct _DskDnsEntry DskDnsEntry;
-
-typedef enum
-{
-  DSK_DNS_ADDRESS_IPV4,
-  DSK_DNS_ADDRESS_IPV6
-} DskDnsAddressType;
-
-struct _DskDnsAddress
-{
-  DskDnsAddressType type;
-  uint8_t address[16];          /* enough for ipv4 or ipv6 */
-};
-  
-dsk_boolean dsk_hostname_looks_numeric (const char *str);
-dsk_boolean dsk_dns_address_parse_numeric (const char *str,
-                                           DskDnsAddress *out);
-char *dsk_dns_address_to_string (const DskDnsAddress *);
 
 typedef enum
 {
@@ -32,7 +14,7 @@ typedef enum
 struct _DskDnsLookupResult
 {
   DskDnsLookupResultType type;
-  DskDnsAddress *addr;          /* if found */
+  DskIpAddress *addr;          /* if found */
   const char *message;          /* for all other types */
 };
 
@@ -56,7 +38,7 @@ typedef enum
 
 DskDnsLookupNonblockingResult
        dsk_dns_lookup_nonblocking (const char *name,
-                                   DskDnsAddress *out,
+                                   DskIpAddress *out,
                                    dsk_boolean    is_ipv6,
                                    DskError     **error);
 
@@ -83,7 +65,7 @@ struct _DskDnsCacheEntry
     DskDnsCacheEntryJob *in_progress;
     struct { char *message; } bad_response;
     char *cname;
-    struct { unsigned n; DskDnsAddress *addresses; unsigned last_used; } addr;
+    struct { unsigned n; DskIpAddress *addresses; unsigned last_used; } addr;
   } info;
 
   DskDnsCacheEntry *expire_left, *expire_right, *expire_parent;
@@ -110,17 +92,17 @@ typedef enum
    DSK_DNS_CONFIG_USE_RESOLV_CONF_NS| \
    DSK_DNS_CONFIG_USE_ETC_HOSTS)
 void dsk_dns_client_config (DskDnsConfigFlags flags);
-void dsk_dns_client_add_nameserver (DskDnsAddress *addr);
+void dsk_dns_client_add_nameserver (DskIpAddress *addr);
 void dsk_dns_config_dump (void);
 
 /* --- interfacing with system-level sockaddr structures --- */
 /* 'out' should be a pointer to a 'struct sockaddr_storage'.
  */
-void dsk_dns_address_to_sockaddr (DskDnsAddress *address,
+void dsk_ip_address_to_sockaddr (DskIpAddress *address,
                                   unsigned       port,
                                   void          *out,
                                   unsigned      *out_len);
 dsk_boolean dsk_sockaddr_to_dns_address (unsigned addr_len,
                                          const void *addr,
-                                         DskDnsAddress *out,
+                                         DskIpAddress *out,
                                          unsigned      *port_out);

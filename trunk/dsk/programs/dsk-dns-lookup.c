@@ -23,7 +23,7 @@ handle_dns_result  (DskDnsLookupResult *result,
   switch (result->type)
     {
     case DSK_DNS_LOOKUP_RESULT_FOUND:
-      str = dsk_dns_address_to_string (result->addr);
+      str = dsk_ip_address_to_string (result->addr);
       printf ("%s: %s\n", name, str);
       dsk_free (str);
       break;
@@ -75,9 +75,9 @@ int main(int argc, char **argv)
     }
   else
     {
-      DskDnsAddress addr;
+      DskIpAddress addr;
       cfg_flags &= ~DSK_DNS_CONFIG_USE_RESOLV_CONF_NS;
-      if (!dsk_dns_address_parse_numeric (nameserver, &addr))
+      if (!dsk_ip_address_parse_numeric (nameserver, &addr))
         dsk_error ("error parsing nameserver address (must be numeric)");
       dsk_dns_client_add_nameserver (&addr);
     }
