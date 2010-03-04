@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>              /* for snprintf() */
 #include "dsk-common.h"
 #include "dsk-ip-address.h"
 
@@ -105,3 +106,29 @@ dsk_ip_address_parse_numeric (const char *str,
   return DSK_TRUE;
 }
 
+char *
+dsk_ip_address_to_string (const DskIpAddress *addr)
+{
+  char buf[16*3+1];
+  unsigned i;
+  static const char hex_chars[16] = "0123456789abcdef";
+  switch (addr->type)
+    {
+    case DSK_IP_ADDRESS_IPV4:
+      snprintf (buf, sizeof (buf), "%d.%d.%d.%d", addr->address[0], addr->address[1], addr->address[2], addr->address[3]);
+      break;
+    case DSK_IP_ADDRESS_IPV6:
+      for (i = 0; i < 16; i++)
+        {
+          buf[3*i+0] = hex_chars[addr->address[i] >> 4];
+          buf[3*i+1] = hex_chars[addr->address[i] & 0xf];
+        }
+      for (i = 0; i < 15; i++)
+        buf[3*i+2] = ':';
+      buf[3*i+2] = 0;
+      break;
+    default:
+      dsk_assert_not_reached ();
+    }
+  return dsk_strdup (buf);
+}
