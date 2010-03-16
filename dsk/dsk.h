@@ -22,6 +22,8 @@
 #include "dsk-http-server-stream.h"
 #include "dsk-http-server.h"
 
+#include "dsk-unicode.h"
+
 #include "dsk-cmdline.h"
 
 #undef _dsk_inline_assert
