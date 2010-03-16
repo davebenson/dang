@@ -170,7 +170,7 @@ dsk_dns_try_init (DskError **error)
         continue;
       ip = at;
       DSK_ASCII_SKIP_NONSPACE (at);
-      *at = 0;
+      *at++ = 0;
       DSK_ASCII_SKIP_SPACE (at);
       name = at;
       DSK_ASCII_SKIP_NONSPACE (at);
@@ -217,14 +217,46 @@ retry:
                      "/etc/resolv.conf", strerror (errno));
       return DSK_FALSE;
     }
+  lineno = 0;
   while (fgets (buf, sizeof (buf), fp) != NULL)
     {
       const char *at = buf;
+      ++lineno;
       while (*at && dsk_ascii_isspace (*at))
         at++;
       if (*at == '#')
         continue;
       ...
+      DSK_ASCII_SKIP_SPACE (at);
+      if (*at == '#')
+        continue;
+      command = at;
+      while (*at && !dsk_ascii_isspace (*at))
+        {
+          if ('A' <= *at && *at <= 'Z')
+            *at += 'a' - 'Z';
+          at++;
+        }
+      *at++ = 0;
+      DSK_ASCII_SKIP_SPACE (at);
+      arg = at;
+      DSK_ASCII_SKIP_NONSPACE (at);
+      *at = 0;
+      if (strcmp (command, "search") == 0)
+        {
+          /* add searchpath */
+          ...
+        }
+      else if (strcmp (command, "nameserver") == 0)
+        {
+          /* add nameserver */
+          ...
+        }
+      else
+        {
+          dsk_warning ("unknown command '%s' in /etc/resolv.conf line %u",
+                       command, lineno);
+        }
     }
   fclose (fp);
 
