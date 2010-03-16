@@ -1,3 +1,8 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include "dsk.h"
+#include "../gskrbtreemacros.h"
 
 #define MAX_CNAMES              16
 
@@ -68,7 +73,7 @@ handle_cache_entry_lookup (DskDnsCacheEntry *entry,
       
         /* add to cname list */
         cname = dsk_strdup (entry->info.cname);
-        dsk_dns_lookup_cache_entry (cname, handle_cache_entry_lookup, data);
+        dsk_dns_lookup_cache_entry (cname, entry->is_ipv6, handle_cache_entry_lookup, data);
         return;
       }
     case DSK_DNS_CACHE_ENTRY_ADDR:
@@ -83,15 +88,16 @@ handle_cache_entry_lookup (DskDnsCacheEntry *entry,
 }
 
 void    dsk_dns_lookup (const char       *name,
+                        dsk_boolean       is_ipv6,
                         DskDnsLookupFunc  callback,
                         void             *callback_data)
 {
-  LookupData *lookup_data = dsk_new (LookupData, 1);
+  LookupData *lookup_data = dsk_malloc (sizeof (LookupData));
   lookup_data->n_cnames = 0;
   lookup_data->cnames = NULL;
   lookup_data->callback = callback;
   lookup_data->callback_data = callback_data;
-  dsk_dns_lookup_cache_entry (name, handle_cache_entry_lookup, lookup_data);
+  dsk_dns_lookup_cache_entry (name, is_ipv6, handle_cache_entry_lookup, lookup_data);
 } 
 
 /* --- configuration --- */
@@ -102,17 +108,130 @@ static char **resolv_conf_search_paths = NULL;
 static DskDnsCacheEntry *etc_hosts_tree = NULL;
 static DskDnsConfigFlags config_flags = DSK_DNS_CONFIG_FLAGS_DEFAULT;
 static dsk_boolean dns_initialized = DSK_FALSE;
+#define CACHE_ENTRY_NAME_IS_RED(n)  n->name_type_is_red
+#define CACHE_ENTRY_NAME_SET_IS_RED(n,v)  n->name_type_is_red=v
+#define COMPARE_DNS_CACHE_ENTRY_BY_NAME_TYPE(a,b,rv) \
+  rv = strcmp ((a)->name, (b)->name); \
+  if (rv == 0) \
+    { \
+      if (a->is_ipv6 && !b->is_ipv6) rv = -1; \
+      else if (!a->is_ipv6 && b->is_ipv6) rv = -1; \
+    }
+#define GET_ETC_HOSTS_TREE() \
+  etc_hosts_tree, DskDnsCacheEntry *, CACHE_ENTRY_NAME_IS_RED, \
+  CACHE_ENTRY_NAME_SET_IS_RED, \
+  name_type_parent, name_type_left, name_type_right, \
+  COMPARE_DNS_CACHE_ENTRY_BY_NAME_TYPE
+
+#define CACHE_ENTRY_EXPIRE_IS_RED(n)  n->name_type_is_red
+#define CACHE_ENTRY_EXPIRE_SET_IS_RED(n,v)  n->name_type_is_red=v
+#define COMPARE_DNS_CACHE_ENTRY_BY_EXPIRE(a,b,rv) \
+  rv = a->expire_time < b->expire_time ? -1 \
+     : a->expire_time > b->expire_time ? 1 \
+     : a < b ? -1 \
+     : a > b ? 1 \
+     : 0
+#define GET_EXPIRATION_TREE() \
+  expiration_tree, DskDnsCacheEntry *, CACHE_ENTRY_EXPIRE_IS_RED, \
+  CACHE_ENTRY_EXPIRE_SET_IS_RED, \
+  name_type_parent, name_type_left, name_type_right, \
+  COMPARE_DNS_CACHE_ENTRY_BY_EXPIRE
+  
 
 /* --- handling system files (resolv.conf and hosts) --- */
 
 static dsk_boolean
 dsk_dns_try_init (DskError **error)
 {
+  char buf[2048];
+  FILE *fp;
+  DskDnsCacheEntry *conflict;
+  unsigned lineno;
+
   /* parse /etc/hosts */
-  ...
+  fp = fopen ("/etc/hosts", "r");
+  if (fp == NULL)
+    {
+      dsk_set_error (error, "error opening %s: %s",
+                     "/etc/hosts", strerror (errno));
+      return DSK_FALSE;
+    }
+  lineno = 0;
+  while (fgets (buf, sizeof (buf), fp) != NULL)
+    {
+      char *at = buf;
+      const char *ip;
+      const char *name;
+      DskIpAddress addr;
+      DskDnsCacheEntry *host_entry;
+      ++lineno;
+      DSK_ASCII_SKIP_SPACE (at);
+      if (*at == '#')
+        continue;
+      ip = at;
+      DSK_ASCII_SKIP_NONSPACE (at);
+      *at = 0;
+      DSK_ASCII_SKIP_SPACE (at);
+      name = at;
+      DSK_ASCII_SKIP_NONSPACE (at);
+      *at = 0;
+      if (*ip == 0 || *name == 0)
+        {
+          dsk_warning ("parsing /etc/hosts line %u: expected ip/name pair",
+                       lineno);
+          continue;
+        }
+      if (!dsk_ip_address_parse_numeric (ip, &addr))
+        {
+          dsk_warning ("parsing /etc/hosts line %u: error parsing ip address",
+                       lineno);
+          continue;
+        }
+      host_entry = dsk_malloc (sizeof (DskDnsCacheEntry)
+                               + sizeof (DskIpAddress)
+                               + strlen (name) + 1);
+
+      host_entry->info.addr.addresses = (DskIpAddress*)(host_entry + 1);
+      host_entry->name = (char*)(host_entry->info.addr.addresses + 1);
+      host_entry->is_ipv6 = addr.type == DSK_IP_ADDRESS_IPV6;
+      host_entry->expire_time = (unsigned)(-1);
+      host_entry->type = DSK_DNS_CACHE_ENTRY_ADDR;
+      host_entry->info.addr.n = 1;
+      host_entry->info.addr.last_used = 0;
+      host_entry->info.addr.addresses[0] = addr;
+retry:
+      GSK_RBTREE_INSERT (GET_ETC_HOSTS_TREE (), host_entry, conflict);
+      if (conflict != NULL)
+        {
+          GSK_RBTREE_REMOVE (GET_ETC_HOSTS_TREE (), conflict);
+          goto retry;
+        }
+    }
+  fclose (fp);
 
   /* parse /etc/resolv.conf */
+  fp = fopen ("/etc/resolv.conf", "r");
+  if (fp == NULL)
+    {
+      dsk_set_error (error, "error opening %s: %s",
+                     "/etc/resolv.conf", strerror (errno));
+      return DSK_FALSE;
+    }
+  while (fgets (buf, sizeof (buf), fp) != NULL)
+    {
+      const char *at = buf;
+      while (*at && dsk_ascii_isspace (*at))
+        at++;
+      if (*at == '#')
+        continue;
+      ...
+    }
+  fclose (fp);
+
+  /* XXX: make UDP connection to nameserver? */
   ...
+
+  return DSK_TRUE;
 }
 
 /* --- low-level ---*/
