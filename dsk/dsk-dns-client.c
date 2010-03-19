@@ -1,6 +1,6 @@
-#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "dsk.h"
 #include "../gskrbtreemacros.h"
 
@@ -61,7 +61,6 @@ handle_cache_entry_lookup (DskDnsCacheEntry *entry,
     case DSK_DNS_CACHE_ENTRY_CNAME:
       {
         unsigned i;
-        char *cname;
         /* check existing cname list for circular references */
         for (i = 0; i < lookup_data->n_cnames; i++)
           if (strcmp (lookup_data->cnames[i], entry->info.cname) == 0)
@@ -76,8 +75,7 @@ handle_cache_entry_lookup (DskDnsCacheEntry *entry,
             }
       
         /* add to cname list */
-        cname = dsk_strdup (entry->info.cname);
-        dsk_dns_lookup_cache_entry (cname, entry->is_ipv6, handle_cache_entry_lookup, data);
+        dsk_dns_lookup_cache_entry (entry->info.cname, entry->is_ipv6, handle_cache_entry_lookup, data);
         return;
       }
     case DSK_DNS_CACHE_ENTRY_ADDR:
@@ -370,12 +368,14 @@ next:
     }
 
   return DSK_TRUE;
+
+  dns_initialized = DSK_TRUE;
 }
 
 #define MAYBE_DNS_INIT_RETURN(error, error_rv)         \
   do {                                                 \
     if (!dns_initialized && !dsk_dns_try_init (error)) \
-      return error_rv; \
+      return error_rv;                                 \
   }while(0)
 
 /* --- low-level ---*/
@@ -429,16 +429,28 @@ static void
 begin_dns_request (DskDnsCacheEntry *entry)
 {
   /* pick dns server */
+  DskDnsCacheEntryJob *job;
   unsigned dns_index = next_nameserver_index++;
   DskDnsMessage message;
+  DskDnsQuestion question;
   if (next_nameserver_index == n_resolv_conf_ns)
     next_nameserver_index = 0;
+
+  /* create job */
+  entry->info.in_progress.job = job = dsk_malloc (sizeof (*job));
+  ...
 
   /* send dns question to nameserver */
   memset (&message, 0, sizeof (message));
   message.n_questions = 1;
   message.questions = &question;
-  message.id = ...;
+  if (!allocate_id (ns_id_allocators + dns_index, &message.id))
+    {
+      /* put cache-entry on "when-id-available" list */
+      ..
+      return;
+    }
+  job->id = message.id;
   message.is_query = 1;
   message.recursion_desired = 1;
   message.opcode = DSK_DNS_OP_QUERY;
@@ -446,6 +458,8 @@ begin_dns_request (DskDnsCacheEntry *entry)
   question.query_type = is_ipv6 ? DSK_DNS_RR_HOST_ADDRESS_IPV6 : DSK_DNS_RR_HOST_ADDRESS;
   question.query_class = DSK_DNS_CLASS_IN;
   msg = dsk_dns_message_serialize (&message, &msg_len);
+  job->msg_data = msg;
+  job->msg_len = msg_len;
   switch (dsk_udp_socket_send_to_ip (dns_udp_socket,
                                      resolv_conf_ns + dns_index,
                                      DSK_DNS_PORT,
@@ -482,8 +496,24 @@ lookup_without_searchpath (const char       *normalized_name,
 {
   DskDnsCacheEntry ce;
   DskDnsCacheEntry *entry;
+  DskError *error = NULL;
   ce.name = (char*) normalized_name;
   ce.is_ipv6 = is_ipv6;
+
+  /* initialize */
+  if (!dns_initialized && !dsk_dns_try_init (&error))
+    {
+      DskDnsCacheEntry entry;
+      entry.name = (char*) name;
+      entry.is_ipv6 = is_ipv6;
+      entry.expire_time = 0;
+      entry.type = DSK_DNS_CACHE_ENTRY_ERROR;
+      entry.info.error = error;
+      callback (&entry, callback_data);
+      dsk_warning ("error initializing dns subsystem: %s", error->message);
+      dsk_error_unref (error);
+      return;
+    }
 
   /* lookup in /etc/hosts if enabled */
   if (flags & DSK_DNS_CONFIG_USE_ETC_HOSTS)
@@ -514,10 +544,18 @@ lookup_without_searchpath (const char       *normalized_name,
       DSK_RBTREE_INSERT (GET_CACHE_BY_NAME_TREE (), entry, conflict);
       dsk_assert (conflict == NULL);
       job->watch_list = NULL;
+      ...
+
+      /* expunge old cache entries */
+      ...
+
       begin_dns_request (entry);
     }
   if (entry->type == DSK_DNS_CACHE_ENTRY_IN_PROGRESS)
     {
+      /* This happens in an existing pending DNS lookup,
+         as well as when a new CacheEntry is created. */
+
       /* add to watch list */
       watch = dsk_mem_pool_fixed_alloc (&watch_mempool);
       watch->callback = callback;
@@ -534,6 +572,8 @@ lookup_without_searchpath (const char       *normalized_name,
 }
 
 
+/* NOTE: we call with 'name' taken from another cache entry when resolving cnames.
+   SO this must copy the string BEFORE it ousts anything from its cache. */
 void
 dsk_dns_lookup_cache_entry (const char       *name,
                             dsk_boolean       is_ipv6,
