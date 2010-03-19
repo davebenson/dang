@@ -37,6 +37,12 @@ DskIOResult    dsk_udp_socket_send_to (DskUdpSocket  *socket,
 			               unsigned       len,
 			               const uint8_t *data,
 			               DskError     **error);
+DskIOResult    dsk_udp_socket_send_to_ip(DskUdpSocket  *socket,
+                                       const DskIpAddress *addr,
+		                       unsigned       port,
+			               unsigned       len,
+			               const uint8_t *data,
+			               DskError     **error);
 dsk_boolean    dsk_udp_socket_bind    (DskUdpSocket  *socket,
                                        DskIpAddress *bind_addr,
 				       unsigned       port,
