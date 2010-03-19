@@ -17,3 +17,5 @@ dsk_boolean dsk_ip_address_parse_numeric (const char *str,
                                            DskIpAddress *out);
 char *dsk_ip_address_to_string (const DskIpAddress *);
 
+dsk_boolean dsk_ip_addresses_equal (const DskIpAddress *a,
+                                    const DskIpAddress *b);
