@@ -19,6 +19,47 @@ struct _LookupData
   void *callback_data;
 };
 
+struct _DskDnsCacheEntryJob
+{
+  DskDnsCacheEntry *owner;
+  unsigned ns_index;
+};
+
+
+typedef struct _NameserverIdInfo NameserverIdInfo;
+typedef struct _NameserverIdAllocator NameserverIdAllocator;
+typedef enum
+{
+  NS_ID_STATE_FREE,
+  NS_ID_STATE_WAITING_TO_FREE,
+  NS_ID_STATE_RUNNING
+} NameserverIdState;
+struct _NameserverIdInfo
+{
+  uint8_t state;                /* one of NameserverIdState */
+  uint8_t delta;                /* so id_wait_time must be <= 255 */
+  uint16_t next;                /* or ((uint16_t)-1) */
+};
+struct _NameserverIdAllocator
+{
+  unsigned n_ids;
+  unsigned first_free;          /* or ((unsigned)-1) */
+  unsigned first_waiting_to_free;  /* sorted chronologically */
+  ...
+};
+static dsk_boolean
+nameserver_id_allocate (NameserverIdAllocator *allocator,
+                        uint16_t              *out)
+{
+  ...
+}
+static void
+nameserver_id_free_wait (NameserverIdAllocator *allocator,
+                         uint16_t               id)
+{
+  ...
+}
+
 
 /* TODO: plugable random number generator.  or mersenne twister import */
 static unsigned
@@ -437,8 +478,9 @@ begin_dns_request (DskDnsCacheEntry *entry)
     next_nameserver_index = 0;
 
   /* create job */
-  entry->info.in_progress.job = job = dsk_malloc (sizeof (*job));
-  ...
+  entry->info.in_progress = job = dsk_malloc (sizeof (*job));
+  job->owner = entry;
+  job->ns_index = dns_index;
 
   /* send dns question to nameserver */
   memset (&message, 0, sizeof (message));
@@ -447,7 +489,8 @@ begin_dns_request (DskDnsCacheEntry *entry)
   if (!allocate_id (ns_id_allocators + dns_index, &message.id))
     {
       /* put cache-entry on "when-id-available" list */
-      ..
+      job->state = WAITING_FOR_ID;
+      ...
       return;
     }
   job->id = message.id;
