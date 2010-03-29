@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "dsk.h"
+#include "dsk-flagged-pointer.h"
 #include "../gskrbtreemacros.h"
 
 #define MAX_CNAMES              16
@@ -34,18 +35,16 @@ typedef enum
   NS_ID_STATE_WAITING_TO_FREE,
   NS_ID_STATE_RUNNING
 } NameserverIdState;
-struct _NameserverIdInfo
-{
-  uint8_t state;                /* one of NameserverIdState */
-  uint8_t delta;                /* so id_wait_time must be <= 255 */
-  uint16_t next;                /* or ((uint16_t)-1) */
-};
+
+
+simplify!
+
 struct _NameserverIdAllocator
 {
   unsigned n_ids;
   unsigned first_free;          /* or ((unsigned)-1) */
   unsigned first_waiting_to_free;  /* sorted chronologically */
-  ...
+  DskFlaggedPointer
 };
 static dsk_boolean
 nameserver_id_allocate (NameserverIdAllocator *allocator,
