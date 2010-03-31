@@ -31,7 +31,7 @@ struct _DskDnsCacheEntryJob
 
 
 typedef struct _NameserverIdInfo NameserverIdInfo;
-typedef struct _NameserverIdAllocator NameserverIdAllocator;
+typedef struct _NameserverInfo NameserverInfo;
 typedef enum
 {
   NS_ID_STATE_FREE,
@@ -60,8 +60,9 @@ struct _NameserverIdInfo
   } info;
 };
 
-struct _NameserverIdAllocator
+struct _NameserverInfo
 {
+  DskIpAddress address;
   unsigned n_ids;
   unsigned first_free;          /* or ((unsigned)-1) */
   unsigned first_waiting_to_free;  /* sorted chronologically (or -1) */
@@ -70,9 +71,18 @@ struct _NameserverIdAllocator
   dsk_time_t last_waiting_to_free_time;
   NameserverIdInfo *id_info;
 };
+static void
+nameserver_info_init (NameserverInfo *init,
+                      const DskIpAddress *addr)
+{
+  init->address = *addr;
+  init->n_ids = 0;
+  init->first_free = init->first_waiting_to_free = init->last_waiting_to_free = (unsigned)-1;
+  init->id_info = NULL;
+}
 
 static void
-flush_waiting_to_free_entries (NameserverIdAllocator *allocator,
+flush_waiting_to_free_entries (NameserverInfo        *allocator,
                                dsk_time_t             cur_time)
 {
   while (allocator->first_waiting_to_free == (unsigned)-1
@@ -107,7 +117,7 @@ flush_waiting_to_free_entries (NameserverIdAllocator *allocator,
 }
 
 static dsk_boolean
-nameserver_id_allocate (NameserverIdAllocator *allocator,
+nameserver_id_allocate (NameserverInfo        *allocator,
                         uint16_t              *out,
                         DskDnsCacheEntryJob   *job)
 {
@@ -163,7 +173,7 @@ nameserver_id_allocate (NameserverIdAllocator *allocator,
 }
 
 static void
-nameserver_id_free_wait (NameserverIdAllocator *allocator,
+nameserver_id_free_wait (NameserverInfo        *allocator,
                          uint16_t               id)
 {
   dsk_time_t cur_time = dsk_get_current_time ();
@@ -294,7 +304,7 @@ static unsigned next_nameserver_index = 0;
 
 /* --- configuration --- */
 static unsigned n_resolv_conf_ns = 0;
-static DskIpAddress *resolv_conf_ns = NULL;
+static NameserverInfo *resolv_conf_ns = NULL;
 static unsigned n_resolv_conf_search_paths = 0;
 static char **resolv_conf_search_paths = NULL;
 static DskDnsCacheEntry *etc_hosts_tree = NULL;
@@ -515,7 +525,7 @@ retry:
               goto next;
             }
           for (i = 0; i < n_resolv_conf_ns; i++)
-            if (dsk_ip_addresses_equal (resolv_conf_ns + i, &addr))
+            if (dsk_ip_addresses_equal (&resolv_conf_ns[i].address, &addr))
               break;
           if (i < n_resolv_conf_ns)
             {
@@ -525,7 +535,7 @@ retry:
             {
               resolv_conf_ns = dsk_realloc (resolv_conf_ns,
                                             (n_resolv_conf_ns+1) * sizeof (DskIpAddress));
-              resolv_conf_ns[n_resolv_conf_ns++] = addr;
+              nameserver_info_init (&resolv_conf_ns[n_resolv_conf_ns++], &addr);
             }
         }
       else
@@ -629,7 +639,7 @@ begin_dns_request (DskDnsCacheEntry *entry)
   memset (&message, 0, sizeof (message));
   message.n_questions = 1;
   message.questions = &question;
-  if (!nameserver_id_allocate (ns_id_allocators + dns_index, &message.id, job))
+  if (!nameserver_id_allocate (resolv_conf_ns + dns_index, &message.id, job))
     {
       /* put cache-entry on "when-id-available" list */
       job->state = WAITING_FOR_ID;
