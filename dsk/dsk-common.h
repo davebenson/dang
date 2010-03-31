@@ -13,6 +13,7 @@ typedef int dsk_boolean;
 #define DSK_FALSE		0
 #define DSK_TRUE		1
 
+
 /* branch-hinting macros */
 #define DSK_LIKELY(condition)     (condition)
 #define DSK_UNLIKELY(condition)   (condition)
@@ -22,6 +23,7 @@ typedef int dsk_boolean;
    Note that many platforms define time_t as a 32-bit quantity--
    it is always 64-bit in dsk. */
 typedef int64_t dsk_time_t;
+dsk_time_t dsk_get_current_time ();
 
 typedef void (*DskDestroyNotify) (void *data);
 

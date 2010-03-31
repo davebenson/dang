@@ -1,3 +1,4 @@
+/* TODO: simplify by not paying attention to id at all!!! */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -5,7 +6,9 @@
 #include "dsk-flagged-pointer.h"
 #include "../gskrbtreemacros.h"
 
-#define MAX_CNAMES              16
+#define MAX_CNAMES                 16
+#define TIME_WAIT_TO_RECYCLE_ID    60
+
 
 #define NO_EXPIRE_TIME  ((unsigned)(-1))
 
@@ -37,28 +40,169 @@ typedef enum
 } NameserverIdState;
 
 
-simplify!
+struct _NameserverIdInfo
+{
+  NameserverIdState state;
+  union
+  {
+    struct {
+      uint16_t next_free;
+      uint8_t is_last;
+    } free;
+    struct {
+      uint16_t next_free;
+      uint16_t delta_t : 15;
+      uint16_t is_last : 1;
+    } waiting_to_free;
+    struct {
+      DskDnsCacheEntryJob *job;
+    } running;
+  } info;
+};
 
 struct _NameserverIdAllocator
 {
   unsigned n_ids;
   unsigned first_free;          /* or ((unsigned)-1) */
-  unsigned first_waiting_to_free;  /* sorted chronologically */
-  DskFlaggedPointer
+  unsigned first_waiting_to_free;  /* sorted chronologically (or -1) */
+  unsigned last_waiting_to_free;  /* sorted chronologically (or -1) */
+  dsk_time_t first_waiting_to_free_time;
+  dsk_time_t last_waiting_to_free_time;
+  NameserverIdInfo *id_info;
 };
+
+static void
+flush_waiting_to_free_entries (NameserverIdAllocator *allocator,
+                               dsk_time_t             cur_time)
+{
+  while (allocator->first_waiting_to_free == (unsigned)-1
+      && allocator->first_waiting_to_free_time <= cur_time)
+    {
+      unsigned idx = allocator->first_waiting_to_free;
+      NameserverIdInfo *info = &allocator->id_info[idx];
+      dsk_assert (info->state == NS_ID_STATE_WAITING_TO_FREE);
+      if (info->info.waiting_to_free.is_last)
+        {
+          allocator->first_waiting_to_free = allocator->last_waiting_to_free = (unsigned)-1;
+        }
+      else
+        {
+          allocator->first_waiting_to_free = info->info.waiting_to_free.next_free;
+          allocator->first_waiting_to_free_time += info->info.waiting_to_free.delta_t;
+        }
+
+      /* add to free list */
+      info->state = NS_ID_STATE_FREE;
+      if (allocator->first_free == (unsigned)-1)
+        {
+          info->info.free.is_last = 1;
+        }
+      else
+        {
+          info->info.free.is_last = 0;
+          info->info.free.next_free = allocator->first_free;
+        }
+      allocator->first_free = idx;
+    }
+}
+
 static dsk_boolean
 nameserver_id_allocate (NameserverIdAllocator *allocator,
-                        uint16_t              *out)
+                        uint16_t              *out,
+                        DskDnsCacheEntryJob   *job)
 {
-  ...
+  dsk_time_t cur_time = dsk_get_current_time ();
+  NameserverIdInfo *info;
+  if (allocator->first_free == (unsigned)-1)
+    flush_waiting_to_free_entries (allocator, cur_time);
+  if (allocator->first_free == (unsigned)-1)
+    {
+      unsigned i, last;
+      if (allocator->n_ids == (1<<16))
+        return DSK_FALSE;
+
+      *out = allocator->n_ids;
+
+      /* resize */
+      if (allocator->n_ids == 0)
+        allocator->n_ids = 8;
+      else
+        allocator->n_ids *= 2;
+      allocator->id_info = dsk_realloc (allocator->id_info,
+                                  allocator->n_ids * sizeof (NameserverIdInfo));
+
+      /* build free list of remaining elements */
+      last = allocator->n_ids - 1;
+      for (i = *out + 1; i < last; i++)
+        {
+          allocator->id_info[i].state = NS_ID_STATE_FREE;
+          allocator->id_info[i].info.free.is_last = 0;
+          allocator->id_info[i].info.free.next_free = i+1;
+        }
+      allocator->id_info[i].state = NS_ID_STATE_FREE;
+      allocator->id_info[i].info.free.is_last = 1;
+
+      info = &allocator->id_info[*out];
+    }
+  else
+    {
+      info = &allocator->id_info[allocator->first_free];
+      *out = allocator->first_free;
+
+      /* remove first element from free list */
+      if (info->info.free.is_last)
+        allocator->first_free = (unsigned)-1;
+      else
+        allocator->first_free = info->info.free.next_free;
+    }
+
+  info->state = NS_ID_STATE_RUNNING;
+  info->info.running.job = job;
+
+  return DSK_TRUE;
 }
+
 static void
 nameserver_id_free_wait (NameserverIdAllocator *allocator,
                          uint16_t               id)
 {
-  ...
-}
+  dsk_time_t cur_time = dsk_get_current_time ();
+  dsk_time_t expire_time = cur_time + TIME_WAIT_TO_RECYCLE_ID;
+  NameserverIdInfo *info = allocator->id_info + id;
+  dsk_assert (id < allocator->n_ids);
+  dsk_assert (allocator->id_info[id].state == NS_ID_STATE_RUNNING);
 
+  /* flush entries that are too old already;
+     this is necessary to insure that the 16-bit delta_t
+     field does not overflow */
+  flush_waiting_to_free_entries (allocator, cur_time);
+
+  if (allocator->first_waiting_to_free != (unsigned)-1)
+    {
+      /* create a new one-entry list */
+      allocator->first_waiting_to_free
+        = allocator->last_waiting_to_free
+        = id;
+
+      allocator->first_waiting_to_free_time
+       = allocator->last_waiting_to_free_time
+       = expire_time;
+    }
+  else
+    {
+      /* append to end of list */
+      NameserverIdInfo *last = allocator->id_info
+                             + allocator->last_waiting_to_free;
+      last->info.waiting_to_free.is_last = 0;
+      last->info.waiting_to_free.next_free = id;
+      dsk_assert (expire_time - allocator->last_waiting_to_free_time < (1<<16));
+      last->info.waiting_to_free.delta_t = expire_time
+                             - allocator->last_waiting_to_free_time;
+
+      allocator->last_waiting_to_free_time = expire_time;
+    }
+  info->info.waiting_to_free.is_last = 1;
+}
 
 /* TODO: plugable random number generator.  or mersenne twister import */
 static unsigned
@@ -485,7 +629,7 @@ begin_dns_request (DskDnsCacheEntry *entry)
   memset (&message, 0, sizeof (message));
   message.n_questions = 1;
   message.questions = &question;
-  if (!allocate_id (ns_id_allocators + dns_index, &message.id))
+  if (!nameserver_id_allocate (ns_id_allocators + dns_index, &message.id, job))
     {
       /* put cache-entry on "when-id-available" list */
       job->state = WAITING_FOR_ID;
