@@ -23,10 +23,27 @@ struct _LookupData
   void *callback_data;
 };
 
+typedef enum
+{
+  JOB_STATE_WAITING_FOR_ID,
+  JOB_STATE_WAITING_FOR_RESPONSE
+} JobState;
+
+
 struct _DskDnsCacheEntryJob
 {
   DskDnsCacheEntry *owner;
   unsigned ns_index;
+  JobState state;
+  union
+  {
+    struct {
+      DskDnsCacheEntryJob *next_waiting;
+    } waiting_for_id;
+    struct {
+      uint16_t id;
+    } waiting_for_response;
+  } info;
 };
 
 
@@ -70,6 +87,7 @@ struct _NameserverInfo
   dsk_time_t first_waiting_to_free_time;
   dsk_time_t last_waiting_to_free_time;
   NameserverIdInfo *id_info;
+  DskDnsCacheEntryJob *waiting_for_id_list;
 };
 static void
 nameserver_info_init (NameserverInfo *init,
@@ -79,6 +97,7 @@ nameserver_info_init (NameserverInfo *init,
   init->n_ids = 0;
   init->first_free = init->first_waiting_to_free = init->last_waiting_to_free = (unsigned)-1;
   init->id_info = NULL;
+  init->waiting_for_id_list = NULL;
 }
 
 static void
@@ -642,20 +661,22 @@ begin_dns_request (DskDnsCacheEntry *entry)
   if (!nameserver_id_allocate (resolv_conf_ns + dns_index, &message.id, job))
     {
       /* put cache-entry on "when-id-available" list */
-      job->state = WAITING_FOR_ID;
-      ...
+      job->state = JOB_STATE_WAITING_FOR_ID;
+      job->info.waiting_for_id.next_waiting = resolv_conf_ns[dns_index].waiting_for_id_list;
+      resolv_conf_ns[dns_index].waiting_for_id_list = job;
       return;
     }
-  job->id = message.id;
+  job->state= JOB_STATE_WAITING_FOR_RESPONSE;
+  job->info.waiting_for_response.id = message.id;
   message.is_query = 1;
   message.recursion_desired = 1;
   message.opcode = DSK_DNS_OP_QUERY;
   question.name = entry->name;
-  question.query_type = is_ipv6 ? DSK_DNS_RR_HOST_ADDRESS_IPV6 : DSK_DNS_RR_HOST_ADDRESS;
+  question.query_type = entry->is_ipv6 ? DSK_DNS_RR_HOST_ADDRESS_IPV6 : DSK_DNS_RR_HOST_ADDRESS;
   question.query_class = DSK_DNS_CLASS_IN;
+  uint8_t *msg;
+  unsigned msg_len;
   msg = dsk_dns_message_serialize (&message, &msg_len);
-  job->msg_data = msg;
-  job->msg_len = msg_len;
   switch (dsk_udp_socket_send_to_ip (dns_udp_socket,
                                      resolv_conf_ns + dns_index,
                                      DSK_DNS_PORT,
@@ -663,9 +684,17 @@ begin_dns_request (DskDnsCacheEntry *entry)
                                      error))
     {
     case DSK_IO_RESULT_SUCCESS:
+      dsk_free (msg);
+
+      /* make timeout timer */
+      ...
+
       break;
     case DSK_IO_RESULT_AGAIN:
       /* trap writable */
+      job->state = JOB_STATE_WAITING_TO_SEND;
+      job->info.waiting_to_send.msg_data = msg;
+      job->info.waiting_to_send.msg_len = msg_len;
       ...
     case DSK_IO_RESULT_EOF:
       dsk_assert_not_reached ();
