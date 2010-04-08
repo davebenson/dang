@@ -47,7 +47,7 @@ DskDnsLookupNonblockingResult
 typedef enum
 {
   DSK_DNS_CACHE_ENTRY_IN_PROGRESS,
-  DSK_DNS_CACHE_ENTRY_BAD_RESPONSE,
+  DSK_DNS_CACHE_ENTRY_ERROR,
   DSK_DNS_CACHE_ENTRY_NEGATIVE,
   DSK_DNS_CACHE_ENTRY_CNAME,
   DSK_DNS_CACHE_ENTRY_ADDR,
@@ -63,7 +63,9 @@ struct _DskDnsCacheEntry
   DskDnsCacheEntryType type;
   union {
     DskDnsCacheEntryJob *in_progress;
-    struct { char *message; } bad_response;
+    struct {
+      DskError *error;
+    } error;
     char *cname;
     struct { unsigned n; DskIpAddress *addresses; unsigned i; } addr;
   } info;
