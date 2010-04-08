@@ -90,11 +90,11 @@ handle_cache_entry_lookup (DskDnsCacheEntry *entry,
     {
     case DSK_DNS_CACHE_ENTRY_IN_PROGRESS:
       dsk_assert_not_reached ();
-    case DSK_DNS_CACHE_ENTRY_BAD_RESPONSE:
+    case DSK_DNS_CACHE_ENTRY_ERROR:
       result.type = DSK_DNS_LOOKUP_RESULT_BAD_RESPONSE;
       result.addr = NULL;
       /* CONSIDER: adding cname chain somewhere */
-      result.message = entry->info.bad_response.message;
+      result.message = entry->info.error.error->message;
       lookup_data->callback (&result, lookup_data->callback_data);
       dsk_free (lookup_data);
       return;
@@ -452,10 +452,10 @@ dsk_dns_lookup_nonblocking (const char *name,
         {
         case DSK_DNS_CACHE_ENTRY_IN_PROGRESS:
           return DSK_DNS_LOOKUP_NONBLOCKING_MUST_BLOCK;
-        case DSK_DNS_CACHE_ENTRY_BAD_RESPONSE:
+        case DSK_DNS_CACHE_ENTRY_ERROR:
           dsk_set_error (error, "looking up %s: %s",
                          name,
-                         entry->info.bad_response.message);
+                         entry->info.error.error->message);
           return DSK_DNS_LOOKUP_NONBLOCKING_ERROR;
         case DSK_DNS_CACHE_ENTRY_NEGATIVE:
           return DSK_DNS_LOOKUP_NONBLOCKING_NOT_FOUND;
@@ -595,8 +595,8 @@ handle_timer_expired (DskDispatch *dispatch,
       DskDnsCacheEntry *owner = job->owner;
       DskDnsCacheEntry *conflict;
       dsk_dispatch_remove_timer (job->timer);
-      owner->type = DSK_DNS_CACHE_ENTRY_BAD_RESPONSE;
-      owner->info.bad_response.message = dsk_strdup ("timed out waiting for response");
+      owner->type = DSK_DNS_CACHE_ENTRY_ERROR;
+      owner->info.error.error = dsk_error_new ("timed out waiting for response");
       owner->expire_time = dsk_get_current_time () + 1;
       GSK_RBTREE_INSERT (GET_EXPIRATION_TREE (), owner, conflict);
       dsk_assert (conflict == NULL);
@@ -704,6 +704,7 @@ begin_dns_request (DskDnsCacheEntry *entry)
 static void
 lookup_without_searchpath (const char       *normalized_name,
                            dsk_boolean       is_ipv6,
+                           DskDnsConfigFlags flags,
                            DskDnsCacheEntryFunc callback,
                            void             *callback_data)
 {
@@ -721,7 +722,7 @@ lookup_without_searchpath (const char       *normalized_name,
       entry.is_ipv6 = is_ipv6;
       entry.expire_time = 0;
       entry.type = DSK_DNS_CACHE_ENTRY_ERROR;
-      entry.info.error = error;
+      entry.info.error.error = error;
       callback (&entry, callback_data);
       dsk_warning ("error initializing dns subsystem: %s", error->message);
       dsk_error_unref (error);
@@ -747,22 +748,21 @@ lookup_without_searchpath (const char       *normalized_name,
   /* create new IN_PROGRESS entry */
   if (entry == NULL)
     {
-      entry = dsk_malloc (sizeof (DskDnsCacheEntry) + strlen (name) + 1);
-      entry->name = strcpy ((char*)(entry+1), name);
+      DskDnsCacheEntry *entry;
+      DskDnsCacheEntry *conflict;
+      DskDnsCacheEntryJob *job;
+      entry = dsk_malloc (sizeof (DskDnsCacheEntry) + strlen (normalized_name) + 1);
+      entry->name = strcpy ((char*)(entry+1), normalized_name);
       entry->is_ipv6 = is_ipv6;
       entry->expire_time = NO_EXPIRE_TIME;
       entry->type = DSK_DNS_CACHE_ENTRY_IN_PROGRESS;
-      job = dsk_malloc (sizeof (DskDnsCacheEntryJob));
-      entry->info.in_progress = 
-      DSK_RBTREE_INSERT (GET_CACHE_BY_NAME_TREE (), entry, conflict);
+
+      GSK_RBTREE_INSERT (GET_CACHE_BY_NAME_TREE (), entry, conflict);
       dsk_assert (conflict == NULL);
-      job->watch_list = NULL;
-      ...
+      begin_dns_request (entry);
 
       /* expunge old cache entries */
       ...
-
-      begin_dns_request (entry);
     }
   if (entry->type == DSK_DNS_CACHE_ENTRY_IN_PROGRESS)
     {
@@ -770,11 +770,12 @@ lookup_without_searchpath (const char       *normalized_name,
          as well as when a new CacheEntry is created. */
 
       /* add to watch list */
-      watch = dsk_mem_pool_fixed_alloc (&watch_mempool);
-      watch->callback = callback;
-      watch->callback_data = callback_data;
-      watch->next = job->watch_list;
-      job->watch_list = watch_list;
+      Waiter *waiter;
+      waiter = dsk_malloc (sizeof (Waiter));
+      waiter->func = callback;
+      waiter->data = callback_data;
+      waiter->next = job->waiters;
+      job->waiters = waiter;
     }
   else
     {
@@ -870,7 +871,7 @@ dsk_dns_lookup_cache_entry (const char       *name,
 
   if (ends_with_dot)
     {
-      lookup_without_searchpath (normalized_name, is_ipv6, callback, callback_data);
+      lookup_without_searchpath (normalized_name, is_ipv6, flags, callback, callback_data);
       return;
     }
   else
