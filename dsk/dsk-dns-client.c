@@ -29,12 +29,20 @@ typedef enum
   JOB_STATE_WAITING_FOR_RESPONSE
 } JobState;
 
+typedef struct _Waiter Waiter;
+struct _Waiter
+{
+  DskDnsCacheEntryFunc func;
+  void *data;
+  Waiter *next;
+};
 
 struct _DskDnsCacheEntryJob
 {
   DskDnsCacheEntry *owner;
   unsigned ns_index;
   JobState state;
+  Waiter *waiters;
   union
   {
     struct {
@@ -42,6 +50,8 @@ struct _DskDnsCacheEntryJob
     } waiting_for_id;
     struct {
       uint16_t id;
+      uint16_t attempt;
+      DskDispatchTimer *timer;
     } waiting_for_response;
   } info;
 };
@@ -639,6 +649,59 @@ dsk_dns_lookup_nonblocking (const char *name,
 }
 
 static void
+job_notify_waiters_and_free (DskDnsCacheEntryJob *job)
+{
+  /* notify waiters */
+  while (job->waiters)
+    {
+      Waiter *w = job->waiters;
+      job->waiters = w->next;
+
+      w->func (job->owner, w->data);
+      dsk_free (w);
+    }
+
+  /* free job */
+  dsk_free (job);
+}
+
+static void
+handle_timer_expired (DskDispatch *dispatch,
+                      void        *data)
+{
+  DskDnsCacheEntryJob *job = data;
+  dsk_assert (job->state == JOB_STATE_WAITING_FOR_RESPONSE);
+
+  /* is this the last attempt? */
+  if (job->info.waiting_for_response.attempt + 1 == DSK_N_ELEMENTS (retry_schedule))
+    {
+      /* Setup cache-entry */
+      DskDnsCacheEntry *owner = job->owner;
+      DskDnsCacheEntry *conflict;
+      dsk_dispatch_remove_timer (job->info.waiting_for_response.timer);
+      owner->type = DSK_DNS_CACHE_ENTRY_BAD_RESPONSE;
+      owner->info.bad_response.message = dsk_strdup ("timed out waiting for response");
+      owner->expire_time = dsk_get_current_time () + 1;
+      GSK_RBTREE_INSERT (GET_EXPIRATION_TREE (), owner, conflict);
+      dsk_assert (conflict == NULL);
+
+      job_notify_waiters_and_free (job);
+      return;
+    }
+
+  /* adjust timer */
+  job->info.waiting_for_response.attempt += 1;
+  dsk_dispatch_adjust_timer (job->info.waiting_for_response.timer,
+                             retry_schedule[job->info.waiting_for_response.attempt]);
+
+  /* try a different nameserver */
+  ...
+
+  /* resend message */
+  ...
+}
+
+static void
 begin_dns_request (DskDnsCacheEntry *entry)
 {
   /* pick dns server */
@@ -668,6 +731,7 @@ begin_dns_request (DskDnsCacheEntry *entry)
     }
   job->state= JOB_STATE_WAITING_FOR_RESPONSE;
   job->info.waiting_for_response.id = message.id;
+  job->info.waiting_for_response.timer = NULL;
   message.is_query = 1;
   message.recursion_desired = 1;
   message.opcode = DSK_DNS_OP_QUERY;
@@ -676,19 +740,23 @@ begin_dns_request (DskDnsCacheEntry *entry)
   question.query_class = DSK_DNS_CLASS_IN;
   uint8_t *msg;
   unsigned msg_len;
+  DskError *error = NULL;
   msg = dsk_dns_message_serialize (&message, &msg_len);
   switch (dsk_udp_socket_send_to_ip (dns_udp_socket,
-                                     resolv_conf_ns + dns_index,
+                                     &resolv_conf_ns[dns_index].address,
                                      DSK_DNS_PORT,
                                      msg_len, msg,
-                                     error))
+                                     &error))
     {
     case DSK_IO_RESULT_SUCCESS:
       dsk_free (msg);
 
       /* make timeout timer */
-      ...
-
+      job->info.waiting_for_response.attempt = 0;
+      job->info.waiting_for_response.timer
+        = dsk_dispatch_add_timer_millis (NULL, retry_schedule[0],
+                                         handle_timer_expired,
+                                         job);
       break;
     case DSK_IO_RESULT_AGAIN:
       /* trap writable */

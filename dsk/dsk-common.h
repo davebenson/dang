@@ -13,6 +13,7 @@ typedef int dsk_boolean;
 #define DSK_FALSE		0
 #define DSK_TRUE		1
 
+#define DSK_N_ELEMENTS(array)   ( sizeof(array) / sizeof((array)[0]) )
 
 /* branch-hinting macros */
 #define DSK_LIKELY(condition)     (condition)
