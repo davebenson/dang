@@ -1,10 +1,10 @@
-/* TODO: simplify by not paying attention to id at all!!! */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include "dsk.h"
 #include "dsk-flagged-pointer.h"
 #include "../gskrbtreemacros.h"
+#include "../gsklistmacros.h"
 
 #define MAX_CNAMES                 16
 #define TIME_WAIT_TO_RECYCLE_ID    60
@@ -23,11 +23,6 @@ struct _LookupData
   void *callback_data;
 };
 
-typedef enum
-{
-  JOB_STATE_WAITING_FOR_ID,
-  JOB_STATE_WAITING_FOR_RESPONSE
-} JobState;
 
 typedef struct _Waiter Waiter;
 struct _Waiter
@@ -40,208 +35,39 @@ struct _Waiter
 struct _DskDnsCacheEntryJob
 {
   DskDnsCacheEntry *owner;
-  unsigned ns_index;
-  JobState state;
+
+  /* users waiting on this job to finish */
   Waiter *waiters;
-  union
-  {
-    struct {
-      DskDnsCacheEntryJob *next_waiting;
-    } waiting_for_id;
-    struct {
-      uint16_t id;
-      uint16_t attempt;
-      DskDispatchTimer *timer;
-    } waiting_for_response;
-  } info;
+
+  unsigned ns_index;
+  uint8_t attempt;
+  uint8_t waiting_to_send;
+  DskDispatchTimer *timer;
+
+  /* the question, stored as binary */
+  unsigned message_len;
+  uint8_t *message;
+
+  DskDnsCacheEntryJob *prev_waiting, *next_waiting;
 };
 
 
-typedef struct _NameserverIdInfo NameserverIdInfo;
+
 typedef struct _NameserverInfo NameserverInfo;
-typedef enum
-{
-  NS_ID_STATE_FREE,
-  NS_ID_STATE_WAITING_TO_FREE,
-  NS_ID_STATE_RUNNING
-} NameserverIdState;
-
-
-struct _NameserverIdInfo
-{
-  NameserverIdState state;
-  union
-  {
-    struct {
-      uint16_t next_free;
-      uint8_t is_last;
-    } free;
-    struct {
-      uint16_t next_free;
-      uint16_t delta_t : 15;
-      uint16_t is_last : 1;
-    } waiting_to_free;
-    struct {
-      DskDnsCacheEntryJob *job;
-    } running;
-  } info;
-};
-
 struct _NameserverInfo
 {
   DskIpAddress address;
-  unsigned n_ids;
-  unsigned first_free;          /* or ((unsigned)-1) */
-  unsigned first_waiting_to_free;  /* sorted chronologically (or -1) */
-  unsigned last_waiting_to_free;  /* sorted chronologically (or -1) */
-  dsk_time_t first_waiting_to_free_time;
-  dsk_time_t last_waiting_to_free_time;
-  NameserverIdInfo *id_info;
-  DskDnsCacheEntryJob *waiting_for_id_list;
+  unsigned n_requests;
+  unsigned n_responses;
 };
 static void
 nameserver_info_init (NameserverInfo *init,
                       const DskIpAddress *addr)
 {
   init->address = *addr;
-  init->n_ids = 0;
-  init->first_free = init->first_waiting_to_free = init->last_waiting_to_free = (unsigned)-1;
-  init->id_info = NULL;
-  init->waiting_for_id_list = NULL;
+  init->n_requests = init->n_responses = 0;
 }
 
-static void
-flush_waiting_to_free_entries (NameserverInfo        *allocator,
-                               dsk_time_t             cur_time)
-{
-  while (allocator->first_waiting_to_free == (unsigned)-1
-      && allocator->first_waiting_to_free_time <= cur_time)
-    {
-      unsigned idx = allocator->first_waiting_to_free;
-      NameserverIdInfo *info = &allocator->id_info[idx];
-      dsk_assert (info->state == NS_ID_STATE_WAITING_TO_FREE);
-      if (info->info.waiting_to_free.is_last)
-        {
-          allocator->first_waiting_to_free = allocator->last_waiting_to_free = (unsigned)-1;
-        }
-      else
-        {
-          allocator->first_waiting_to_free = info->info.waiting_to_free.next_free;
-          allocator->first_waiting_to_free_time += info->info.waiting_to_free.delta_t;
-        }
-
-      /* add to free list */
-      info->state = NS_ID_STATE_FREE;
-      if (allocator->first_free == (unsigned)-1)
-        {
-          info->info.free.is_last = 1;
-        }
-      else
-        {
-          info->info.free.is_last = 0;
-          info->info.free.next_free = allocator->first_free;
-        }
-      allocator->first_free = idx;
-    }
-}
-
-static dsk_boolean
-nameserver_id_allocate (NameserverInfo        *allocator,
-                        uint16_t              *out,
-                        DskDnsCacheEntryJob   *job)
-{
-  dsk_time_t cur_time = dsk_get_current_time ();
-  NameserverIdInfo *info;
-  if (allocator->first_free == (unsigned)-1)
-    flush_waiting_to_free_entries (allocator, cur_time);
-  if (allocator->first_free == (unsigned)-1)
-    {
-      unsigned i, last;
-      if (allocator->n_ids == (1<<16))
-        return DSK_FALSE;
-
-      *out = allocator->n_ids;
-
-      /* resize */
-      if (allocator->n_ids == 0)
-        allocator->n_ids = 8;
-      else
-        allocator->n_ids *= 2;
-      allocator->id_info = dsk_realloc (allocator->id_info,
-                                  allocator->n_ids * sizeof (NameserverIdInfo));
-
-      /* build free list of remaining elements */
-      last = allocator->n_ids - 1;
-      for (i = *out + 1; i < last; i++)
-        {
-          allocator->id_info[i].state = NS_ID_STATE_FREE;
-          allocator->id_info[i].info.free.is_last = 0;
-          allocator->id_info[i].info.free.next_free = i+1;
-        }
-      allocator->id_info[i].state = NS_ID_STATE_FREE;
-      allocator->id_info[i].info.free.is_last = 1;
-
-      info = &allocator->id_info[*out];
-    }
-  else
-    {
-      info = &allocator->id_info[allocator->first_free];
-      *out = allocator->first_free;
-
-      /* remove first element from free list */
-      if (info->info.free.is_last)
-        allocator->first_free = (unsigned)-1;
-      else
-        allocator->first_free = info->info.free.next_free;
-    }
-
-  info->state = NS_ID_STATE_RUNNING;
-  info->info.running.job = job;
-
-  return DSK_TRUE;
-}
-
-static void
-nameserver_id_free_wait (NameserverInfo        *allocator,
-                         uint16_t               id)
-{
-  dsk_time_t cur_time = dsk_get_current_time ();
-  dsk_time_t expire_time = cur_time + TIME_WAIT_TO_RECYCLE_ID;
-  NameserverIdInfo *info = allocator->id_info + id;
-  dsk_assert (id < allocator->n_ids);
-  dsk_assert (allocator->id_info[id].state == NS_ID_STATE_RUNNING);
-
-  /* flush entries that are too old already;
-     this is necessary to insure that the 16-bit delta_t
-     field does not overflow */
-  flush_waiting_to_free_entries (allocator, cur_time);
-
-  if (allocator->first_waiting_to_free != (unsigned)-1)
-    {
-      /* create a new one-entry list */
-      allocator->first_waiting_to_free
-        = allocator->last_waiting_to_free
-        = id;
-
-      allocator->first_waiting_to_free_time
-       = allocator->last_waiting_to_free_time
-       = expire_time;
-    }
-  else
-    {
-      /* append to end of list */
-      NameserverIdInfo *last = allocator->id_info
-                             + allocator->last_waiting_to_free;
-      last->info.waiting_to_free.is_last = 0;
-      last->info.waiting_to_free.next_free = id;
-      dsk_assert (expire_time - allocator->last_waiting_to_free_time < (1<<16));
-      last->info.waiting_to_free.delta_t = expire_time
-                             - allocator->last_waiting_to_free_time;
-
-      allocator->last_waiting_to_free_time = expire_time;
-    }
-  info->info.waiting_to_free.is_last = 1;
-}
 
 /* TODO: plugable random number generator.  or mersenne twister import */
 static unsigned
@@ -327,9 +153,12 @@ void    dsk_dns_lookup (const char       *name,
 
 /* --- globals --- */
 static DskUdpSocket *dns_udp_socket = NULL;
+static DskHookTrap *dns_udp_socket_trap = NULL;
 static DskDnsCacheEntry *dns_cache = NULL;
 static DskDnsCacheEntry *expiration_tree = NULL;
 static unsigned next_nameserver_index = 0;
+static DskDnsCacheEntryJob *first_waiting_to_send = NULL;
+static DskDnsCacheEntryJob *last_waiting_to_send = NULL;
 
 /* --- configuration --- */
 static unsigned n_resolv_conf_ns = 0;
@@ -662,7 +491,90 @@ job_notify_waiters_and_free (DskDnsCacheEntryJob *job)
     }
 
   /* free job */
+  dsk_free (job->message);
   dsk_free (job);
+}
+
+static DskIOResult
+job_send_message (DskDnsCacheEntryJob *job, DskError **error)
+{
+  return dsk_udp_socket_send_to_ip (dns_udp_socket,
+                                    &resolv_conf_ns[job->ns_index].address,
+                                    DSK_DNS_PORT,
+                                    job->message_len, job->message,
+                                    error);
+}
+
+static void clear_waiting_to_send_flag (DskDnsCacheEntryJob *job);
+static void raise_waiting_to_send_flag (DskDnsCacheEntryJob *job);
+
+static dsk_boolean
+handle_socket_writable (void)
+{
+  while (first_waiting_to_send != NULL)
+    {
+      DskDnsCacheEntryJob *job = first_waiting_to_send;
+      DskError *error = NULL;
+      clear_waiting_to_send_flag (job);
+      switch (job_send_message (job, &error))
+        {
+        case DSK_IO_RESULT_SUCCESS:
+          /* wait for message or timeout */
+          break;
+
+        case DSK_IO_RESULT_AGAIN:
+          raise_waiting_to_send_flag (job);
+          return DSK_FALSE; /* do not run this trap again -
+                               we have a new one */
+
+        case DSK_IO_RESULT_EOF:
+          dsk_assert_not_reached ();
+          break;
+        case DSK_IO_RESULT_ERROR:
+          /* Treat this like a timeout */
+          dsk_warning ("error sending UDP for DNS: %s", error->message);
+          dsk_error_unref (error);
+          break;
+
+        default:
+          dsk_assert_not_reached ();
+        }
+    }
+  return DSK_FALSE;
+}
+
+#define GET_WAITING_TO_SEND_LIST() \
+  DskDnsCacheEntryJob *, first_waiting_to_send, last_waiting_to_send, \
+  prev_waiting, next_waiting
+static void
+raise_waiting_to_send_flag (DskDnsCacheEntryJob *job)
+{
+  if (!job->waiting_to_send)
+    {
+      if (first_waiting_to_send == NULL)
+        {
+          dns_udp_socket_trap
+            = dsk_hook_trap (&dns_udp_socket->writable,
+                             (DskHookFunc) handle_socket_writable,
+                             NULL, NULL);
+        }
+      GSK_LIST_APPEND (GET_WAITING_TO_SEND_LIST (), job);
+      job->waiting_to_send = DSK_TRUE;
+    }
+}
+static void
+clear_waiting_to_send_flag (DskDnsCacheEntryJob *job)
+{
+  if (job->waiting_to_send)
+    {
+      GSK_LIST_REMOVE (GET_WAITING_TO_SEND_LIST (), job);
+      job->waiting_to_send = DSK_FALSE;
+      if (first_waiting_to_send == NULL)
+        {
+          dsk_hook_trap_destroy (dns_udp_socket_trap);
+          dns_udp_socket_trap = NULL;
+        }
+    }
 }
 
 static void
@@ -670,15 +582,19 @@ handle_timer_expired (DskDispatch *dispatch,
                       void        *data)
 {
   DskDnsCacheEntryJob *job = data;
-  dsk_assert (job->state == JOB_STATE_WAITING_FOR_RESPONSE);
+  DskError *error = NULL;
+  (void) dispatch;
+  (void) data;
+
+  clear_waiting_to_send_flag (job);
 
   /* is this the last attempt? */
-  if (job->info.waiting_for_response.attempt + 1 == DSK_N_ELEMENTS (retry_schedule))
+  if (job->attempt + 1 == DSK_N_ELEMENTS (retry_schedule))
     {
       /* Setup cache-entry */
       DskDnsCacheEntry *owner = job->owner;
       DskDnsCacheEntry *conflict;
-      dsk_dispatch_remove_timer (job->info.waiting_for_response.timer);
+      dsk_dispatch_remove_timer (job->timer);
       owner->type = DSK_DNS_CACHE_ENTRY_BAD_RESPONSE;
       owner->info.bad_response.message = dsk_strdup ("timed out waiting for response");
       owner->expire_time = dsk_get_current_time () + 1;
@@ -690,15 +606,38 @@ handle_timer_expired (DskDispatch *dispatch,
     }
 
   /* adjust timer */
-  job->info.waiting_for_response.attempt += 1;
-  dsk_dispatch_adjust_timer (job->info.waiting_for_response.timer,
-                             retry_schedule[job->info.waiting_for_response.attempt]);
+  job->attempt += 1;
+  dsk_dispatch_adjust_timer (job->timer,
+                             retry_schedule[job->attempt]);
 
   /* try a different nameserver */
-  ...
+  job->ns_index += 1;
+  if (job->ns_index == n_resolv_conf_ns)
+    job->ns_index = 0;
 
   /* resend message */
-  ...
+  switch (job_send_message (job, &error))
+    {
+    case DSK_IO_RESULT_SUCCESS:
+      /* wait for message or timeout */
+      break;
+
+    case DSK_IO_RESULT_AGAIN:
+      raise_waiting_to_send_flag (job);
+      break;
+
+    case DSK_IO_RESULT_EOF:
+      dsk_assert_not_reached ();
+      break;
+    case DSK_IO_RESULT_ERROR:
+      /* Treat this like a timeout */
+      dsk_warning ("error sending UDP for DNS: %s", error->message);
+      dsk_error_unref (error);
+      break;
+
+    default:
+      dsk_assert_not_reached ();
+    }
 }
 
 static void
@@ -716,68 +655,49 @@ begin_dns_request (DskDnsCacheEntry *entry)
   entry->info.in_progress = job = dsk_malloc (sizeof (*job));
   job->owner = entry;
   job->ns_index = dns_index;
+  job->waiters = NULL;
+  job->attempt = 0;
+  job->timer = NULL;
+  job->message = NULL;
+  job->waiting_to_send = DSK_FALSE;
 
   /* send dns question to nameserver */
   memset (&message, 0, sizeof (message));
   message.n_questions = 1;
   message.questions = &question;
-  if (!nameserver_id_allocate (resolv_conf_ns + dns_index, &message.id, job))
-    {
-      /* put cache-entry on "when-id-available" list */
-      job->state = JOB_STATE_WAITING_FOR_ID;
-      job->info.waiting_for_id.next_waiting = resolv_conf_ns[dns_index].waiting_for_id_list;
-      resolv_conf_ns[dns_index].waiting_for_id_list = job;
-      return;
-    }
-  job->state= JOB_STATE_WAITING_FOR_RESPONSE;
-  job->info.waiting_for_response.id = message.id;
-  job->info.waiting_for_response.timer = NULL;
+  message.id = 1;
   message.is_query = 1;
   message.recursion_desired = 1;
   message.opcode = DSK_DNS_OP_QUERY;
   question.name = entry->name;
   question.query_type = entry->is_ipv6 ? DSK_DNS_RR_HOST_ADDRESS_IPV6 : DSK_DNS_RR_HOST_ADDRESS;
   question.query_class = DSK_DNS_CLASS_IN;
-  uint8_t *msg;
-  unsigned msg_len;
   DskError *error = NULL;
-  msg = dsk_dns_message_serialize (&message, &msg_len);
-  switch (dsk_udp_socket_send_to_ip (dns_udp_socket,
-                                     &resolv_conf_ns[dns_index].address,
-                                     DSK_DNS_PORT,
-                                     msg_len, msg,
-                                     &error))
+  job->message = dsk_dns_message_serialize (&message, &job->message_len);
+  job->timer = dsk_dispatch_add_timer_millis (NULL, retry_schedule[0],
+                                              handle_timer_expired,
+                                              job);
+  switch (job_send_message (job, &error))
     {
     case DSK_IO_RESULT_SUCCESS:
-      dsk_free (msg);
 
       /* make timeout timer */
-      job->info.waiting_for_response.attempt = 0;
-      job->info.waiting_for_response.timer
-        = dsk_dispatch_add_timer_millis (NULL, retry_schedule[0],
-                                         handle_timer_expired,
-                                         job);
       break;
     case DSK_IO_RESULT_AGAIN:
-      /* trap writable */
-      job->state = JOB_STATE_WAITING_TO_SEND;
-      job->info.waiting_to_send.msg_data = msg;
-      job->info.waiting_to_send.msg_len = msg_len;
-      ...
+      raise_waiting_to_send_flag (job);
+      break;
     case DSK_IO_RESULT_EOF:
       dsk_assert_not_reached ();
       break;
     case DSK_IO_RESULT_ERROR:
-      ...
+      dsk_warning ("error sending UDP for DNS: %s", error->message);
+      dsk_error_unref (error);
 
       /* Proceed to create fail timer; we will handle this like a timeout */
       break;
     default:
       dsk_assert_not_reached ();
     }
-
-  /* create retry/fail timer */
-  ...
 }
 
 
@@ -797,7 +717,7 @@ lookup_without_searchpath (const char       *normalized_name,
   if (!dns_initialized && !dsk_dns_try_init (&error))
     {
       DskDnsCacheEntry entry;
-      entry.name = (char*) name;
+      entry.name = (char*) normalized_name;
       entry.is_ipv6 = is_ipv6;
       entry.expire_time = 0;
       entry.type = DSK_DNS_CACHE_ENTRY_ERROR;
