@@ -117,11 +117,12 @@ struct _DskDnsResourceRecord
   /* rdata: record type specific data */
   union
   {
-    /* For DSK_DNS_RR_HOST_ADDRESS and DSK_DNS_CLASS_INTERNET */
-    struct
-    {
-      uint8_t ip_address[4];
-    } a;
+    /* For DSK_DNS_RR_HOST_ADDRESS (and IPV6 variant)
+       and DSK_DNS_CLASS_INTERNET.  We will make sure that
+       aaaa.address and ip_address alias!  So you may
+       use aaaa.address == a.ip_address, to save code */
+    struct { uint8_t ip_address[4]; } a;
+    struct { uint8_t address[16]; } aaaa;
 
 		/* unsupported */
     /* For DSK_DNS_RR_HOST_ADDRESS and DSK_DNS_CLASS_CHAOS */
@@ -191,9 +192,6 @@ struct _DskDnsResourceRecord
       uint32_t minimum_time;
     } soa;
 
-    struct {
-      uint8_t address[16];
-    } aaaa;
   } rdata;
 };
 
