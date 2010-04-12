@@ -36,6 +36,8 @@ typedef enum
   DSK_DNS_LOOKUP_NONBLOCKING_ERROR
 } DskDnsLookupNonblockingResult;
 
+
+/* NB: 'name' must be normalized !!!! */
 DskDnsLookupNonblockingResult
        dsk_dns_lookup_nonblocking (const char *name,
                                    DskIpAddress *out,

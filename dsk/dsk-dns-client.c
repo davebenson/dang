@@ -8,6 +8,7 @@
 
 #define MAX_CNAMES                 16
 #define TIME_WAIT_TO_RECYCLE_ID    60
+#define DSK_DNS_MAX_NAMELEN        1024         /* TODO: look it up! */
 
 
 #define NO_EXPIRE_TIME  ((unsigned)(-1))
@@ -205,6 +206,192 @@ static dsk_boolean dns_initialized = DSK_FALSE;
   
 
 /* --- handling system files (resolv.conf and hosts) --- */
+static void
+job_notify_waiters_and_free (DskDnsCacheEntryJob *job)
+{
+  /* notify waiters */
+  while (job->waiters)
+    {
+      Waiter *w = job->waiters;
+      job->waiters = w->next;
+
+      w->func (job->owner, w->data);
+      dsk_free (w);
+    }
+
+  /* free job */
+  dsk_free (job->message);
+  dsk_free (job);
+}
+
+#define MAX_ANSWER_RR  256
+static void
+handle_message (DskDnsMessage *message)
+{
+  unsigned n_answer = message->n_answer_rr;
+  unsigned i, j;
+  if (n_answer > MAX_ANSWER_RR)
+    n_answer = MAX_ANSWER_RR;
+  for (i = 0; i < message->n_questions; i++)
+    {
+      DskDnsQuestion *q = message->questions + i;
+      DskDnsResourceRecord *a = message->answer_rr;
+      char answers_that_match[MAX_ANSWER_RR];
+      unsigned n_matches = 0;
+      int cname_index = -1;
+      dsk_boolean is_ipv6;
+      DskDnsCacheEntry dummy, *entry;
+      DskDnsCacheEntryJob *job;
+      if (q->query_type == DSK_DNS_RR_HOST_ADDRESS)
+        is_ipv6 = DSK_FALSE;
+      else if (q->query_type == DSK_DNS_RR_HOST_ADDRESS_IPV6)
+        is_ipv6 = DSK_TRUE;
+      else
+        {
+          dsk_warning ("DNS system: received packet with unexpected question type %u", q->query_type);
+          continue;
+        }
+
+      dummy.name = (char *) q->name;
+      dummy.is_ipv6 = is_ipv6;
+      GSK_RBTREE_LOOKUP (GET_CACHE_BY_NAME_TREE (), &dummy, entry);
+      if (entry == NULL)
+        {
+          dsk_warning ("DNS system: unexpected packet pertaining to %s",
+                       q->name);
+          continue;
+        }
+      if (entry->type != DSK_DNS_CACHE_ENTRY_IN_PROGRESS)
+        continue;
+      job = entry->info.in_progress;
+      memset (answers_that_match, 0, n_answer);
+      n_matches = 0;
+      for (j = 0; j < n_answer; j++, a++)
+        if (strcmp (q->name, a->owner) == 0)
+          {
+            if ((a->type == DSK_DNS_RR_HOST_ADDRESS && !is_ipv6)
+             || (a->type == DSK_DNS_RR_HOST_ADDRESS_IPV6 && is_ipv6))
+              {
+                n_matches++;
+                answers_that_match[j] = DSK_TRUE;
+              }
+            else if (a->type == DSK_DNS_RR_CANONICAL_NAME)
+              {
+                cname_index = j;
+              }
+            else
+              {
+                /* not expected, but we ignore it */
+              }
+          }
+      if (cname_index >= 0)
+        {
+          /* cname result */
+          entry->type = DSK_DNS_CACHE_ENTRY_CNAME;
+          entry->info.cname = dsk_strdup (message->answer_rr[cname_index].rdata.domain_name);
+        }
+      else if (n_matches == 0)
+        {
+          /* negative result */
+          entry->type = DSK_DNS_CACHE_ENTRY_NEGATIVE;
+        }
+      else
+        {
+          /* positive result (an actual address) */
+          DskIpAddress *addrs = dsk_malloc (sizeof (DskIpAddress) * n_matches);
+          unsigned ai = 0;
+          entry->type = DSK_DNS_CACHE_ENTRY_ADDR;
+          entry->info.addr.n = n_matches;
+          entry->info.addr.addresses = addrs;
+          for (j = 0; j < n_answer; j++)
+            if (answers_that_match[j])
+              {
+                addrs[ai].type = DSK_IP_ADDRESS_IPV6;
+
+                /* NOTE: we assume aaaa.address and a.ip_address
+                   alias!  This is fine though- we comment appropriately in
+                   dsk-dns-protocol.h */
+                memcpy (addrs[ai].address,
+                        message->answer_rr[j].rdata.aaaa.address,
+                        is_ipv6 ? 16 : 4);
+                ai++;
+              }
+        }
+
+      /* destroy job */
+      dsk_dispatch_remove_timer (job->timer);
+      job_notify_waiters_and_free (job);
+    }
+}
+
+static dsk_boolean
+handle_dns_udp_socket_readable (void *socket,
+                                void *user_data)
+{
+  DSK_UNUSED (user_data);
+  for (;;)
+    {
+      DskIpAddress addr;
+      unsigned port;
+      unsigned len;
+      uint8_t *data;
+      DskError *error = NULL;
+      DskDnsMessage *message;
+next_packet:
+      switch (dsk_udp_socket_receive (socket,
+                                      &addr, &port, &len, &data,
+                                      &error))
+        {
+        case DSK_IO_RESULT_SUCCESS:
+          /* verify address matches id */
+          {
+            if (len < 12)
+              {
+                dsk_warning ("DNS system: message far too short");
+                dsk_free (data);
+                goto next_packet;
+              }
+            unsigned id;
+            id = (data[0] << 8) | (data[1]);
+            if (id >= n_resolv_conf_ns)
+              {
+                dsk_warning ("DNS system: received packet with bad ID");
+                dsk_free (data);
+                goto next_packet;
+              }
+
+            /* ip-based security :/ */
+            if (!dsk_ip_addresses_equal (&addr, &resolv_conf_ns[id].address))
+              {
+                dsk_warning ("DNS system: packet source address incorrect");
+                dsk_free (data);
+                goto next_packet;
+              }
+            message = dsk_dns_message_parse (len, data, &error);
+            if (message == NULL)
+              {
+                dsk_warning ("DNS system: error parsing message: %s",
+                             error->message);
+                dsk_free (data);
+                dsk_error_unref (error);
+                error = NULL;
+                goto next_packet;
+              }
+            handle_message (message);
+            dsk_free (message);
+            dsk_free (data);
+            break;
+          }
+        case DSK_IO_RESULT_AGAIN:
+        case DSK_IO_RESULT_EOF:      /* shouldn't happen, try like AGAIN */
+          return DSK_TRUE;
+        case DSK_IO_RESULT_ERROR:
+          dsk_warning ("DNS: receiving from UDP socket: %s", error->message);
+          dsk_error_unref (error);
+          return DSK_TRUE;              /* um, could induce busy loop */
+        }
+    }
+}
 
 static dsk_boolean
 dsk_dns_try_init (DskError **error)
@@ -254,11 +441,11 @@ dsk_dns_try_init (DskError **error)
           continue;
         }
       host_entry = dsk_malloc (sizeof (DskDnsCacheEntry)
-                               + sizeof (DskIpAddress)
                                + strlen (name) + 1);
 
-      host_entry->info.addr.addresses = (DskIpAddress*)(host_entry + 1);
-      host_entry->name = (char*)(host_entry->info.addr.addresses + 1);
+      host_entry->info.addr.addresses = dsk_malloc (sizeof (DskIpAddress));
+      host_entry->info.addr.addresses[0] = addr;
+      host_entry->name = (char*)(host_entry + 1);
       host_entry->is_ipv6 = addr.type == DSK_IP_ADDRESS_IPV6;
       host_entry->expire_time = NO_EXPIRE_TIME;
       host_entry->type = DSK_DNS_CACHE_ENTRY_ADDR;
@@ -418,6 +605,10 @@ next:
       dsk_add_error_prefix (error, "initializing dns client");
       return DSK_FALSE;
     }
+  dsk_hook_trap (&dns_udp_socket->readable,
+                 handle_dns_udp_socket_readable,
+                 NULL, NULL);
+
 
   return DSK_TRUE;
 
@@ -430,10 +621,58 @@ next:
       return error_rv;                                 \
   }while(0)
 
+/* --- expunging old records --- */
+static unsigned expunge_block_count = 0;
+static dsk_boolean blocked_expunge = DSK_FALSE;
+static void
+expunge_old_cache_entries (void)
+{
+  dsk_time_t cur_time;
+  if (expunge_block_count)
+    {
+      blocked_expunge = DSK_TRUE;
+      return;
+    }
+  cur_time = dsk_get_current_time ();
+  while (expiration_tree)
+    {
+      DskDnsCacheEntry *oldest;
+      GSK_RBTREE_FIRST (GET_EXPIRATION_TREE (), oldest);
+      if (oldest->expire_time > cur_time)
+        break;
+
+      /* free oldest */
+      GSK_RBTREE_REMOVE (GET_CACHE_BY_NAME_TREE (), oldest);
+      GSK_RBTREE_REMOVE (GET_EXPIRATION_TREE (), oldest);
+      switch (oldest->type)
+        {
+        case DSK_DNS_CACHE_ENTRY_IN_PROGRESS:
+          /* IN_PROGRESS cache-entries don't expire -- they time out --
+             in the sense that expiration happens a fixed time after
+             a reponse. timing-out occurs after all the retries have failed. */
+          dsk_assert_not_reached ();
+
+        case DSK_DNS_CACHE_ENTRY_ERROR:
+          dsk_error_unref (oldest->info.error.error);
+          break;
+        case DSK_DNS_CACHE_ENTRY_NEGATIVE:
+          break;
+        case DSK_DNS_CACHE_ENTRY_CNAME:
+          dsk_free (oldest->info.cname);
+          break;
+        case DSK_DNS_CACHE_ENTRY_ADDR:
+          dsk_free (oldest->info.addr.addresses);
+          break;
+        }
+    }
+}
+
+
 /* --- low-level ---*/
-DskDnsLookupNonblockingResult
+/* TODO: what is this function for?  we expect it to handle cnames in
+   dsk_dns_lookup(), but is that appropriate? */
+DskDnsCacheEntry *
 dsk_dns_lookup_nonblocking (const char *name,
-                           DskIpAddress *out,
                            dsk_boolean    is_ipv6,
                            DskError     **error)
 {
@@ -475,24 +714,6 @@ dsk_dns_lookup_nonblocking (const char *name,
   while (n_cnames < MAX_CNAMES);
   dsk_set_error (error, "too many cnames or cname loop");
   return DSK_DNS_LOOKUP_NONBLOCKING_ERROR;
-}
-
-static void
-job_notify_waiters_and_free (DskDnsCacheEntryJob *job)
-{
-  /* notify waiters */
-  while (job->waiters)
-    {
-      Waiter *w = job->waiters;
-      job->waiters = w->next;
-
-      w->func (job->owner, w->data);
-      dsk_free (w);
-    }
-
-  /* free job */
-  dsk_free (job->message);
-  dsk_free (job);
 }
 
 static DskIOResult
@@ -665,7 +886,7 @@ begin_dns_request (DskDnsCacheEntry *entry)
   memset (&message, 0, sizeof (message));
   message.n_questions = 1;
   message.questions = &question;
-  message.id = 1;
+  message.id = dns_index;
   message.is_query = 1;
   message.recursion_desired = 1;
   message.opcode = DSK_DNS_OP_QUERY;
@@ -750,7 +971,6 @@ lookup_without_searchpath (const char       *normalized_name,
     {
       DskDnsCacheEntry *entry;
       DskDnsCacheEntry *conflict;
-      DskDnsCacheEntryJob *job;
       entry = dsk_malloc (sizeof (DskDnsCacheEntry) + strlen (normalized_name) + 1);
       entry->name = strcpy ((char*)(entry+1), normalized_name);
       entry->is_ipv6 = is_ipv6;
@@ -761,8 +981,7 @@ lookup_without_searchpath (const char       *normalized_name,
       dsk_assert (conflict == NULL);
       begin_dns_request (entry);
 
-      /* expunge old cache entries */
-      ...
+      expunge_old_cache_entries ();
     }
   if (entry->type == DSK_DNS_CACHE_ENTRY_IN_PROGRESS)
     {
@@ -774,12 +993,18 @@ lookup_without_searchpath (const char       *normalized_name,
       waiter = dsk_malloc (sizeof (Waiter));
       waiter->func = callback;
       waiter->data = callback_data;
-      waiter->next = job->waiters;
-      job->waiters = waiter;
+      waiter->next = entry->info.in_progress->waiters;
+      entry->info.in_progress->waiters = waiter;
     }
   else
     {
+      ++expunge_block_count;
       (*callback) (entry, callback_data);
+      if (--expunge_block_count == 0 && blocked_expunge)
+        {
+          blocked_expunge = DSK_FALSE;
+          expunge_old_cache_entries ();
+        }
       return;
     }
 
@@ -798,7 +1023,7 @@ dsk_dns_lookup_cache_entry (const char       *name,
   DskDnsCacheEntry *entry;
   DskDnsConfigFlags flags = config_flags;
   DskError *error = NULL;
-  char normalized_name[DSK_DNS_MAX_NAMELEN];
+  char normalized_name[DSK_DNS_MAX_NAMELEN + 1];
   const char *in = name;
   char *out = normalized_name;
   dsk_boolean last_was_dot = DSK_TRUE;          /* to inhibit initial '.'s */
@@ -830,9 +1055,10 @@ dsk_dns_lookup_cache_entry (const char       *name,
             {
               ce.name = (char*)name;
               ce.is_ipv6 = is_ipv6;
-              ce.type = DSK_DNS_CACHE_ENTRY_BAD_RESPONSE;
-              ce.info.bad_response.message = (char*)"illegal char in domain-name";
+              ce.type = DSK_DNS_CACHE_ENTRY_ERROR;
+              ce.info.error.error = dsk_error_new ("illegal char in domain-name");
               callback (&ce, callback_data);
+              dsk_error_unref (ce.info.error.error);
               return;
             }
           if (out == normalized_name + DSK_DNS_MAX_NAMELEN)
@@ -845,8 +1071,8 @@ dsk_dns_lookup_cache_entry (const char       *name,
     {
       ce.name = (char*)name;
       ce.is_ipv6 = is_ipv6;
-      ce.type = DSK_DNS_CACHE_ENTRY_BAD_RESPONSE;
-      ce.info.bad_response.message = (char*)"empty domain name cannot be looked up";
+      ce.type = DSK_DNS_CACHE_ENTRY_ERROR;
+      ce.info.error.error = dsk_error_new ("empty domain name cannot be looked up");
       callback (&ce, callback_data);
       return;
     }
@@ -857,19 +1083,19 @@ dsk_dns_lookup_cache_entry (const char       *name,
       ends_with_dot = DSK_TRUE;
     }
   /* ensure dns system is ready */
-  if (!dns_initialized && !dsk_dns_try_init (error))
+  if (!dns_initialized && !dsk_dns_try_init (&error))
     {
       ce.name = (char*) name;
       ce.is_ipv6 = is_ipv6;
       ce.expire_time = NO_EXPIRE_TIME;
-      ce.type = DSK_DNS_CACHE_ENTRY_BAD_RESPONSE;
-      ce.info.bad_response.message = error->message;
+      ce.type = DSK_DNS_CACHE_ENTRY_ERROR;
+      ce.info.error.error = error;
       callback (&ce, callback_data);
       dsk_error_unref (error);
       return;
     }
 
-  if (ends_with_dot)
+  if (ends_with_dot || n_resolv_conf_search_paths == 0)
     {
       lookup_without_searchpath (normalized_name, is_ipv6, flags, callback, callback_data);
       return;
@@ -877,6 +1103,26 @@ dsk_dns_lookup_cache_entry (const char       *name,
   else
     {
       /* iterate through searchpath, eventually trying "no search path" */
+      SearchpathStatus *status;
+      unsigned norm_len = out - normalized_name;
+
+      /* first iterate though in non-blocking fashion. */
+      for (i = 0; i <= n_resolv_conf_search_paths; i++)
+        {
+          if (i == n_resolv_conf_search_paths)
+            {
+              lookup_without_searchpath (normalized_name, is_ipv6, flags, callback, callback_data);
+              return;
+            }
+          if (norm_len + resolv_conf_search_path_lens[i] > DSK_DNS_MAX_NAMELEN)
+            continue;
+          strcpy (out, resolv_conf_search_paths[i]);
+          entry = dsk_dns_lookup_nonblocking (normalized_name,
+
+      ...
+
+
+
       ...
     }
 }
