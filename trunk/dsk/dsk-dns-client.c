@@ -669,51 +669,23 @@ expunge_old_cache_entries (void)
 
 
 /* --- low-level ---*/
-/* TODO: what is this function for?  we expect it to handle cnames in
-   dsk_dns_lookup(), but is that appropriate? */
+/* MAY or MAY NOT set error.
+   Unset if we just neeed to block; set if there was an error
+   (too many cnames is the only possible error).
+
+   name must be canonicalized. */
 DskDnsCacheEntry *
-dsk_dns_lookup_nonblocking (const char *name,
-                           dsk_boolean    is_ipv6,
-                           DskError     **error)
+dsk_dns_lookup_nonblocking_entry (const char    *name,
+                                  dsk_boolean    is_ipv6,
+                                  DskError     **error)
 {
-  unsigned n_cnames = 0;
-  MAYBE_DNS_INIT_RETURN (error, DSK_DNS_LOOKUP_NONBLOCKING_ERROR);
-  do
-    {
-      DskDnsCacheEntry ce;
-      DskDnsCacheEntry *entry;
-      ce.name = (char*) name;
-      ce.is_ipv6 = is_ipv6 ? 1 : 0;
-      GSK_RBTREE_LOOKUP (GET_CACHE_BY_NAME_TREE (), &ce, entry);
-      if (entry == NULL)
-        return DSK_DNS_LOOKUP_NONBLOCKING_MUST_BLOCK;
-      switch (entry->type)
-        {
-        case DSK_DNS_CACHE_ENTRY_IN_PROGRESS:
-          return DSK_DNS_LOOKUP_NONBLOCKING_MUST_BLOCK;
-        case DSK_DNS_CACHE_ENTRY_ERROR:
-          dsk_set_error (error, "looking up %s: %s",
-                         name,
-                         entry->info.error.error->message);
-          return DSK_DNS_LOOKUP_NONBLOCKING_ERROR;
-        case DSK_DNS_CACHE_ENTRY_NEGATIVE:
-          return DSK_DNS_LOOKUP_NONBLOCKING_NOT_FOUND;
-        case DSK_DNS_CACHE_ENTRY_CNAME:
-          name = entry->info.cname;
-          break;
-        case DSK_DNS_CACHE_ENTRY_ADDR:
-          *out = entry->info.addr.addresses[entry->info.addr.i];
-          if (++entry->info.addr.i == entry->info.addr.n)
-            entry->info.addr.i = 0;
-          return DSK_DNS_LOOKUP_NONBLOCKING_FOUND;
-        default:
-          dsk_assert_not_reached ();
-        }
-      n_cnames++;
-    }
-  while (n_cnames < MAX_CNAMES);
-  dsk_set_error (error, "too many cnames or cname loop");
-  return DSK_DNS_LOOKUP_NONBLOCKING_ERROR;
+  DskDnsCacheEntry ce;
+  DskDnsCacheEntry *entry;
+  MAYBE_DNS_INIT_RETURN (error, );
+  ce.name = (char*) name;
+  ce.is_ipv6 = is_ipv6 ? 1 : 0;
+  GSK_RBTREE_LOOKUP (GET_CACHE_BY_NAME_TREE (), &ce, entry);
+  return entry;
 }
 
 static DskIOResult
@@ -1010,6 +982,8 @@ lookup_without_searchpath (const char       *normalized_name,
 
 }
 
+static void
+handle_searchpath_entry_lookup
 
 /* NOTE: we call with 'name' taken from another cache entry when resolving cnames.
    SO this must copy the string BEFORE it ousts anything from its cache. */
@@ -1103,26 +1077,34 @@ dsk_dns_lookup_cache_entry (const char       *name,
   else
     {
       /* iterate through searchpath, eventually trying "no search path" */
-      SearchpathStatus *status;
+      SearchpathStatus *status = dsk_malloc (sizeof (SearchpathStatus));
       unsigned norm_len = out - normalized_name;
+      status->searchpath_index = 0;
+      status->name = dsk_malloc (norm_len + 1);
+      memcpy (status->name, normalized_name, norm_len);
+      status->name[norm_len] = 0;
 
-      /* first iterate though in non-blocking fashion. */
-      for (i = 0; i <= n_resolv_conf_search_paths; i++)
+
+      while (status->searchpath_index <= n_resolv_conf_search_paths)
         {
-          if (i == n_resolv_conf_search_paths)
+          unsigned j = status->searchpath_index;
+          unsigned baselen = resolv_conf_search_path_lens[j];
+          memcpy (normalized_name, resolv_conf_search_paths[j], baselen);
+          strcpy (normalized_name + baselen, status->name);
+          status->in_progress = DSK_TRUE;
+          status->not_found_while_in_progress = DSK_FALSE;
+          lookup_without_searchpath (normalized_name, is_ipv6, flags,
+                                     handle_searchpath_entry_lookup, status);
+          status->in_progress = DSK_FALSE;
+          if (status->not_found_while_in_progress)
             {
-              lookup_without_searchpath (normalized_name, is_ipv6, flags, callback, callback_data);
-              return;
+              /* next searchpath */
+              status->searchpath_index += 1;
             }
-          if (norm_len + resolv_conf_search_path_lens[i] > DSK_DNS_MAX_NAMELEN)
-            continue;
-          strcpy (out, resolv_conf_search_paths[i]);
-          entry = dsk_dns_lookup_nonblocking (normalized_name,
-
-      ...
-
-
-
-      ...
+          else
+            {
+              return;           /* wait for callback */
+            }
+        }
     }
 }
