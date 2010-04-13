@@ -983,7 +983,11 @@ lookup_without_searchpath (const char       *normalized_name,
 }
 
 static void
-handle_searchpath_entry_lookup
+handle_searchpath_entry_lookup (DskDnsCacheEntry *entry,
+                                void             *callback_data)
+{
+  ...
+}
 
 /* NOTE: we call with 'name' taken from another cache entry when resolving cnames.
    SO this must copy the string BEFORE it ousts anything from its cache. */
