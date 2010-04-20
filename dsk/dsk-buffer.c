@@ -206,7 +206,7 @@ verify_buffer (const GskBuffer *buffer)
     total += frag->buf_length;
   return total == buffer->size;
 }
-#define CHECK_INTEGRITY(buffer)	g_assert (verify_buffer (buffer))
+#define CHECK_INTEGRITY(buffer)	dsk_assert (verify_buffer (buffer))
 #else
 #define CHECK_INTEGRITY(buffer)
 #endif
@@ -389,7 +389,7 @@ gsk_buffer_read(GskBuffer    *buffer,
 	}
     }
   buffer->size -= rv;
-  g_assert (rv == orig_max_length || buffer->size == 0);
+  dsk_assert (rv == orig_max_length || buffer->size == 0);
   CHECK_INTEGRITY (buffer);
   return rv;
 }

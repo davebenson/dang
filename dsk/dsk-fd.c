@@ -1,5 +1,7 @@
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
+#include "dsk-common.h"
 #include "dsk-fd.h"
 
 static inline void
