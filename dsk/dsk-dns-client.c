@@ -691,6 +691,51 @@ dsk_dns_lookup_nonblocking_entry (const char    *name,
   GSK_RBTREE_LOOKUP (GET_CACHE_BY_NAME_TREE (), &ce, entry);
   return entry;
 }
+DskDnsLookupNonblockingResult
+dsk_dns_lookup_nonblocking (const char *name,
+                           DskIpAddress *out,
+                           dsk_boolean    is_ipv6,
+                           DskError     **error)
+{
+  unsigned n_cnames = 0;
+  MAYBE_DNS_INIT_RETURN (error, DSK_DNS_LOOKUP_NONBLOCKING_ERROR);
+  do
+    {
+      DskDnsCacheEntry ce;
+      DskDnsCacheEntry *entry;
+      ce.name = (char*) name;
+      ce.is_ipv6 = is_ipv6 ? 1 : 0;
+      GSK_RBTREE_LOOKUP (GET_CACHE_BY_NAME_TREE (), &ce, entry);
+      if (entry == NULL)
+        return DSK_DNS_LOOKUP_NONBLOCKING_MUST_BLOCK;
+      switch (entry->type)
+        {
+	case DSK_DNS_CACHE_ENTRY_IN_PROGRESS:
+          return DSK_DNS_LOOKUP_NONBLOCKING_MUST_BLOCK;
+        case DSK_DNS_CACHE_ENTRY_ERROR:
+          dsk_set_error (error, "looking up %s: %s",
+                         name,
+                         entry->info.error.error->message);
+          return DSK_DNS_LOOKUP_NONBLOCKING_ERROR;
+	case DSK_DNS_CACHE_ENTRY_NEGATIVE:
+          return DSK_DNS_LOOKUP_NONBLOCKING_NOT_FOUND;
+	case DSK_DNS_CACHE_ENTRY_CNAME:
+          name = entry->info.cname;
+	  break;
+	case DSK_DNS_CACHE_ENTRY_ADDR:
+          *out = entry->info.addr.addresses[entry->info.addr.i];
+          if (++entry->info.addr.i == entry->info.addr.n)
+            entry->info.addr.i = 0;
+          return DSK_DNS_LOOKUP_NONBLOCKING_FOUND;
+	default:
+	  dsk_assert_not_reached ();
+	}
+    }
+  while (n_cnames < MAX_CNAMES);
+  dsk_set_error (error, "looking up %s: too many cnames",
+		 name);
+  return DSK_DNS_LOOKUP_NONBLOCKING_ERROR;
+} 
 
 static DskIOResult
 job_send_message (DskDnsCacheEntryJob *job, DskError **error)

@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
@@ -58,3 +60,12 @@ dsk_fd_set_no_close_on_exec (DskFileDescriptor fd)
 {
   set_flag_generic (fd, F_GETFD, F_SETFD, DSK_FALSE, FD_CLOEXEC);
 }
+
+static void
+default_too_many_fd_handler (void)
+{
+  fprintf (stderr, "ERROR: out of file-descriptors!\n");
+  abort ();
+}
+
+void (*dsk_too_many_fds) (void) = default_too_many_fd_handler;
