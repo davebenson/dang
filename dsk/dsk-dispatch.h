@@ -48,7 +48,8 @@ DskDispatchTimer *
                                     DskDispatchTimerFunc func,
                                     void               *func_data);
 void  dsk_dispatch_adjust_timer    (DskDispatchTimer *timer,
-                                    unsigned          milliseconds);
+                                    unsigned           timeout_secs,
+                                    unsigned           timeout_usecs);
 void  dsk_dispatch_adjust_timer_millis (DskDispatchTimer *timer,
                                         unsigned          milliseconds);
 void  dsk_dispatch_remove_timer (DskDispatchTimer *);
