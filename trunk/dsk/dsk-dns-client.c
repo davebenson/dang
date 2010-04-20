@@ -166,6 +166,7 @@ static unsigned n_resolv_conf_ns = 0;
 static NameserverInfo *resolv_conf_ns = NULL;
 static unsigned n_resolv_conf_search_paths = 0;
 static char **resolv_conf_search_paths = NULL;
+static unsigned max_resolv_conf_searchpath_len = 0;
 static DskDnsCacheEntry *etc_hosts_tree = NULL;
 static DskDnsConfigFlags config_flags = DSK_DNS_CONFIG_FLAGS_DEFAULT;
 static dsk_boolean dns_initialized = DSK_FALSE;
@@ -554,8 +555,11 @@ retry:
             }
           else
             {
+              unsigned len = strlen (arg);
               resolv_conf_search_paths = dsk_realloc (resolv_conf_search_paths,
                                             (n_resolv_conf_search_paths+1) * sizeof (char *));
+              if (max_resolv_conf_searchpath_len < len)
+                max_resolv_conf_searchpath_len = len;
               resolv_conf_search_paths[n_resolv_conf_search_paths++] = dsk_strdup (arg);
             }
         }
@@ -681,7 +685,7 @@ dsk_dns_lookup_nonblocking_entry (const char    *name,
 {
   DskDnsCacheEntry ce;
   DskDnsCacheEntry *entry;
-  MAYBE_DNS_INIT_RETURN (error, );
+  MAYBE_DNS_INIT_RETURN (error, NULL);
   ce.name = (char*) name;
   ce.is_ipv6 = is_ipv6 ? 1 : 0;
   GSK_RBTREE_LOOKUP (GET_CACHE_BY_NAME_TREE (), &ce, entry);
@@ -982,11 +986,114 @@ lookup_without_searchpath (const char       *normalized_name,
 
 }
 
+typedef struct _SearchpathStatus SearchpathStatus;
+struct _SearchpathStatus
+{
+  unsigned searchpath_index;
+  unsigned n_cnames;
+  char *name;
+  char *end_of_name;
+  unsigned expire_time;
+  unsigned in_progress : 1;
+  unsigned not_found_while_in_progress : 1;
+  unsigned found_while_in_progress : 1;
+  unsigned is_ipv6 : 1;
+  DskDnsCacheEntryFunc callback;
+  void *callback_data;
+};
 static void
 handle_searchpath_entry_lookup (DskDnsCacheEntry *entry,
                                 void             *callback_data)
 {
-  ...
+  SearchpathStatus *status = callback_data;
+  switch (entry->type)
+    {
+    case DSK_DNS_CACHE_ENTRY_IN_PROGRESS:
+      dsk_assert_not_reached ();
+    case DSK_DNS_CACHE_ENTRY_ERROR:
+      status->callback (entry, status->callback_data);
+      if (status->in_progress)
+        status->found_while_in_progress = DSK_TRUE;
+      else
+        {
+          dsk_free (status->name);
+          dsk_free (status);
+          return;
+        }
+      break;
+    case DSK_DNS_CACHE_ENTRY_NEGATIVE:
+      if (status->expire_time > entry->expire_time)
+        status->expire_time = entry->expire_time;
+      if (status->in_progress)
+        status->not_found_while_in_progress = DSK_TRUE;
+      else
+        {
+next_search_path:
+          /* go to next searchpath, or not found */
+          ++(status->searchpath_index);
+          if (status->searchpath_index <= n_resolv_conf_search_paths)
+            {
+              /* lookup with the given searchpath */
+              status->in_progress = DSK_TRUE;
+              status->found_while_in_progress = DSK_FALSE;
+              status->not_found_while_in_progress = DSK_FALSE;
+              if (status->searchpath_index == n_resolv_conf_search_paths)
+                /* no searchpath */
+                *(status->end_of_name) = 0;
+              else
+                /* searchpath */
+                strcpy (status->end_of_name,
+                        resolv_conf_search_paths[status->searchpath_index]);
+              lookup_without_searchpath (status->name, status->is_ipv6,
+                                         config_flags,
+                                         handle_searchpath_entry_lookup,
+                                         status);
+              status->in_progress = DSK_FALSE;
+              if (status->found_while_in_progress)
+                {
+                  dsk_free (status->name);
+                  dsk_free (status);
+                  return;
+                }
+              else if (status->not_found_while_in_progress)
+                {
+                  goto next_search_path;
+                }
+              else
+                {
+                  /* we must block, waiting for the query to return; the
+                     work will resume at that point. */
+                }
+            }
+          else
+            {
+              /* not found */
+              DskDnsCacheEntry fake;
+              fake.expire_time = status->expire_time;
+              fake.name = status->name;
+              fake.type = DSK_DNS_CACHE_ENTRY_NEGATIVE;
+              fake.is_ipv6 = status->is_ipv6;
+              status->callback (&fake, status->callback_data);
+              dsk_free (status->name);
+              dsk_free (status);
+            }
+          return;
+        }
+      break;
+    case DSK_DNS_CACHE_ENTRY_CNAME:
+      /* CNAMEs are resolved by 'lookup_without_searchpath()' */
+      dsk_assert_not_reached ();
+    case DSK_DNS_CACHE_ENTRY_ADDR:
+      status->callback (entry, status->callback_data);
+      if (status->in_progress)
+        status->found_while_in_progress = 1;
+      else
+        {
+          dsk_free (status->name);
+          dsk_free (status);
+        }
+      return;
+    }
 }
 
 /* NOTE: we call with 'name' taken from another cache entry when resolving cnames.
@@ -998,7 +1105,6 @@ dsk_dns_lookup_cache_entry (const char       *name,
                             void             *callback_data)
 {
   DskDnsCacheEntry ce;
-  DskDnsCacheEntry *entry;
   DskDnsConfigFlags flags = config_flags;
   DskError *error = NULL;
   char normalized_name[DSK_DNS_MAX_NAMELEN + 1];
@@ -1006,6 +1112,10 @@ dsk_dns_lookup_cache_entry (const char       *name,
   char *out = normalized_name;
   dsk_boolean last_was_dot = DSK_TRUE;          /* to inhibit initial '.'s */
   dsk_boolean ends_with_dot = DSK_FALSE;
+
+  /* ensure is_ipv6 is 0 or 1 */
+  if (is_ipv6)
+    is_ipv6 = DSK_TRUE;
 
   /* normalize name */
   while (*in)
@@ -1082,21 +1192,24 @@ dsk_dns_lookup_cache_entry (const char       *name,
     {
       /* iterate through searchpath, eventually trying "no search path" */
       SearchpathStatus *status = dsk_malloc (sizeof (SearchpathStatus));
-      unsigned norm_len = out - normalized_name;
       status->searchpath_index = 0;
-      status->name = dsk_malloc (norm_len + 1);
-      memcpy (status->name, normalized_name, norm_len);
-      status->name[norm_len] = 0;
-
+      status->name = normalized_name;
+      status->expire_time = 0xffffffff;
+      status->callback = callback;
+      status->callback_data = callback_data;
+      status->is_ipv6 = is_ipv6;
 
       while (status->searchpath_index <= n_resolv_conf_search_paths)
         {
           unsigned j = status->searchpath_index;
-          unsigned baselen = resolv_conf_search_path_lens[j];
-          memcpy (normalized_name, resolv_conf_search_paths[j], baselen);
-          strcpy (normalized_name + baselen, status->name);
+          /* construct full name */
+          *out = '.';
+          strcpy (out + 1, resolv_conf_search_paths[j]);
+
+          /* make request without searchpath */
           status->in_progress = DSK_TRUE;
           status->not_found_while_in_progress = DSK_FALSE;
+          status->found_while_in_progress = DSK_FALSE;
           lookup_without_searchpath (normalized_name, is_ipv6, flags,
                                      handle_searchpath_entry_lookup, status);
           status->in_progress = DSK_FALSE;
@@ -1105,10 +1218,46 @@ dsk_dns_lookup_cache_entry (const char       *name,
               /* next searchpath */
               status->searchpath_index += 1;
             }
+          else if (status->found_while_in_progress)
+            {
+              /* free status object */
+              dsk_free (status);
+              return;
+            }
           else
             {
+              unsigned name_len = out - normalized_name;
+              status->name = dsk_malloc (name_len
+                                         + 1 + max_resolv_conf_searchpath_len
+                                         + 1);
+              strcpy (status->name, normalized_name);
+              status->end_of_name = status->name + name_len;
+
               return;           /* wait for callback */
             }
         }
+
+      /* not found */
+      {
+        ce.type = DSK_DNS_CACHE_ENTRY_NEGATIVE;
+        ce.name = normalized_name;
+        ce.is_ipv6 = is_ipv6;
+        ce.expire_time = status->expire_time;
+        callback (&ce, callback_data);
+        dsk_free (status);
+      }
     }
+  return;
+
+
+name_too_long:
+  {
+    ce.type = DSK_DNS_CACHE_ENTRY_ERROR;
+    ce.name = (char*) name;
+    ce.is_ipv6 = is_ipv6;
+    ce.expire_time = 0xffffffff;
+    ce.info.error.error = dsk_error_new ("name too long in DNS lookup");
+    callback (&ce, callback_data);
+    dsk_error_unref (ce.info.error.error);
+  }
 }

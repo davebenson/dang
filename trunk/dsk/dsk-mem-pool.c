@@ -1,4 +1,5 @@
-#include "dskmempool.h"
+#include "dsk-common.h"
+#include "dsk-mem-pool.h"
 #include <string.h>
 
 #define ALIGN(size)	        _DSK_MEM_POOL_ALIGN(size)
@@ -66,13 +67,13 @@
 
 void *
 dsk_mem_pool_must_alloc   (DskMemPool     *pool,
-			   gsize           size)
+			   size_t          size)
 {
   char *rv;
   if (size < CHUNK_SIZE)
     {
       /* Allocate a new chunk. */
-      void * carved = g_malloc (CHUNK_SIZE + sizeof (void *));
+      void * carved = dsk_malloc (CHUNK_SIZE + sizeof (void *));
       SLAB_GET_NEXT_PTR (carved) = pool->all_chunk_list;
       pool->all_chunk_list = carved;
       rv = carved;
@@ -83,7 +84,7 @@ dsk_mem_pool_must_alloc   (DskMemPool     *pool,
   else
     {
       /* Allocate a chunk of exactly the right size. */
-      void * carved = g_malloc (size + sizeof (void *));
+      void * carved = dsk_malloc (size + sizeof (void *));
       if (pool->all_chunk_list)
 	{
 	  SLAB_GET_NEXT_PTR (carved) = SLAB_GET_NEXT_PTR (pool->all_chunk_list);
@@ -112,7 +113,7 @@ dsk_mem_pool_must_alloc   (DskMemPool     *pool,
  * returns: the slab of memory allocated from the pool.
  */
 void * dsk_mem_pool_alloc0           (DskMemPool     *pool,
-                                        gsize           size)
+                                      size_t           size)
 {
   return memset (dsk_mem_pool_alloc (pool, size), 0, size);
 }
@@ -134,7 +135,7 @@ char *
 dsk_mem_pool_strdup       (DskMemPool     *pool,
 			   const char     *str)
 {
-  guint L;
+  unsigned L;
   if (str == NULL)
     return NULL;
   L = strlen (str) + 1;
@@ -155,7 +156,7 @@ dsk_mem_pool_destruct     (DskMemPool     *pool)
   while (slab)
     {
       void * new_slab = SLAB_GET_NEXT_PTR (slab);
-      g_free (slab);
+      dsk_free (slab);
       slab = new_slab;
     }
 #ifdef DSK_DEBUG
@@ -173,13 +174,16 @@ dsk_mem_pool_destruct     (DskMemPool     *pool)
  * Set up a fixed-size memory allocator for use.
  */
 void
-dsk_mem_pool_fixed_construct (DskMemPoolFixed     *pool,
-			      gsize           size)
+dsk_mem_pool_fixed_construct (DskMemPoolFixed   *pool,
+			      size_t             size)
 {
   pool->slab_list = NULL;
   pool->chunk = NULL;
   pool->pieces_left = 0;
-  pool->piece_size = MAX (ALIGN (size), sizeof (void *));
+  size = ALIGN (size);
+  if (size < sizeof (void *))
+    size = sizeof (void *);
+  pool->piece_size = size;
   pool->free_list = NULL;
 }
 
@@ -202,7 +206,7 @@ dsk_mem_pool_fixed_alloc     (DskMemPoolFixed     *pool)
     }
   if (pool->pieces_left == 0)
     {
-      void * slab = g_malloc (256 * pool->piece_size + sizeof (void *));
+      void * slab = dsk_malloc (256 * pool->piece_size + sizeof (void *));
       SLAB_GET_NEXT_PTR (slab) = pool->slab_list;
       pool->slab_list = slab;
       pool->chunk = slab;
@@ -258,6 +262,6 @@ void     dsk_mem_pool_fixed_destruct  (DskMemPoolFixed     *pool)
     {
       void * kill = pool->slab_list;
       pool->slab_list = SLAB_GET_NEXT_PTR (kill);
-      g_free (kill);
+      dsk_free (kill);
     }
 }

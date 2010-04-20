@@ -1,6 +1,8 @@
-#include "dsk-hook.h"
+#include "dsk.h"
 
 static DskDispatchIdle *idle_handler = NULL;
+static DskHook *dsk_hook_idle_first = NULL;
+static DskHook *dsk_hook_idle_last = NULL;
 
 DskHookFuncs dsk_hook_funcs_default =
 {
@@ -27,11 +29,12 @@ dsk_hook_notify (DskHook *hook)
       if (!hook->trap.callback (hook->object, data) || hook->trap.destroy_in_notify)
         {
           DskHookDestroy destroy = hook->trap.callback_data_destroy;
+          void *destroy_data = hook->trap.callback_data;
           hook->trap.callback = NULL;
           hook->trap.callback_data = NULL;
           hook->trap.callback_data_destroy = NULL;
           if (destroy)
-            destroy (data);
+            destroy (destroy_data);
           hook->trap.destroy_in_notify = 0;
         }
       hook->trap.is_notifying = 0;
@@ -41,13 +44,14 @@ dsk_hook_notify (DskHook *hook)
       DskHookTrap *trap;
       dsk_boolean must_prune = DSK_FALSE;
       for (trap = hook->trap.next;
-           trap != NULL && !hook->destroy_in_notify;
+           trap != NULL;
            trap = trap->next)
         {
           trap->is_notifying = 1;
-          if (!trap->callback (hook->object, data) || trap->destroy_in_notify)
+          if (!trap->callback (hook->object, trap->callback_data) || trap->destroy_in_notify)
             {
               DskHookDestroy destroy = trap->callback_data_destroy;
+              void *destroy_data = hook->trap.callback_data;
               if (trap->block_count == 0 && trap->callback != NULL)
                 {
                   if (--(hook->trap_count) == 0)
@@ -57,8 +61,8 @@ dsk_hook_notify (DskHook *hook)
               trap->callback_data = NULL;
               trap->callback_data_destroy = NULL;
               if (destroy)
-                destroy (data);
-              must_prune = TRUE;
+                destroy (destroy_data);
+              must_prune = DSK_TRUE;
             }
           trap->is_notifying = 0;
         }
@@ -116,17 +120,23 @@ dsk_hook_trap_destroy (DskHookTrap   *trap)
       *pt = trap->next;
       dsk_mem_pool_fixed_free (&dsk_hook_trap_pool, trap);
     }
+}
 
 
-static dsk_boolean
-run_idle_notifications (void *data)
+static void
+run_idle_notifications (DskDispatch *dispatch, void *data)
 {
   DskHook idle_notify_guard;
+  DSK_UNUSED (dispatch);
   DSK_UNUSED (data);
   if (dsk_hook_idle_first == NULL)
     {
-      idle_handler = NULL;
-      return FALSE;
+      if (idle_handler)
+        {
+          dsk_dispatch_remove_idle (idle_handler);
+          idle_handler = NULL;
+        }
+      return;
     }
   idle_notify_guard.idle_prev = dsk_hook_idle_last;
   idle_notify_guard.idle_next = NULL;
@@ -172,8 +182,8 @@ void _dsk_hook_trap_count_nonzero (DskHook *hook)
                                               run_idle_notifications,
                                               NULL);
     }
-  if (hook->set_poll_func != NULL)
-    hook->set_poll_func (hook->object, DSK_TRUE);
+  if (hook->funcs->set_poll != NULL)
+    hook->funcs->set_poll (hook->object, DSK_TRUE);
 }
 void _dsk_hook_trap_count_zero (DskHook *hook)
 {
@@ -189,8 +199,8 @@ void _dsk_hook_trap_count_zero (DskHook *hook)
       else
         hook->idle_next->idle_prev = hook->idle_prev;
     }
-  if (hook->set_poll_func != NULL)
-    hook->set_poll_func (hook->object, DSK_FALSE);
+  if (hook->funcs->set_poll != NULL)
+    hook->funcs->set_poll (hook->object, DSK_FALSE);
 }
 
 void
@@ -206,14 +216,14 @@ dsk_hook_clear      (DskHook       *hook)
     }
   hook->is_cleared = 1;
   hook->magic = 1;
-  if (hook->trap.destroy)
-    hook->trap.destroy (hook->trap.data);
-  trap = hook->trap.next
+  if (hook->trap.callback_data_destroy)
+    hook->trap.callback_data_destroy (hook->trap.callback_data);
+  trap = hook->trap.next;
   while (trap != NULL)
     {
       DskHookTrap *next = trap->next;
-      if (trap->destroy != NULL)
-        trap->destroy (trap->data);
+      if (trap->callback_data_destroy != NULL)
+        trap->callback_data_destroy (trap->callback_data);
       dsk_mem_pool_fixed_free (&dsk_hook_trap_pool, trap);
       trap = next;
     }

@@ -1,0 +1,3 @@
+- move DskDispatch parameters to the end of callback functions
+  since most code doesn't need the dispatch object (assuming
+  we add a dsk_main_* pile of API)
