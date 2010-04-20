@@ -749,6 +749,33 @@ dsk_dispatch_add_timer_millis (DskDispatch         *dispatch,
     }
   return dsk_dispatch_add_timer (dispatch, tsec, tusec, func, func_data);
 }
+void  dsk_dispatch_adjust_timer    (DskDispatchTimer *timer,
+                                    unsigned           timeout_secs,
+                                    unsigned           timeout_usecs)
+{
+  DskDispatchTimer *conflict;
+  RealDispatch *d = timer->dispatch;
+  GSK_RBTREE_REMOVE (GET_TIMER_TREE (d), timer);
+  timer->timeout_secs = timeout_secs;
+  timer->timeout_usecs = timeout_usecs;
+  GSK_RBTREE_INSERT (GET_TIMER_TREE (d), timer, conflict);
+  dsk_assert (conflict == NULL);
+}
+
+void  dsk_dispatch_adjust_timer_millis (DskDispatchTimer *timer,
+                                        unsigned          milliseconds)
+{
+  unsigned tsec = timer->dispatch->base.last_dispatch_secs;
+  unsigned tusec = timer->dispatch->base.last_dispatch_usecs;
+  tusec += milliseconds % 1000 * 1000;
+  tsec += milliseconds / 1000;
+  if (tusec >= 1000*1000)
+    {
+      tusec -= 1000*1000;
+      tsec += 1;
+    }
+  dsk_dispatch_adjust_timer (timer, tsec, tusec);
+}
 
 void  dsk_dispatch_remove_timer (DskDispatchTimer *timer)
 {

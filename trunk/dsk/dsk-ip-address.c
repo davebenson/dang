@@ -132,3 +132,12 @@ dsk_ip_address_to_string (const DskIpAddress *addr)
     }
   return dsk_strdup (buf);
 }
+dsk_boolean dsk_ip_addresses_equal (const DskIpAddress *a,
+                                    const DskIpAddress *b)
+{
+  unsigned size;
+  if (a->type != b->type)
+    return DSK_FALSE;
+  size = a->type == DSK_IP_ADDRESS_IPV4 ? 4 : 16;
+  return memcmp (a->address, b->address, size) == 0;
+}

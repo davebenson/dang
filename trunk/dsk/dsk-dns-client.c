@@ -849,8 +849,8 @@ handle_timer_expired (DskDispatch *dispatch,
 
   /* adjust timer */
   job->attempt += 1;
-  dsk_dispatch_adjust_timer (job->timer,
-                             retry_schedule[job->attempt]);
+  dsk_dispatch_adjust_timer_millis (job->timer,
+                                    retry_schedule[job->attempt]);
 
   /* try a different nameserver */
   job->ns_index += 1;
