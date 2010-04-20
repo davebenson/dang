@@ -97,6 +97,13 @@ dsk_strdup (const char *str)
       return rv;
     }
 }
+void *
+dsk_memdup (size_t size, const void *ptr)
+{
+  void *rv = dsk_malloc (size);
+  memcpy (rv, ptr, size);
+  return rv;
+}
 void
 dsk_bzero_pointers (void *ptrs,
                     unsigned n_ptrs)
