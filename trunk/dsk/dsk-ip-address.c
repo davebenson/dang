@@ -142,10 +142,11 @@ dsk_boolean dsk_ip_addresses_equal (const DskIpAddress *a,
   size = a->type == DSK_IP_ADDRESS_IPV4 ? 4 : 16;
   return memcmp (a->address, b->address, size) == 0;
 }
-void dsk_ip_address_to_sockaddr (DskIpAddress *address,
-                                  unsigned       port,
-                                  void          *out,
-                                  unsigned      *out_len)
+
+void dsk_ip_address_to_sockaddr (const DskIpAddress *address,
+                                 unsigned            port,
+                                 void               *out,
+                                 unsigned           *out_len)
 {
   switch (address->type)
     {

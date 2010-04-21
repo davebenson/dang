@@ -99,5 +99,6 @@ int main(int argc, char **argv)
       while (n_running >= max_concurrent)
         dsk_main_run_once ();
     }
+  dsk_dispatch_destroy_default ();
   return exit_status;
 }

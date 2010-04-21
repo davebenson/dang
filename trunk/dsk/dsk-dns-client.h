@@ -77,10 +77,18 @@ struct _DskDnsCacheEntry
   DskDnsCacheEntry *name_type_left, *name_type_right, *name_type_parent;
   dsk_boolean name_type_is_red;
 };
+
+typedef enum
+{
+  DSK_DNS_LOOKUP_USE_SEARCHPATH = (1<<0),
+  DSK_DNS_LOOKUP_FOLLOW_CNAMES = (1<<1)
+} DskDnsLookupFlags;
+
 typedef void (*DskDnsCacheEntryFunc) (DskDnsCacheEntry *entry,
                                       void             *callback_data);
 void              dsk_dns_lookup_cache_entry (const char       *name,
                                               dsk_boolean       is_ipv6,
+                                              DskDnsLookupFlags flags,
                                               DskDnsCacheEntryFunc callback,
                                               void             *callback_data);
 

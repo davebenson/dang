@@ -1083,7 +1083,7 @@ dsk_dns_message_serialize (DskDnsMessage *message,
   max_str_nodes = get_max_str_nodes (message);
 
   /* scan through figuring out how long the packed data will be. */
-  nodes = dsk_malloc (sizeof (StrTreeNode) * max_str_nodes);        /* HACK */
+  nodes = alloca (sizeof (StrTreeNode) * max_str_nodes);
   nodes_at = nodes;
   size = 12;
   for (i = 0; i < message->n_questions; i++)
