@@ -10,6 +10,7 @@ DskHookFuncs dsk_hook_funcs_default =
   (DskHookObjectFunc) dsk_object_unref_f,
   NULL
 };
+DskMemPoolFixed dsk_hook_trap_pool = DSK_MEM_POOL_FIXED_STATIC_INIT (sizeof (DskHookTrap));
 
 void
 dsk_hook_notify (DskHook *hook)

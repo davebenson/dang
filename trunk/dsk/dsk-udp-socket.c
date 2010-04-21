@@ -273,9 +273,9 @@ dsk_udp_socket_receive (DskUdpSocket  *socket,
 
   if (addr_out != NULL || port_out != NULL)
     {
-      if (!dsk_sockaddr_to_dns_address (msg.msg_namelen, msg.msg_name,
+      if (!dsk_sockaddr_to_ip_address (msg.msg_namelen, msg.msg_name,
                                         addr_out, port_out))
-        dsk_error ("dsk_sockaddr_to_dns_address failed in udp code");
+        dsk_error ("dsk_sockaddr_to_ip_address failed in udp code");
     }
   *len_out = rv;
   if (socket->recv_slab == NULL)

@@ -205,6 +205,32 @@ static dsk_boolean dns_initialized = DSK_FALSE;
   name_type_parent, name_type_left, name_type_right, \
   COMPARE_DNS_CACHE_ENTRY_BY_EXPIRE
   
+/* --- configuration functions --- */
+void dsk_dns_client_config (DskDnsConfigFlags flags)
+{
+  config_flags = flags;
+}
+void dsk_dns_client_add_nameserver (DskIpAddress *addr)
+{
+  unsigned N = n_resolv_conf_ns;
+  resolv_conf_ns = dsk_realloc (resolv_conf_ns, sizeof (NameserverInfo) * N);
+  n_resolv_conf_ns = N + 1;
+  resolv_conf_ns[N].address = *addr;
+  resolv_conf_ns[N].n_requests = 0;
+  resolv_conf_ns[N].n_responses = 0;
+}
+void dsk_dns_config_dump (void)
+{
+  unsigned i;
+  for (i = 0; i < n_resolv_conf_ns; i++)
+    {
+      char *str = dsk_ip_address_to_string (&resolv_conf_ns[i].address);
+      printf ("nameserver %u: %s\n", i, str);
+      dsk_free (str);
+    }
+  for (i = 0; i < n_resolv_conf_search_paths; i++)
+    printf ("searchpath %u: %s\n", i, resolv_conf_search_paths[i]);
+}
 
 /* --- handling system files (resolv.conf and hosts) --- */
 static void
