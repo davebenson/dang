@@ -635,7 +635,6 @@ static unsigned get_name_n_components (const char *str)
         }
       str++;
     }
-  fprintf(stderr, "get_name_n_components(%s) = %u\n", str, rv);
   return rv;
 }
 static unsigned
@@ -673,16 +672,12 @@ get_max_str_nodes (DskDnsMessage *message)
   unsigned i;
   for (i = 0; i < message->n_questions; i++)
     max_str_nodes += get_question_n_components (message->questions + i);
-  fprintf(stderr, "after questions: get_max_str_nodes: %u\n", max_str_nodes);
   for (i = 0; i < message->n_answer_rr; i++)
     max_str_nodes += get_rr_n_components (message->answer_rr + i);
-  fprintf(stderr, "after answers: get_max_str_nodes: %u\n", max_str_nodes);
   for (i = 0; i < message->n_authority_rr; i++)
     max_str_nodes += get_rr_n_components (message->authority_rr + i);
-  fprintf(stderr, "after authority: get_max_str_nodes: %u\n", max_str_nodes);
   for (i = 0; i < message->n_additional_rr; i++)
     max_str_nodes += get_rr_n_components (message->additional_rr + i);
-  fprintf(stderr, "after additional: get_max_str_nodes: %u\n", max_str_nodes);
   return max_str_nodes;
 }
 
@@ -758,7 +753,6 @@ get_name_size (const char     *name,
           *p_heap += 1;
           memset (child, 0, sizeof (StrTreeNode));
           child->str = cstart;
-          fprintf(stderr, "no child '%s' found\n", cstart);
 
           /* insert node */
           GSK_RBTREE_INSERT (STR_NODE_GET_TREE (*p_at), 
@@ -768,8 +762,6 @@ get_name_size (const char     *name,
           /* increase size */
           str_size += (end - cstart) + 1;
         }
-      else
-          fprintf(stderr, "child '%s' found\n", cstart);
       p_at = &child->subtree;
 
       if (cstart == name)
@@ -785,7 +777,6 @@ get_question_size (DskDnsQuestion *question,
                    StrTreeNode   **p_heap)
 {
   unsigned rv = get_name_size (question->name, p_top, p_heap) + 4;
-  fprintf(stderr, "get_question_size(%s): %u\n", question->name, rv);
   return rv;
 }
 static unsigned
@@ -825,7 +816,6 @@ get_rr_size (DskDnsResourceRecord *rr,
     default:
       dsk_assert_not_reached ();
     }
-  fprintf(stderr, "get_rr_size(%s): %u\n", rr->owner, rv);
   return rv;
 }
 
@@ -892,7 +882,6 @@ pack_domain_name  (const char     *name,
       beg = end;
       while (beg > name && beg[-1] != '.')
         beg--;
-      fprintf(stderr, "pack_domain_name: looking up %s\n", beg);
       GSK_RBTREE_LOOKUP_COMPARATOR (STR_NODE_GET_TREE (top),
                                     beg, COMPARE_STR_TO_TREE_NODE,
                                     cur);
@@ -918,7 +907,6 @@ pack_domain_name  (const char     *name,
           memcpy (at, beg, end - beg);
           at--;
           *at = (end-beg);
-          fprintf(stderr, "packing %.*s at offset %u\n",end-beg,beg,at-data_start);
 
           cur->offset = (at - data_start);
           top = cur->subtree;
@@ -930,7 +918,6 @@ pack_domain_name  (const char     *name,
               beg = end;
               while (beg > name && beg[-1] != '.')
                 beg--;
-              fprintf(stderr, "looking up %s\n", beg);
               GSK_RBTREE_LOOKUP_COMPARATOR (STR_NODE_GET_TREE (top),
                                     beg, COMPARE_STR_TO_TREE_NODE,
                                     cur);
@@ -1096,11 +1083,9 @@ dsk_dns_message_serialize (DskDnsMessage *message,
   max_str_nodes = get_max_str_nodes (message);
 
   /* scan through figuring out how long the packed data will be. */
-  fprintf(stderr,"get_max_str_nodes: %u\n",max_str_nodes);
   nodes = dsk_malloc (sizeof (StrTreeNode) * max_str_nodes);        /* HACK */
   nodes_at = nodes;
   size = 12;
-  fprintf(stderr, "nodes[0]=%p\n", nodes);
   for (i = 0; i < message->n_questions; i++)
     size += get_question_size (message->questions + i, &top, &nodes_at);
   for (i = 0; i < message->n_answer_rr; i++)
@@ -1109,7 +1094,6 @@ dsk_dns_message_serialize (DskDnsMessage *message,
     size += get_rr_size (message->authority_rr + i, &top, &nodes_at);
   for (i = 0; i < message->n_additional_rr; i++)
     size += get_rr_size (message->additional_rr + i, &top, &nodes_at);
-  fprintf(stderr, "total size=%u\n", size);
   dsk_assert ((unsigned)(nodes_at - nodes) <= max_str_nodes);
 
   /* pack the message */
@@ -1118,17 +1102,13 @@ dsk_dns_message_serialize (DskDnsMessage *message,
   pack_message_header (message, at);
   at += sizeof (DskDnsHeader);
   for (i = 0; i < message->n_questions; i++)
-    {
-      fprintf(stderr, "packing question %s pre-size=%u\n", message->questions[i].name, (unsigned)(at-rv));
-      pack_question (message->questions + i, rv, &at, top);
-    }
+    pack_question (message->questions + i, rv, &at, top);
   for (i = 0; i < message->n_answer_rr; i++)
     pack_resource_record (message->answer_rr + i, rv, &at, top);
   for (i = 0; i < message->n_authority_rr; i++)
     pack_resource_record (message->authority_rr + i, rv, &at, top);
   for (i = 0; i < message->n_additional_rr; i++)
     pack_resource_record (message->additional_rr + i, rv, &at, top);
-  fprintf(stderr, "final size=%u\n", ((unsigned)(at-rv)));
   dsk_assert ((unsigned)(at - rv) == size);
   *length_out = size;
 

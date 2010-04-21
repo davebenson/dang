@@ -552,12 +552,18 @@ retry:
                     }
                 }
               else if ('A' <= *in && *in <= 'Z')
-                *out++ = *in + ('a' - 'A');
+                {
+                  dot_allowed = DSK_TRUE;
+                  *out++ = *in + ('a' - 'A');
+                }
               else if (('0' <= *in && *in <= '9')
                     || ('a' <= *in && *in <= 'z')
                     || (*in == '-')
                     || (*in == '_'))
-                *out++ = *in;
+                {
+                  dot_allowed = DSK_TRUE;
+                  *out++ = *in;
+                }
               else
                 {
                   dsk_warning ("disallowed character '%c' in searchpath in /etc/resolv.conf line %u", *in, lineno);
@@ -580,7 +586,10 @@ retry:
           /* add if not already in set */
           for (i = 0; i < n_resolv_conf_search_paths; i++)
             if (strcmp (arg, resolv_conf_search_paths[i]) == 0)
-              break;
+              {
+                dsk_warning ("match: searchpath[%u] = %s", i, resolv_conf_search_paths[i]);
+                break;
+              }
           if (i < n_resolv_conf_search_paths)
             {
               dsk_warning ("searchpath '%s' appears twice in /etc/resolv.conf (line %u)",
@@ -647,9 +656,8 @@ next:
                  NULL, NULL);
 
 
-  return DSK_TRUE;
-
   dns_initialized = DSK_TRUE;
+  return DSK_TRUE;
 }
 
 #define MAYBE_DNS_INIT_RETURN(error, error_rv)         \
@@ -862,6 +870,7 @@ handle_timer_expired (DskDispatch *dispatch,
   (void) data;
 
   clear_waiting_to_send_flag (job);
+  job->timer = NULL;
 
   /* is this the last attempt? */
   if (job->attempt + 1 == DSK_N_ELEMENTS (retry_schedule))
@@ -882,8 +891,9 @@ handle_timer_expired (DskDispatch *dispatch,
 
   /* adjust timer */
   job->attempt += 1;
-  dsk_dispatch_adjust_timer_millis (job->timer,
-                                    retry_schedule[job->attempt]);
+  job->timer = dsk_dispatch_add_timer_millis (dispatch,
+                                    retry_schedule[job->attempt],
+                                    handle_timer_expired, job);
 
   /* try a different nameserver */
   job->ns_index += 1;
@@ -1064,7 +1074,6 @@ lookup_without_searchpath (const char       *normalized_name,
     }
 
 }
-
 typedef struct _SearchpathStatus SearchpathStatus;
 struct _SearchpathStatus
 {

@@ -12,6 +12,50 @@
 #include "dsk-dns-client.h"
 #include "dsk-fd.h"
 #include "dsk-udp-socket.h"
+#include "dsk-dispatch.h"
+
+static void
+handle_dispatch_events (DskFileDescriptor   fd,
+                        unsigned            events,
+                        void               *callback_data)
+{
+  DskUdpSocket *socket = callback_data;
+  dsk_assert (socket->fd == fd);
+  if (events & DSK_EVENT_READABLE)
+    dsk_hook_notify (&socket->readable);
+  if (events & DSK_EVENT_WRITABLE)
+    dsk_hook_notify (&socket->writable);
+}
+
+static void handle_set_poll (DskUdpSocket *socket)
+{
+  unsigned events = 0;
+  if (socket->fd == -1)
+    return;
+  if (dsk_hook_is_trapped (&socket->readable))
+    events |= DSK_EVENT_READABLE;
+  if (dsk_hook_is_trapped (&socket->writable))
+    events |= DSK_EVENT_WRITABLE;
+  dsk_dispatch_watch_fd (dsk_dispatch_default (),
+                         socket->fd,
+                         events,
+                         handle_dispatch_events,
+                         socket);
+}
+
+static DskHookFuncs udp_socket_read_hook_funcs =
+{
+  (DskHookObjectFunc) dsk_object_ref,
+  (DskHookObjectFunc) dsk_object_unref,
+  (DskHookSetPoll) handle_set_poll
+};
+
+static DskHookFuncs udp_socket_write_hook_funcs =
+{
+  (DskHookObjectFunc) dsk_object_ref,
+  (DskHookObjectFunc) dsk_object_unref,
+  (DskHookSetPoll) handle_set_poll
+};
 
 static void
 dsk_udp_socket_init (DskUdpSocket *socket)
@@ -19,6 +63,8 @@ dsk_udp_socket_init (DskUdpSocket *socket)
   socket->fd = -1;
   dsk_hook_init (&socket->readable, socket);
   dsk_hook_init (&socket->writable, socket);
+  dsk_hook_set_funcs (&socket->readable, &udp_socket_read_hook_funcs);
+  dsk_hook_set_funcs (&socket->writable, &udp_socket_write_hook_funcs);
 }
 
 static void
