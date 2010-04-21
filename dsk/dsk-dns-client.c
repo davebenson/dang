@@ -1326,6 +1326,7 @@ dsk_dns_lookup_cache_entry (const char       *name,
     }
 
   if (ends_with_dot || n_resolv_conf_search_paths == 0
+      || (config_flags & DSK_DNS_CONFIG_USE_RESOLV_CONF_SEARCHPATH) == 0
       || (flags & DSK_DNS_LOOKUP_USE_SEARCHPATH) == 0)
     {
       lookup_without_searchpath (normalized_name, is_ipv6, flags, callback, callback_data);
