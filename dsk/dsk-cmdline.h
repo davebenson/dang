@@ -18,6 +18,7 @@ typedef enum
 
 void dsk_cmdline_init        (const char     *static_short_desc,
                               const char     *long_desc,
+                              const char     *non_option_arg_desc,
                               DskCmdlineInitFlags flags);
 
 void dsk_cmdline_add_int     (const char     *static_option_name,

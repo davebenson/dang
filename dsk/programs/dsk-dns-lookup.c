@@ -55,6 +55,7 @@ int main(int argc, char **argv)
   int i;
   dsk_cmdline_init ("perform DNS lookups",
                     "Perform DNS lookups with Dsk DNS client.\n",
+                    "HOSTNAMES...",
                     0);
   dsk_cmdline_permit_extra_arguments (DSK_TRUE);
   dsk_cmdline_add_boolean ("ipv6", "Lookup names in the IPv6 namespace", NULL, 0, &use_ipv6);
