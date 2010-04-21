@@ -3,10 +3,15 @@ extern unsigned char dsk_ascii_chartable[256];
 
 /* NOTE: NUL is NOT a space */
 #define dsk_ascii_isspace(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 1)
-#define dsk_ascii_isalpha(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 2)
-#define dsk_ascii_isdigit(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 4)
-#define dsk_ascii_isxdigit(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 8)
+#define dsk_ascii_isupper(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 2)
+#define dsk_ascii_islower(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 4)
+#define dsk_ascii_isdigit(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 8)
+#define dsk_ascii_isxdigit(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 16)
 
+/* isalpha = isupper || is_lower */
+#define dsk_ascii_isalpha(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 6)
+/* isalpha = isupper || is_lower || is_digit */
+#define dsk_ascii_isalnum(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 14)
 
 
 #define DSK_ASCII_SKIP_SPACE(ptr) \

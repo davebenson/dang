@@ -25,6 +25,7 @@ typedef int dsk_boolean;
    it is always 64-bit in dsk. */
 typedef int64_t dsk_time_t;
 dsk_time_t dsk_get_current_time ();
+#define dsk_get_current_time() ((dsk_time_t) (dsk_dispatch_default ()->last_dispatch_secs))
 
 typedef void (*DskDestroyNotify) (void *data);
 

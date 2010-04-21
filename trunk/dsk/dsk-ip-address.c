@@ -1,3 +1,4 @@
+#include <netinet/in.h>         /* for sockaddr_in etc */
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>              /* for snprintf() */
@@ -141,3 +142,76 @@ dsk_boolean dsk_ip_addresses_equal (const DskIpAddress *a,
   size = a->type == DSK_IP_ADDRESS_IPV4 ? 4 : 16;
   return memcmp (a->address, b->address, size) == 0;
 }
+void dsk_ip_address_to_sockaddr (DskIpAddress *address,
+                                  unsigned       port,
+                                  void          *out,
+                                  unsigned      *out_len)
+{
+  switch (address->type)
+    {
+    case DSK_IP_ADDRESS_IPV4:
+      *out_len = sizeof (struct sockaddr_in);
+      break;
+    case DSK_IP_ADDRESS_IPV6:
+      *out_len = sizeof (struct sockaddr_in6);
+      break;
+    default:
+      dsk_assert_not_reached ();
+    }
+  memset (out, 0, *out_len);
+  switch (address->type)
+    {
+    case DSK_IP_ADDRESS_IPV4:
+      {
+        struct sockaddr_in *s = out;
+        s->sin_family = PF_INET;
+        s->sin_port = htons (port);
+        memcpy (&s->sin_addr, address->address, 4);
+        break;
+      }
+    case DSK_IP_ADDRESS_IPV6:
+      {
+        struct sockaddr_in6 *s = out;
+        s->sin6_family = PF_INET6;
+        s->sin6_port = htons (port);
+        memcpy (&s->sin6_addr, address->address, 16);
+        break;
+      }
+    }
+}
+
+dsk_boolean dsk_sockaddr_to_ip_address  (unsigned     addr_len,
+                                         const void   *addr,
+                                         DskIpAddress *out,
+                                         unsigned     *port_out)
+{
+  if (addr_len < sizeof (struct sockaddr))
+    return DSK_FALSE;           /* too short */
+  switch (((const struct sockaddr *) addr)->sa_family)
+    {
+    case PF_INET:
+      {
+        const struct sockaddr_in *s = addr;
+        if (addr_len < sizeof (*s))
+          return DSK_FALSE;
+        out->type = DSK_IP_ADDRESS_IPV4;
+        memcpy (out->address, &s->sin_addr, 4);
+        *port_out = htons (s->sin_port);
+        break;
+      }
+    case PF_INET6:
+      {
+        const struct sockaddr_in6 *s = addr;
+        if (addr_len < sizeof (*s))
+          return DSK_FALSE;
+        out->type = DSK_IP_ADDRESS_IPV6;
+        memcpy (out->address, &s->sin6_addr, 16);
+        *port_out = htons (s->sin6_port);
+        break;
+      }
+    default:
+      return DSK_FALSE;          /* unhandled protocol */
+    }
+  return DSK_TRUE;
+}
+

@@ -428,6 +428,8 @@ dsk_dns_try_init (DskError **error)
   DskDnsCacheEntry *conflict;
   unsigned lineno;
 
+  dsk_assert (!dns_initialized);
+
   /* parse /etc/hosts */
   fp = fopen ("/etc/hosts", "r");
   if (fp == NULL)
@@ -473,6 +475,11 @@ dsk_dns_try_init (DskError **error)
       host_entry->info.addr.addresses = dsk_malloc (sizeof (DskIpAddress));
       host_entry->info.addr.addresses[0] = addr;
       host_entry->name = (char*)(host_entry + 1);
+      strcpy (host_entry->name, name);
+      for (at = host_entry->name; *at; at++)
+        if (dsk_ascii_isupper (*at))
+          *at += ('a' - 'A');
+
       host_entry->is_ipv6 = addr.type == DSK_IP_ADDRESS_IPV6;
       host_entry->expire_time = NO_EXPIRE_TIME;
       host_entry->type = DSK_DNS_CACHE_ENTRY_ADDR;
@@ -609,7 +616,7 @@ retry:
           else
             {
               resolv_conf_ns = dsk_realloc (resolv_conf_ns,
-                                            (n_resolv_conf_ns+1) * sizeof (DskIpAddress));
+                                            (n_resolv_conf_ns+1) * sizeof (NameserverInfo));
               nameserver_info_init (&resolv_conf_ns[n_resolv_conf_ns++], &addr);
             }
         }
@@ -941,8 +948,10 @@ begin_dns_request (DskDnsCacheEntry *entry)
   question.query_type = entry->is_ipv6 ? DSK_DNS_RR_HOST_ADDRESS_IPV6 : DSK_DNS_RR_HOST_ADDRESS;
   question.query_class = DSK_DNS_CLASS_IN;
   DskError *error = NULL;
+  fprintf(stderr, "looking up %s", entry->name);
   job->message = dsk_dns_message_serialize (&message, &job->message_len);
-  job->timer = dsk_dispatch_add_timer_millis (NULL, retry_schedule[0],
+  job->timer = dsk_dispatch_add_timer_millis (dsk_dispatch_default (),
+                                              retry_schedule[0],
                                               handle_timer_expired,
                                               job);
   switch (job_send_message (job, &error))
@@ -1016,7 +1025,6 @@ lookup_without_searchpath (const char       *normalized_name,
   /* create new IN_PROGRESS entry */
   if (entry == NULL)
     {
-      DskDnsCacheEntry *entry;
       DskDnsCacheEntry *conflict;
       entry = dsk_malloc (sizeof (DskDnsCacheEntry) + strlen (normalized_name) + 1);
       entry->name = strcpy ((char*)(entry+1), normalized_name);
