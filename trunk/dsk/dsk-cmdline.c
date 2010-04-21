@@ -9,6 +9,7 @@
 
 static const char *cmdline_short_desc;
 static const char *cmdline_long_desc;
+static const char *cmdline_non_option_arg_desc;
 static DskCmdlineInitFlags cmdline_init_flags;
 static dsk_boolean cmdline_permit_unknown_options = DSK_FALSE;
 static dsk_boolean cmdline_permit_extra_arguments = DSK_FALSE;
@@ -71,10 +72,12 @@ compare_equal_terminated_str (const char *option,
 
 void dsk_cmdline_init        (const char     *short_desc,
                               const char     *long_desc,
+                              const char     *non_option_arg_desc,
                               DskCmdlineInitFlags flags)
 {
   cmdline_short_desc = short_desc;
   cmdline_long_desc = long_desc;
+  cmdline_non_option_arg_desc = non_option_arg_desc;
   cmdline_init_flags = flags;
 }
 
@@ -334,12 +337,11 @@ static void usage (const char *prog_name)
   else
     base_prog_name = prog_name;
   if (cmdline_short_desc)
-    fprintf (stderr, "%s - %s\n",
+    fprintf (stderr, "%s - %s\n\n",
              base_prog_name,
              cmdline_short_desc);
-  else
-    fprintf (stderr, "usage: %s\n",
-             base_prog_name);
+  fprintf (stderr, "usage: %s [OPTIONS] %s\n",
+           base_prog_name, cmdline_non_option_arg_desc ? cmdline_non_option_arg_desc : "");
   if (cmdline_long_desc)
     {
       fprintf (stderr, "\n%s\n", cmdline_long_desc);
@@ -377,6 +379,7 @@ dsk_cmdline_try_process_args (int *argc_inout,
                   if (cmdline_permit_help && strcmp (opt, "help") == 0)
                     {
                       usage (**argv_inout);
+                      exit (1);
                     }
                   dsk_set_error (error, "bad option --%s", opt);
                   return DSK_FALSE;
