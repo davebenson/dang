@@ -17,6 +17,8 @@ static void
 dsk_udp_socket_init (DskUdpSocket *socket)
 {
   socket->fd = -1;
+  dsk_hook_init (&socket->readable, socket);
+  dsk_hook_init (&socket->writable, socket);
 }
 
 static void
@@ -101,8 +103,8 @@ dsk_udp_socket_send    (DskUdpSocket  *socket,
 }
 
 DskIOResult
-dsk_udp_socket_send_to_address (DskUdpSocket  *socket,
-                                DskIpAddress *address,
+dsk_udp_socket_send_to_ip      (DskUdpSocket  *socket,
+                                const DskIpAddress  *address,
                                 unsigned       port,
                                 unsigned       len,
                                 const uint8_t *data,
@@ -143,9 +145,9 @@ handle_send_blocking_dns_data (DskDnsLookupResult *result,
   SendBlockingDnsData *sbdd = callback_data;
   if (result->type == DSK_DNS_LOOKUP_RESULT_FOUND)
     {
-      dsk_udp_socket_send_to_address (sbdd->socket, result->addr,
-                                      sbdd->port, sbdd->len, sbdd->send_data,
-                                      NULL);
+      dsk_udp_socket_send_to_ip (sbdd->socket, result->addr,
+                                 sbdd->port, sbdd->len, sbdd->send_data,
+                                 NULL);
     }
   else
     {
@@ -183,8 +185,8 @@ dsk_udp_socket_send_to (DskUdpSocket  *socket,
         return DSK_IO_RESULT_SUCCESS;
       }
     case DSK_DNS_LOOKUP_NONBLOCKING_FOUND:
-      return dsk_udp_socket_send_to_address (socket, &address, port,
-                                             len, data, error);
+      return dsk_udp_socket_send_to_ip (socket, &address, port,
+                                        len, data, error);
     case DSK_DNS_LOOKUP_NONBLOCKING_ERROR:
       return DSK_IO_RESULT_ERROR;
     }
