@@ -755,6 +755,7 @@ void  dsk_dispatch_adjust_timer    (DskDispatchTimer *timer,
 {
   DskDispatchTimer *conflict;
   RealDispatch *d = timer->dispatch;
+  dsk_assert (timer->func != NULL);
   GSK_RBTREE_REMOVE (GET_TIMER_TREE (d), timer);
   timer->timeout_secs = timeout_secs;
   timer->timeout_usecs = timeout_usecs;

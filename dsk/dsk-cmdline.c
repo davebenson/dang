@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "../gskrbtreemacros.h"
 #include "dsk-common.h"
 #include "dsk-object.h"
@@ -11,6 +12,7 @@ static const char *cmdline_long_desc;
 static DskCmdlineInitFlags cmdline_init_flags;
 static dsk_boolean cmdline_permit_unknown_options = DSK_FALSE;
 static dsk_boolean cmdline_permit_extra_arguments = DSK_FALSE;
+static dsk_boolean cmdline_permit_help = DSK_TRUE;
 static dsk_boolean swallow_arguments = DSK_TRUE;
 
 #define _DSK_CMDLINE_OPTION_USED                (1<<31)
@@ -292,6 +294,61 @@ check_mandatory_args_recursive (DskCmdlineArg *node,
       && (node->right == NULL || check_mandatory_args_recursive (node->right, error));
 }
 
+static void
+print_option (DskCmdlineArg *arg)
+{
+  fprintf (stderr, "  ");
+  if (arg->option_name)
+    {
+      if (arg->arg_description)
+        fprintf (stderr, "--%s=%s", arg->option_name, arg->arg_description);
+      else
+        fprintf (stderr, "--%s", arg->option_name);
+    }
+  if (arg->option_name && arg->c)
+    fprintf (stderr, ", ");
+  if (arg->c)
+    {
+      fprintf (stderr, "-%c", arg->c);
+      if (arg->arg_description)
+        fprintf (stderr, " %s", arg->arg_description);
+    }
+  fprintf (stderr, "\n        %s\n", arg->description);
+}
+
+static void
+print_options_recursive (DskCmdlineArg *tree)
+{
+  if (tree == NULL)
+    return;
+  print_options_recursive (tree->left);
+  print_option (tree);
+  print_options_recursive (tree->right);
+}
+
+static void usage (const char *prog_name)
+{
+  const char *base_prog_name = strrchr (prog_name, '/');
+  if (base_prog_name)
+    base_prog_name++;
+  else
+    base_prog_name = prog_name;
+  if (cmdline_short_desc)
+    fprintf (stderr, "%s - %s\n",
+             base_prog_name,
+             cmdline_short_desc);
+  else
+    fprintf (stderr, "usage: %s\n",
+             base_prog_name);
+  if (cmdline_long_desc)
+    {
+      fprintf (stderr, "\n%s\n", cmdline_long_desc);
+    }
+  fprintf (stderr, "Options:\n");
+  print_options_recursive (cmdline_arg_tree);
+}
+
+
 dsk_boolean
 dsk_cmdline_try_process_args (int *argc_inout,
                               char ***argv_inout,
@@ -317,7 +374,12 @@ dsk_cmdline_try_process_args (int *argc_inout,
                       i++;
                       continue;
                     }
+                  if (cmdline_permit_help && strcmp (opt, "help") == 0)
+                    {
+                      usage (**argv_inout);
+                    }
                   dsk_set_error (error, "bad option --%s", opt);
+                  return DSK_FALSE;
                 }
               else
                 {
