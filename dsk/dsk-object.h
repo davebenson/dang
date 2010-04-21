@@ -18,7 +18,7 @@ typedef void (*DskObjectFinalizeFunc) (DskObject *object);
 #define DSK_OBJECT_CLASS_DEFINE(name, parent_class, init_func, finalize_func) \
        { #name, (DskObjectClass *) parent_class, \
          sizeof (name ## Class), sizeof (name), \
-         (sizeof (name ## Class) - sizeof (DskObjectClass)) / sizeof(void*), \
+         (sizeof (name) - sizeof (DskObject)) / sizeof(void*), \
          DSK_OBJECT_CLASS_MAGIC, \
          (DskObjectInitFunc) init_func, (DskObjectFinalizeFunc) finalize_func }
 

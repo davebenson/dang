@@ -18,8 +18,6 @@ static unsigned retry_schedule[] = { 1000, 2000, 3000, 4000 };
 typedef struct _LookupData LookupData;
 struct _LookupData
 {
-  unsigned n_cnames;
-  char **cnames;
   DskDnsLookupFunc callback;
   void *callback_data;
 };
@@ -109,25 +107,7 @@ handle_cache_entry_lookup (DskDnsCacheEntry *entry,
       dsk_free (lookup_data);
       return;
     case DSK_DNS_CACHE_ENTRY_CNAME:
-      {
-        unsigned i;
-        /* check existing cname list for circular references */
-        for (i = 0; i < lookup_data->n_cnames; i++)
-          if (strcmp (lookup_data->cnames[i], entry->info.cname) == 0)
-            {
-              result.type = DSK_DNS_LOOKUP_RESULT_BAD_RESPONSE;
-              result.addr = NULL;
-              result.message = "circular cname loop";
-              /* CONSIDER: adding cname chain somewhere */
-              lookup_data->callback (&result, lookup_data->callback_data);
-              dsk_free (lookup_data);
-              return;
-            }
-      
-        /* add to cname list */
-        dsk_dns_lookup_cache_entry (entry->info.cname, entry->is_ipv6, handle_cache_entry_lookup, data);
-        return;
-      }
+      dsk_assert_not_reached ();
     case DSK_DNS_CACHE_ENTRY_ADDR:
       result.type = DSK_DNS_LOOKUP_RESULT_FOUND;
       result.addr = entry->info.addr.addresses
@@ -145,11 +125,12 @@ void    dsk_dns_lookup (const char       *name,
                         void             *callback_data)
 {
   LookupData *lookup_data = dsk_malloc (sizeof (LookupData));
-  lookup_data->n_cnames = 0;
-  lookup_data->cnames = NULL;
   lookup_data->callback = callback;
   lookup_data->callback_data = callback_data;
-  dsk_dns_lookup_cache_entry (name, is_ipv6, handle_cache_entry_lookup, lookup_data);
+  dsk_dns_lookup_cache_entry (name, is_ipv6,
+                              DSK_DNS_LOOKUP_USE_SEARCHPATH |
+                              DSK_DNS_LOOKUP_FOLLOW_CNAMES,
+                              handle_cache_entry_lookup, lookup_data);
 } 
 
 /* --- globals --- */
@@ -333,7 +314,7 @@ handle_message (DskDnsMessage *message)
           for (j = 0; j < n_answer; j++)
             if (answers_that_match[j])
               {
-                addrs[ai].type = DSK_IP_ADDRESS_IPV6;
+                addrs[ai].type = is_ipv6 ? DSK_IP_ADDRESS_IPV6 : DSK_IP_ADDRESS_IPV4;
 
                 /* NOTE: we assume aaaa.address and a.ip_address
                    alias!  This is fine though- we comment appropriately in
@@ -958,7 +939,6 @@ begin_dns_request (DskDnsCacheEntry *entry)
   question.query_type = entry->is_ipv6 ? DSK_DNS_RR_HOST_ADDRESS_IPV6 : DSK_DNS_RR_HOST_ADDRESS;
   question.query_class = DSK_DNS_CLASS_IN;
   DskError *error = NULL;
-  fprintf(stderr, "looking up %s", entry->name);
   job->message = dsk_dns_message_serialize (&message, &job->message_len);
   job->timer = dsk_dispatch_add_timer_millis (dsk_dispatch_default (),
                                               retry_schedule[0],
@@ -989,35 +969,19 @@ begin_dns_request (DskDnsCacheEntry *entry)
 
 
 static void
-lookup_without_searchpath (const char       *normalized_name,
-                           dsk_boolean       is_ipv6,
-                           DskDnsConfigFlags flags,
-                           DskDnsCacheEntryFunc callback,
-                           void             *callback_data)
+lookup_without_searchpath_or_cnames (const char       *normalized_name,
+                                     dsk_boolean       is_ipv6,
+                                     DskDnsCacheEntryFunc callback,
+                                     void             *callback_data)
 {
   DskDnsCacheEntry ce;
   DskDnsCacheEntry *entry;
-  DskError *error = NULL;
   ce.name = (char*) normalized_name;
   ce.is_ipv6 = is_ipv6;
 
-  /* initialize */
-  if (!dns_initialized && !dsk_dns_try_init (&error))
-    {
-      DskDnsCacheEntry entry;
-      entry.name = (char*) normalized_name;
-      entry.is_ipv6 = is_ipv6;
-      entry.expire_time = 0;
-      entry.type = DSK_DNS_CACHE_ENTRY_ERROR;
-      entry.info.error.error = error;
-      callback (&entry, callback_data);
-      dsk_warning ("error initializing dns subsystem: %s", error->message);
-      dsk_error_unref (error);
-      return;
-    }
 
   /* lookup in /etc/hosts if enabled */
-  if (flags & DSK_DNS_CONFIG_USE_ETC_HOSTS)
+  if (config_flags & DSK_DNS_CONFIG_USE_ETC_HOSTS)
     {
       GSK_RBTREE_LOOKUP (GET_ETC_HOSTS_TREE (), &ce, entry);
       if (entry != NULL)
@@ -1072,8 +1036,85 @@ lookup_without_searchpath (const char       *normalized_name,
         }
       return;
     }
-
 }
+
+typedef struct _CnameInfo CnameInfo;
+struct _CnameInfo
+{
+  dsk_boolean is_ipv6;
+  unsigned n_cnames;
+  DskDnsCacheEntryFunc callback;
+  void *callback_data;
+  unsigned expire_time;
+};
+
+static void
+handle_cname_callback (DskDnsCacheEntry *entry,
+                       void             *callback_data)
+{
+  CnameInfo *ci = callback_data;
+  switch (entry->type)
+    {
+    case DSK_DNS_CACHE_ENTRY_IN_PROGRESS:
+      dsk_assert_not_reached ();
+    case DSK_DNS_CACHE_ENTRY_ERROR:
+    case DSK_DNS_CACHE_ENTRY_NEGATIVE:
+    case DSK_DNS_CACHE_ENTRY_ADDR:
+      ci->callback (entry, ci->callback_data);
+      dsk_free (ci);
+      break;
+    case DSK_DNS_CACHE_ENTRY_CNAME:
+      if (ci->n_cnames >= MAX_CNAMES)
+        {
+          DskDnsCacheEntry ce;
+          ce.type = DSK_DNS_CACHE_ENTRY_ERROR;
+          ce.expire_time = ci->expire_time;
+          ce.info.error.error = dsk_error_new ("too many cnames (at %s -> %s)",
+                                               entry->name,
+                                               entry->info.cname);
+          ci->callback (&ce, ci->callback_data);
+          dsk_error_unref (ce.info.error.error);
+          dsk_free (ci);
+          break;
+        }
+      ci->n_cnames += 1;
+      if (entry->expire_time < ci->expire_time)
+        ci->expire_time = entry->expire_time;
+      lookup_without_searchpath_or_cnames (entry->info.cname,
+                                           ci->is_ipv6, handle_cname_callback,
+                                           ci);
+      break;
+    default:
+      dsk_assert_not_reached ();
+    }
+}
+
+
+static void
+lookup_without_searchpath (const char       *normalized_name,
+                           dsk_boolean       is_ipv6,
+                           DskDnsLookupFlags flags,
+                           DskDnsCacheEntryFunc callback,
+                           void             *callback_data)
+{
+  if (flags & DSK_DNS_LOOKUP_FOLLOW_CNAMES)
+    {
+      CnameInfo *ci = dsk_malloc (sizeof (CnameInfo));
+      ci->is_ipv6 = is_ipv6;
+      ci->n_cnames = 0;
+      ci->callback = callback;
+      ci->callback_data = callback_data;
+      ci->expire_time = 0xffffffff;
+      lookup_without_searchpath_or_cnames (normalized_name,
+                                           is_ipv6, handle_cname_callback,
+                                           ci);
+    }
+  else
+    lookup_without_searchpath_or_cnames (normalized_name,
+                                         is_ipv6, callback,
+                                         callback_data);
+}
+
 typedef struct _SearchpathStatus SearchpathStatus;
 struct _SearchpathStatus
 {
@@ -1169,8 +1210,6 @@ next_search_path:
         }
       break;
     case DSK_DNS_CACHE_ENTRY_CNAME:
-      /* CNAMEs are resolved by 'lookup_without_searchpath()' */
-      dsk_assert_not_reached ();
     case DSK_DNS_CACHE_ENTRY_ADDR:
       status->callback (entry, status->callback_data);
       if (status->in_progress)
@@ -1189,17 +1228,32 @@ next_search_path:
 void
 dsk_dns_lookup_cache_entry (const char       *name,
                             dsk_boolean       is_ipv6,
+                            DskDnsLookupFlags flags,
                             DskDnsCacheEntryFunc callback,
                             void             *callback_data)
 {
   DskDnsCacheEntry ce;
-  DskDnsConfigFlags flags = config_flags;
   DskError *error = NULL;
   char normalized_name[DSK_DNS_MAX_NAMELEN + 1];
   const char *in = name;
   char *out = normalized_name;
   dsk_boolean last_was_dot = DSK_TRUE;          /* to inhibit initial '.'s */
   dsk_boolean ends_with_dot = DSK_FALSE;
+
+  /* initialize */
+  if (!dns_initialized && !dsk_dns_try_init (&error))
+    {
+      DskDnsCacheEntry entry;
+      entry.name = (char*) normalized_name;
+      entry.is_ipv6 = is_ipv6;
+      entry.expire_time = 0;
+      entry.type = DSK_DNS_CACHE_ENTRY_ERROR;
+      entry.info.error.error = error;
+      callback (&entry, callback_data);
+      dsk_warning ("error initializing dns subsystem: %s", error->message);
+      dsk_error_unref (error);
+      return;
+    }
 
   /* ensure is_ipv6 is 0 or 1 */
   if (is_ipv6)
@@ -1271,7 +1325,8 @@ dsk_dns_lookup_cache_entry (const char       *name,
       return;
     }
 
-  if (ends_with_dot || n_resolv_conf_search_paths == 0)
+  if (ends_with_dot || n_resolv_conf_search_paths == 0
+      || (flags & DSK_DNS_LOOKUP_USE_SEARCHPATH) == 0)
     {
       lookup_without_searchpath (normalized_name, is_ipv6, flags, callback, callback_data);
       return;
