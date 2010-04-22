@@ -51,3 +51,4 @@ DskObjectSourceClass dsk_octet_source_class =
   NULL,                 /* no default read_buffer impl */
   NULL,                 /* no default shutdown impl */
 };
+

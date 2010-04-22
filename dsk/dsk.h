@@ -15,6 +15,7 @@
 #include "dsk-dns-protocol.h"
 
 #include "dsk-client-stream.h"
+#include "dsk-octet-fd.h"
 
 #include "dsk-udp-socket.h"
 

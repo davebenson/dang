@@ -11,7 +11,6 @@ static char *local_path = NULL;
 
 int main(int argc, char **argv)
 {
-  int i;
   dsk_cmdline_init ("connect to a server or listen for a connection",
                     "Connect to a server or listen for a client; write data from socket to standard-output; any data collected on standard-input will be sent to the connection.",
                     "[HOST:PORT]",
