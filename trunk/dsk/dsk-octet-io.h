@@ -75,9 +75,51 @@ DSK_INLINE_FUNC DskIOResult dsk_octet_sink_write_buffer  (void           *octet_
 DSK_INLINE_FUNC void dsk_octet_sink_shutdown     (void           *octet_sink);
 
 
+typedef struct _DskOctetConnectionClass DskOctetConnectionClass;
+typedef struct _DskOctetConnection DskOctetConnection;
+typedef struct _DskOctetConnectionOptions DskOctetConnectionOptions;
+
+struct _DskOctetConnectionClass
+{
+  DskObjectClass base_class;
+};
+struct _DskOctetConnection
+{
+  DskObject base_instance;
+  DskBuffer buffer;
+  DskOctetSource *source;
+  DskOctetSink *sink;
+
+  unsigned max_buffer;
+  unsigned shutdown_on_read_error : 1;
+  unsigned shutdown_on_write_error : 1;
+
+  /* tracking the latest error */
+  unsigned last_error_from_reading : 1;
+  DskError *last_error;
+};
+
+struct _DskOctetConnectionOptions
+{
+  unsigned max_buffer;
+  dsk_boolean shutdown_on_read_error;
+  dsk_boolean shutdown_on_write_error;
+};
+
+DSK_INLINE_FUNC void dsk_octet_connect       (DskOctetSource *source,
+                                              DskOctetSink   *sink,
+                                              DskOctetConnectionOptions *opt);
+
+DskOctetConnection *dsk_octet_connection_new (DskOctetSource *source,
+                                              DskOctetSink   *sink,
+                                              DskOctetConnectionOptions *opt);
+void                dsk_octet_connection_shutdown (DskOctetConnection *);
+void                dsk_octet_connection_disconnect (DskOctetConnection *);
 
 extern DskOctetSourceClass dsk_octet_source_class;
 extern DskOctetSinkClass dsk_octet_sink_class;
+extern DskOctetConnectionClass dsk_octet_connection_class;
+
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC DskIOResult dsk_octet_source_read (void         *octet_source,
                                            unsigned      max_len,
@@ -123,5 +165,10 @@ DSK_INLINE_FUNC void dsk_octet_sink_shutdown     (void           *octet_sink)
   if (c->shutdown != NULL)
     c->shutdown (octet_sink);
 }
-
+DSK_INLINE_FUNC void dsk_octet_connect       (DskOctetSource *source,
+                                              DskOctetSink   *sink,
+                                              DskOctetConnectionOptions *opt)
+{
+  dsk_object_unref (dsk_octet_connection_new (source, sink, opt));
+}
 #endif
