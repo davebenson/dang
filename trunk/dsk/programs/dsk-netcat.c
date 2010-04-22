@@ -60,8 +60,11 @@ int main(int argc, char **argv)
     }
   else
     {
+      DskClientStream *client_stream;
+      DskOctetSink *std_input;
+      DskOctetSource *std_output;
       if (local_path)
-        client_stream = dsk_client_stream_new_local (path);
+        client_stream = dsk_client_stream_new_local (local_path);
       else
         client_stream = dsk_client_stream_new (hostname, port);
 
