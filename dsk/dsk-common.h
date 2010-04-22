@@ -77,6 +77,10 @@ void *dsk_realloc (void *, size_t);
 char *dsk_strdup (const char *str);
 void *dsk_memdup (size_t, const void *);
 
+/* copy the string starting at 'str', and ending with the last-character
+   at end_str-1 (so end_str would point to the NUL on a NUL-terminated string */
+char *dsk_strdup_slice (const char *str, const char *end_str);
+
 /* utility for initializing objects */
 void dsk_bzero_pointers (void *ptrs, unsigned n_ptrs);
 
