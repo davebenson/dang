@@ -104,6 +104,14 @@ dsk_memdup (size_t size, const void *ptr)
   memcpy (rv, ptr, size);
   return rv;
 }
+char *dsk_strdup_slice (const char *str, const char *end_str)
+{
+  unsigned len = end_str - str;
+  char *rv = dsk_malloc (len + 1);
+  memcpy (rv, str, len);
+  rv[len] = '\0';
+  return rv;
+}
 void
 dsk_bzero_pointers (void *ptrs,
                     unsigned n_ptrs)

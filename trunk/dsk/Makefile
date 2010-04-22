@@ -1,8 +1,13 @@
 # just so :make works in vi
-all: dsk-ascii-chartable.inc tests/test-dns-protocol programs/dsk-dns-lookup
+
+BUILT_SOURCES = dsk-ascii-chartable.inc
+TEST_PROGRAMS = tests/test-dns-protocol
+PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat
+all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
+
 tests/test-dns-protocol: tests/test-dns-protocol.c libdsk.a
 	gcc -W -Wall -g -o $@ $^
-programs/dsk-dns-lookup: programs/dsk-dns-lookup.c libdsk.a
+programs/%: programs/%.c libdsk.a
 	gcc -W -Wall -g -o $@ $^
 libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socket.o dsk-dispatch.o dsk-hook.o \
 	  dsk-cmdline.o dsk-ip-address.o dsk-dns-client.o dsk-mem-pool.o \
