@@ -1,13 +1,38 @@
 
 /* dispatch wrappers */
-...
+void              dsk_main_watch_fd        (DskFileDescriptor   fd,
+                                            unsigned            events,
+                                            DskFDFunc           callback,
+                                            void               *callback_data);
+void              dsk_main_close_fd        (DskFileDescriptor   fd);
+void              dsk_main_fd_closed       (DskFileDescriptor   fd);
+
+DskDispatchTimer *dsk_main_add_timer       (unsigned            timeout_secs,
+                                            unsigned            timeout_usecs,
+                                            DskTimerFunc        func,
+                                            void               *func_data);
+DskDispatchTimer *dsk_main_add_timer_millis(unsigned            milliseconds,
+                                            DskTimerFunc        func,
+                                            void               *func_data);
+void              dsk_main_adjust_timer    (DskDispatchTimer   *timer,
+                                            unsigned            timeout_secs,
+                                            unsigned            timeout_usecs);
+void              dsk_main_adjust_timer_millis (DskDispatchTimer *timer,
+                                            unsigned            milliseconds);
+void              dsk_main_remove_timer    (DskDispatchTimer   *timer);
+DskDispatchIdle  *dsk_main_add_idle        (DskIdleFunc         func,
+                                            void               *func_data);
+void              dsk_main_remove_idle     (DskDispatchIdle    *idle);
+
 
 /* program termination (terminate when ref-count gets to 0);
  * many programs leave 0 refs the whole time.
  */
-void dsk_main_add_object (void *object);
-void dsk_main_add_ref    (void);
-void dsk_main_remove_ref (void);
+void              dsk_main_add_object      (void               *object);
+void              dsk_main_add_ref         (void);
+void              dsk_main_remove_ref      (void);
 
 /* running until termination (ie until we get to 0 refs) */
-int  dsk_main_run        (void);
+int               dsk_main_run             (void);
+void              dsk_main_exit            (int                exit_status);
+
