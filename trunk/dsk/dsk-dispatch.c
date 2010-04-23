@@ -40,7 +40,7 @@
 typedef struct _Callback Callback;
 struct _Callback
 {
-  DskDispatchCallback func;
+  DskFDFunc func;
   void *data;
 };
 
@@ -99,7 +99,7 @@ struct _DskDispatchTimer
   dsk_boolean is_red;
 
   /* user callback */
-  DskDispatchTimerFunc func;
+  DskTimerFunc func;
   void *func_data;
 };
 
@@ -110,7 +110,7 @@ struct _DskDispatchIdle
   DskDispatchIdle *prev, *next;
 
   /* user callback */
-  DskDispatchIdleFunc func;
+  DskIdleFunc func;
   void *func_data;
 };
 /* Define the tree of timers, as per gskrbtreemacros.h */
@@ -386,7 +386,7 @@ void
 dsk_dispatch_watch_fd (DskDispatch *dispatch,
                               int                 fd,
                               unsigned            events,
-                              DskDispatchCallback callback,
+                              DskFDFunc           callback,
                               void               *callback_data)
 {
   RealDispatch *d = (RealDispatch *) dispatch;
@@ -524,12 +524,12 @@ dsk_dispatch_dispatch (DskDispatch *dispatch,
   while (d->first_idle != NULL)
     {
       DskDispatchIdle *idle = d->first_idle;
-      DskDispatchIdleFunc func = idle->func;
+      DskIdleFunc func = idle->func;
       void *data = idle->func_data;
       GSK_LIST_REMOVE_FIRST (GET_IDLE_LIST (d));
 
       idle->func = NULL;                /* set to NULL to render remove_idle a no-op */
-      func (dispatch, data);
+      func (data);
 
       idle->next = d->recycled_idles;
       d->recycled_idles = idle;
@@ -547,14 +547,14 @@ dsk_dispatch_dispatch (DskDispatch *dispatch,
        || (min_timer->timeout_secs == (unsigned long) tv.tv_sec
         && min_timer->timeout_usecs <= (unsigned) tv.tv_usec))
         {
-          DskDispatchTimerFunc func = min_timer->func;
+          DskTimerFunc func = min_timer->func;
           void *func_data = min_timer->func_data;
           GSK_RBTREE_REMOVE (GET_TIMER_TREE (d), min_timer);
           /* Set to NULL as a way to tell dsk_dispatch_remove_timer()
              that we are in the middle of notifying */
           min_timer->func = NULL;
           min_timer->func_data = NULL;
-          func (&d->base, func_data);
+          func (func_data);
           free_timer (min_timer);
         }
       else
@@ -695,7 +695,7 @@ DskDispatchTimer *
 dsk_dispatch_add_timer(DskDispatch *dispatch,
                               unsigned            timeout_secs,
                               unsigned            timeout_usecs,
-                              DskDispatchTimerFunc func,
+                              DskTimerFunc func,
                               void               *func_data)
 {
   RealDispatch *d = (RealDispatch *) dispatch;
@@ -735,7 +735,7 @@ dsk_dispatch_add_timer(DskDispatch *dispatch,
 DskDispatchTimer *
 dsk_dispatch_add_timer_millis (DskDispatch         *dispatch,
                                unsigned             millis,
-                               DskDispatchTimerFunc func,
+                               DskTimerFunc func,
                                void                *func_data)
 {
   unsigned tsec = dispatch->last_dispatch_secs;
@@ -807,7 +807,7 @@ void  dsk_dispatch_remove_timer (DskDispatchTimer *timer)
 }
 DskDispatchIdle *
 dsk_dispatch_add_idle (DskDispatch        *dispatch,
-                       DskDispatchIdleFunc func,
+                       DskIdleFunc func,
                        void               *func_data)
 {
   RealDispatch *d = (RealDispatch *) dispatch;
