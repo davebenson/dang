@@ -23,7 +23,8 @@ dsk_client_stream_new       (const char *name,
                              DskError  **error)
 {
   DskClientStream *rv = create_raw_client_stream ();
-  if (hostname_looks_numeric (name))
+  DSK_UNUSED (error);
+  if (dsk_hostname_looks_numeric (name))
     rv->is_numeric_name = 1;
   rv->name = dsk_strdup (name);
   rv->port = port;
@@ -37,6 +38,7 @@ dsk_client_stream_new_addr  (DskIpAddress *addr,
                              DskError     **error)
 {
   DskClientStream *rv = create_raw_client_stream ();
+  DSK_UNUSED (error);
   rv->is_numeric_name = 1;
   rv->name = dsk_ip_address_to_string (addr);
   rv->port = port;
