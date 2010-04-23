@@ -60,23 +60,25 @@ int main(int argc, char **argv)
   else
     {
       DskClientStream *client_stream;
-      DskOctetSink *std_input;
-      DskOctetSource *std_output;
+      DskOctetSource *std_input;
+      DskOctetSink *std_output;
       if (local_path)
         client_stream = dsk_client_stream_new_local (local_path);
       else
         client_stream = dsk_client_stream_new (hostname, port);
 
-      std_input = dsk_octet_sink_new_stdin ();
-      std_output = dsk_octet_source_new_stdout ();
-      dsk_octet_stream_connect (std_input,
-                                &client_stream->sink.base_instance);
-      dsk_octet_stream_connect (&client_stream->source.base_instance, 
-                                std_output);
+      std_input = dsk_octet_source_new_stdin ();
+      std_output = dsk_octet_sink_new_stdout ();
+      dsk_octet_connect (std_input,
+                         &client_stream->sink->base_instance,
+                         NULL);
+      dsk_octet_connect (&client_stream->source->base_instance, 
+                         std_output,
+                         NULL);
 
       /* keep running until i/o is done ?!? */
-      ...
+      dsk_main_add_object (std_input);
+      dsk_main_add_object (std_output);
+      return dsk_main_run ();
     }
-
-  return exit_status;
 }
