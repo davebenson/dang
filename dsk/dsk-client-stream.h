@@ -56,6 +56,9 @@ struct _DskClientStream
    * May be used directly. */
   DskClientStreamSink *sink;
 
+  /* underlying file-descriptor */
+  DskFileDescriptor fd;
+
   /* A hook that notifies when the stream is disconnected.
      May be used directly. */
   DskHook disconnect_hook;
@@ -90,7 +93,8 @@ extern DskClientStreamSinkClass dsk_client_stream_sink_class;
 extern DskClientStreamClass dsk_client_stream_class;
 
 DskClientStream *dsk_client_stream_new       (const char *name,
-                                              unsigned    port);
+                                              unsigned    port,
+                                              DskError  **error);
 DskClientStream *dsk_client_stream_new_addr  (DskIpAddress *addr,
                                               unsigned    port);
 DskClientStream *dsk_client_stream_new_local (const char *path);
