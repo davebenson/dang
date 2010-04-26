@@ -25,7 +25,7 @@ struct _DskOctetSourceClass
 struct _DskOctetSource
 {
   DskObject base_instance;
-  DskHook *readable_hook;
+  DskHook readable_hook;
 };
 
 struct _DskOctetSinkClass
@@ -48,7 +48,7 @@ struct _DskOctetSinkClass
 struct _DskOctetSink
 {
   DskObject base_instance;
-  DskHook *writable_hook;
+  DskHook writable_hook;
 };
 #define DSK_OCTET_SOURCE(object) DSK_OBJECT_CAST(DskOctetSource, object, &dsk_octet_source_class)
 #define DSK_OCTET_SINK(object) DSK_OBJECT_CAST(DskOctetSink, object, &dsk_octet_sink_class)
