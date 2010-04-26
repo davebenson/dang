@@ -11,6 +11,7 @@ static char *local_path = NULL;
 
 int main(int argc, char **argv)
 {
+  DskClientStreamOptions options = DSK_CLIENT_STREAM_OPTIONS_DEFAULT;
   dsk_cmdline_init ("connect to a server or listen for a connection",
                     "Connect to a server or listen for a client; write data from socket to standard-output; any data collected on standard-input will be sent to the connection.",
                     "[HOST:PORT]",
@@ -62,10 +63,13 @@ int main(int argc, char **argv)
       DskClientStream *client_stream;
       DskOctetSource *std_input;
       DskOctetSink *std_output;
-      if (local_path)
-        client_stream = dsk_client_stream_new_local (local_path);
-      else
-        client_stream = dsk_client_stream_new (hostname, port);
+      DskError *error = NULL;
+      options.hostname = hostname;
+      options.port = port;
+      options.path = local_path;
+      client_stream = dsk_client_stream_new (&options, &error);
+      if (client_stream == NULL)
+        dsk_die ("error creating client-stream: %s", error->message);
 
       std_input = dsk_octet_source_new_stdin ();
       std_output = dsk_octet_sink_new_stdout ();
@@ -81,4 +85,5 @@ int main(int argc, char **argv)
       dsk_main_add_object (std_output);
       return dsk_main_run ();
     }
+  return 1;             /* should not reach here */
 }

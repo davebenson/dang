@@ -14,3 +14,4 @@ _ JSON implementation
 _ YAML implementation
   _ parser
   _ printer
+_ checksum implementations
