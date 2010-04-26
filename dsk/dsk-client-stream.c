@@ -493,10 +493,11 @@ DskClientStreamClass dsk_client_stream_class =
 
 
 /* === Implementation of octet-source class === */
-static int
+static DskIOResult
 dsk_client_stream_source_read (DskOctetSource *source,
                                unsigned        max_len,
                                void           *data_out,
+                               unsigned       *bytes_read_out,
                                DskError      **error)
 {
   int n_read;
@@ -504,31 +505,34 @@ dsk_client_stream_source_read (DskOctetSource *source,
   if (stream == NULL)
     {
       dsk_set_error (error, "write to dead client stream");
-      return -1;
+      return DSK_IO_RESULT_ERROR;
     }
   if (stream->fd < 0)
     {
       dsk_set_error (error, "no file-descriptor");
-      return -1;
+      return DSK_IO_RESULT_ERROR;
     }
   if (stream->is_connecting)
     {
       dsk_set_error (error, "file-descriptor %d not connected yet", stream->fd);
-      return -1;
+      return DSK_IO_RESULT_ERROR;
     }
   n_read = read (stream->fd, data_out, max_len);
   if (n_read < 0)
     {
       if (errno == EINTR || errno == EAGAIN)
-        return 0;
+        return DSK_IO_RESULT_AGAIN;
       dsk_set_error (error, "error reading from client stream (fd %d): %s",
                      stream->fd, strerror (errno));
-      return -1;
+      return DSK_IO_RESULT_ERROR;
     }
-  return n_read;
+  if (n_read == 0)
+    return DSK_IO_RESULT_EOF;
+  *bytes_read_out = n_read;
+  return DSK_IO_RESULT_SUCCESS;
 }
 
-static int
+static DskIOResult
 dsk_client_stream_source_read_buffer  (DskOctetSource *source,
                                        DskBuffer      *read_buffer,
                                        DskError      **error)
@@ -538,29 +542,31 @@ dsk_client_stream_source_read_buffer  (DskOctetSource *source,
   if (stream == NULL)
     {
       dsk_set_error (error, "read from dead stream");
-      return -1;
+      return DSK_IO_RESULT_ERROR;
     }
   if (stream->fd < 0)
     {
       dsk_set_error (error, "read from stream with no file-descriptor");
-      return -1;
+      return DSK_IO_RESULT_ERROR;
     }
-  rv = dsk_buffer_readv (stream->fd, read_buffer);
+  rv = dsk_buffer_readv (read_buffer, stream->fd);
   if (rv < 0)
     {
       if (errno == EINTR || errno == EAGAIN)
-        return 0;
+        return DSK_IO_RESULT_AGAIN;
       dsk_set_error (error, "error reading data from fd %u: %s",
                      stream->fd, strerror (errno));
-      return -1;
+      return DSK_IO_RESULT_ERROR;
     }
-  return rv;
+  if (rv == 0)
+    return DSK_IO_RESULT_EOF;
+  return DSK_IO_RESULT_SUCCESS;
 }
 
 static void
 dsk_client_stream_source_shutdown (DskOctetSource *source)
 {
-  DskClientStream *stream = ((DskClientStreamSource*)source)->stream;
+  DskClientStream *stream = ((DskClientStreamSource*)source)->owner;
   if (stream == NULL)
     return;
   if (stream->fd >= 0)
@@ -571,7 +577,7 @@ dsk_client_stream_source_shutdown (DskOctetSource *source)
 }
 
 
-DskClientStreamSinkClass dsk_client_stream_source_class =
+DskClientStreamSourceClass dsk_client_stream_source_class =
 {
   { DSK_OBJECT_CLASS_DEFINE (DskClientStreamSource, &dsk_octet_source_class,
                              NULL, NULL),
@@ -595,7 +601,7 @@ dsk_client_stream_sink_write  (DskOctetSink   *sink,
       dsk_set_error (error, "write to dead client stream");
       return -1;
     }
-  if (sink->fd < 0)
+  if (stream->fd < 0)
     {
       dsk_set_error (error, "no file-descriptor");
       return -1;
