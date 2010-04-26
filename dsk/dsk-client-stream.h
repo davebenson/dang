@@ -92,12 +92,27 @@ extern DskClientStreamSourceClass dsk_client_stream_source_class;
 extern DskClientStreamSinkClass dsk_client_stream_sink_class;
 extern DskClientStreamClass dsk_client_stream_class;
 
-DskClientStream *dsk_client_stream_new       (const char *name,
-                                              unsigned    port,
+typedef struct _DskClientStreamOptions DskClientStreamOptions;
+struct _DskClientStreamOptions
+{
+  const char *hostname;
+  unsigned port;
+  DskIpAddress address;
+  const char *path;          /* for unix-domain (aka local) sockets */
+  int reconnect_time;        /* in milliseconds */
+  int idle_disconnect_time;  /* in milliseconds */
+};
+#define DSK_CLIENT_STREAM_OPTIONS_DEFAULT \
+{ NULL,                                     /* hostname */               \
+  0,                                        /* port */                   \
+  { 0, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} }, /* address */                \
+  NULL,                                     /* path */                   \
+  -1,                                       /* reconnect_time */         \
+  -1,                                       /* idle_disconnect_time */   \
+}
+
+DskClientStream *dsk_client_stream_new       (DskClientStreamOptions *options,
                                               DskError  **error);
-DskClientStream *dsk_client_stream_new_addr  (DskIpAddress *addr,
-                                              unsigned    port);
-DskClientStream *dsk_client_stream_new_local (const char *path);
 
 /* use -1 to disable these timeouts */
 void             dsk_client_stream_set_reconnect_time (DskClientStream *client,
@@ -105,4 +120,5 @@ void             dsk_client_stream_set_reconnect_time (DskClientStream *client,
 void             dsk_client_stream_set_max_idle_time  (DskClientStream *client,
                                                        int              millis);
 
+void dsk_client_stream_disconnect (DskClientStream *stream);
 

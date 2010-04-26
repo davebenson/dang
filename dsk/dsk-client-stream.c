@@ -1,3 +1,8 @@
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/un.h>
+#include <sys/socket.h>
 #include "dsk.h"
 
 /* Begin connecting to the given resolved address. */
@@ -17,43 +22,76 @@ create_raw_client_stream (void)
   return rv;
 }
 
+static dsk_boolean ip_address_is_default (DskIpAddress *address)
+{
+  unsigned i;
+  if (address->type != 0)
+    return DSK_FALSE;
+  for (i = 0; i < 16; i++)
+    if (address->address[i])
+      return DSK_FALSE;
+  return DSK_TRUE;
+}
+
 DskClientStream *
-dsk_client_stream_new       (const char *name,
-                             unsigned    port,
+dsk_client_stream_new       (DskClientStreamOptions *options,
                              DskError  **error)
 {
-  DskClientStream *rv = create_raw_client_stream ();
+  DskClientStream *rv;
+  dsk_boolean has_address = !ip_address_is_default (&options->address);
   DSK_UNUSED (error);
-  if (dsk_hostname_looks_numeric (name))
-    rv->is_numeric_name = 1;
-  rv->name = dsk_strdup (name);
-  rv->port = port;
+
+  /* check trivial usage considerations */
+  dsk_warn_if_fail (!(options->hostname != NULL && has_address),
+                    "ignoring ip-address because symbolic name given");
+  if (options->hostname != NULL || has_address)
+    {
+      if (options->port == 0)
+        {
+          dsk_set_error (error,
+                         "port must be non-zero for client (hostname is '%s')",
+                         options->hostname);
+          return NULL;
+        }
+      dsk_warn_if_fail (options->path == NULL,
+                        "cannot decide between tcp and local client");
+    }
+
+  rv = create_raw_client_stream ();
+  if (options->hostname != NULL)
+    {
+      if (dsk_hostname_looks_numeric (options->hostname))
+        rv->is_numeric_name = 1;
+      rv->name = dsk_strdup (options->hostname);
+      rv->port = options->port;
+    }
+  else if (has_address)
+    {
+      rv->is_numeric_name = 1;
+      rv->name = dsk_ip_address_to_string (&options->address);
+      rv->port = options->port;
+    }
+  else if (options->path != NULL)
+    {
+      rv->is_local_socket = 1;
+      rv->name = dsk_strdup (options->path);
+    }
+  rv->idle_disconnect_time_ms = options->idle_disconnect_time;
+  rv->reconnect_time_ms = options->reconnect_time;
   begin_connecting (rv);
+  if (options->idle_disconnect_time >= 0)
+    dsk_client_stream_set_max_idle_time (rv, options->idle_disconnect_time);
+  if (options->reconnect_time >= 0)
+    dsk_client_stream_set_reconnect_time (rv, options->reconnect_time);
   return rv;
 }
 
-DskClientStream *
-dsk_client_stream_new_addr  (DskIpAddress *addr,
-                             unsigned       port,
-                             DskError     **error)
+static void
+handle_reconnect_timer_expired (void *data)
 {
-  DskClientStream *rv = create_raw_client_stream ();
-  DSK_UNUSED (error);
-  rv->is_numeric_name = 1;
-  rv->name = dsk_ip_address_to_string (addr);
-  rv->port = port;
-  begin_connecting (rv);
-  return rv;
-}
-
-DskClientStream *
-dsk_client_stream_new_local (const char *path)
-{
-  DskClientStream *rv = create_raw_client_stream ();
-  rv->is_local_socket = 1;
-  rv->name = dsk_strdup (path);
-  begin_connecting (rv);
-  return rv;
+  DskClientStream *stream = data;
+  stream->reconnect_timer = NULL;
+  begin_connecting (stream);
 }
 
 /* numeric hostnames */
@@ -90,7 +128,7 @@ dsk_client_stream_set_reconnect_time (DskClientStream *client,
           client->reconnect_timer = NULL;
         }
       else
-        dsk_soft_should_not_happen ("no reconnect timer?");
+        dsk_warn_if_reached ("no reconnect timer?");
     }
   else
     {
@@ -98,12 +136,23 @@ dsk_client_stream_set_reconnect_time (DskClientStream *client,
         dsk_dispatch_remove_timer (client->reconnect_timer);
       else
         dsk_assert (client->reconnect_timer == NULL);
+      client->reconnect_time_ms = millis;
+
+      /* TODO: subtract elapsed time from last disconnect / failed to connect */
+
       client->reconnect_timer
         = dsk_dispatch_add_timer_millis (dsk_dispatch_default (),
                                          millis,
                                          handle_reconnect_timer_expired,
                                          client);
     }
+}
+
+static void
+handle_idle_too_long (void *data)
+{
+  DskClientStream *stream = data;
+  dsk_client_stream_disconnect (stream);
 }
 
 void
@@ -123,7 +172,8 @@ dsk_client_stream_set_max_idle_time  (DskClientStream *client,
    && client->is_connected)
     client->idle_disconnect_timer = dsk_dispatch_add_timer_millis (dsk_dispatch_default (),
                                                                    millis,
-                                                                   handle_idle_too_long);
+                                                                   handle_idle_too_long,
+                                                                   client);
   client->idle_disconnect_time_ms = millis;
 }
 
@@ -135,9 +185,9 @@ stream_set_last_error (DskClientStream *stream,
 {
   va_list args;
   va_start (args, format);
-  if (stream->last_error)
-    dsk_error_unref (stream->last_error);
-  stream->last_error = dsk_error_new_valist (stream, format, args);
+  if (stream->latest_error)
+    dsk_error_unref (stream->latest_error);
+  stream->latest_error = dsk_error_new_valist (format, args);
   va_end (args);
 }
 
@@ -159,16 +209,32 @@ dsk_errno_from_fd (int fd)
 
   return value;
 }
+static void
+handle_fd_events (DskFileDescriptor   fd,
+                  unsigned            events,
+                  void               *callback_data)
+{
+  DskClientStream *stream = callback_data;
+  DSK_UNUSED (fd);
+  if ((events & DSK_EVENT_READABLE) != 0
+   && stream->source != NULL)
+    dsk_hook_notify (&stream->source->base_instance.readable_hook);
+  if ((events & DSK_EVENT_WRITABLE) != 0
+   && stream->sink != NULL)
+    dsk_hook_notify (&stream->sink->base_instance.writable_hook);
+}
 
 static void
 handle_fd_connected (DskClientStream *stream)
 {
   int events = 0;
-  if (dsk_hook_is_trapped (stream->readable_hook))
+  if (stream->source != NULL
+   && dsk_hook_is_trapped (&stream->source->base_instance.readable_hook))
     events |= DSK_EVENT_READABLE;
-  if (dsk_hook_is_trapped (stream->writable_hook))
+  if (stream->sink != NULL
+   && dsk_hook_is_trapped (&stream->sink->base_instance.writable_hook))
     events |= DSK_EVENT_WRITABLE;
-  dsk_dispatch_watch_fd (dsk_dispatch_default (), fd, events,
+  dsk_dispatch_watch_fd (dsk_dispatch_default (), stream->fd, events,
                          handle_fd_events, stream);
   dsk_assert (stream->idle_disconnect_timer == NULL);
   if (stream->idle_disconnect_time_ms >= 0)
@@ -188,11 +254,25 @@ ping_idle_disconnect_timer (DskClientStream *stream)
 }
 
 static void
+maybe_set_autoreconnect_timer (DskClientStream *stream)
+{
+  dsk_assert (stream->reconnect_timer == NULL);
+  if (stream->reconnect_time_ms >= 0)
+    stream->reconnect_timer
+      = dsk_dispatch_add_timer_millis (dsk_dispatch_default (),
+                                       stream->reconnect_time_ms,
+                                       handle_reconnect_timer_expired,
+                                       stream);
+}
+
+static void
 handle_fd_connecting (DskFileDescriptor   fd,
                       unsigned            events,
                       void               *callback_data)
 {
   int err = dsk_errno_from_fd (fd);
+  DskClientStream *stream = callback_data;
+  DSK_UNUSED (events);
   if (err == 0)
     {
       stream->is_connecting = DSK_FALSE;
@@ -203,9 +283,9 @@ handle_fd_connecting (DskFileDescriptor   fd,
 
   if (err != EINTR && err != EAGAIN)
     {
-      if (stream->last_error)
-        dsk_error_unref (stream->last_error);
-      stream->last_error = dsk_error_new ("error finishing connection to %s: %s",
+      if (stream->latest_error)
+        dsk_error_unref (stream->latest_error);
+      stream->latest_error = dsk_error_new ("error finishing connection to %s: %s",
                                           stream->name, strerror (err));
       dsk_dispatch_close_fd (dsk_dispatch_default (), stream->fd);
       stream->fd = -1;
@@ -221,7 +301,7 @@ handle_fd_connecting (DskFileDescriptor   fd,
 static void
 begin_connecting_sockaddr (DskClientStream *stream,
                            unsigned          addr_len,
-                           struct sockaddr_t *addr)
+                           struct sockaddr   *addr)
 {
   int fd;
   dsk_assert (stream->fd == -1);
@@ -280,8 +360,8 @@ retry_sys_connect:
   handle_fd_connected (stream);
   return;
 
-error:
-  dsk_hook_notify (stream->error_hook);
+handle_error:
+  dsk_hook_notify (&stream->error_hook);
   maybe_set_autoreconnect_timer (stream);
   return;
 }
@@ -298,52 +378,20 @@ begin_connecting_dns_entry (DskClientStream *stream,
   begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
 }
 #endif
-void
-dsk_ip_address_to_sock_addr (DskIpAddress *address,
-                          unsigned port,
-                          void *out,
-                          unsigned *out_len);
-{
-  /* necessary? probably not for ipv4 */
-  memset (out, 0, sizeof (struct sockaddr_storage));
-
-  switch (address->type)
-    {
-    case DSK_IP_ADDRESS_IPV4:
-      {
-        struct sockaddr_in *a = (struct sockaddr_in *) out;
-        a->sin_family = PF_INET;
-        a->sin_port = htons (port);
-        memcpy (&a->sin_addr, address->info.address, 4);
-        break;
-      }
-    case DSK_IP_ADDRESS_IPV6:
-      {
-        struct sockaddr_in6 *a = (struct sockaddr_in6 *) out;
-        a->sin6_family = PF_INET6;
-        a->sin6_port = htons (port);
-        memcpy (&a->sin6_addr, address->info.address, 16);
-        break;
-      }
-    default:
-      dsk_assert_not_reached ();
-    }
-}
-
 static void
 handle_dns_done (DskDnsLookupResult *result,
                  void               *callback_data)
 {
   DskClientStream *stream = callback_data;
 
-  result->is_resolving_name = 0;
+  stream->is_resolving_name = 0;
   switch (result->type)
     {
     case DSK_DNS_LOOKUP_RESULT_FOUND:
       {
         struct sockaddr_storage addr;
         unsigned addr_len;
-        dsk_ip_address_to_sock_addr (result->addr, stream->port, &addr, &addr_len);
+        dsk_ip_address_to_sockaddr (result->addr, stream->port, &addr, &addr_len);
         begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
       }
       break;
@@ -401,7 +449,7 @@ begin_connecting (DskClientStream *stream)
       /* parse name into addr/addr_len */
       if (!dsk_ip_address_parse_numeric (stream->name, &address))
         dsk_die ("dsk_ip_address_parse_numeric failed on %s", stream->name);
-      dsk_ip_address_to_sock_addr (&address, stream->port, &addr, &addr_len);
+      dsk_ip_address_to_sockaddr (&address, stream->port, &addr, &addr_len);
       begin_connecting_sockaddr (stream, addr_len, (struct sockaddr *) &addr);
     }
   else
@@ -409,17 +457,19 @@ begin_connecting (DskClientStream *stream)
       /* begin dns lookup */
       stream->is_resolving_name = 1;
       dsk_object_ref (stream);
-      dsk_dns_lookup (stream->name, handle_dns_done, stream);
+      dsk_dns_lookup (stream->name,
+                      DSK_FALSE,                /* is_ipv6? should be be needed */
+                      handle_dns_done, stream);
     }
 }
 
 static void
 dsk_client_stream_finalize (DskClientStream *stream)
 {
-  dsk_hook_clear (&stream->sink.base_instance.writable_hook);
+  dsk_hook_clear (&stream->sink->base_instance.writable_hook);
   stream->sink->owner = NULL;
   dsk_object_unref (stream->sink);
-  dsk_hook_clear (&stream->source.base_instance.readable_hook);
+  dsk_hook_clear (&stream->source->base_instance.readable_hook);
   stream->source->owner = NULL;
   dsk_object_unref (stream->source);
   dsk_hook_clear (&stream->disconnect_hook);
@@ -484,7 +534,7 @@ dsk_client_stream_source_read_buffer  (DskOctetSource *source,
                                        DskError      **error)
 {
   int rv;
-  DskClientStream *stream = ((DskClientStreamSource*)source)->stream;
+  DskClientStream *stream = ((DskClientStreamSource*)source)->owner;
   if (stream == NULL)
     {
       dsk_set_error (error, "read from dead stream");

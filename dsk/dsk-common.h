@@ -65,6 +65,70 @@ void dsk_error(const char *format, ...) DSK_GNUC_PRINTF(1,2);
 /* non-fatal warning message */
 void dsk_warning(const char *format, ...) DSK_GNUC_PRINTF(1,2);
 
+
+/* --- assertions */
+#ifdef DSK_DISABLE_ASSERTIONS
+#define dsk_warn_if_fail(condition, blurb) do{}while(0)
+#define dsk_error_if_fail(condition, blurb) do{}while(0)
+#define dsk_goto_if_fail(condition, blurb, label) do{}while(0)
+#define dsk_return_if_fail(condition, blurb) do{}while(0)
+#define dsk_return_val_if_fail(condition, blurb, value) do{}while(0)
+#else
+#define dsk_warn_if_fail(condition, blurb) \
+  do{ if (!(condition)) \
+        dsk_warning ("%s:%u: condition '%s' failed: %s (%s)", \
+                     __FILE__, __LINE__, #condition, \
+                     (blurb) ? (blurb) : "dsk_warn_if_fail failed", \
+                     __func__); \
+  }while (0)
+#define dsk_die_if_fail(condition, blurb) \
+  do{ if (!(condition)) \
+        dsk_die ("%s:%u: condition '%s' failed: %s (%s)", \
+                  __FILE__, __LINE__, #condition, \
+                  (blurb) ? (blurb) : "dsk_error_if_fail failed", \
+                  __func__); } while (0)
+#define dsk_goto_if_fail(condition, blurb, label) \
+  do{ if (!(condition)) \
+        { \
+          dsk_warning ("%s:%u: condition '%s' failed: %s (%s)", \
+                       __FILE__, __LINE__, #condition, \
+                       (blurb) ? (blurb) : "dsk_goto_if_fail failed", \
+                       __func__); \
+          goto label; \
+        } \
+  }while (0)
+#define dsk_return_if_fail(condition, blurb) \
+  do{ if (!(condition)) \
+        { \
+          dsk_warning ("%s:%u: condition '%s' failed: %s (%s)", \
+                       __FILE__, __LINE__, #condition, \
+                       (blurb) ? (blurb) : "dsk_return_if_fail failed", \
+                       __func__); \
+          return; \
+        } \
+  }while (0)
+#define dsk_return_val_if_fail(condition, blurb, value) \
+  do{ if (!(condition)) \
+        { \
+          dsk_warning ("%s:%u: condition '%s' failed: %s (%s)", \
+                       __FILE__, __LINE__, #condition, \
+                       (blurb) ? (blurb) : "dsk_return_val_if_fail failed", \
+                       __func__); \
+          return (value); \
+        } \
+  }while (0)
+#define dsk_warn_if_reached(blurb) \
+  dsk_warning ("%s:%u: should not be reached: %s (%s)", \
+                       __FILE__, __LINE__, \
+                       (blurb) ? (blurb) : "dsk_warn_if_reached", \
+                       __func__)
+#define dsk_die_if_reached(blurb) \
+  dsk_die ("%s:%u: should not be reached: %s (%s)", \
+                       __FILE__, __LINE__, \
+                       (blurb) ? (blurb) : "dsk_die_if_reached", \
+                       __func__)
+#endif
+
 /* programmer error:  only needed during development, hopefully.. */
 void dsk_die(const char *format, ...) DSK_GNUC_PRINTF(1,2);
 
