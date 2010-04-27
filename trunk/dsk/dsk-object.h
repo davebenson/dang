@@ -22,11 +22,28 @@ typedef void (*DskObjectFinalizeFunc) (DskObject *object);
          DSK_OBJECT_CLASS_MAGIC, \
          (DskObjectInitFunc) init_func, (DskObjectFinalizeFunc) finalize_func }
 
+typedef struct _DskObjectWeakRef DskObjectWeakRef;
+struct _DskObjectWeakRef
+{
+  unsigned ref_count;
+  DskObject *object;
+};
+
+typedef struct _DskObjectFinalizeHandler DskObjectFinalizeHandler;
+struct _DskObjectFinalizeHandler
+{
+  DskDestroyNotify destroy;
+  void *destroy_data;
+  DskObjectFinalizeHandler *next;
+};
+
 
 struct _DskObject
 {
   DskObjectClass *object_class;
   unsigned ref_count;
+  DskObjectWeakRef *weak_ref;
+  DskObjectFinalizeHandler *finalizer_list;
 };
 
 /* The object interface */
@@ -52,6 +69,12 @@ DSK_INLINE_FUNC void      *dsk_object_ref   (void *object);
                  void       dsk_object_unref_f (void *object);
                  void    *  dsk_object_ref_f (void *object);
 
+                 void       dsk_object_weak_ref (DskObject *object,
+                                                 DskDestroyNotify destroy,
+                                                 void            *destroy_data);
+                 void       dsk_object_weak_unref(DskObject      *object,
+                                                 DskDestroyNotify destroy,
+                                                 void            *destroy_data);
 /* debugging and non-debugging implementations of the various
    cast macros.  */
 #ifdef DSK_DISABLE_CAST_CHECKS
