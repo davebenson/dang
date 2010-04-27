@@ -1,6 +1,8 @@
-_ move DskDispatch parameters to the end of callback functions
+x move DskDispatch parameters to the end of callback functions
   since most code doesn't need the dispatch object (assuming
   we add a dsk_main_* pile of API)
+_ DskClientStreamSource BUT DskOctetStreamSourceFd.
+  Fix this inconsistency and come up with a policy for naming derived classes
 _ HTTP implementation
 _ Mime Multipart Impl
 _ XML implementation

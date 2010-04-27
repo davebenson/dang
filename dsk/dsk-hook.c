@@ -1,8 +1,11 @@
 #include "dsk.h"
 
+#include "../gsklistmacros.h"
+
 static DskDispatchIdle *idle_handler = NULL;
 static DskHook *dsk_hook_idle_first = NULL;
 static DskHook *dsk_hook_idle_last = NULL;
+#define GET_IDLE_HOOK_LIST()    DskHook *, dsk_hook_idle_first, dsk_hook_idle_last, idle_prev, idle_next
 
 DskHookFuncs dsk_hook_funcs_default =
 {
@@ -125,10 +128,9 @@ dsk_hook_trap_destroy (DskHookTrap   *trap)
 
 
 static void
-run_idle_notifications (DskDispatch *dispatch, void *data)
+run_idle_notifications (void *data)
 {
   DskHook idle_notify_guard;
-  DSK_UNUSED (dispatch);
   DSK_UNUSED (data);
   if (dsk_hook_idle_first == NULL)
     {
@@ -148,36 +150,20 @@ run_idle_notifications (DskDispatch *dispatch, void *data)
     {
       /* move idle handler to end of list */
       DskHook *at = dsk_hook_idle_first;
-      dsk_hook_idle_first = dsk_hook_idle_first->idle_next;
-      dsk_hook_idle_first->idle_prev = NULL;
-      dsk_hook_idle_last->idle_next = at;
-      at->idle_prev = dsk_hook_idle_last;
-      at->idle_next = NULL;
-      dsk_hook_idle_last = at;
+      GSK_LIST_REMOVE_FIRST (GET_IDLE_HOOK_LIST ());
+      GSK_LIST_APPEND (GET_IDLE_HOOK_LIST (), at);
 
       /* invoke it */
       dsk_hook_notify (at);
     }
-  if (dsk_hook_idle_first->idle_next == NULL)
-    {
-      dsk_hook_idle_first = dsk_hook_idle_last = NULL;
-    }
-  else
-    {
-      dsk_hook_idle_first->idle_next->idle_prev = NULL;
-      dsk_hook_idle_first = dsk_hook_idle_first->idle_next;
-    }
+  GSK_LIST_REMOVE_FIRST (GET_IDLE_HOOK_LIST ());
 }
 void _dsk_hook_trap_count_nonzero (DskHook *hook)
 {
   if (hook->is_idle_notify)
     {
       /* put into idle-notify list */
-      hook->idle_prev = dsk_hook_idle_last;
-      hook->idle_next = NULL;
-      dsk_hook_idle_last = hook;
-      if (dsk_hook_idle_first == NULL)
-        dsk_hook_idle_first = hook;
+      GSK_LIST_APPEND (GET_IDLE_HOOK_LIST (), hook);
       if (idle_handler == NULL)
         idle_handler = dsk_dispatch_add_idle (dsk_dispatch_default (),
                                               run_idle_notifications,
@@ -191,17 +177,24 @@ void _dsk_hook_trap_count_zero (DskHook *hook)
   if (hook->is_idle_notify)
     {
       /* remove from idle-notify list */
-      if (hook->idle_prev == NULL)
-        dsk_hook_idle_first = hook->idle_next;
-      else
-        hook->idle_prev->idle_next = hook->idle_next;
-      if (hook->idle_next == NULL)
-        dsk_hook_idle_last = hook->idle_prev;
-      else
-        hook->idle_next->idle_prev = hook->idle_prev;
+      GSK_LIST_REMOVE (GET_IDLE_HOOK_LIST (), hook);
     }
   if (hook->funcs->set_poll != NULL)
     hook->funcs->set_poll (hook->object, DSK_FALSE);
+}
+
+void _dsk_hook_add_to_idle_notify_list (DskHook *hook)
+{
+  if (idle_handler == NULL)
+    idle_handler = dsk_dispatch_add_idle (dsk_dispatch_default (),
+                                          run_idle_notifications,
+                                          NULL);
+
+  GSK_LIST_APPEND (GET_IDLE_HOOK_LIST (), hook);
+}
+void _dsk_hook_remove_from_idle_notify_list (DskHook *hook)
+{
+  GSK_LIST_REMOVE (GET_IDLE_HOOK_LIST (), hook);
 }
 
 void
@@ -228,4 +221,5 @@ dsk_hook_clear      (DskHook       *hook)
       dsk_mem_pool_fixed_free (&dsk_hook_trap_pool, trap);
       trap = next;
     }
+  hook->trap_count = 0;
 }

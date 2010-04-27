@@ -47,6 +47,57 @@ DskOctetSink *dsk_octet_sink_new_stdout (void)
   return std_output;
 }
 
+static void
+handle_fd_ready (DskFileDescriptor   fd,
+                 unsigned       events,
+                 void          *callback_data)
+{
+  DskOctetStreamFd *stream = callback_data;
+  dsk_assert (stream->fd == fd);
+  if ((events & DSK_EVENT_READABLE) != 0 && stream->source != NULL)
+    dsk_hook_notify (&stream->source->base_instance.readable_hook);
+  if ((events & DSK_EVENT_WRITABLE) != 0 && stream->sink != NULL)
+    dsk_hook_notify (&stream->sink->base_instance.writable_hook);
+}
+
+static void
+stream_set_poll (DskOctetStreamFd *stream)
+{
+  unsigned flags = 0;
+  if (stream->sink != NULL
+   && dsk_hook_is_trapped (&stream->sink->base_instance.writable_hook))
+    flags |= DSK_EVENT_WRITABLE;
+  if (stream->source != NULL
+   && dsk_hook_is_trapped (&stream->source->base_instance.readable_hook))
+    flags |= DSK_EVENT_READABLE;
+  dsk_main_watch_fd (stream->fd, flags, handle_fd_ready, stream);
+}
+static void
+sink_set_poll (DskOctetSinkStreamFd *sink, dsk_boolean is_trapped)
+{
+  DSK_UNUSED (is_trapped);
+  stream_set_poll (sink->owner);
+}
+static void
+source_set_poll (DskOctetSourceStreamFd *source, dsk_boolean is_trapped)
+{
+  DSK_UNUSED (is_trapped);
+  stream_set_poll (source->owner);
+}
+
+static DskHookFuncs sink_pollable_funcs =
+{
+  (DskHookObjectFunc) dsk_object_ref_f,
+  (DskHookObjectFunc) dsk_object_unref_f,
+  (DskHookSetPoll) sink_set_poll
+};
+static DskHookFuncs source_pollable_funcs =
+{
+  (DskHookObjectFunc) dsk_object_ref_f,
+  (DskHookObjectFunc) dsk_object_unref_f,
+  (DskHookSetPoll) source_set_poll
+};
+
 DskOctetStreamFd *
 dsk_octet_stream_new_fd (DskFileDescriptor fd,
                          DskFileDescriptorStreamFlags flags,
@@ -131,6 +182,24 @@ dsk_octet_stream_new_fd (DskFileDescriptor fd,
       rv->sink = dsk_object_new (&dsk_octet_sink_stream_fd_class);
       rv->sink->owner = rv;
       dsk_object_ref (rv);
+    }
+  if (is_pollable)
+    {
+      if (rv->sink)
+        dsk_hook_set_funcs (&rv->sink->base_instance.writable_hook,
+                            &sink_pollable_funcs);
+      if (rv->source)
+        dsk_hook_set_funcs (&rv->source->base_instance.readable_hook,
+                            &source_pollable_funcs);
+    }
+  else
+    {
+      if (rv->sink)
+        dsk_hook_set_idle_notify (&rv->sink->base_instance.writable_hook,
+                                  DSK_TRUE);
+      if (rv->source)
+        dsk_hook_set_idle_notify (&rv->source->base_instance.readable_hook,
+                                  DSK_TRUE);
     }
   return rv;
 }
@@ -338,7 +407,7 @@ DskOctetSourceStreamFdClass dsk_octet_source_stream_fd_class =
     dsk_octet_source_stream_fd_read_buffer,
     dsk_octet_source_stream_fd_shutdown
   }
-}
+};
 
 static void
 dsk_octet_stream_fd_init (DskOctetStreamFd *stream)
@@ -358,11 +427,11 @@ dsk_octet_stream_fd_finalize (DskOctetStreamFd *stream)
     }
 }
 
-DskOctetStreamFdClass dsk_octet_stream_fd_class
+DskOctetStreamFdClass dsk_octet_stream_fd_class =
 {
   DSK_OBJECT_CLASS_DEFINE(DskOctetStreamFd,
                           &dsk_object_class,
                           dsk_octet_stream_fd_init,
-                          dsk_octet_stream_fd_finalize),
+                          dsk_octet_stream_fd_finalize)
 };
 
