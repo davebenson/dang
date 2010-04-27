@@ -34,5 +34,9 @@ void              dsk_main_remove_ref      (void);
 
 /* running until termination (ie until we get to 0 refs) */
 int               dsk_main_run             (void);
+
+/* terminate dsk_main_run() */
 void              dsk_main_exit            (int                exit_status);
 
+/* same as dsk_main_exit(0) -- useful as a callback */
+void              dsk_main_quit            (void);

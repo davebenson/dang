@@ -123,3 +123,35 @@ dsk_object_unref_f (void *object)
 {
   dsk_object_unref (object);
 }
+
+void
+dsk_object_weak_ref (DskObject *object,
+                     DskDestroyNotify destroy,
+                     void            *destroy_data)
+{
+  DskObjectFinalizeHandler *f = dsk_malloc (sizeof (DskObjectFinalizeHandler));
+  f->destroy = destroy;
+  f->destroy_data = destroy_data;
+  f->next = object->finalizer_list;
+  object->finalizer_list = f;
+}
+
+void
+dsk_object_weak_unref(DskObject      *object,
+                      DskDestroyNotify destroy,
+                      void            *destroy_data)
+{
+  DskObjectFinalizeHandler **pf = &object->finalizer_list;
+  while (*pf)
+    {
+      if ((*pf)->destroy == destroy && (*pf)->destroy_data == destroy_data)
+        {
+          DskObjectFinalizeHandler *die = *pf;
+          *pf = die->next;
+          dsk_free (die);
+          return;
+        }
+      pf = &((*pf)->next);
+    }
+  dsk_return_if_reached ("no matching finalizer");
+}

@@ -1,4 +1,4 @@
-/* GSK - a library to write servers
+/* DSK - a library to write servers
     Copyright (C) 1999-2000 Dave Benson
 
     This library is free software; you can redistribute it and/or
@@ -35,173 +35,161 @@
  * On the other hand, this can mask over some abuses (eg stack-based
  * foreign buffer fragment bugs) so we disable it by default.
  */ 
-#define GSK_DEBUG_BUFFER_ALLOCATIONS	0
+#define DSK_DEBUG_BUFFER_ALLOCATIONS	0
 
-#include "config.h"
-#include "gskmacros.h"
+#include <alloca.h>
 #include <sys/types.h>
-#if HAVE_WRITEV
 #include <sys/uio.h>
-#endif
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include "gskbuffer.h"
-#include "gskerrno.h"
+#include "dsk-common.h"
+#include "dsk-buffer.h"
 
-/* --- GskBufferFragment implementation --- */
+/* --- DskBufferFragment implementation --- */
 static inline int 
-gsk_buffer_fragment_avail (GskBufferFragment *frag)
+dsk_buffer_fragment_avail (DskBufferFragment *frag)
 {
   return frag->buf_max_size - frag->buf_start - frag->buf_length;
 }
-static inline char *
-gsk_buffer_fragment_start (GskBufferFragment *frag)
+static inline uint8_t *
+dsk_buffer_fragment_start (DskBufferFragment *frag)
 {
   return frag->buf + frag->buf_start;
 }
-static inline char *
-gsk_buffer_fragment_end (GskBufferFragment *frag)
+static inline uint8_t *
+dsk_buffer_fragment_end (DskBufferFragment *frag)
 {
   return frag->buf + frag->buf_start + frag->buf_length;
 }
 
-/* --- GskBufferFragment recycling --- */
-#if !GSK_DEBUG_BUFFER_ALLOCATIONS
+/* --- DskBufferFragment recycling --- */
+#if !DSK_DEBUG_BUFFER_ALLOCATIONS
 static int num_recycled = 0;
-static GskBufferFragment* recycling_stack = 0;
-G_LOCK_DEFINE_STATIC (recycling_stack);
+static DskBufferFragment* recycling_stack = 0;
 
 #endif
 
-static GskBufferFragment *
+static DskBufferFragment *
 new_native_fragment()
 {
-  GskBufferFragment *frag;
-#if GSK_DEBUG_BUFFER_ALLOCATIONS
-  frag = (GskBufferFragment *) g_malloc (BUF_CHUNK_SIZE);
-  frag->buf_max_size = BUF_CHUNK_SIZE - sizeof (GskBufferFragment);
+  DskBufferFragment *frag;
+#if DSK_DEBUG_BUFFER_ALLOCATIONS
+  frag = (DskBufferFragment *) g_malloc (BUF_CHUNK_SIZE);
+  frag->buf_max_size = BUF_CHUNK_SIZE - sizeof (DskBufferFragment);
 #else  /* optimized (?) */
-  G_LOCK (recycling_stack);
   if (recycling_stack)
     {
       frag = recycling_stack;
       recycling_stack = recycling_stack->next;
       num_recycled--;
-      G_UNLOCK (recycling_stack);
     }
   else
     {
-      G_UNLOCK (recycling_stack);
-      frag = (GskBufferFragment *) g_malloc (BUF_CHUNK_SIZE);
-      frag->buf_max_size = BUF_CHUNK_SIZE - sizeof (GskBufferFragment);
+      frag = (DskBufferFragment *) dsk_malloc (BUF_CHUNK_SIZE);
+      frag->buf_max_size = BUF_CHUNK_SIZE - sizeof (DskBufferFragment);
     }
-#endif	/* !GSK_DEBUG_BUFFER_ALLOCATIONS */
+#endif	/* !DSK_DEBUG_BUFFER_ALLOCATIONS */
   frag->buf_start = frag->buf_length = 0;
   frag->next = 0;
-  frag->buf = (char *) (frag + 1);
+  frag->buf = (uint8_t *) (frag + 1);
   frag->is_foreign = 0;
   return frag;
 }
 
-static GskBufferFragment *
-new_foreign_fragment (gconstpointer        ptr,
+static DskBufferFragment *
+new_foreign_fragment (const void *        ptr,
 		      int                  length,
-		      GDestroyNotify       destroy,
-		      gpointer             ddata)
+		      DskDestroyNotify       destroy,
+		      void *             ddata)
 {
-  GskBufferFragment *fragment;
-  fragment = g_slice_new (GskBufferFragment);
+  DskBufferFragment *fragment;
+  fragment = dsk_malloc (sizeof (DskBufferFragment));
   fragment->is_foreign = 1;
   fragment->buf_start = 0;
   fragment->buf_length = length;
   fragment->buf_max_size = length;
   fragment->next = NULL;
-  fragment->buf = (char *) ptr;
+  fragment->buf = (uint8_t *) ptr;
   fragment->destroy = destroy;
   fragment->destroy_data = ddata;
   return fragment;
 }
 
-#if GSK_DEBUG_BUFFER_ALLOCATIONS
+#if DSK_DEBUG_BUFFER_ALLOCATIONS
 #define recycle(frag) G_STMT_START{ \
     if (frag->is_foreign) { \
       { if (frag->destroy) frag->destroy (frag->destroy_data); \
-        g_slice_free(GskBufferFragment, frag); } \
+        g_slice_free(DskBufferFragment, frag); } \
     else g_free (frag); \
    }G_STMT_END
 #else	/* optimized (?) */
 static void
-recycle(GskBufferFragment* frag)
+recycle(DskBufferFragment* frag)
 {
   if (frag->is_foreign)
     {
       if (frag->destroy)
         frag->destroy (frag->destroy_data);
-      g_slice_free (GskBufferFragment, frag);
+      dsk_free (frag);
       return;
     }
-  G_LOCK (recycling_stack);
 #if defined(MAX_RECYCLED)
   if (num_recycled >= MAX_RECYCLED)
     {
-      g_free (frag);
-      G_UNLOCK (recycling_stack);
+      dsk_free (frag);
       return;
     }
 #endif
   frag->next = recycling_stack;
   recycling_stack = frag;
   num_recycled++;
-  G_UNLOCK (recycling_stack);
 }
-#endif	/* !GSK_DEBUG_BUFFER_ALLOCATIONS */
+#endif	/* !DSK_DEBUG_BUFFER_ALLOCATIONS */
 
 /* --- Global public methods --- */
 /**
- * gsk_buffer_cleanup_recycling_bin:
+ * dsk_buffer_cleanup_recycling_bin:
  * 
  * Free unused buffer fragments.  (Normally some are
  * kept around to reduce strain on the global allocator.)
  */
 void
-gsk_buffer_cleanup_recycling_bin ()
+dsk_buffer_cleanup_recycling_bin ()
 {
-#if !GSK_DEBUG_BUFFER_ALLOCATIONS
-  G_LOCK (recycling_stack);
+#if !DSK_DEBUG_BUFFER_ALLOCATIONS
   while (recycling_stack != NULL)
     {
-      GskBufferFragment *next;
+      DskBufferFragment *next;
       next = recycling_stack->next;
-      g_free (recycling_stack);
+      dsk_free (recycling_stack);
       recycling_stack = next;
     }
   num_recycled = 0;
-  G_UNLOCK (recycling_stack);
 #endif
 }
       
 /* --- Public methods --- */
 /**
- * gsk_buffer_construct:
+ * dsk_buffer_construct:
  * @buffer: buffer to initialize (as empty).
  *
  * Construct an empty buffer out of raw memory.
  * (This is equivalent to filling the buffer with 0s)
  */
 void
-gsk_buffer_construct(GskBuffer *buffer)
+dsk_buffer_construct(DskBuffer *buffer)
 {
   buffer->first_frag = buffer->last_frag = NULL;
   buffer->size = 0;
 }
 
-#if defined(GSK_DEBUG) || GSK_DEBUG_BUFFER_ALLOCATIONS
+#if defined(DSK_DEBUG) || DSK_DEBUG_BUFFER_ALLOCATIONS
 static inline gboolean
-verify_buffer (const GskBuffer *buffer)
+verify_buffer (const DskBuffer *buffer)
 {
-  const GskBufferFragment *frag;
-  guint total = 0;
+  const DskBufferFragment *frag;
+  unsigned total = 0;
   for (frag = buffer->first_frag; frag != NULL; frag = frag->next)
     total += frag->buf_length;
   return total == buffer->size;
@@ -212,7 +200,7 @@ verify_buffer (const GskBuffer *buffer)
 #endif
 
 /**
- * gsk_buffer_append:
+ * dsk_buffer_append:
  * @buffer: the buffer to add data to.  Data is put at the end of the buffer.
  * @data: binary data to add to the buffer.
  * @length: length of @data to add to the buffer.
@@ -220,33 +208,33 @@ verify_buffer (const GskBuffer *buffer)
  * Append data into the buffer.
  */
 void
-gsk_buffer_append(GskBuffer    *buffer,
-                  gconstpointer data,
-		  guint         length)
+dsk_buffer_append(DskBuffer    *buffer,
+                  const void * data,
+		  unsigned      length)
 {
   CHECK_INTEGRITY (buffer);
   buffer->size += length;
   while (length > 0)
     {
-      guint avail;
+      unsigned avail;
       if (!buffer->last_frag)
 	{
 	  buffer->last_frag = buffer->first_frag = new_native_fragment ();
-	  avail = gsk_buffer_fragment_avail (buffer->last_frag);
+	  avail = dsk_buffer_fragment_avail (buffer->last_frag);
 	}
       else
 	{
-	  avail = gsk_buffer_fragment_avail (buffer->last_frag);
+	  avail = dsk_buffer_fragment_avail (buffer->last_frag);
 	  if (avail <= 0)
 	    {
 	      buffer->last_frag->next = new_native_fragment ();
-	      avail = gsk_buffer_fragment_avail (buffer->last_frag);
+	      avail = dsk_buffer_fragment_avail (buffer->last_frag);
 	      buffer->last_frag = buffer->last_frag->next;
 	    }
 	}
       if (avail > length)
 	avail = length;
-      memcpy (gsk_buffer_fragment_end (buffer->last_frag), data, avail);
+      memcpy (dsk_buffer_fragment_end (buffer->last_frag), data, avail);
       data = (const char *) data + avail;
       length -= avail;
       buffer->last_frag->buf_length += avail;
@@ -255,33 +243,33 @@ gsk_buffer_append(GskBuffer    *buffer,
 }
 
 void
-gsk_buffer_append_repeated_char (GskBuffer    *buffer, 
+dsk_buffer_append_repeated_char (DskBuffer    *buffer, 
                                  char          character,
-                                 gsize         count)
+                                 size_t        count)
 {
   CHECK_INTEGRITY (buffer);
   buffer->size += count;
   while (count > 0)
     {
-      guint avail;
+      unsigned avail;
       if (!buffer->last_frag)
 	{
 	  buffer->last_frag = buffer->first_frag = new_native_fragment ();
-	  avail = gsk_buffer_fragment_avail (buffer->last_frag);
+	  avail = dsk_buffer_fragment_avail (buffer->last_frag);
 	}
       else
 	{
-	  avail = gsk_buffer_fragment_avail (buffer->last_frag);
+	  avail = dsk_buffer_fragment_avail (buffer->last_frag);
 	  if (avail <= 0)
 	    {
 	      buffer->last_frag->next = new_native_fragment ();
-	      avail = gsk_buffer_fragment_avail (buffer->last_frag);
+	      avail = dsk_buffer_fragment_avail (buffer->last_frag);
 	      buffer->last_frag = buffer->last_frag->next;
 	    }
 	}
       if (avail > count)
 	avail = count;
-      memset (gsk_buffer_fragment_end (buffer->last_frag), character, avail);
+      memset (dsk_buffer_fragment_end (buffer->last_frag), character, avail);
       count -= avail;
       buffer->last_frag->buf_length += avail;
     }
@@ -290,17 +278,17 @@ gsk_buffer_append_repeated_char (GskBuffer    *buffer,
 
 #if 0
 void
-gsk_buffer_append_repeated_data (GskBuffer    *buffer, 
-                                 gconstpointer data_to_repeat,
-                                 gsize         data_length,
-                                 gsize         count)
+dsk_buffer_append_repeated_data (DskBuffer    *buffer, 
+                                 const void * data_to_repeat,
+                                 size_t         data_length,
+                                 size_t         count)
 {
   ...
 }
 #endif
 
 /**
- * gsk_buffer_append_string:
+ * dsk_buffer_append_string:
  * @buffer: the buffer to add data to.  Data is put at the end of the buffer.
  * @string: NUL-terminated string to append to the buffer.
  *  The NUL is not appended.
@@ -308,29 +296,29 @@ gsk_buffer_append_repeated_data (GskBuffer    *buffer,
  * Append a string to the buffer.
  */
 void
-gsk_buffer_append_string(GskBuffer  *buffer,
+dsk_buffer_append_string(DskBuffer  *buffer,
                          const char *string)
 {
-  g_return_if_fail (string != NULL);
-  gsk_buffer_append (buffer, string, strlen (string));
+  dsk_return_if_fail (string != NULL, "string must be non-null");
+  dsk_buffer_append (buffer, string, strlen (string));
 }
 
 /**
- * gsk_buffer_append_char:
+ * dsk_buffer_append_char:
  * @buffer: the buffer to add the byte to.
  * @character: the byte to add to the buffer.
  *
  * Append a byte to a buffer.
  */
 void
-gsk_buffer_append_char(GskBuffer *buffer,
+dsk_buffer_append_char(DskBuffer *buffer,
 		       char       character)
 {
-  gsk_buffer_append (buffer, &character, 1);
+  dsk_buffer_append (buffer, &character, 1);
 }
 
 /**
- * gsk_buffer_append_string0:
+ * dsk_buffer_append_string0:
  * @buffer: the buffer to add data to.  Data is put at the end of the buffer.
  * @string: NUL-terminated string to append to the buffer;
  *  NUL is appended.
@@ -338,14 +326,14 @@ gsk_buffer_append_char(GskBuffer *buffer,
  * Append a NUL-terminated string to the buffer.  The NUL is appended.
  */
 void
-gsk_buffer_append_string0      (GskBuffer    *buffer,
+dsk_buffer_append_string0      (DskBuffer    *buffer,
 				const char   *string)
 {
-  gsk_buffer_append (buffer, string, strlen (string) + 1);
+  dsk_buffer_append (buffer, string, strlen (string) + 1);
 }
 
 /**
- * gsk_buffer_read:
+ * dsk_buffer_read:
  * @buffer: the buffer to read data from.
  * @data: buffer to fill with up to @max_length bytes of data.
  * @max_length: maximum number of bytes to read.
@@ -356,20 +344,20 @@ gsk_buffer_append_string0      (GskBuffer    *buffer,
  *
  * returns: number of bytes transferred.
  */
-guint
-gsk_buffer_read(GskBuffer    *buffer,
-                gpointer      data,
-		guint         max_length)
+unsigned
+dsk_buffer_read(DskBuffer    *buffer,
+                void *      data,
+		unsigned         max_length)
 {
-  guint rv = 0;
-  guint orig_max_length = max_length;
+  unsigned rv = 0;
+  unsigned orig_max_length = max_length;
   CHECK_INTEGRITY (buffer);
   while (max_length > 0 && buffer->first_frag)
     {
-      GskBufferFragment *first = buffer->first_frag;
+      DskBufferFragment *first = buffer->first_frag;
       if (first->buf_length <= max_length)
 	{
-	  memcpy (data, gsk_buffer_fragment_start (first), first->buf_length);
+	  memcpy (data, dsk_buffer_fragment_start (first), first->buf_length);
 	  rv += first->buf_length;
 	  data = (char *) data + first->buf_length;
 	  max_length -= first->buf_length;
@@ -380,7 +368,7 @@ gsk_buffer_read(GskBuffer    *buffer,
 	}
       else
 	{
-	  memcpy (data, gsk_buffer_fragment_start (first), max_length);
+	  memcpy (data, dsk_buffer_fragment_start (first), max_length);
 	  rv += max_length;
 	  first->buf_length -= max_length;
 	  first->buf_start += max_length;
@@ -395,7 +383,7 @@ gsk_buffer_read(GskBuffer    *buffer,
 }
 
 /**
- * gsk_buffer_peek:
+ * dsk_buffer_peek:
  * @buffer: the buffer to peek data from the front of.
  *    This buffer is unchanged by the operation.
  * @data: buffer to fill with up to @max_length bytes of data.
@@ -405,24 +393,24 @@ gsk_buffer_read(GskBuffer    *buffer,
  * and writes it to @data.  The number of bytes actually copied
  * is returned.
  *
- * This function is just like gsk_buffer_read() except that the 
+ * This function is just like dsk_buffer_read() except that the 
  * data is not removed from the buffer.
  *
  * returns: number of bytes copied into data.
  */
-guint
-gsk_buffer_peek     (const GskBuffer *buffer,
-                     gpointer         data,
-		     guint            max_length)
+unsigned
+dsk_buffer_peek     (const DskBuffer *buffer,
+                     void *         data,
+		     unsigned            max_length)
 {
   int rv = 0;
-  GskBufferFragment *frag = (GskBufferFragment *) buffer->first_frag;
+  DskBufferFragment *frag = (DskBufferFragment *) buffer->first_frag;
   CHECK_INTEGRITY (buffer);
   while (max_length > 0 && frag)
     {
       if (frag->buf_length <= max_length)
 	{
-	  memcpy (data, gsk_buffer_fragment_start (frag), frag->buf_length);
+	  memcpy (data, dsk_buffer_fragment_start (frag), frag->buf_length);
 	  rv += frag->buf_length;
 	  data = (char *) data + frag->buf_length;
 	  max_length -= frag->buf_length;
@@ -430,7 +418,7 @@ gsk_buffer_peek     (const GskBuffer *buffer,
 	}
       else
 	{
-	  memcpy (data, gsk_buffer_fragment_start (frag), max_length);
+	  memcpy (data, dsk_buffer_fragment_start (frag), max_length);
 	  rv += max_length;
 	  data = (char *) data + max_length;
 	  max_length = 0;
@@ -440,7 +428,7 @@ gsk_buffer_peek     (const GskBuffer *buffer,
 }
 
 /**
- * gsk_buffer_read_line:
+ * dsk_buffer_read_line:
  * @buffer: buffer to read a line from.
  *
  * Parse a newline (\n) terminated line from
@@ -452,17 +440,17 @@ gsk_buffer_peek     (const GskBuffer *buffer,
  * returns: a newly allocated NUL-terminated string, or NULL.
  */
 char *
-gsk_buffer_read_line(GskBuffer *buffer)
+dsk_buffer_read_line(DskBuffer *buffer)
 {
   int len = 0;
   char *rv;
-  GskBufferFragment *at;
+  DskBufferFragment *at;
   int newline_length;
   CHECK_INTEGRITY (buffer);
   for (at = buffer->first_frag; at; at = at->next)
     {
-      char *start = gsk_buffer_fragment_start (at);
-      char *got;
+      uint8_t *start = dsk_buffer_fragment_start (at);
+      uint8_t *got;
       got = memchr (start, '\n', at->buf_length);
       if (got)
 	{
@@ -473,21 +461,21 @@ gsk_buffer_read_line(GskBuffer *buffer)
     }
   if (at == NULL)
     return NULL;
-  rv = g_new (char, len + 1);
+  rv = dsk_malloc (len + 1);
   /* If we found a newline, read it out, truncating
    * it with NUL before we return from the function... */
   if (at)
     newline_length = 1;
   else
     newline_length = 0;
-  gsk_buffer_read (buffer, rv, len + newline_length);
+  dsk_buffer_read (buffer, rv, len + newline_length);
   rv[len] = 0;
   CHECK_INTEGRITY (buffer);
   return rv;
 }
 
 /**
- * gsk_buffer_parse_string0:
+ * dsk_buffer_parse_string0:
  * @buffer: buffer to read a line from.
  *
  * Parse a NUL-terminated line from
@@ -498,19 +486,19 @@ gsk_buffer_read_line(GskBuffer *buffer)
  * returns: a newly allocated NUL-terminated string, or NULL.
  */
 char *
-gsk_buffer_parse_string0(GskBuffer *buffer)
+dsk_buffer_parse_string0(DskBuffer *buffer)
 {
-  int index0 = gsk_buffer_index_of (buffer, '\0');
+  int index0 = dsk_buffer_index_of (buffer, '\0');
   char *rv;
   if (index0 < 0)
     return NULL;
-  rv = g_new (char, index0 + 1);
-  gsk_buffer_read (buffer, rv, index0 + 1);
+  rv = dsk_malloc (index0 + 1);
+  dsk_buffer_read (buffer, rv, index0 + 1);
   return rv;
 }
 
 /**
- * gsk_buffer_peek_char:
+ * dsk_buffer_peek_char:
  * @buffer: buffer to peek a single byte from.
  *
  * Get the first byte in the buffer as a positive or 0 number.
@@ -520,9 +508,9 @@ gsk_buffer_parse_string0(GskBuffer *buffer)
  * returns: an unsigned character or -1.
  */
 int
-gsk_buffer_peek_char(const GskBuffer *buffer)
+dsk_buffer_peek_char(const DskBuffer *buffer)
 {
-  const GskBufferFragment *frag;
+  const DskBufferFragment *frag;
 
   if (buffer->size == 0)
     return -1;
@@ -530,11 +518,12 @@ gsk_buffer_peek_char(const GskBuffer *buffer)
   for (frag = buffer->first_frag; frag; frag = frag->next)
     if (frag->buf_length > 0)
       break;
-  return * (const unsigned char *) (gsk_buffer_fragment_start ((GskBufferFragment*)frag));
+  return * (const unsigned char *) (dsk_buffer_fragment_start ((DskBufferFragment*)frag));
 }
 
+#if 0
 /**
- * gsk_buffer_read_char:
+ * dsk_buffer_read_char:
  * @buffer: buffer to read a single byte from.
  *
  * Get the first byte in the buffer as a positive or 0 number,
@@ -544,16 +533,17 @@ gsk_buffer_peek_char(const GskBuffer *buffer)
  * returns: an unsigned character or -1.
  */
 int
-gsk_buffer_read_char (GskBuffer *buffer)
+dsk_buffer_read_char (DskBuffer *buffer)
 {
   char c;
-  if (gsk_buffer_read (buffer, &c, 1) == 0)
+  if (dsk_buffer_read (buffer, &c, 1) == 0)
     return -1;
-  return (int) (guint8) c;
+  return (int) (uint8_t) c;
 }
+#endif
 
 /**
- * gsk_buffer_discard:
+ * dsk_buffer_discard:
  * @buffer: the buffer to discard data from.
  * @max_discard: maximum number of bytes to discard.
  *
@@ -563,14 +553,14 @@ gsk_buffer_read_char (GskBuffer *buffer)
  * returns: number of bytes discarded.
  */
 int
-gsk_buffer_discard(GskBuffer *buffer,
-                   guint      max_discard)
+dsk_buffer_discard(DskBuffer *buffer,
+                   unsigned      max_discard)
 {
   int rv = 0;
   CHECK_INTEGRITY (buffer);
   while (max_discard > 0 && buffer->first_frag)
     {
-      GskBufferFragment *first = buffer->first_frag;
+      DskBufferFragment *first = buffer->first_frag;
       if (first->buf_length <= max_discard)
 	{
 	  rv += first->buf_length;
@@ -594,7 +584,7 @@ gsk_buffer_discard(GskBuffer *buffer,
 }
 
 /**
- * gsk_buffer_writev:
+ * dsk_buffer_writev:
  * @read_from: buffer to take data from.
  * @fd: file-descriptor to write data to.
  *
@@ -607,13 +597,13 @@ gsk_buffer_discard(GskBuffer *buffer,
  * or -1 on a write error (consult errno).
  */
 int
-gsk_buffer_writev (GskBuffer       *read_from,
+dsk_buffer_writev (DskBuffer       *read_from,
 		   int              fd)
 {
   int rv;
   struct iovec *iov;
   int nfrag, i;
-  GskBufferFragment *frag_at = read_from->first_frag;
+  DskBufferFragment *frag_at = read_from->first_frag;
   CHECK_INTEGRITY (read_from);
   for (nfrag = 0; frag_at != NULL
 #ifdef MAX_FRAGMENTS_TO_WRITE
@@ -626,20 +616,20 @@ gsk_buffer_writev (GskBuffer       *read_from,
   for (i = 0; i < nfrag; i++)
     {
       iov[i].iov_len = frag_at->buf_length;
-      iov[i].iov_base = gsk_buffer_fragment_start (frag_at);
+      iov[i].iov_base = dsk_buffer_fragment_start (frag_at);
       frag_at = frag_at->next;
     }
   rv = writev (fd, iov, nfrag);
-  if (rv < 0 && gsk_errno_is_ignorable (errno))
+  if (rv < 0 && (errno == EINTR || errno == EAGAIN))
     return 0;
   if (rv <= 0)
     return rv;
-  gsk_buffer_discard (read_from, rv);
+  dsk_buffer_discard (read_from, rv);
   return rv;
 }
 
 /**
- * gsk_buffer_writev_len:
+ * dsk_buffer_writev_len:
  * @read_from: buffer to take data from.
  * @fd: file-descriptor to write data to.
  * @max_bytes: maximum number of bytes to write.
@@ -653,15 +643,15 @@ gsk_buffer_writev (GskBuffer       *read_from,
  * or -1 on a write error (consult errno).
  */
 int
-gsk_buffer_writev_len (GskBuffer *read_from,
+dsk_buffer_writev_len (DskBuffer *read_from,
 		       int        fd,
-		       guint      max_bytes)
+		       unsigned      max_bytes)
 {
   int rv;
   struct iovec *iov;
   int nfrag, i;
-  guint bytes;
-  GskBufferFragment *frag_at = read_from->first_frag;
+  unsigned bytes;
+  DskBufferFragment *frag_at = read_from->first_frag;
   CHECK_INTEGRITY (read_from);
   for (nfrag = 0, bytes = 0; frag_at != NULL && bytes < max_bytes
 #ifdef MAX_FRAGMENTS_TO_WRITE
@@ -676,23 +666,25 @@ gsk_buffer_writev_len (GskBuffer *read_from,
   frag_at = read_from->first_frag;
   for (bytes = max_bytes, i = 0; i < nfrag && bytes > 0; i++)
     {
-      guint frag_bytes = MIN (frag_at->buf_length, bytes);
+      unsigned frag_bytes = frag_at->buf_length;
+      if (frag_bytes > bytes)
+        frag_bytes = bytes;
       iov[i].iov_len = frag_bytes;
-      iov[i].iov_base = gsk_buffer_fragment_start (frag_at);
+      iov[i].iov_base = dsk_buffer_fragment_start (frag_at);
       frag_at = frag_at->next;
       bytes -= frag_bytes;
     }
   rv = writev (fd, iov, i);
-  if (rv < 0 && gsk_errno_is_ignorable (errno))
+  if (rv < 0 && (errno == EINTR || errno == EAGAIN))
     return 0;
   if (rv <= 0)
     return rv;
-  gsk_buffer_discard (read_from, rv);
+  dsk_buffer_discard (read_from, rv);
   return rv;
 }
 
 /**
- * gsk_buffer_read_in_fd:
+ * dsk_buffer_read_in_fd:
  * @write_to: buffer to append data to.
  * @read_from: file-descriptor to read data from.
  *
@@ -704,19 +696,19 @@ gsk_buffer_writev_len (GskBuffer *read_from,
  */
 /* TODO: zero-copy! */
 int
-gsk_buffer_read_in_fd(GskBuffer *write_to,
+dsk_buffer_readv(DskBuffer *write_to,
                       int        read_from)
 {
   char buf[8192];
   int rv = read (read_from, buf, sizeof (buf));
   if (rv < 0)
     return rv;
-  gsk_buffer_append (write_to, buf, rv);
+  dsk_buffer_append (write_to, buf, rv);
   return rv;
 }
 
 /**
- * gsk_buffer_destruct:
+ * dsk_buffer_destruct:
  * @to_destroy: the buffer to empty.
  *
  * Remove all fragments from a buffer, leaving it empty.
@@ -724,13 +716,13 @@ gsk_buffer_read_in_fd(GskBuffer *write_to,
  * but it also is allowed to start using it again.
  */
 void
-gsk_buffer_destruct(GskBuffer *to_destroy)
+dsk_buffer_destruct(DskBuffer *to_destroy)
 {
-  GskBufferFragment *at = to_destroy->first_frag;
+  DskBufferFragment *at = to_destroy->first_frag;
   CHECK_INTEGRITY (to_destroy);
   while (at)
     {
-      GskBufferFragment *next = at->next;
+      DskBufferFragment *next = at->next;
       recycle (at);
       at = next;
     }
@@ -739,7 +731,7 @@ gsk_buffer_destruct(GskBuffer *to_destroy)
 }
 
 /**
- * gsk_buffer_index_of:
+ * dsk_buffer_index_of:
  * @buffer: buffer to scan.
  * @char_to_find: a byte to look for.
  *
@@ -748,15 +740,15 @@ gsk_buffer_destruct(GskBuffer *to_destroy)
  * is not in the buffer.
  */
 int
-gsk_buffer_index_of(GskBuffer *buffer,
+dsk_buffer_index_of(DskBuffer *buffer,
                     char       char_to_find)
 {
-  GskBufferFragment *at = buffer->first_frag;
+  DskBufferFragment *at = buffer->first_frag;
   int rv = 0;
   while (at)
     {
-      char *start = gsk_buffer_fragment_start (at);
-      char *saught = memchr (start, char_to_find, at->buf_length);
+      uint8_t *start = dsk_buffer_fragment_start (at);
+      uint8_t *saught = memchr (start, char_to_find, at->buf_length);
       if (saught)
 	return (saught - start) + rv;
       else
@@ -767,7 +759,7 @@ gsk_buffer_index_of(GskBuffer *buffer,
 }
 
 /**
- * gsk_buffer_str_index_of:
+ * dsk_buffer_str_index_of:
  * @buffer: buffer to scan.
  * @str_to_find: a string to look for.
  *
@@ -776,22 +768,22 @@ gsk_buffer_index_of(GskBuffer *buffer,
  * is not in the buffer.
  */
 int 
-gsk_buffer_str_index_of (GskBuffer *buffer,
+dsk_buffer_str_index_of (DskBuffer *buffer,
                          const char *str_to_find)
 {
-  GskBufferFragment *frag = buffer->first_frag;
-  guint rv = 0;
+  DskBufferFragment *frag = buffer->first_frag;
+  unsigned rv = 0;
   for (frag = buffer->first_frag; frag; frag = frag->next)
     {
-      const char *frag_at = frag->buf + frag->buf_start;
-      guint frag_rem = frag->buf_length;
+      const uint8_t *frag_at = frag->buf + frag->buf_start;
+      unsigned frag_rem = frag->buf_length;
       while (frag_rem > 0)
         {
-          GskBufferFragment *subfrag;
-          const char *subfrag_at;
-          guint subfrag_rem;
+          DskBufferFragment *subfrag;
+          const uint8_t *subfrag_at;
+          unsigned subfrag_rem;
           const char *str_at;
-          if (G_LIKELY (*frag_at != str_to_find[0]))
+          if (*frag_at != str_to_find[0])
             {
               frag_at++;
               frag_rem--;
@@ -833,7 +825,7 @@ bad_guess:
 }
 
 /**
- * gsk_buffer_drain:
+ * dsk_buffer_drain:
  * @dst: buffer to add to.
  * @src: buffer to remove from.
  *
@@ -842,30 +834,30 @@ bad_guess:
  *
  * returns: the number of bytes transferred.
  */
-#if GSK_DEBUG_BUFFER_ALLOCATIONS
-guint
-gsk_buffer_drain (GskBuffer *dst,
-		  GskBuffer *src)
+#if DSK_DEBUG_BUFFER_ALLOCATIONS
+unsigned
+dsk_buffer_drain (DskBuffer *dst,
+		  DskBuffer *src)
 {
-  guint rv = src->size;
-  GskBufferFragment *frag;
+  unsigned rv = src->size;
+  DskBufferFragment *frag;
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
   for (frag = src->first_frag; frag; frag = frag->next)
-    gsk_buffer_append (dst,
-                       gsk_buffer_fragment_start (frag),
+    dsk_buffer_append (dst,
+                       dsk_buffer_fragment_start (frag),
                        frag->buf_length);
-  gsk_buffer_discard (src, src->size);
+  dsk_buffer_discard (src, src->size);
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
   return rv;
 }
 #else	/* optimized */
-guint
-gsk_buffer_drain (GskBuffer *dst,
-		  GskBuffer *src)
+unsigned
+dsk_buffer_drain (DskBuffer *dst,
+		  DskBuffer *src)
 {
-  guint rv = src->size;
+  unsigned rv = src->size;
 
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
@@ -892,7 +884,7 @@ gsk_buffer_drain (GskBuffer *dst,
 #endif
 
 /**
- * gsk_buffer_transfer:
+ * dsk_buffer_transfer:
  * @dst: place to copy data into.
  * @src: place to read data from.
  * @max_transfer: maximum number of bytes to transfer.
@@ -903,49 +895,49 @@ gsk_buffer_drain (GskBuffer *dst,
  *
  * returns: the number of bytes transferred.
  */
-#if GSK_DEBUG_BUFFER_ALLOCATIONS
-guint
-gsk_buffer_transfer(GskBuffer *dst,
-		    GskBuffer *src,
-		    guint max_transfer)
+#if DSK_DEBUG_BUFFER_ALLOCATIONS
+unsigned
+dsk_buffer_transfer(DskBuffer *dst,
+		    DskBuffer *src,
+		    unsigned max_transfer)
 {
-  guint rv = 0;
-  GskBufferFragment *frag;
+  unsigned rv = 0;
+  DskBufferFragment *frag;
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
   for (frag = src->first_frag; frag && max_transfer > 0; frag = frag->next)
     {
-      guint len = frag->buf_length;
+      unsigned len = frag->buf_length;
       if (len >= max_transfer)
         {
-          gsk_buffer_append (dst, gsk_buffer_fragment_start (frag), max_transfer);
+          dsk_buffer_append (dst, dsk_buffer_fragment_start (frag), max_transfer);
           rv += max_transfer;
           break;
         }
       else
         {
-          gsk_buffer_append (dst, gsk_buffer_fragment_start (frag), len);
+          dsk_buffer_append (dst, dsk_buffer_fragment_start (frag), len);
           rv += len;
           max_transfer -= len;
         }
     }
-  gsk_buffer_discard (src, rv);
+  dsk_buffer_discard (src, rv);
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
   return rv;
 }
 #else	/* optimized */
-guint
-gsk_buffer_transfer(GskBuffer *dst,
-		    GskBuffer *src,
-		    guint max_transfer)
+unsigned
+dsk_buffer_transfer(DskBuffer *dst,
+		    DskBuffer *src,
+		    unsigned max_transfer)
 {
-  guint rv = 0;
+  unsigned rv = 0;
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
   while (src->first_frag && max_transfer >= src->first_frag->buf_length)
     {
-      GskBufferFragment *frag = src->first_frag;
+      DskBufferFragment *frag = src->first_frag;
       src->first_frag = frag->next;
       frag->next = NULL;
       if (src->first_frag == NULL)
@@ -963,8 +955,8 @@ gsk_buffer_transfer(GskBuffer *dst,
   dst->size += rv;
   if (src->first_frag && max_transfer)
     {
-      GskBufferFragment *frag = src->first_frag;
-      gsk_buffer_append (dst, gsk_buffer_fragment_start (frag), max_transfer);
+      DskBufferFragment *frag = src->first_frag;
+      dsk_buffer_append (dst, dsk_buffer_fragment_start (frag), max_transfer);
       frag->buf_start += max_transfer;
       frag->buf_length -= max_transfer;
       rv += max_transfer;
@@ -974,11 +966,11 @@ gsk_buffer_transfer(GskBuffer *dst,
   CHECK_INTEGRITY (src);
   return rv;
 }
-#endif	/* !GSK_DEBUG_BUFFER_ALLOCATIONS */
+#endif	/* !DSK_DEBUG_BUFFER_ALLOCATIONS */
 
 /* --- foreign data --- */
 /**
- * gsk_buffer_append_foreign:
+ * dsk_buffer_append_foreign:
  * @buffer: the buffer to append into.
  * @data: the data to append.
  * @length: length of @data.
@@ -991,13 +983,13 @@ gsk_buffer_transfer(GskBuffer *dst,
  * @destroy may be omitted if @data is permanent, for example,
  * if appended a static string into a buffer.
  */
-void gsk_buffer_append_foreign (GskBuffer        *buffer,
-                                gconstpointer     data,
+void dsk_buffer_append_foreign (DskBuffer        *buffer,
+                                const void *     data,
 				int               length,
-				GDestroyNotify    destroy,
-				gpointer          destroy_data)
+				DskDestroyNotify    destroy,
+				void *          destroy_data)
 {
-  GskBufferFragment *fragment;
+  DskBufferFragment *fragment;
 
   CHECK_INTEGRITY (buffer);
 
@@ -1015,88 +1007,90 @@ void gsk_buffer_append_foreign (GskBuffer        *buffer,
   CHECK_INTEGRITY (buffer);
 }
 
+#if 0
 /**
- * gsk_buffer_printf:
+ * dsk_buffer_printf:
  * @buffer: the buffer to append to.
  * @format: printf-style format string describing what to append to buffer.
  * @Varargs: values referenced by @format string.
  *
  * Append printf-style content to a buffer.
  */
-void     gsk_buffer_printf              (GskBuffer    *buffer,
+void     dsk_buffer_printf              (DskBuffer    *buffer,
 					 const char   *format,
 					 ...)
 {
   va_list args;
   va_start (args, format);
-  gsk_buffer_vprintf (buffer, format, args);
+  dsk_buffer_vprintf (buffer, format, args);
   va_end (args);
 }
 
 /**
- * gsk_buffer_vprintf:
+ * dsk_buffer_vprintf:
  * @buffer: the buffer to append to.
  * @format: printf-style format string describing what to append to buffer.
  * @args: values referenced by @format string.
  *
  * Append printf-style content to a buffer, given a va_list.
  */
-void     gsk_buffer_vprintf             (GskBuffer    *buffer,
+void     dsk_buffer_vprintf             (DskBuffer    *buffer,
 					 const char   *format,
 					 va_list       args)
 {
-  gsize size = g_printf_string_upper_bound (format, args);
+  size_t size = g_printf_string_upper_bound (format, args);
   if (size < 1024)
     {
       char buf[1024];
       g_vsnprintf (buf, sizeof (buf), format, args);
-      gsk_buffer_append_string (buffer, buf);
+      dsk_buffer_append_string (buffer, buf);
     }
   else
     {
       char *buf = g_strdup_vprintf (format, args);
-      gsk_buffer_append_foreign (buffer, buf, strlen (buf), g_free, buf);
+      dsk_buffer_append_foreign (buffer, buf, strlen (buf), g_free, buf);
     }
 }
+#endif
 
-/* --- gsk_buffer_polystr_index_of implementation --- */
+/* --- dsk_buffer_polystr_index_of implementation --- */
 /* Test to see if a sequence of buffer fragments
  * starts with a particular NUL-terminated string.
  */
-static gboolean
-fragment_n_str(GskBufferFragment   *frag,
-               guint                frag_index,
+static dsk_boolean
+fragment_n_str(DskBufferFragment   *frag,
+               unsigned                frag_index,
                const char          *string)
 {
-  guint len = strlen (string);
+  unsigned len = strlen (string);
   for (;;)
     {
-      guint test_len = frag->buf_length - frag_index;
+      unsigned test_len = frag->buf_length - frag_index;
       if (test_len > len)
         test_len = len;
 
       if (memcmp (string,
-                  gsk_buffer_fragment_start (frag) + frag_index,
+                  dsk_buffer_fragment_start (frag) + frag_index,
                   test_len) != 0)
-        return FALSE;
+        return DSK_FALSE;
 
       len -= test_len;
       string += test_len;
 
       if (len <= 0)
-        return TRUE;
+        return DSK_TRUE;
       frag_index += test_len;
       if (frag_index >= frag->buf_length)
         {
           frag = frag->next;
           if (frag == NULL)
-            return FALSE;
+            return DSK_FALSE;
         }
     }
 }
 
 /**
- * gsk_buffer_polystr_index_of:
+ * dsk_buffer_polystr_index_of:
  * @buffer: buffer to scan.
  * @strings: NULL-terminated set of string.
  *
@@ -1106,20 +1100,20 @@ fragment_n_str(GskBufferFragment   *frag,
  * returns: the index of that instance, or -1 if not found.
  */
 int     
-gsk_buffer_polystr_index_of    (GskBuffer    *buffer,
+dsk_buffer_polystr_index_of    (DskBuffer    *buffer,
                                 char        **strings)
 {
-  guint8 init_char_map[16];
+  uint8_t init_char_map[16];
   int num_strings;
   int num_bits = 0;
   int total_index = 0;
-  GskBufferFragment *frag;
+  DskBufferFragment *frag;
   memset (init_char_map, 0, sizeof (init_char_map));
   for (num_strings = 0; strings[num_strings] != NULL; num_strings++)
     {
-      guint8 c = strings[num_strings][0];
-      guint8 mask = (1 << (c % 8));
-      guint8 *rack = init_char_map + (c / 8);
+      uint8_t c = strings[num_strings][0];
+      uint8_t mask = (1 << (c % 8));
+      uint8_t *rack = init_char_map + (c / 8);
       if ((*rack & mask) == 0)
         {
           *rack |= mask;
@@ -1130,14 +1124,14 @@ gsk_buffer_polystr_index_of    (GskBuffer    *buffer,
     return 0;
   for (frag = buffer->first_frag; frag != NULL; frag = frag->next)
     {
-      const char *frag_start;
-      const char *at;
+      const uint8_t *frag_start;
+      const uint8_t *at;
       int remaining = frag->buf_length;
-      frag_start = gsk_buffer_fragment_start (frag);
+      frag_start = dsk_buffer_fragment_start (frag);
       at = frag_start;
       while (at != NULL)
         {
-          const char *start = at;
+          const uint8_t *start = at;
           if (num_bits == 1)
             {
               at = memchr (start, strings[0][0], remaining);
@@ -1150,7 +1144,7 @@ gsk_buffer_polystr_index_of    (GskBuffer    *buffer,
             {
               while (remaining > 0)
                 {
-                  guint8 i = (guint8) (*at);
+                  uint8_t i = (uint8_t) (*at);
                   if (init_char_map[i / 8] & (1 << (i % 8)))
                     break;
                   remaining--;
@@ -1179,24 +1173,25 @@ gsk_buffer_polystr_index_of    (GskBuffer    *buffer,
   return -1;
 }
 
-/* --- GskBufferIterator --- */
+#if 0
+/* --- DskBufferIterator --- */
 
 /**
- * gsk_buffer_iterator_construct:
+ * dsk_buffer_iterator_construct:
  * @iterator: to initialize.
  * @to_iterate: the buffer to walk through.
  *
- * Initialize a new #GskBufferIterator.
+ * Initialize a new #DskBufferIterator.
  */
 void 
-gsk_buffer_iterator_construct (GskBufferIterator *iterator,
-			       GskBuffer         *to_iterate)
+dsk_buffer_iterator_construct (DskBufferIterator *iterator,
+			       DskBuffer         *to_iterate)
 {
   iterator->fragment = to_iterate->first_frag;
   if (iterator->fragment != NULL)
     {
       iterator->in_cur = 0;
-      iterator->cur_data = (guint8*)gsk_buffer_fragment_start (iterator->fragment);
+      iterator->cur_data = (uint8_t*)dsk_buffer_fragment_start (iterator->fragment);
       iterator->cur_length = iterator->fragment->buf_length;
     }
   else
@@ -1209,7 +1204,7 @@ gsk_buffer_iterator_construct (GskBufferIterator *iterator,
 }
 
 /**
- * gsk_buffer_iterator_peek:
+ * dsk_buffer_iterator_peek:
  * @iterator: to peek data from.
  * @out: to copy data into.
  * @max_length: maximum number of bytes to write to @out.
@@ -1219,23 +1214,23 @@ gsk_buffer_iterator_construct (GskBufferIterator *iterator,
  *
  * returns: number of bytes peeked into @out.
  */
-guint
-gsk_buffer_iterator_peek      (GskBufferIterator *iterator,
-			       gpointer           out,
-			       guint              max_length)
+unsigned
+dsk_buffer_iterator_peek      (DskBufferIterator *iterator,
+			       void *           out,
+			       unsigned              max_length)
 {
-  GskBufferFragment *fragment = iterator->fragment;
+  DskBufferFragment *fragment = iterator->fragment;
 
-  guint frag_length = iterator->cur_length;
-  const guint8 *frag_data = iterator->cur_data;
-  guint in_frag = iterator->in_cur;
+  unsigned frag_length = iterator->cur_length;
+  const uint8_t *frag_data = iterator->cur_data;
+  unsigned in_frag = iterator->in_cur;
 
-  guint out_remaining = max_length;
-  guint8 *out_at = out;
+  unsigned out_remaining = max_length;
+  uint8_t *out_at = out;
 
   while (fragment != NULL)
     {
-      guint frag_remaining = frag_length - in_frag;
+      unsigned frag_remaining = frag_length - in_frag;
       if (out_remaining <= frag_remaining)
 	{
 	  memcpy (out_at, frag_data + in_frag, out_remaining);
@@ -1250,7 +1245,7 @@ gsk_buffer_iterator_peek      (GskBufferIterator *iterator,
       fragment = fragment->next;
       if (fragment != NULL)
 	{
-	  frag_data = (guint8 *) gsk_buffer_fragment_start (fragment);
+	  frag_data = (uint8_t *) dsk_buffer_fragment_start (fragment);
 	  frag_length = fragment->buf_length;
 	}
       in_frag = 0;
@@ -1259,7 +1254,7 @@ gsk_buffer_iterator_peek      (GskBufferIterator *iterator,
 }
 
 /**
- * gsk_buffer_iterator_read:
+ * dsk_buffer_iterator_read:
  * @iterator: to read data from.
  * @out: to copy data into.
  * @max_length: maximum number of bytes to write to @out.
@@ -1270,23 +1265,23 @@ gsk_buffer_iterator_peek      (GskBufferIterator *iterator,
  *
  * returns: number of bytes read into @out.
  */
-guint
-gsk_buffer_iterator_read      (GskBufferIterator *iterator,
-			       gpointer           out,
-			       guint              max_length)
+unsigned
+dsk_buffer_iterator_read      (DskBufferIterator *iterator,
+			       void *           out,
+			       unsigned              max_length)
 {
-  GskBufferFragment *fragment = iterator->fragment;
+  DskBufferFragment *fragment = iterator->fragment;
 
-  guint frag_length = iterator->cur_length;
-  const guint8 *frag_data = iterator->cur_data;
-  guint in_frag = iterator->in_cur;
+  unsigned frag_length = iterator->cur_length;
+  const uint8_t *frag_data = iterator->cur_data;
+  unsigned in_frag = iterator->in_cur;
 
-  guint out_remaining = max_length;
-  guint8 *out_at = out;
+  unsigned out_remaining = max_length;
+  uint8_t *out_at = out;
 
   while (fragment != NULL)
     {
-      guint frag_remaining = frag_length - in_frag;
+      unsigned frag_remaining = frag_length - in_frag;
       if (out_remaining <= frag_remaining)
 	{
 	  memcpy (out_at, frag_data + in_frag, out_remaining);
@@ -1302,7 +1297,7 @@ gsk_buffer_iterator_read      (GskBufferIterator *iterator,
       fragment = fragment->next;
       if (fragment != NULL)
 	{
-	  frag_data = (guint8 *) gsk_buffer_fragment_start (fragment);
+	  frag_data = (uint8_t *) dsk_buffer_fragment_start (fragment);
 	  frag_length = fragment->buf_length;
 	}
       in_frag = 0;
@@ -1316,7 +1311,7 @@ gsk_buffer_iterator_read      (GskBufferIterator *iterator,
 }
 
 /**
- * gsk_buffer_iterator_find_char:
+ * dsk_buffer_iterator_find_char:
  * @iterator: to advance.
  * @c: the character to look for.
  *
@@ -1328,23 +1323,23 @@ gsk_buffer_iterator_read      (GskBufferIterator *iterator,
  */
 
 gboolean
-gsk_buffer_iterator_find_char (GskBufferIterator *iterator,
+dsk_buffer_iterator_find_char (DskBufferIterator *iterator,
 			       char               c)
 {
-  GskBufferFragment *fragment = iterator->fragment;
+  DskBufferFragment *fragment = iterator->fragment;
 
-  guint frag_length = iterator->cur_length;
-  const guint8 *frag_data = iterator->cur_data;
-  guint in_frag = iterator->in_cur;
-  guint new_offset = iterator->offset;
+  unsigned frag_length = iterator->cur_length;
+  const uint8_t *frag_data = iterator->cur_data;
+  unsigned in_frag = iterator->in_cur;
+  unsigned new_offset = iterator->offset;
 
   if (fragment == NULL)
     return -1;
 
   for (;;)
     {
-      guint frag_remaining = frag_length - in_frag;
-      const guint8 * ptr = memchr (frag_data + in_frag, c, frag_remaining);
+      unsigned frag_remaining = frag_length - in_frag;
+      const uint8_t * ptr = memchr (frag_data + in_frag, c, frag_remaining);
       if (ptr != NULL)
 	{
 	  iterator->offset = (ptr - frag_data) - in_frag + new_offset;
@@ -1360,12 +1355,12 @@ gsk_buffer_iterator_find_char (GskBufferIterator *iterator,
       new_offset += frag_length - in_frag;
       in_frag = 0;
       frag_length = fragment->buf_length;
-      frag_data = (guint8 *) fragment->buf + fragment->buf_start;
+      frag_data = (uint8_t *) fragment->buf + fragment->buf_start;
     }
 }
 
 /**
- * gsk_buffer_iterator_skip:
+ * dsk_buffer_iterator_skip:
  * @iterator: to advance.
  * @max_length: maximum number of bytes to skip forward.
  *
@@ -1374,21 +1369,21 @@ gsk_buffer_iterator_find_char (GskBufferIterator *iterator,
  *
  * returns: number of bytes skipped forward.
  */
-guint
-gsk_buffer_iterator_skip      (GskBufferIterator *iterator,
-			       guint              max_length)
+unsigned
+dsk_buffer_iterator_skip      (DskBufferIterator *iterator,
+			       unsigned              max_length)
 {
-  GskBufferFragment *fragment = iterator->fragment;
+  DskBufferFragment *fragment = iterator->fragment;
 
-  guint frag_length = iterator->cur_length;
-  const guint8 *frag_data = iterator->cur_data;
-  guint in_frag = iterator->in_cur;
+  unsigned frag_length = iterator->cur_length;
+  const uint8_t *frag_data = iterator->cur_data;
+  unsigned in_frag = iterator->in_cur;
 
-  guint out_remaining = max_length;
+  unsigned out_remaining = max_length;
 
   while (fragment != NULL)
     {
-      guint frag_remaining = frag_length - in_frag;
+      unsigned frag_remaining = frag_length - in_frag;
       if (out_remaining <= frag_remaining)
 	{
 	  in_frag += out_remaining;
@@ -1401,7 +1396,7 @@ gsk_buffer_iterator_skip      (GskBufferIterator *iterator,
       fragment = fragment->next;
       if (fragment != NULL)
 	{
-	  frag_data = (guint8 *) gsk_buffer_fragment_start (fragment);
+	  frag_data = (uint8_t *) dsk_buffer_fragment_start (fragment);
 	  frag_length = fragment->buf_length;
 	}
       else
@@ -1418,3 +1413,4 @@ gsk_buffer_iterator_skip      (GskBufferIterator *iterator,
   iterator->offset += max_length - out_remaining;
   return max_length - out_remaining;
 }
+#endif

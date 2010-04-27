@@ -99,3 +99,6 @@ void     dsk_buffer_clear               (DskBuffer    *to_destroy);
 /* Free all unused buffer fragments. */
 void     dsk_buffer_cleanup_recycling_bin ();
 
+
+/* misc */
+int dsk_buffer_index_of(DskBuffer *buffer, char char_to_find);

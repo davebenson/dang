@@ -73,6 +73,9 @@ void dsk_warning(const char *format, ...) DSK_GNUC_PRINTF(1,2);
 #define dsk_goto_if_fail(condition, blurb, label) do{}while(0)
 #define dsk_return_if_fail(condition, blurb) do{}while(0)
 #define dsk_return_val_if_fail(condition, blurb, value) do{}while(0)
+#define dsk_return_if_reached(blurb)     return
+#define dsk_return_val_if_reached(blurb, value)     return (value)
+
 #else
 #define dsk_warn_if_fail(condition, blurb) \
   do{ if (!(condition)) \
@@ -127,6 +130,22 @@ void dsk_warning(const char *format, ...) DSK_GNUC_PRINTF(1,2);
                        __FILE__, __LINE__, \
                        (blurb) ? (blurb) : "dsk_die_if_reached", \
                        __func__)
+#define dsk_return_if_reached(blurb) \
+  do{ \
+    dsk_warning ("%s:%u: should not be reached: %s (%s)", \
+                         __FILE__, __LINE__, \
+                         (blurb) ? (blurb) : "dsk_return_if_reached", \
+                         __func__); \
+    return; \
+  } while(0)
+#define dsk_return_val_if_reached(blurb, value) \
+  do{ \
+    dsk_warning ("%s:%u: should not be reached: %s (%s)", \
+                         __FILE__, __LINE__, \
+                         (blurb) ? (blurb) : "dsk_return_val_if_reached", \
+                         __func__); \
+    return (value); \
+  } while(0)
 #endif
 
 /* programmer error:  only needed during development, hopefully.. */

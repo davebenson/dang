@@ -11,7 +11,8 @@ programs/%: programs/%.c libdsk.a
 	gcc -W -Wall -g -o $@ $^
 libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socket.o dsk-dispatch.o dsk-hook.o \
 	  dsk-cmdline.o dsk-ip-address.o dsk-dns-client.o dsk-mem-pool.o \
-	  dsk-fd.o dsk-unicode.o dsk-client-stream.o
+	  dsk-fd.o dsk-octet-io.o dsk-octet-fd.o dsk-unicode.o dsk-client-stream.o \
+	  dsk-buffer.o dsk-main.o
 	ar cru $@ $^
 
 %.o: %.c
