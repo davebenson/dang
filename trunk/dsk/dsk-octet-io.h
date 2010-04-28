@@ -89,6 +89,8 @@ struct _DskOctetConnection
   DskBuffer buffer;
   DskOctetSource *source;
   DskOctetSink *sink;
+  DskHookTrap *read_trap;
+  DskHookTrap *write_trap;
 
   unsigned max_buffer;
   unsigned shutdown_on_read_error : 1;
@@ -105,6 +107,11 @@ struct _DskOctetConnectionOptions
   dsk_boolean shutdown_on_read_error;
   dsk_boolean shutdown_on_write_error;
 };
+#define DSK_OCTET_CONNECTION_OPTIONS_DEFAULT \
+{ 4096,                         /* max_buffer */                \
+  DSK_TRUE,                     /* shutdown_on_read_error */    \
+  DSK_TRUE                      /* shutdown_on_write_error */   \
+}
 
 DSK_INLINE_FUNC void dsk_octet_connect       (DskOctetSource *source,
                                               DskOctetSink   *sink,
