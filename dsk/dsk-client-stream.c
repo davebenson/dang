@@ -50,7 +50,6 @@ dsk_client_stream_new       (DskClientStreamOptions *options,
 {
   DskClientStream *rv;
   dsk_boolean has_address = !ip_address_is_default (&options->address);
-  DSK_UNUSED (error);
 
   /* check trivial usage considerations */
   dsk_warn_if_fail (!(options->hostname != NULL && has_address),
@@ -493,6 +492,21 @@ DskClientStreamClass dsk_client_stream_class =
                           NULL, dsk_client_stream_finalize)
 };
 
+void dsk_client_stream_disconnect (DskClientStream *stream)
+{
+  if (!stream->is_connected)
+    return;
+
+  /* close fd */
+  dsk_main_close_fd (stream->fd);
+  stream->is_connected = DSK_FALSE;
+
+  /* emit disconnect hook */
+  dsk_hook_notify (&stream->disconnect_hook);
+
+  /* maybe plan reconnect */
+  maybe_set_autoreconnect_timer (stream);
+}
 
 /* === Implementation of octet-source class === */
 static DskIOResult

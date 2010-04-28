@@ -842,12 +842,10 @@ clear_waiting_to_send_flag (DskDnsCacheEntryJob *job)
 }
 
 static void
-handle_timer_expired (DskDispatch *dispatch,
-                      void        *data)
+handle_timer_expired (void        *data)
 {
   DskDnsCacheEntryJob *job = data;
   DskError *error = NULL;
-  (void) dispatch;
   (void) data;
 
   clear_waiting_to_send_flag (job);
@@ -859,7 +857,6 @@ handle_timer_expired (DskDispatch *dispatch,
       /* Setup cache-entry */
       DskDnsCacheEntry *owner = job->owner;
       DskDnsCacheEntry *conflict;
-      dsk_dispatch_remove_timer (job->timer);
       owner->type = DSK_DNS_CACHE_ENTRY_ERROR;
       owner->info.error.error = dsk_error_new ("timed out waiting for response");
       owner->expire_time = dsk_get_current_time () + 1;
@@ -872,9 +869,8 @@ handle_timer_expired (DskDispatch *dispatch,
 
   /* adjust timer */
   job->attempt += 1;
-  job->timer = dsk_dispatch_add_timer_millis (dispatch,
-                                    retry_schedule[job->attempt],
-                                    handle_timer_expired, job);
+  job->timer = dsk_main_add_timer_millis (retry_schedule[job->attempt],
+                                          handle_timer_expired, job);
 
   /* try a different nameserver */
   job->ns_index += 1;

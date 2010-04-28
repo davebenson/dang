@@ -27,6 +27,8 @@ handle_source_readable (void       *object,
   if (conn->buffer.size > 0
    && conn->write_trap->block_count == 1)
     dsk_hook_trap_unblock (conn->write_trap);
+  if (conn->buffer.size >= conn->max_buffer)
+    dsk_hook_trap_block (conn->read_trap);
   return DSK_TRUE;
 
 done_reading:
@@ -71,14 +73,33 @@ handle_sink_writable (void *object, void *callback_data)
     }
   if (conn->buffer.size == 0 && conn->write_trap->block_count == 0)
     dsk_hook_trap_block (conn->write_trap);
+  if (conn->read_trap->block_count > 0
+   && conn->buffer.size < conn->max_buffer)
+    dsk_hook_trap_unblock (conn->read_trap);
   return DSK_TRUE;
 
 got_error:
   if (conn->shutdown_on_write_error)
     {
-      ...
+      if (conn->read_trap)
+        {
+          if (conn->read_trap->block_count > 0)
+            dsk_hook_trap_unblock (conn->read_trap);
+          dsk_hook_trap_destroy (conn->read_trap);
+          conn->read_trap = NULL;
+        }
+      if (conn->source)
+        {
+          DskOctetSource *source = conn->source;
+          conn->source = NULL;
+          dsk_octet_source_shutdown (source);
+          dsk_object_unref (source);
+        }
+      dsk_octet_sink_shutdown (sink);
     }
-  ...
+  conn->sink = NULL;
+  dsk_object_unref (sink);
+  return DSK_FALSE;
 }
 
 DskOctetConnection *
@@ -109,9 +130,71 @@ dsk_octet_connection_new (DskOctetSource *source,
   return connection;
 }
 
-void                dsk_octet_connection_shutdown (DskOctetConnection *);
-void                dsk_octet_connection_disconnect (DskOctetConnection *);
+void
+dsk_octet_connection_shutdown (DskOctetConnection *conn)
+{
+  dsk_object_ref (conn);
+  if (conn->read_trap)
+    {
+      dsk_hook_trap_destroy (conn->read_trap);
+      conn->read_trap = NULL;
+    }
+  if (conn->write_trap)
+    {
+      dsk_hook_trap_destroy (conn->read_trap);
+      conn->write_trap = NULL;
+    }
+  if (conn->sink)
+    {
+      dsk_octet_sink_shutdown (conn->sink);
+      dsk_object_unref (conn->sink);
+      conn->sink = NULL;
+    }
+  if (conn->source)
+    {
+      dsk_octet_source_shutdown (conn->source);
+      dsk_object_unref (conn->source);
+      conn->source = NULL;
+    }
+  dsk_object_unref (conn);
+}
 
+void
+dsk_octet_connection_disconnect (DskOctetConnection *conn)
+{
+  dsk_object_ref (conn);
+  if (conn->read_trap)
+    {
+      dsk_hook_trap_destroy (conn->read_trap);
+      conn->read_trap = NULL;
+    }
+  if (conn->write_trap)
+    {
+      dsk_hook_trap_destroy (conn->read_trap);
+      conn->write_trap = NULL;
+    }
+  if (conn->sink)
+    {
+      dsk_object_unref (conn->sink);
+      conn->sink = NULL;
+    }
+  if (conn->source)
+    {
+      dsk_object_unref (conn->source);
+      conn->source = NULL;
+    }
+  dsk_object_unref (conn);
+}
+
+static void
+dsk_octet_connection_finalize (DskOctetConnection *conn)
+{
+  dsk_assert (conn->source == NULL);
+  dsk_assert (conn->sink == NULL);
+  if (conn->last_error)
+    dsk_error_unref (conn->last_error);
+  dsk_buffer_clear (&conn->buffer);
+}
 
 DskOctetConnectionClass dsk_octet_connection_class =
 {

@@ -400,10 +400,13 @@ dsk_dispatch_watch_fd (DskDispatch *dispatch,
            (events&DSK_EVENT_READABLE)?"r":"",
            (events&DSK_EVENT_WRITABLE)?"w":"");
 #endif
-  if (callback == NULL)
-    assert (events == 0);
+  if (events == 0)
+    {
+      callback = NULL;
+      callback_data = NULL;
+    }
   else
-    assert (events != 0);
+    dsk_assert (callback != NULL);
   fm = force_fd_map (d, f);
 
   /* XXX: should we set fm->map.closed_since_notify_started=0 ??? */
