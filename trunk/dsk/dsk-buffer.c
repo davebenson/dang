@@ -708,7 +708,7 @@ dsk_buffer_readv(DskBuffer *write_to,
 }
 
 /**
- * dsk_buffer_destruct:
+ * dsk_buffer_clear:
  * @to_destroy: the buffer to empty.
  *
  * Remove all fragments from a buffer, leaving it empty.
@@ -716,7 +716,7 @@ dsk_buffer_readv(DskBuffer *write_to,
  * but it also is allowed to start using it again.
  */
 void
-dsk_buffer_destruct(DskBuffer *to_destroy)
+dsk_buffer_clear(DskBuffer *to_destroy)
 {
   DskBufferFragment *at = to_destroy->first_frag;
   CHECK_INTEGRITY (to_destroy);

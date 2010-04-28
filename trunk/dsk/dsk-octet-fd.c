@@ -17,7 +17,7 @@ DskOctetSource *dsk_octet_source_new_stdin (void)
       DskError *error = NULL;
       fdstream = dsk_octet_stream_new_fd (STDIN_FILENO,
                                           DSK_FILE_DESCRIPTOR_IS_NOT_WRITABLE
-                                          |DSK_FILE_DESCRIPTOR_IS_WRITABLE
+                                          |DSK_FILE_DESCRIPTOR_IS_READABLE
                                           |DSK_FILE_DESCRIPTOR_DO_NOT_CLOSE,
                                           &error);
       if (fdstream == NULL)
@@ -35,7 +35,7 @@ DskOctetSink *dsk_octet_sink_new_stdout (void)
     {
       DskError *error = NULL;
       fdstream = dsk_octet_stream_new_fd (STDOUT_FILENO,
-                                          DSK_FILE_DESCRIPTOR_IS_NOT_WRITABLE
+                                          DSK_FILE_DESCRIPTOR_IS_NOT_READABLE
                                           |DSK_FILE_DESCRIPTOR_IS_WRITABLE
                                           |DSK_FILE_DESCRIPTOR_DO_NOT_CLOSE,
                                           &error);
