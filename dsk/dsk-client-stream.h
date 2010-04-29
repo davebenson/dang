@@ -111,8 +111,11 @@ struct _DskClientStreamOptions
   -1,                                       /* idle_disconnect_time */   \
 }
 
-DskClientStream *dsk_client_stream_new       (DskClientStreamOptions *options,
-                                              DskError  **error);
+dsk_boolean      dsk_client_stream_new       (DskClientStreamOptions *options,
+                                              DskClientStream **stream_out,
+                                              DskOctetSource  **source_out,
+                                              DskOctetSink    **sink_out,
+                                              DskError        **error);
 
 /* use -1 to disable these timeouts */
 void             dsk_client_stream_set_reconnect_time (DskClientStream *client,

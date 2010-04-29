@@ -46,9 +46,10 @@ done_reading:
             conn->write_trap = NULL;
             if (write_trap->block_count > 0)
               dsk_hook_trap_unblock (write_trap);
+            dsk_hook_trap_destroy (write_trap);
+
             if (conn->sink)
               dsk_octet_sink_shutdown (conn->sink);
-            dsk_hook_trap_destroy (write_trap);
           }
       }
     dsk_hook_trap_destroy (read_trap);
@@ -92,7 +93,7 @@ got_error:
           dsk_hook_trap_destroy (conn->read_trap);
           conn->read_trap = NULL;
         }
-      if (conn->source)
+      if (conn->source != NULL)
         {
           DskOctetSource *source = conn->source;
           conn->source = NULL;
@@ -104,6 +105,37 @@ got_error:
   conn->sink = NULL;
   dsk_object_unref (sink);
   return DSK_FALSE;
+}
+
+static void
+sink_hook_destroyed (void *data)
+{
+  DskOctetConnection *conn = data;
+  dsk_warning ("sink_hook_destroyed: conn=%p[%s]; write_trap=%p",
+               conn, ((DskObject*)conn)->object_class->name,
+               conn->write_trap);
+  conn->write_trap = NULL;
+  if (conn->sink != NULL)
+    {
+      DskOctetSink *sink = conn->sink;
+      conn->sink = NULL;
+      dsk_object_unref (sink);
+    }
+  dsk_object_unref (conn);
+}
+static void
+source_hook_destroyed (void *data)
+{
+  DskOctetConnection *conn = data;
+  dsk_warning ("source_hook_destroyed: conn=%p", conn);
+  conn->read_trap = NULL;
+  if (conn->source)
+    {
+      DskOctetSource *source = conn->source;
+      conn->source = NULL;
+      dsk_object_unref (source);
+    }
+  dsk_object_unref (conn);
 }
 
 DskOctetConnection *
@@ -125,12 +157,14 @@ dsk_octet_connection_new (DskOctetSource *source,
   connection->read_trap = dsk_hook_trap (&(source->readable_hook),
                                          handle_source_readable,
                                          dsk_object_ref (connection),
-                                         (DskHookDestroy) dsk_object_unref_f);
+                                         source_hook_destroyed);
   connection->write_trap = dsk_hook_trap (&(sink->writable_hook),
                                           handle_sink_writable,
                                           dsk_object_ref (connection),
-                                          (DskHookDestroy) dsk_object_unref_f);
+                                          sink_hook_destroyed);
   dsk_hook_trap_block (connection->write_trap);
+  dsk_warning ("dsk_octet_connection_new: %p->%p; conn=%p",
+               source,sink,connection);
   return connection;
 }
 

@@ -96,6 +96,7 @@ dsk_hook_notify (DskHook *hook)
 void
 dsk_hook_trap_destroy (DskHookTrap   *trap)
 {
+  dsk_warning ("dsk_hook_trap_destroy: trap=%p, object=%p", trap, trap->owner->object);
   /* If the trap itself is notifying, we handle it in dsk_hook_notify() */
   if (trap->is_notifying)
     {
