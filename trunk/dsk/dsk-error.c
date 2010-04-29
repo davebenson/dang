@@ -9,6 +9,7 @@ static void dsk_error_finalize (DskError *error)
   dsk_free (error->message);
 }
 
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskError);
 DskErrorClass dsk_error_class =
 {
   DSK_OBJECT_CLASS_DEFINE(DskError, &dsk_object_class,

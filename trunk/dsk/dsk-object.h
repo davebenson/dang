@@ -1,6 +1,7 @@
 
 typedef struct _DskObjectClass DskObjectClass;
 typedef struct _DskObject DskObject;
+typedef struct _DskObjectClassCacheData DskObjectClassCacheData;
 struct _DskObjectClass
 {
   const char *name;
@@ -11,6 +12,7 @@ struct _DskObjectClass
   unsigned object_class_magic;
   void (*init) (DskObject *object);
   void (*finalize) (DskObject *object);
+  DskObjectClassCacheData *cache_data;
 };
 typedef void (*DskObjectInitFunc) (DskObject *object);
 typedef void (*DskObjectFinalizeFunc) (DskObject *object);
@@ -20,7 +22,19 @@ typedef void (*DskObjectFinalizeFunc) (DskObject *object);
          sizeof (name ## Class), sizeof (name), \
          (sizeof (name) - sizeof (DskObject)) / sizeof(void*), \
          DSK_OBJECT_CLASS_MAGIC, \
-         (DskObjectInitFunc) init_func, (DskObjectFinalizeFunc) finalize_func }
+         (DskObjectInitFunc) init_func, (DskObjectFinalizeFunc) finalize_func, \
+         &name ## __cache_data }
+#define DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(name) \
+       static DskObjectClassCacheData name##__cache_data = \
+              { DSK_FALSE, 0, NULL, 0, NULL }
+struct _DskObjectClassCacheData
+{
+  dsk_boolean instantiated;
+  unsigned n_init_funcs;
+  DskObjectInitFunc *init_funcs;
+  unsigned n_finalizer_funcs;
+  DskObjectFinalizeFunc *finalizer_funcs;
+};
 
 typedef struct _DskObjectWeakRef DskObjectWeakRef;
 struct _DskObjectWeakRef
@@ -92,24 +106,26 @@ DSK_INLINE_FUNC void      *dsk_object_ref   (void *object);
 
 /* private: but need to be exposed for public macros etc */
 void dsk_object_handle_last_unref (DskObject *o);
+void _dsk_object_class_first_instance (DskObjectClass *c);
 
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC  void      *dsk_object_new   (void *object_class)
 {
   DskObjectClass *c = object_class;
   DskObject *rv;
+  unsigned i, n;
+  DskObjectInitFunc *funcs;
   _dsk_inline_assert (c->object_class_magic == DSK_OBJECT_CLASS_MAGIC);
+  if (!c->cache_data->instantiated)
+    _dsk_object_class_first_instance (c);
   rv = dsk_malloc (c->sizeof_instance);
   rv->object_class = object_class;
   rv->ref_count = 1;
   dsk_bzero_pointers (rv + 1, c->pointers_after_base);
-  do
-    {
-      if (c->init != NULL)
-        c->init (rv);
-      c = c->parent_class;
-    }
-  while (c != NULL);
+  n = c->cache_data->n_init_funcs;
+  funcs = c->cache_data->init_funcs;
+  for (i = 0; i < n; i++)
+    funcs[i] (rv);
   return rv;
 }
 
