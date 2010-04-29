@@ -122,6 +122,7 @@ dsk_hook_trap         (DskHook       *hook,
   if (hook->trap.callback == NULL)
     {
       trap = &hook->trap;
+      dsk_warning ("using internal trap %p", trap);
     }
   else
     {
@@ -131,6 +132,7 @@ dsk_hook_trap         (DskHook       *hook,
         last = last->next;
       last->next = trap;
       trap->next = NULL;
+      dsk_warning ("allocating trap %p", trap);
     }
   
   trap->callback = func;

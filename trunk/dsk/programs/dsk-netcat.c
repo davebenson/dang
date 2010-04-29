@@ -63,22 +63,23 @@ int main(int argc, char **argv)
       DskClientStream *client_stream;
       DskOctetSource *std_input;
       DskOctetSink *std_output;
+      DskOctetSource *csource;
+      DskOctetSink *csink;
       DskError *error = NULL;
       options.hostname = hostname;
       options.port = port;
       options.path = local_path;
-      client_stream = dsk_client_stream_new (&options, &error);
-      if (client_stream == NULL)
+      if (!dsk_client_stream_new (&options,
+                                  &client_stream,
+                                  &csource,
+                                  &csink,
+                                  &error))
         dsk_die ("error creating client-stream: %s", error->message);
 
       std_input = dsk_octet_source_new_stdin ();
       std_output = dsk_octet_sink_new_stdout ();
-      dsk_octet_connect (std_input,
-                         &client_stream->sink->base_instance,
-                         NULL);
-      dsk_octet_connect (&client_stream->source->base_instance, 
-                         std_output,
-                         NULL);
+      dsk_octet_connect (std_input, csink, NULL);
+      dsk_octet_connect (csource, std_output, NULL);
 
       /* keep running until i/o is done ?!? */
       dsk_main_add_object (std_input);

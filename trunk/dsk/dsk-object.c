@@ -133,6 +133,7 @@ dsk_object_handle_last_unref (DskObject *o)
   DskObjectClass *c = o->object_class;
   unsigned i, n;
   DskObjectFinalizeFunc *funcs;
+  dsk_warning ("dsk_object_handle_last_unref: %p[%s]",o,c->name);
   ASSERT_OBJECT_CLASS_MAGIC (c);
   n = c->cache_data->n_finalizer_funcs;
   funcs = c->cache_data->finalizer_funcs;

@@ -19,20 +19,6 @@ ping_idle_disconnect_timer (DskClientStream *stream)
 
 
 
-/* Create the barebones client-stream objects. */
-static DskClientStream *
-create_raw_client_stream (void)
-{
-  DskClientStream *rv = dsk_object_new (&dsk_client_stream_class);
-  rv->sink = dsk_object_new (&dsk_client_stream_sink_class);
-  rv->source = dsk_object_new (&dsk_client_stream_source_class);
-  rv->sink->owner = rv->source->owner = rv;
-  rv->reconnect_time_ms = -1;
-  rv->idle_disconnect_time_ms = -1;
-  rv->fd = -1;
-  return rv;
-}
-
 static dsk_boolean ip_address_is_default (DskIpAddress *address)
 {
   unsigned i;
@@ -44,9 +30,12 @@ static dsk_boolean ip_address_is_default (DskIpAddress *address)
   return DSK_TRUE;
 }
 
-DskClientStream *
+dsk_boolean
 dsk_client_stream_new       (DskClientStreamOptions *options,
-                             DskError  **error)
+                             DskClientStream **stream_out,
+                             DskOctetSource  **source_out,
+                             DskOctetSink    **sink_out,
+                             DskError        **error)
 {
   DskClientStream *rv;
   dsk_boolean has_address = !ip_address_is_default (&options->address);
@@ -61,13 +50,20 @@ dsk_client_stream_new       (DskClientStreamOptions *options,
           dsk_set_error (error,
                          "port must be non-zero for client (hostname is '%s')",
                          options->hostname);
-          return NULL;
+          return DSK_FALSE;
         }
       dsk_warn_if_fail (options->path == NULL,
                         "cannot decide between tcp and local client");
     }
 
-  rv = create_raw_client_stream ();
+  rv = dsk_object_new (&dsk_client_stream_class);
+  rv->sink = dsk_object_new (&dsk_client_stream_sink_class);
+  rv->source = dsk_object_new (&dsk_client_stream_source_class);
+  rv->sink->owner = rv->source->owner = rv;
+  rv->reconnect_time_ms = -1;
+  rv->idle_disconnect_time_ms = -1;
+  rv->fd = -1;
+
   if (options->hostname != NULL)
     {
       if (dsk_hostname_looks_numeric (options->hostname))
@@ -93,7 +89,19 @@ dsk_client_stream_new       (DskClientStreamOptions *options,
     dsk_client_stream_set_max_idle_time (rv, options->idle_disconnect_time);
   if (options->reconnect_time >= 0)
     dsk_client_stream_set_reconnect_time (rv, options->reconnect_time);
-  return rv;
+  if (source_out)
+    *source_out = (DskOctetSource *) rv->source;
+  else if (rv->source)
+    dsk_object_unref (rv->source);
+  if (sink_out)
+    *sink_out = (DskOctetSink *) rv->sink;
+  else if (rv->sink)
+    dsk_object_unref (rv->sink);
+  if (stream_out)
+    *stream_out = rv;
+  else
+    dsk_object_unref (rv);
+  return DSK_TRUE;
 }
 
 static void
