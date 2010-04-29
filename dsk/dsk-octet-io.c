@@ -26,6 +26,7 @@ dsk_octet_sink_finalize (DskOctetSink *sink)
     dsk_hook_clear (&sink->writable_hook);
 }
 
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskOctetSink);
 DskOctetSinkClass dsk_octet_sink_class =
 {
   DSK_OBJECT_CLASS_DEFINE (DskOctetSink, &dsk_object_class, 
@@ -36,6 +37,7 @@ DskOctetSinkClass dsk_octet_sink_class =
   NULL,                 /* no default shutdown impl */
 };
 
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskOctetSource);
 DskOctetSourceClass dsk_octet_source_class =
 {
   DSK_OBJECT_CLASS_DEFINE (DskOctetSource, &dsk_object_class, 

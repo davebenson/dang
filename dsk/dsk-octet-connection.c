@@ -24,6 +24,7 @@ handle_source_readable (void       *object,
         dsk_octet_source_shutdown (source);
       goto done_reading;
     }
+  dsk_warning ("handle_source_readable: buffer size now %u: write_trap->block_count=%u",conn->buffer.size,conn->write_trap->block_count);
   if (conn->buffer.size > 0
    && conn->write_trap->block_count == 1)
     dsk_hook_trap_unblock (conn->write_trap);
@@ -71,9 +72,12 @@ handle_sink_writable (void *object, void *callback_data)
     case DSK_IO_RESULT_ERROR:
       goto got_error;
     }
-  if (conn->buffer.size == 0 && conn->write_trap->block_count == 0)
+  if (conn->buffer.size == 0
+   /* && conn->write_trap != NULL */
+   && conn->write_trap->block_count == 0)
     dsk_hook_trap_block (conn->write_trap);
-  if (conn->read_trap->block_count > 0
+  if (conn->read_trap != NULL
+   && conn->read_trap->block_count > 0
    && conn->buffer.size < conn->max_buffer)
     dsk_hook_trap_unblock (conn->read_trap);
   return DSK_TRUE;
@@ -196,6 +200,7 @@ dsk_octet_connection_finalize (DskOctetConnection *conn)
   dsk_buffer_clear (&conn->buffer);
 }
 
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskOctetConnection);
 DskOctetConnectionClass dsk_octet_connection_class =
 {
   DSK_OBJECT_CLASS_DEFINE (DskOctetConnection,

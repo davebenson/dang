@@ -74,6 +74,7 @@ dsk_udp_socket_finalize (DskUdpSocket *socket)
     close (socket->fd);
 }
 
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskUdpSocket);
 DskUdpSocketClass dsk_udp_socket_class =
 {
   DSK_OBJECT_CLASS_DEFINE(DskUdpSocket,

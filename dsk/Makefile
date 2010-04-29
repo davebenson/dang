@@ -2,7 +2,7 @@
 
 BUILT_SOURCES = dsk-ascii-chartable.inc
 TEST_PROGRAMS = tests/test-dns-protocol
-PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat
+PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
 
 tests/test-dns-protocol: tests/test-dns-protocol.c libdsk.a

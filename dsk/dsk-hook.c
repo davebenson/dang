@@ -160,6 +160,7 @@ run_idle_notifications (void *data)
 }
 void _dsk_hook_trap_count_nonzero (DskHook *hook)
 {
+  dsk_warning ("_dsk_hook_trap_count_nonzero: set_poll=%p",hook->funcs->set_poll);
   if (hook->is_idle_notify)
     {
       /* put into idle-notify list */

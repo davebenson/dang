@@ -17,6 +17,7 @@ dsk_object_finalize (DskObject *object)
   dsk_assert (object->ref_count == 0);
 }
 
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskObject);
 DskObjectClass dsk_object_class =
 DSK_OBJECT_CLASS_DEFINE(DskObject, NULL, dsk_object_init, dsk_object_finalize);
 
@@ -96,18 +97,47 @@ dsk_object_cast_get_class (void       *object,
   return ((DskObject*)object)->object_class;
 }
 
+void _dsk_object_class_first_instance (DskObjectClass *c)
+{
+  DskObjectClass *at;
+  DskObjectInitFunc *iat, *fat;
+  DskObjectClassCacheData *cd = c->cache_data;
+  unsigned n_init = 0, n_finalize = 0;
+  dsk_assert (!cd->instantiated);
+  for (at = c; at; at = at->parent_class)
+    {
+      if (at->init)
+        n_init++;
+      if (at->finalize)
+        n_finalize++;
+    }
+  cd->init_funcs = dsk_malloc (sizeof (DskObjectFinalizeFunc)
+                               * (n_init+n_finalize));
+  cd->finalizer_funcs = cd->init_funcs + n_init;
+  cd->n_init_funcs = n_init;
+  cd->n_finalizer_funcs = n_finalize;
+  iat = fat = cd->finalizer_funcs;
+  for (at = c; at; at = at->parent_class)
+    {
+      if (at->init)
+        *(--iat) = at->init;
+      if (at->finalize)
+        *fat++ = at->finalize;
+    }
+  cd->instantiated = DSK_TRUE;
+}
+
 void
 dsk_object_handle_last_unref (DskObject *o)
 {
   DskObjectClass *c = o->object_class;
+  unsigned i, n;
+  DskObjectFinalizeFunc *funcs;
   ASSERT_OBJECT_CLASS_MAGIC (c);
-  do
-    {
-      if (c->finalize != NULL)
-        c->finalize (o);
-      c = c->parent_class;
-    }
-  while (c != NULL);
+  n = c->cache_data->n_finalizer_funcs;
+  funcs = c->cache_data->finalizer_funcs;
+  for (i = 0; i < n; i++)
+    funcs[i] (o);
   dsk_free (o);
 }
 

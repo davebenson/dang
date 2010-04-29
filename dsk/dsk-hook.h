@@ -89,6 +89,7 @@ DSK_INLINE_FUNC void
 _dsk_hook_incr_trap_count         (DskHook       *hook)
 {
   _dsk_inline_assert (hook->magic == DSK_HOOK_MAGIC);
+  dsk_warning ("_dsk_hook_incr_trap_count: count was %u", hook->trap_count);
   if (++(hook->trap_count) == 1)
     _dsk_hook_trap_count_nonzero (hook);
 } 
@@ -158,6 +159,7 @@ dsk_hook_trap_unblock (DskHookTrap   *trap)
   _dsk_inline_assert (trap->owner->magic == DSK_HOOK_MAGIC);
   _dsk_inline_assert (trap->callback != NULL);
   _dsk_inline_assert (trap->block_count != 0);
+  dsk_warning ("dsk_hook_trap_unblock: block_count was %u", trap->block_count);
   if (--(trap->block_count) == 0)
     _dsk_hook_incr_trap_count (trap->owner);
 }

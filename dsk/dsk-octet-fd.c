@@ -287,6 +287,7 @@ dsk_octet_sink_stream_fd_shutdown     (DskOctetSink   *sink)
 }
 
 
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskOctetSinkStreamFd);
 DskOctetSinkStreamFdClass dsk_octet_sink_stream_fd_class =
 {
   {
@@ -397,6 +398,7 @@ dsk_octet_source_stream_fd_shutdown (DskOctetSource *source)
 }
 
 
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskOctetSourceStreamFd);
 DskOctetSourceStreamFdClass dsk_octet_source_stream_fd_class =
 {
   { DSK_OBJECT_CLASS_DEFINE(DskOctetSourceStreamFd,
@@ -427,6 +429,7 @@ dsk_octet_stream_fd_finalize (DskOctetStreamFd *stream)
     }
 }
 
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskOctetStreamFd);
 DskOctetStreamFdClass dsk_octet_stream_fd_class =
 {
   DSK_OBJECT_CLASS_DEFINE(DskOctetStreamFd,
