@@ -641,6 +641,8 @@ dsk_client_stream_source_shutdown (DskOctetSource *source)
 
   stream->shutdown_read = 1;
   dsk_hook_clear (&source->readable_hook);
+
+  stream_do_watch_fd (stream);
 }
 
 
@@ -758,6 +760,8 @@ dsk_client_stream_sink_shutdown   (DskOctetSink   *sink)
 
   stream->shutdown_write = 1;
   dsk_hook_clear (&sink->writable_hook);
+
+  stream_do_watch_fd (stream);
 }
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskClientStreamSink);
