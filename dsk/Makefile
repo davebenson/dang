@@ -24,6 +24,24 @@ dsk-ascii-chartable.inc: mk-ascii-chartable.pl
 clean:
 	rm *.o libdsk.a tests/test-dns-protocol
 
+check: $(TEST_PROGRAMS)
+	@nfail=0; ntest=0; \
+	for p in $(TEST_PROGRAMS) ; do \
+	  echo "--- $$p ---" ; \
+	  if $$p ; then \
+	    echo "$$p SUCCESS" ; \
+	  else \
+	    { echo "$$p FAIL" ; nfail=$$(($$nfail + 1)) ; } ; \
+	  fi; \
+	  ntest=$$(($$ntest + 1)) ; \
+	done ; \
+	if test $$nfail = 0 ; then \
+	  echo "Success! $$ntest tests passed." ; \
+	else \
+	  echo "$$nfail out of $$ntest tests failed." ; \
+	fi
+
+
 # HACK
 missing-refs:
 	$(MAKE) all 2>&1 | grep 'undefined reference' | sed -e 's/.*`//;' -e "s/'.*//" | sort -u

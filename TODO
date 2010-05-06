@@ -49,6 +49,8 @@ _ Tree
   _ misc methods (keys, values, map)
   _ foreach
   _ implement compare,hash,equal for all types
+  _ perhaps mutable objects should be "builders" -- TensorBuilder,
+    TreeBuilder
   _ ref-counted object like thing
     _ immutable core w/ ref-count guided mutation.
       in this case, we probably do not need to expose immutable_tree?
