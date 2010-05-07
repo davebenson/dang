@@ -14,7 +14,6 @@ struct _DskClientStreamSourceClass
 struct _DskClientStreamSource
 {
   DskOctetSource base_instance;
-  DskClientStream *owner;
 };
 
 struct _DskClientStreamSinkClass
@@ -24,16 +23,15 @@ struct _DskClientStreamSinkClass
 struct _DskClientStreamSink
 {
   DskOctetSink base_instance;
-  DskClientStream *owner;
 };
 
 struct _DskClientStreamClass
 {
-  DskObjectClass base_class;
+  DskOctetStreamClass base_class;
 };
 struct _DskClientStream
 {
-  DskObject base_instance;
+  DskOctetStream base_instance;
 
   
   /* Hostname for normal (DNS-based) clients,
@@ -48,14 +46,6 @@ struct _DskClientStream
    * Only valid if !is_resolving_name. */
   DskIpAddress connect_addr;			/* if !is_resolving_name */
 
-  /* An octet stream of data coming from the remote side.
-     May be used directly. */
-  DskClientStreamSource *source;
-
-  /* An octet stream of data going to the remote side.
-   * May be used directly. */
-  DskClientStreamSink *sink;
-
   /* underlying file-descriptor */
   DskFileDescriptor fd;
 
@@ -65,10 +55,6 @@ struct _DskClientStream
 
   /* May be used directly. */
   DskHook connect_hook;
-
-  /* Invoked whenever a new error occurs */
-  DskHook error_hook;
-  DskError *latest_error;
 
   /* for autoreconnect */
   DskDispatchTimer *reconnect_timer;
@@ -125,3 +111,9 @@ void             dsk_client_stream_set_max_idle_time  (DskClientStream *client,
 
 void dsk_client_stream_disconnect (DskClientStream *stream);
 
+#define DSK_CLIENT_SOURCE(object) DSK_OBJECT_CAST(DskClientSource, object, &dsk_octet_source_class)
+#define DSK_CLIENT_SINK(object) DSK_OBJECT_CAST(DskClientSink, object, &dsk_octet_sink_class)
+#define DSK_CLIENT_STREAM(object) DSK_OBJECT_CAST(DskClientStream, object, &dsk_octet_stream_class)
+#define DSK_CLIENT_SOURCE_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskClientSource, object, &dsk_octet_source_class)
+#define DSK_CLIENT_SINK_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskClientSink, object, &dsk_octet_sink_class)
+#define DSK_CLIENT_STREAM_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskClientStream, object, &dsk_octet_stream_class)

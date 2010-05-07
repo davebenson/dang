@@ -5,7 +5,7 @@ typedef struct _DskObjectClassCacheData DskObjectClassCacheData;
 struct _DskObjectClass
 {
   const char *name;
-  DskObjectClass *parent_class;
+  const DskObjectClass *parent_class;
   size_t sizeof_class;
   size_t sizeof_instance;
   unsigned pointers_after_base;
@@ -18,12 +18,12 @@ typedef void (*DskObjectInitFunc) (DskObject *object);
 typedef void (*DskObjectFinalizeFunc) (DskObject *object);
 #define DSK_OBJECT_CLASS_MAGIC          0x159daf3f
 #define DSK_OBJECT_CLASS_DEFINE(name, parent_class, init_func, finalize_func) \
-       { #name, (DskObjectClass *) parent_class, \
+       { #name, (const DskObjectClass *) parent_class, \
          sizeof (name ## Class), sizeof (name), \
          (sizeof (name) - sizeof (DskObject)) / sizeof(void*), \
          DSK_OBJECT_CLASS_MAGIC, \
          (DskObjectInitFunc) init_func, (DskObjectFinalizeFunc) finalize_func, \
-         &name ## __cache_data }
+         (DskObjectClassCacheData *) &name ## __cache_data }
 #define DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(name) \
        static DskObjectClassCacheData name##__cache_data = \
               { DSK_FALSE, 0, NULL, 0, NULL }
@@ -36,8 +36,8 @@ struct _DskObjectClassCacheData
   DskObjectFinalizeFunc *finalizer_funcs;
 };
 
-typedef struct _DskObjectWeakRef DskObjectWeakRef;
-struct _DskObjectWeakRef
+typedef struct _DskWeakPointer DskWeakPointer;
+struct _DskWeakPointer
 {
   unsigned ref_count;
   DskObject *object;
@@ -54,28 +54,28 @@ struct _DskObjectFinalizeHandler
 
 struct _DskObject
 {
-  DskObjectClass *object_class;
+  const DskObjectClass *object_class;
   unsigned ref_count;
-  DskObjectWeakRef *weak_ref;
+  DskWeakPointer *weak_pointer;
   DskObjectFinalizeHandler *finalizer_list;
 };
 
 /* The object interface */
-DSK_INLINE_FUNC void      *dsk_object_new   (void *object_class);
+DSK_INLINE_FUNC void      *dsk_object_new   (const void *object_class);
 DSK_INLINE_FUNC void       dsk_object_unref (void *object);
 DSK_INLINE_FUNC void      *dsk_object_ref   (void *object);
                  dsk_boolean dsk_object_is_a (void *object,
-                                              void *isa_class);
-           dsk_boolean dsk_object_class_is_a (void *object_class,
-                                              void *isa_class);
+                                              const void *isa_class);
+           dsk_boolean dsk_object_class_is_a (const void *object_class,
+                                              const void *isa_class);
 
 /* for use by debugging cast-macro implementations */
                  void       *dsk_object_cast (void *object,
-                                              void *isa_class,
+                                              const void *isa_class,
                                               const char *filename,
                                               unsigned line);
-                 void       *dsk_object_cast_get_class (void *object,
-                                              void *isa_class,
+const            void       *dsk_object_cast_get_class (void *object,
+                                              const void *isa_class,
                                               const char *filename,
                                               unsigned line);
 /* non-inline versions of dsk_object_{ref,unref}
@@ -83,12 +83,16 @@ DSK_INLINE_FUNC void      *dsk_object_ref   (void *object);
                  void       dsk_object_unref_f (void *object);
                  void    *  dsk_object_ref_f (void *object);
 
-                 void       dsk_object_weak_ref (DskObject *object,
+                 void       dsk_object_trap_finalize (DskObject *object,
                                                  DskDestroyNotify destroy,
                                                  void            *destroy_data);
-                 void       dsk_object_weak_unref(DskObject      *object,
+                 void       dsk_object_untrap_finalize(DskObject      *object,
                                                  DskDestroyNotify destroy,
                                                  void            *destroy_data);
+DskWeakPointer             *dsk_weak_pointer_ref (DskWeakPointer *);
+void                        dsk_weak_pointer_unref (DskWeakPointer *);
+DskWeakPointer             *dsk_object_get_weak_pointer (DskObject *);
+
 /* debugging and non-debugging implementations of the various
    cast macros.  */
 #ifdef DSK_DISABLE_CAST_CHECKS
@@ -106,12 +110,12 @@ DSK_INLINE_FUNC void      *dsk_object_ref   (void *object);
 
 /* private: but need to be exposed for public macros etc */
 void dsk_object_handle_last_unref (DskObject *o);
-void _dsk_object_class_first_instance (DskObjectClass *c);
+void _dsk_object_class_first_instance (const DskObjectClass *c);
 
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
-DSK_INLINE_FUNC  void      *dsk_object_new   (void *object_class)
+DSK_INLINE_FUNC  void      *dsk_object_new   (const void *object_class)
 {
-  DskObjectClass *c = object_class;
+  const DskObjectClass *c = object_class;
   DskObject *rv;
   unsigned i, n;
   DskObjectInitFunc *funcs;
@@ -121,6 +125,8 @@ DSK_INLINE_FUNC  void      *dsk_object_new   (void *object_class)
   rv = dsk_malloc (c->sizeof_instance);
   rv->object_class = object_class;
   rv->ref_count = 1;
+  rv->finalizer_list = NULL;
+  rv->weak_pointer = NULL;
   dsk_bzero_pointers (rv + 1, c->pointers_after_base);
   n = c->cache_data->n_init_funcs;
   funcs = c->cache_data->init_funcs;

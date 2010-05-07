@@ -3,45 +3,41 @@
  * does not hold refs to the sink/source, it isn't an adequate of handling this
  */
 
-typedef struct _DskOctetSourceStreamFdClass DskOctetSourceStreamFdClass;
-typedef struct _DskOctetSourceStreamFd DskOctetSourceStreamFd;
-typedef struct _DskOctetSinkStreamFdClass DskOctetSinkStreamFdClass;
-typedef struct _DskOctetSinkStreamFd DskOctetSinkStreamFd;
+typedef struct _DskOctetStreamFdSourceClass DskOctetStreamFdSourceClass;
+typedef struct _DskOctetStreamFdSource DskOctetStreamFdSource;
+typedef struct _DskOctetStreamFdSinkClass DskOctetStreamFdSinkClass;
+typedef struct _DskOctetStreamFdSink DskOctetStreamFdSink;
 typedef struct _DskOctetStreamFdClass DskOctetStreamFdClass;
 typedef struct _DskOctetStreamFd DskOctetStreamFd;
 
 DskOctetSource *dsk_octet_source_new_stdin (void);
 DskOctetSink *dsk_octet_sink_new_stdout (void);
 
-struct _DskOctetSourceStreamFdClass
+struct _DskOctetStreamFdSourceClass
 {
   DskOctetSourceClass base_class;
 };
-struct _DskOctetSourceStreamFd
+struct _DskOctetStreamFdSource
 {
   DskOctetSource base_instance;
-  DskOctetStreamFd *owner;
 };
 
-struct _DskOctetSinkStreamFdClass
+struct _DskOctetStreamFdSinkClass
 {
   DskOctetSinkClass base_class;
 };
-struct _DskOctetSinkStreamFd
+struct _DskOctetStreamFdSink
 {
   DskOctetSink base_instance;
-  DskOctetStreamFd *owner;
 };
 
 struct _DskOctetStreamFdClass
 {
-  DskObjectClass base_class;
+  DskOctetStreamClass base_class;
 };
 struct _DskOctetStreamFd
 {
-  DskObject base_instance;
-  DskOctetSinkStreamFd *sink;
-  DskOctetSourceStreamFd *source;
+  DskOctetStream base_instance;
   DskFileDescriptor fd;
   unsigned do_not_close : 1;
   unsigned is_pollable : 1;
@@ -57,10 +53,17 @@ typedef enum
   DSK_FILE_DESCRIPTOR_DO_NOT_CLOSE             = (1<<16)
 } DskFileDescriptorStreamFlags;
 
-DskOctetStreamFd *dsk_octet_stream_new_fd (DskFileDescriptor fd,
+dsk_boolean     dsk_octet_stream_new_fd (DskFileDescriptor fd,
                                          DskFileDescriptorStreamFlags flags,
+                                         DskOctetStreamFd **stream_out,
+                                         DskOctetStreamFdSource **source_out,
+                                         DskOctetStreamFdSink **sink_out,
                                          DskError        **error);
 
-extern DskOctetSinkStreamFdClass dsk_octet_sink_stream_fd_class;
-extern DskOctetSourceStreamFdClass dsk_octet_source_stream_fd_class;
-extern DskOctetStreamFdClass dsk_octet_stream_fd_class;
+extern const DskOctetStreamFdSinkClass dsk_octet_stream_fd_sink_class;
+extern const DskOctetStreamFdSourceClass dsk_octet_stream_fd_source_class;
+extern const DskOctetStreamFdClass dsk_octet_stream_fd_class;
+
+#define DSK_OCTET_STREAM_FD_SOURCE(object) DSK_OBJECT_CAST(DskOctetStreamFdSource, object, &dsk_octet_stream_fd_source_class)
+#define DSK_OCTET_STREAM_FD_SINK(object) DSK_OBJECT_CAST(DskOctetStreamFdSink, object, &dsk_octet_stream_fd_sink_class)
+#define DSK_OCTET_STREAM_FD(object) DSK_OBJECT_CAST(DskOctetStreamFd, object, &dsk_octet_stream_fd_class)

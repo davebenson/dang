@@ -6,6 +6,8 @@
 #define SLAB_GET_NEXT_PTR(slab) _DSK_MEM_POOL_SLAB_GET_NEXT_PTR(slab)
 #define CHUNK_SIZE	        8192
 
+#define ENABLE_FIXED_MEM_POOL   1
+
 /* --- Allocate-only Memory Pool --- */
 /**
  * dsk_mem_pool_construct:
@@ -198,6 +200,7 @@ dsk_mem_pool_fixed_construct (DskMemPoolFixed   *pool,
 void *
 dsk_mem_pool_fixed_alloc     (DskMemPoolFixed     *pool)
 {
+#if ENABLE_FIXED_MEM_POOL
   if (pool->free_list)
     {
       void * rv = pool->free_list;
@@ -219,6 +222,9 @@ dsk_mem_pool_fixed_alloc     (DskMemPoolFixed     *pool)
     pool->pieces_left--;
     return rv;
   }
+#else
+  return dsk_malloc (pool->piece_size);
+#endif
 }
 
 /**
@@ -246,8 +252,12 @@ void * dsk_mem_pool_fixed_alloc0    (DskMemPoolFixed     *pool)
 void     dsk_mem_pool_fixed_free      (DskMemPoolFixed     *pool,
                                        void *        from_pool)
 {
+#if ENABLE_FIXED_MEM_POOL
   SLAB_GET_NEXT_PTR (from_pool) = pool->free_list;
   pool->free_list = from_pool;
+#else
+  dsk_free (from_pool);
+#endif
 }
 
 /**

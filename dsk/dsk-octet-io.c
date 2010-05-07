@@ -9,8 +9,16 @@ dsk_octet_source_init (DskOctetSource *source)
 static void
 dsk_octet_source_finalize (DskOctetSource *source)
 {
+  DskOctetStream *stream = source->stream;
   if (!source->readable_hook.is_cleared)
     dsk_hook_clear (&source->readable_hook);
+  if (stream != NULL)
+    {
+      dsk_assert (stream->source == source);
+      stream->source = NULL;
+      source->stream = NULL;
+      dsk_object_unref (stream);
+    }
 }
 
 static void
@@ -22,12 +30,20 @@ dsk_octet_sink_init (DskOctetSink *sink)
 static void
 dsk_octet_sink_finalize (DskOctetSink *sink)
 {
+  DskOctetStream *stream = sink->stream;
   if (!sink->writable_hook.is_cleared)
     dsk_hook_clear (&sink->writable_hook);
+  if (stream != NULL)
+    {
+      dsk_assert (stream->sink == sink);
+      stream->sink = NULL;
+      sink->stream = NULL;
+      dsk_object_unref (stream);
+    }
 }
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskOctetSink);
-DskOctetSinkClass dsk_octet_sink_class =
+const DskOctetSinkClass dsk_octet_sink_class =
 {
   DSK_OBJECT_CLASS_DEFINE (DskOctetSink, &dsk_object_class, 
                            dsk_octet_sink_init,
@@ -38,7 +54,7 @@ DskOctetSinkClass dsk_octet_sink_class =
 };
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskOctetSource);
-DskOctetSourceClass dsk_octet_source_class =
+const DskOctetSourceClass dsk_octet_source_class =
 {
   DSK_OBJECT_CLASS_DEFINE (DskOctetSource, &dsk_object_class, 
                            dsk_octet_source_init,
@@ -47,4 +63,40 @@ DskOctetSourceClass dsk_octet_source_class =
   NULL,                 /* no default read_buffer impl */
   NULL,                 /* no default shutdown impl */
 };
+
+static void
+dsk_octet_stream_init (DskOctetStream *stream)
+{
+  dsk_hook_init (&stream->error_hook, stream);
+}
+
+static void
+dsk_octet_stream_finalize (DskOctetStream *stream)
+{
+  if (!stream->error_hook.is_cleared)
+    dsk_hook_clear (&stream->error_hook);
+  dsk_assert (stream->sink == NULL);
+  dsk_assert (stream->source == NULL);
+}
+
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskOctetStream);
+const DskOctetStreamClass dsk_octet_stream_class =
+{
+  DSK_OBJECT_CLASS_DEFINE (DskOctetStream, &dsk_object_class, 
+                           dsk_octet_stream_init,
+                           dsk_octet_stream_finalize)
+};
+
+void
+dsk_octet_stream_set_last_error (DskOctetStream  *stream,
+                                 const char      *format,
+                                 ...)
+{
+  va_list args;
+  va_start (args, format);
+  if (stream->latest_error)
+    dsk_error_unref (stream->latest_error);
+  stream->latest_error = dsk_error_new_valist (format, args);
+  va_end (args);
+}
 

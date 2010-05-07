@@ -73,7 +73,7 @@ static int main_exit_status = -1;
 void              dsk_main_add_object      (void               *object)
 {
   dsk_main_add_ref ();
-  dsk_object_weak_ref (object, (DskDestroyNotify) dsk_main_remove_ref, NULL);
+  dsk_object_trap_finalize (object, (DskDestroyNotify) dsk_main_remove_ref, NULL);
 }
 
 void              dsk_main_add_ref         (void)

@@ -1,18 +1,26 @@
 #include "dsk-common.h"
 #include "dsk-object.h"
+#include "dsk-mem-pool.h"
+#include "debug.h"
 
 #define ASSERT_OBJECT_CLASS_MAGIC(class) \
   dsk_assert ((class)->object_class_magic == DSK_OBJECT_CLASS_MAGIC)
 
+static DskMemPoolFixed weak_pointer_pool = DSK_MEM_POOL_FIXED_STATIC_INIT(sizeof (DskWeakPointer));
+
 static void
 dsk_object_init (DskObject *object)
 {
+  if (dsk_debug_object_lifetimes)
+    dsk_warning ("creating object %s at %p", object->object_class->name, object);
   ASSERT_OBJECT_CLASS_MAGIC (object->object_class);
 }
 
 static void
 dsk_object_finalize (DskObject *object)
 {
+  if (dsk_debug_object_lifetimes)
+    dsk_warning ("finalizing object %s at %p", object->object_class->name, object);
   ASSERT_OBJECT_CLASS_MAGIC (object->object_class);
   dsk_assert (object->ref_count == 0);
 }
@@ -23,11 +31,11 @@ DSK_OBJECT_CLASS_DEFINE(DskObject, NULL, dsk_object_init, dsk_object_finalize);
 
 dsk_boolean
 dsk_object_is_a (void *object,
-                 void *isa_class)
+                 const void *isa_class)
 {
   DskObject *o = object;
-  DskObjectClass *c;
-  DskObjectClass *ic = isa_class;
+  const DskObjectClass *c;
+  const DskObjectClass *ic = isa_class;
   if (o == NULL)
     return DSK_FALSE;
   ASSERT_OBJECT_CLASS_MAGIC (ic);
@@ -57,7 +65,7 @@ dsk_object_get_class_name (void *object)
 }
 
 static const char *
-dsk_object_class_get_name (DskObjectClass *class)
+dsk_object_class_get_name (const DskObjectClass *class)
 {
   if (class->object_class_magic == DSK_OBJECT_CLASS_MAGIC)
     return class->name;
@@ -67,7 +75,7 @@ dsk_object_class_get_name (DskObjectClass *class)
 
 void *
 dsk_object_cast (void       *object,
-                 void       *isa_class,
+                 const void *isa_class,
                  const char *filename,
                  unsigned    line)
 {
@@ -81,9 +89,9 @@ dsk_object_cast (void       *object,
   return object;
 }
 
-void *
+const void *
 dsk_object_cast_get_class (void       *object,
-                           void       *isa_class,
+                           const void *isa_class,
                            const char *filename,
                            unsigned    line)
 {
@@ -97,11 +105,11 @@ dsk_object_cast_get_class (void       *object,
   return ((DskObject*)object)->object_class;
 }
 
-void _dsk_object_class_first_instance (DskObjectClass *c)
+void _dsk_object_class_first_instance (const DskObjectClass *c)
 {
-  DskObjectClass *at;
+  const DskObjectClass *at;
   DskObjectInitFunc *iat, *fat;
-  DskObjectClassCacheData *cd = c->cache_data;
+  DskObjectClassCacheData *cd = (DskObjectClassCacheData *) c->cache_data;
   unsigned n_init = 0, n_finalize = 0;
   dsk_assert (!cd->instantiated);
   for (at = c; at; at = at->parent_class)
@@ -130,11 +138,26 @@ void _dsk_object_class_first_instance (DskObjectClass *c)
 void
 dsk_object_handle_last_unref (DskObject *o)
 {
-  DskObjectClass *c = o->object_class;
+  const DskObjectClass *c = o->object_class;
   unsigned i, n;
   DskObjectFinalizeFunc *funcs;
-  dsk_warning ("dsk_object_handle_last_unref: %p[%s]",o,c->name);
   ASSERT_OBJECT_CLASS_MAGIC (c);
+
+  if (o->weak_pointer)
+    {
+      DskWeakPointer *wp = o->weak_pointer;
+      wp->object = NULL;
+      o->weak_pointer = NULL;
+      dsk_weak_pointer_unref (wp);
+    }
+  while (o->finalizer_list)
+    {
+      DskObjectFinalizeHandler *h = o->finalizer_list;
+      o->finalizer_list = h->next;
+      h->destroy (h->destroy_data);
+      dsk_free (h);
+    }
+
   n = c->cache_data->n_finalizer_funcs;
   funcs = c->cache_data->finalizer_funcs;
   for (i = 0; i < n; i++)
@@ -156,7 +179,7 @@ dsk_object_unref_f (void *object)
 }
 
 void
-dsk_object_weak_ref (DskObject *object,
+dsk_object_trap_finalize (DskObject *object,
                      DskDestroyNotify destroy,
                      void            *destroy_data)
 {
@@ -168,9 +191,9 @@ dsk_object_weak_ref (DskObject *object,
 }
 
 void
-dsk_object_weak_unref(DskObject      *object,
-                      DskDestroyNotify destroy,
-                      void            *destroy_data)
+dsk_object_untrap_finalize (DskObject      *object,
+                            DskDestroyNotify destroy,
+                            void            *destroy_data)
 {
   DskObjectFinalizeHandler **pf = &object->finalizer_list;
   while (*pf)
@@ -185,4 +208,30 @@ dsk_object_weak_unref(DskObject      *object,
       pf = &((*pf)->next);
     }
   dsk_return_if_reached ("no matching finalizer");
+}
+
+void dsk_weak_pointer_unref (DskWeakPointer *weak_pointer)
+{
+  if (--(weak_pointer->ref_count) == 0)
+    {
+      dsk_assert (weak_pointer->object == NULL);
+      dsk_mem_pool_fixed_free (&weak_pointer_pool, weak_pointer);
+    }
+}
+DskWeakPointer * dsk_weak_pointer_ref (DskWeakPointer *weak_pointer)
+{
+  ++(weak_pointer->ref_count);
+  return weak_pointer;
+}
+DskWeakPointer * dsk_object_get_weak_pointer (DskObject *object)
+{
+  if (object->weak_pointer)
+    ++(object->weak_pointer->ref_count);
+  else
+    {
+      object->weak_pointer = dsk_mem_pool_fixed_alloc (&weak_pointer_pool);
+      object->weak_pointer->ref_count = 2;
+      object->weak_pointer->object = object;
+    }
+  return object->weak_pointer;
 }

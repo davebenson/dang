@@ -3,6 +3,8 @@ typedef struct _DskOctetSourceClass DskOctetSourceClass;
 typedef struct _DskOctetSinkClass DskOctetSinkClass;
 typedef struct _DskOctetSource DskOctetSource;
 typedef struct _DskOctetSink DskOctetSink;
+typedef struct _DskOctetStreamClass DskOctetStreamClass;
+typedef struct _DskOctetStream DskOctetStream;
 
 struct _DskOctetSourceClass
 {
@@ -25,6 +27,7 @@ struct _DskOctetSourceClass
 struct _DskOctetSource
 {
   DskObject base_instance;
+  DskOctetStream *stream;         /* optional */
   DskHook readable_hook;
 };
 
@@ -48,12 +51,35 @@ struct _DskOctetSinkClass
 struct _DskOctetSink
 {
   DskObject base_instance;
+  DskOctetStream *stream;         /* optional */
   DskHook writable_hook;
 };
+
+
+struct _DskOctetStreamClass
+{
+  DskObjectClass base_class;
+};
+struct _DskOctetStream
+{
+  DskObject base_instance;
+  /* NOTE: source/sink hold a reference to Stream, NOT
+     the other way around. */
+  DskOctetSource *source;
+  DskOctetSink *sink;
+  DskHook error_hook;
+  DskError *latest_error;
+};
+void dsk_octet_stream_set_last_error (DskOctetStream  *stream,
+                                      const char      *format,
+                                      ...) DSK_GNUC_PRINTF(2,3);
+
 #define DSK_OCTET_SOURCE(object) DSK_OBJECT_CAST(DskOctetSource, object, &dsk_octet_source_class)
 #define DSK_OCTET_SINK(object) DSK_OBJECT_CAST(DskOctetSink, object, &dsk_octet_sink_class)
+#define DSK_OCTET_STREAM(object) DSK_OBJECT_CAST(DskOctetStream, object, &dsk_octet_stream_class)
 #define DSK_OCTET_SOURCE_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetSource, object, &dsk_octet_source_class)
 #define DSK_OCTET_SINK_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetSink, object, &dsk_octet_sink_class)
+#define DSK_OCTET_STREAM_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetStream, object, &dsk_octet_stream_class)
 
 DSK_INLINE_FUNC DskIOResult dsk_octet_source_read (void         *octet_source,
                                                    unsigned      max_len,
@@ -73,6 +99,7 @@ DSK_INLINE_FUNC DskIOResult dsk_octet_sink_write_buffer  (void           *octet_
                                                   DskBuffer      *write_buffer,
                                                   DskError      **error);
 DSK_INLINE_FUNC void dsk_octet_sink_shutdown     (void           *octet_sink);
+
 
 
 typedef struct _DskOctetConnectionClass DskOctetConnectionClass;
@@ -123,9 +150,10 @@ DskOctetConnection *dsk_octet_connection_new (DskOctetSource *source,
 void                dsk_octet_connection_shutdown (DskOctetConnection *);
 void                dsk_octet_connection_disconnect (DskOctetConnection *);
 
-extern DskOctetSourceClass dsk_octet_source_class;
-extern DskOctetSinkClass dsk_octet_sink_class;
-extern DskOctetConnectionClass dsk_octet_connection_class;
+extern const DskOctetSourceClass dsk_octet_source_class;
+extern const DskOctetSinkClass dsk_octet_sink_class;
+extern const DskOctetStreamClass dsk_octet_stream_class;
+extern const DskOctetConnectionClass dsk_octet_connection_class;
 
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC DskIOResult dsk_octet_source_read (void         *octet_source,

@@ -1,4 +1,5 @@
 #include "dsk.h"
+#include "debug.h"
 
 static DskOctetConnectionOptions default_options = DSK_OCTET_CONNECTION_OPTIONS_DEFAULT;
 
@@ -24,7 +25,8 @@ handle_source_readable (void       *object,
         dsk_octet_source_shutdown (source);
       goto done_reading;
     }
-  dsk_warning ("handle_source_readable: buffer size now %u: write_trap->block_count=%u",conn->buffer.size,conn->write_trap->block_count);
+  if (dsk_debug_connections)
+    dsk_warning ("handle_source_readable: buffer size now %u: write_trap->block_count=%u",conn->buffer.size,conn->write_trap->block_count);
   if (conn->buffer.size > 0
    && conn->write_trap->block_count == 1)
     dsk_hook_trap_unblock (conn->write_trap);
@@ -111,9 +113,10 @@ static void
 sink_hook_destroyed (void *data)
 {
   DskOctetConnection *conn = data;
-  dsk_warning ("sink_hook_destroyed: conn=%p[%s]; write_trap=%p",
-               conn, ((DskObject*)conn)->object_class->name,
-               conn->write_trap);
+  if (dsk_debug_connections)
+    dsk_warning ("sink_hook_destroyed: conn=%p[%s]; write_trap=%p",
+                 conn, ((DskObject*)conn)->object_class->name,
+                 conn->write_trap);
   conn->write_trap = NULL;
   if (conn->sink != NULL)
     {
@@ -127,7 +130,8 @@ static void
 source_hook_destroyed (void *data)
 {
   DskOctetConnection *conn = data;
-  dsk_warning ("source_hook_destroyed: conn=%p", conn);
+  if (dsk_debug_connections)
+    dsk_warning ("source_hook_destroyed: conn=%p", conn);
   conn->read_trap = NULL;
   if (conn->source)
     {
@@ -163,8 +167,6 @@ dsk_octet_connection_new (DskOctetSource *source,
                                           dsk_object_ref (connection),
                                           sink_hook_destroyed);
   dsk_hook_trap_block (connection->write_trap);
-  dsk_warning ("dsk_octet_connection_new: %p->%p; conn=%p",
-               source,sink,connection);
   return connection;
 }
 
@@ -179,7 +181,7 @@ dsk_octet_connection_shutdown (DskOctetConnection *conn)
     }
   if (conn->write_trap)
     {
-      dsk_hook_trap_destroy (conn->read_trap);
+      dsk_hook_trap_destroy (conn->write_trap);
       conn->write_trap = NULL;
     }
   if (conn->sink)
@@ -235,7 +237,7 @@ dsk_octet_connection_finalize (DskOctetConnection *conn)
 }
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskOctetConnection);
-DskOctetConnectionClass dsk_octet_connection_class =
+const DskOctetConnectionClass dsk_octet_connection_class =
 {
   DSK_OBJECT_CLASS_DEFINE (DskOctetConnection,
                            &dsk_object_class,
