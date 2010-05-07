@@ -1,6 +1,7 @@
 #include "dsk.h"
 
 #include "../gsklistmacros.h"
+#include "debug.h"
 
 static DskDispatchIdle *idle_handler = NULL;
 static DskHook *dsk_hook_idle_first = NULL;
@@ -96,7 +97,8 @@ dsk_hook_notify (DskHook *hook)
 void
 dsk_hook_trap_destroy (DskHookTrap   *trap)
 {
-  dsk_warning ("dsk_hook_trap_destroy: trap=%p, object=%p", trap, trap->owner->object);
+  if (dsk_debug_hooks)
+    dsk_warning ("dsk_hook_trap_destroy: trap=%p, object=%p", trap, trap->owner->object);
   /* If the trap itself is notifying, we handle it in dsk_hook_notify() */
   if (trap->is_notifying)
     {
@@ -111,11 +113,15 @@ dsk_hook_trap_destroy (DskHookTrap   *trap)
       if (--(trap->owner->trap_count) == 0)
         _dsk_hook_trap_count_zero (trap->owner);
     }
-  if (trap->callback_data_destroy)
-    trap->callback_data_destroy (trap->callback_data);
+
+  /* invoke destroy-notify */
+  DskDestroyNotify destroy = trap->callback_data_destroy;
+  void *data = trap->callback_data;
+
   trap->callback = NULL;
   trap->callback_data = NULL;
   trap->callback_data_destroy = NULL;
+
   if (&(trap->owner->trap) != trap)
     {
       /* remove from list and free */
@@ -125,6 +131,9 @@ dsk_hook_trap_destroy (DskHookTrap   *trap)
       *pt = trap->next;
       dsk_mem_pool_fixed_free (&dsk_hook_trap_pool, trap);
     }
+
+  if (destroy)
+    destroy (data);
 }
 
 
@@ -161,7 +170,8 @@ run_idle_notifications (void *data)
 }
 void _dsk_hook_trap_count_nonzero (DskHook *hook)
 {
-  dsk_warning ("_dsk_hook_trap_count_nonzero: set_poll=%p",hook->funcs->set_poll);
+  if (dsk_debug_hooks)
+    dsk_warning ("_dsk_hook_trap_count_nonzero: set_poll=%p",hook->funcs->set_poll);
   if (hook->is_idle_notify)
     {
       /* put into idle-notify list */
@@ -203,6 +213,7 @@ void
 dsk_hook_clear      (DskHook       *hook)
 {
   DskHookTrap *trap;
+  dsk_boolean was_trapped = hook->trap_count > 0;
   dsk_assert (!hook->is_cleared);
   dsk_assert (hook->magic == DSK_HOOK_MAGIC);
   if (hook->is_notifying)
@@ -224,4 +235,6 @@ dsk_hook_clear      (DskHook       *hook)
       trap = next;
     }
   hook->trap_count = 0;
+  if (was_trapped)
+    _dsk_hook_trap_count_zero (hook);
 }

@@ -82,8 +82,10 @@ int main(int argc, char **argv)
       dsk_octet_connect (csource, std_output, NULL);
 
       /* keep running until i/o is done ?!? */
-      dsk_main_add_object (std_input);
-      dsk_main_add_object (std_output);
+      dsk_main_add_object (csink);
+      dsk_main_add_object (csource);
+      dsk_object_unref (csource);
+      dsk_object_unref (csink);
       return dsk_main_run ();
     }
   return 1;             /* should not reach here */
