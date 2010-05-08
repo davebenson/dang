@@ -24,6 +24,7 @@ struct _DskOctetListenerSocket
   DskFileDescriptor listening_fd;
 };
 
+typedef struct _DskOctetListenerSocketOptions DskOctetListenerSocketOptions;
 struct _DskOctetListenerSocketOptions
 {
   dsk_boolean is_local;
