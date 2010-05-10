@@ -1,6 +1,8 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/un.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -77,3 +79,132 @@ const DskOctetListenerSocketClass dsk_octet_listener_socket_class =
     dsk_octet_listener_socket_accept
 } };
 
+static dsk_boolean
+maybe_delete_stale_socket (const char *path,
+                           unsigned addr_len,
+                           struct sockaddr *addr,
+                           DskError **error)
+{
+  int fd;
+  struct stat statbuf;
+  if (stat (path, &statbuf) < 0)
+    return DSK_TRUE;
+  if (!S_ISSOCK (statbuf.st_mode))
+    {
+      dsk_set_error (error, "%s existed but was not a socket\n", path);
+      return DSK_FALSE;
+    }
+
+  fd = socket (PF_UNIX, SOCK_STREAM, 0);
+  if (fd < 0)
+    return DSK_TRUE;
+  dsk_fd_set_nonblocking (fd);
+  if (connect (fd, addr, addr_len) < 0)
+    {
+      if (errno == EINPROGRESS)
+        {
+          close (fd);
+          return DSK_TRUE;
+        }
+    }
+  else
+    {
+      close (fd);
+      return DSK_TRUE;
+    }
+
+  /* ok, we should delete the stale socket */
+  close (fd);
+  if (unlink (path) < 0)
+    {
+      dsk_set_error (error, "unable to delete %s: %s", path, strerror(errno));
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
+
+DskOctetListener *
+dsk_octet_listener_socket_new (const DskOctetListenerSocketOptions *options,
+                               DskError **error)
+{
+  struct sockaddr_storage storage;
+  struct sockaddr *addr = (struct sockaddr *) &storage;
+  unsigned addr_len = sizeof (storage);
+  DskFileDescriptor fd;
+  DskOctetListenerSocket *rv;
+  /* check options for validity */
+  if (options->is_local)
+    {
+      if (options->local_path == NULL)
+        {
+          dsk_set_error (error, "path must be given to bind to local socket");
+          return NULL;
+        }
+    }
+
+  /* set-up socket address */
+  if (options->is_local)
+    {
+      struct sockaddr_un *un = (struct sockaddr_un *) addr;
+      un->sun_family = PF_LOCAL;
+      strncpy (un->sun_path, options->local_path, sizeof (un->sun_path));
+      if (!maybe_delete_stale_socket (options->local_path, addr_len, addr, error))
+        return NULL;
+    }
+  else
+    {
+      dsk_ip_address_to_sockaddr (&options->bind_address, options->bind_port,
+                                  addr, &addr_len);
+    }
+
+  /* create bound file-descriptor */
+retry_socket_syscall:
+  fd = socket (addr->sa_family, SOCK_STREAM, 0);
+  if (fd < 0)
+    {
+      if (errno == EINTR)
+        goto retry_socket_syscall;
+      dsk_set_error (error, "error creating socket: %s", strerror (errno));
+      return NULL;
+    }
+retry_bind_syscall:
+  if (bind (fd, addr, addr_len) < 0)
+    {
+      if (errno == EINTR)
+        goto retry_bind_syscall;
+      if (options->is_local)
+        dsk_set_error (error, "error binding socket (fd=%u) to path %s: %s", fd, options->local_path, strerror (errno));
+      else
+        dsk_set_error (error, "error binding socket (fd=%u) to port %u: %s", fd, options->bind_port, strerror (errno));
+      close (fd);
+      return NULL;
+    }
+retry_listen_syscall:
+  if (listen (fd, options->max_pending_connections) < 0)
+    {
+      if (errno == EINTR)
+        goto retry_listen_syscall;
+      dsk_set_error (error, "error setting size of listen queue to %u: %s",
+                     options->max_pending_connections, strerror (errno));
+      close (fd);
+      return NULL;
+    }
+
+#if 0
+  /* if the user lets the OS choose the port, read the port back in. */
+  if (!options->is_local && options->bind_port == 0)
+    {
+      ...
+    }
+#endif
+
+  rv = dsk_object_new (&dsk_octet_listener_socket_class);
+  rv->is_local = options->is_local;
+  rv->path = dsk_strdup (options->local_path);
+  rv->bind_address = options->bind_address;
+  rv->bind_port = options->bind_port;
+  rv->bind_iface = dsk_strdup (options->bind_iface);
+  rv->listening_fd = fd;
+  return &rv->base_instance;
+}
