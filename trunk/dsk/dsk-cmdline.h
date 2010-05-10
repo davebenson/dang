@@ -56,3 +56,6 @@ void dsk_cmdline_process_args(int            *argc_inout,
 dsk_boolean dsk_cmdline_try_process_args (int *argc_inout,
                                           char ***argv_inout,
                                           DskError **error);
+
+
+void _dsk_cmdline_cleanup (void);

@@ -385,5 +385,8 @@ int main(int argc, char **argv)
   printf ("killing client\n");
   kill_client ();
 
+  dsk_cleanup ();
+
+
   return 0;
 }

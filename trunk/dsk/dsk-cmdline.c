@@ -557,3 +557,21 @@ dsk_cmdline_try_process_args (int *argc_inout,
 
   return DSK_TRUE;
 }
+
+static void
+do_cleanup_recursive (DskCmdlineArg *arg)
+{
+  if (arg == NULL)
+    return;
+  if (arg->left)
+    do_cleanup_recursive (arg->left);
+  if (arg->right)
+    do_cleanup_recursive (arg->right);
+
+  dsk_free (arg);
+}
+
+void _dsk_cmdline_cleanup (void)
+{
+  do_cleanup_recursive (cmdline_arg_tree);
+}

@@ -48,12 +48,14 @@ handle_fd_ready (DskFileDescriptor   fd,
                  unsigned       events,
                  void          *callback_data)
 {
-  DskOctetStreamFd *stream = callback_data;
+  DskOctetStreamFd *stream = DSK_OCTET_STREAM_FD (callback_data);
   dsk_assert (stream->fd == fd);
+  dsk_object_ref (stream);
   if ((events & DSK_EVENT_READABLE) != 0 && stream->base_instance.source != NULL)
     dsk_hook_notify (&stream->base_instance.source->readable_hook);
   if ((events & DSK_EVENT_WRITABLE) != 0 && stream->base_instance.sink != NULL)
     dsk_hook_notify (&stream->base_instance.sink->writable_hook);
+  dsk_object_unref (stream);
 }
 
 static void

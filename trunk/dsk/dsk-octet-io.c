@@ -75,6 +75,8 @@ dsk_octet_stream_finalize (DskOctetStream *stream)
 {
   if (!stream->error_hook.is_cleared)
     dsk_hook_clear (&stream->error_hook);
+  if (stream->latest_error)
+    dsk_error_unref (stream->latest_error);
   dsk_assert (stream->sink == NULL);
   dsk_assert (stream->source == NULL);
 }
