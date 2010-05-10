@@ -98,10 +98,10 @@ new_native_fragment()
 }
 
 static DskBufferFragment *
-new_foreign_fragment (const void *        ptr,
-		      int                  length,
-		      DskDestroyNotify       destroy,
-		      void *             ddata)
+new_foreign_fragment (unsigned             length,
+                      const void          *ptr,
+		      DskDestroyNotify     destroy,
+		      void                *ddata)
 {
   DskBufferFragment *fragment;
   fragment = dsk_malloc (sizeof (DskBufferFragment));
@@ -178,7 +178,7 @@ dsk_buffer_cleanup_recycling_bin ()
  * (This is equivalent to filling the buffer with 0s)
  */
 void
-dsk_buffer_construct(DskBuffer *buffer)
+dsk_buffer_init(DskBuffer *buffer)
 {
   buffer->first_frag = buffer->last_frag = NULL;
   buffer->size = 0;
@@ -209,8 +209,8 @@ verify_buffer (const DskBuffer *buffer)
  */
 void
 dsk_buffer_append(DskBuffer    *buffer,
-                  const void * data,
-		  unsigned      length)
+		  unsigned      length,
+                  const void * data)
 {
   CHECK_INTEGRITY (buffer);
   buffer->size += length;
@@ -244,8 +244,8 @@ dsk_buffer_append(DskBuffer    *buffer,
 
 void
 dsk_buffer_append_repeated_char (DskBuffer    *buffer, 
-                                 char          character,
-                                 size_t        count)
+                                 size_t        count,
+                                 char          character)
 {
   CHECK_INTEGRITY (buffer);
   buffer->size += count;
@@ -300,7 +300,7 @@ dsk_buffer_append_string(DskBuffer  *buffer,
                          const char *string)
 {
   dsk_return_if_fail (string != NULL, "string must be non-null");
-  dsk_buffer_append (buffer, string, strlen (string));
+  dsk_buffer_append (buffer, strlen (string), string);
 }
 
 /**
@@ -314,7 +314,7 @@ void
 dsk_buffer_append_char(DskBuffer *buffer,
 		       char       character)
 {
-  dsk_buffer_append (buffer, &character, 1);
+  dsk_buffer_append (buffer, 1, &character);
 }
 
 /**
@@ -329,7 +329,7 @@ void
 dsk_buffer_append_string0      (DskBuffer    *buffer,
 				const char   *string)
 {
-  dsk_buffer_append (buffer, string, strlen (string) + 1);
+  dsk_buffer_append (buffer, strlen (string) + 1, string);
 }
 
 /**
@@ -346,8 +346,8 @@ dsk_buffer_append_string0      (DskBuffer    *buffer,
  */
 unsigned
 dsk_buffer_read(DskBuffer    *buffer,
-                void *      data,
-		unsigned         max_length)
+		unsigned      max_length,
+                void         *data)
 {
   unsigned rv = 0;
   unsigned orig_max_length = max_length;
@@ -400,8 +400,8 @@ dsk_buffer_read(DskBuffer    *buffer,
  */
 unsigned
 dsk_buffer_peek     (const DskBuffer *buffer,
-                     void *         data,
-		     unsigned            max_length)
+		     unsigned         max_length,
+                     void            *data)
 {
   int rv = 0;
   DskBufferFragment *frag = (DskBufferFragment *) buffer->first_frag;
@@ -468,7 +468,7 @@ dsk_buffer_read_line(DskBuffer *buffer)
     newline_length = 1;
   else
     newline_length = 0;
-  dsk_buffer_read (buffer, rv, len + newline_length);
+  dsk_buffer_read (buffer, len + newline_length, rv);
   rv[len] = 0;
   CHECK_INTEGRITY (buffer);
   return rv;
@@ -493,7 +493,7 @@ dsk_buffer_parse_string0(DskBuffer *buffer)
   if (index0 < 0)
     return NULL;
   rv = dsk_malloc (index0 + 1);
-  dsk_buffer_read (buffer, rv, index0 + 1);
+  dsk_buffer_read (buffer, index0 + 1, rv);
   return rv;
 }
 
@@ -703,7 +703,7 @@ dsk_buffer_readv(DskBuffer *write_to,
   int rv = read (read_from, buf, sizeof (buf));
   if (rv < 0)
     return rv;
-  dsk_buffer_append (write_to, buf, rv);
+  dsk_buffer_append (write_to, rv, buf);
   return rv;
 }
 
@@ -956,7 +956,7 @@ dsk_buffer_transfer(DskBuffer *dst,
   if (src->first_frag && max_transfer)
     {
       DskBufferFragment *frag = src->first_frag;
-      dsk_buffer_append (dst, dsk_buffer_fragment_start (frag), max_transfer);
+      dsk_buffer_append (dst, max_transfer, dsk_buffer_fragment_start (frag));
       frag->buf_start += max_transfer;
       frag->buf_length -= max_transfer;
       rv += max_transfer;
@@ -984,8 +984,8 @@ dsk_buffer_transfer(DskBuffer *dst,
  * if appended a static string into a buffer.
  */
 void dsk_buffer_append_foreign (DskBuffer        *buffer,
+				unsigned          length,
                                 const void *     data,
-				int               length,
 				DskDestroyNotify    destroy,
 				void *          destroy_data)
 {
@@ -993,7 +993,7 @@ void dsk_buffer_append_foreign (DskBuffer        *buffer,
 
   CHECK_INTEGRITY (buffer);
 
-  fragment = new_foreign_fragment (data, length, destroy, destroy_data);
+  fragment = new_foreign_fragment (length, data, destroy, destroy_data);
   fragment->next = NULL;
 
   if (buffer->last_frag == NULL)

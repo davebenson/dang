@@ -12,11 +12,13 @@
 #include "dsk-memory.h"
 #include "dsk-ip-address.h"
 #include "dsk-dns-client.h"
+#include "dsk-octet-listener.h"
 
 #include "dsk-dns-protocol.h"
 
 #include "dsk-client-stream.h"
 #include "dsk-octet-fd.h"
+#include "dsk-octet-listener-socket.h"
 
 #include "dsk-udp-socket.h"
 
