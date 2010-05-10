@@ -5,6 +5,7 @@ void              dsk_main_watch_fd        (DskFileDescriptor   fd,
                                             DskFDFunc           callback,
                                             void               *callback_data)
 {
+  dsk_assert (fd >= 0);
   dsk_dispatch_watch_fd (dsk_dispatch_default (),
                          fd, events, callback, callback_data);
 }
