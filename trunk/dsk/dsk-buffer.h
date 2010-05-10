@@ -28,11 +28,11 @@ struct _DskBuffer
 void     dsk_buffer_init                (DskBuffer       *buffer);
 
 unsigned dsk_buffer_read                (DskBuffer    *buffer,
-                                         void         *data,
-                                         unsigned      max_length);
+                                         unsigned      max_length,
+                                         void         *data);
 unsigned dsk_buffer_peek                (const DskBuffer* buffer,
-                                         void         *data,
-                                         unsigned      max_length);
+                                         unsigned      max_length,
+                                         void         *data);
 int      dsk_buffer_discard             (DskBuffer    *buffer,
                                          unsigned      max_discard);
 char    *dsk_buffer_read_line           (DskBuffer    *buffer);
@@ -46,15 +46,15 @@ int      dsk_buffer_read_char           (DskBuffer    *buffer);
  * Appending to the buffer.
  */
 void     dsk_buffer_append              (DskBuffer    *buffer, 
-                                         const void   *data,
-                                         unsigned      length);
+                                         unsigned      length,
+                                         const void   *data);
 void     dsk_buffer_append_string       (DskBuffer    *buffer, 
                                          const char   *string);
 void     dsk_buffer_append_byte         (DskBuffer    *buffer, 
                                          uint8_t       character);
 void     dsk_buffer_append_repeated_byte(DskBuffer    *buffer, 
-                                         uint8_t       character,
-                                         unsigned      count);
+                                         unsigned      count,
+                                         uint8_t       character);
 #define dsk_buffer_append_zeros(buffer, count) \
   dsk_buffer_append_repeated_byte ((buffer), 0, (count))
 
@@ -63,8 +63,8 @@ void     dsk_buffer_append_string0      (DskBuffer    *buffer,
                                          const char   *string);
 
 void     dsk_buffer_append_foreign      (DskBuffer    *buffer,
+					 unsigned      length,
                                          const void   *data,
-					 int           length,
 					 DskDestroyNotify destroy,
 					 void         *destroy_data);
 

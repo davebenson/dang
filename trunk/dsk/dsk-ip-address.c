@@ -282,3 +282,14 @@ dsk_ip_address_to_sock_addr (DskIpAddress *address,
 }
 
 #endif
+
+/* XXX: implementing using network-interface api */
+void
+dsk_ip_address_localhost (DskIpAddress *out)
+{
+  out->type = DSK_IP_ADDRESS_IPV4;
+  out->address[0] = 127;
+  out->address[1] = 0;
+  out->address[2] = 0;
+  out->address[3] = 1;
+}

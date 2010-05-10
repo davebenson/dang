@@ -33,3 +33,5 @@ dsk_boolean dsk_sockaddr_to_ip_address (unsigned addr_len,
                                          const void *addr,
                                          DskIpAddress *out,
                                          unsigned      *port_out);
+
+void dsk_ip_address_localhost (DskIpAddress *out);
