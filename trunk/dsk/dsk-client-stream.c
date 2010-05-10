@@ -503,6 +503,7 @@ void dsk_client_stream_disconnect (DskClientStream *stream)
   /* close fd */
   dsk_main_close_fd (stream->fd);
   stream->is_connected = DSK_FALSE;
+  stream->fd = -1;
 
   /* emit disconnect hook */
   dsk_hook_notify (&stream->disconnect_hook);

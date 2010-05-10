@@ -16,6 +16,8 @@
 #include "dsk-octet-listener.h"
 #include "dsk-ip-address.h"
 #include "dsk-fd.h"
+#include "dsk-dispatch.h"
+#include "dsk-main.h"
 #include "dsk-octet-fd.h"
 #include "dsk-octet-listener-socket.h"
 
@@ -54,18 +56,57 @@ dsk_octet_listener_socket_accept (DskOctetListener        *listener,
 }
 
 static void
+listener_handle_fd_readable (DskFileDescriptor   fd,
+                             unsigned            events,
+                             void               *callback_data)
+{
+  DskOctetListener *listener = DSK_OCTET_LISTENER (callback_data);
+  DskOctetListenerSocket *sock = DSK_OCTET_LISTENER_SOCKET (callback_data);
+  dsk_assert (fd == sock->listening_fd);
+  dsk_assert (events & DSK_EVENT_READABLE);
+  dsk_hook_notify (&listener->incoming);
+}
+
+static void
+dsk_octet_listener_socket_set_poll (DskOctetListenerSocket *listener_socket,
+                                    dsk_boolean             poll)
+{
+  if (listener_socket->listening_fd < 0)
+    return;
+
+  if (poll)
+    {
+      dsk_main_watch_fd (listener_socket->listening_fd,
+                         DSK_EVENT_READABLE,
+                         listener_handle_fd_readable,
+                         listener_socket);
+    }
+  else
+    {
+      dsk_main_watch_fd (listener_socket->listening_fd, 0, NULL, NULL);
+    }
+}
+
+
+static DskHookFuncs listener_incoming_hook_funcs =
+{
+  (DskHookObjectFunc) dsk_object_ref_f,
+  (DskHookObjectFunc) dsk_object_unref_f,
+  (DskHookSetPoll) dsk_octet_listener_socket_set_poll
+};
+   
+
+static void
 dsk_octet_listener_socket_init (DskOctetListenerSocket *s)
 {
   s->listening_fd = -1;
+  dsk_hook_set_funcs (&s->base_instance.incoming, &listener_incoming_hook_funcs);
 }
 static void
 dsk_octet_listener_socket_finalize (DskOctetListenerSocket *s)
 {
-  if (s->listening_fd >= 0)
-    {
-      close (s->listening_fd);
-      s->listening_fd = -1;
-    }
+  dsk_main_close_fd (s->listening_fd);
+  s->listening_fd = -1;
   dsk_free (s->path);
   dsk_free (s->bind_iface);
 }
@@ -130,7 +171,7 @@ dsk_octet_listener_socket_new (const DskOctetListenerSocketOptions *options,
 {
   struct sockaddr_storage storage;
   struct sockaddr *addr = (struct sockaddr *) &storage;
-  unsigned addr_len = sizeof (storage);
+  socklen_t addr_len = sizeof (storage);
   DskFileDescriptor fd;
   DskOctetListenerSocket *rv;
   /* check options for validity */
@@ -147,6 +188,7 @@ dsk_octet_listener_socket_new (const DskOctetListenerSocketOptions *options,
   if (options->is_local)
     {
       struct sockaddr_un *un = (struct sockaddr_un *) addr;
+      addr_len = sizeof (struct sockaddr_un);
       un->sun_family = PF_LOCAL;
       strncpy (un->sun_path, options->local_path, sizeof (un->sun_path));
       if (!maybe_delete_stale_socket (options->local_path, addr_len, addr, error))
@@ -154,8 +196,10 @@ dsk_octet_listener_socket_new (const DskOctetListenerSocketOptions *options,
     }
   else
     {
+      unsigned al = addr_len;
       dsk_ip_address_to_sockaddr (&options->bind_address, options->bind_port,
-                                  addr, &addr_len);
+                                  addr, &al);
+      addr_len = al;
     }
 
   /* create bound file-descriptor */
@@ -168,6 +212,8 @@ retry_socket_syscall:
       dsk_set_error (error, "error creating socket: %s", strerror (errno));
       return NULL;
     }
+
+  /* TODO setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) */
 retry_bind_syscall:
   if (bind (fd, addr, addr_len) < 0)
     {
@@ -198,6 +244,9 @@ retry_listen_syscall:
       ...
     }
 #endif
+
+  dsk_fd_set_nonblocking (fd);
+  dsk_fd_set_close_on_exec (fd);
 
   rv = dsk_object_new (&dsk_octet_listener_socket_class);
   rv->is_local = options->is_local;

@@ -1,10 +1,12 @@
 #include <string.h>
+#include <stdio.h>
 #include "../dsk.h"
 
 /* --- implement a simple echo server --- */
 static dsk_boolean cmdline_is_tcp = DSK_FALSE;
-static char *cmdline_local_path = (char *) "test-client-server-0.socket";
+static char *cmdline_local_path = (char *) "./test-client-server-0.socket";
 static unsigned cmdline_tcp_port = 10101;
+static dsk_boolean cmdline_debug_server = DSK_FALSE;
 
 typedef struct _EchoConnection EchoConnection;
 struct _EchoConnection
@@ -23,6 +25,8 @@ handle_sink_writable (DskOctetSink *sink,
                       EchoConnection *ec)
 {
   DskError *error = NULL;
+  if (cmdline_debug_server)
+    dsk_warning ("server: handle_sink_writable: pending size = %u", (unsigned)(ec->pending.size));
   switch (dsk_octet_sink_write_buffer (sink, &ec->pending, &error))
     {
     case DSK_IO_RESULT_SUCCESS:
@@ -55,11 +59,16 @@ handle_source_readable (DskOctetSource *source,
                         EchoConnection *ec)
 {
   DskError *error = NULL;
+  if (cmdline_debug_server)
+    dsk_warning ("handle_source_readable (initial pending=%u)", ec->pending.size);
   switch (dsk_octet_source_read_buffer (source, &ec->pending, &error))
     {
     case DSK_IO_RESULT_SUCCESS:
       if (ec->write_trap == NULL && ec->pending.size > 0)
         {
+          if (cmdline_debug_server)
+            dsk_warning ("server: creating write-trap (%u bytes received)",
+                         (unsigned)ec->pending.size);
           ec->write_trap = dsk_hook_trap (&ec->sink->writable_hook,
                                           (DskHookFunc) handle_sink_writable,
                                           ec,
@@ -139,6 +148,7 @@ create_server (void)
   if (listener == NULL)
     dsk_die ("error creating listener: %s", error->message);
   dsk_hook_trap (&listener->incoming, (DskHookFunc) handle_incoming_connection, NULL, NULL);
+  global_listener = listener;
 }
 static void
 kill_server (void)
@@ -147,20 +157,25 @@ kill_server (void)
   dsk_object_unref (global_listener);
   global_listener = NULL;
 }
-/* --- test utilities --- */
+/* --- client implementation --- */
 static DskClientStreamSink *client_sink;
 static DskClientStreamSource *client_source;
 static DskClientStream *client_stream;
 static unsigned cmdline_wait_time = 250;
+static dsk_boolean cmdline_debug_client = DSK_FALSE;
 
 static void
 create_client (void)
 {
   DskClientStreamOptions options = DSK_CLIENT_STREAM_OPTIONS_DEFAULT;
   DskError *error = NULL;
-  dsk_ip_address_localhost (&options.address);
-  options.port = cmdline_tcp_port;
-  options.path = cmdline_local_path;
+  if (cmdline_is_tcp)
+    {
+      dsk_ip_address_localhost (&options.address);
+      options.port = cmdline_tcp_port;
+    }
+  else
+    options.path = cmdline_local_path;
   options.reconnect_time = 10;
   if (!dsk_client_stream_new (&options,
                               &client_stream,
@@ -200,15 +215,21 @@ write_then_read (unsigned write_len,
                  unsigned time_millis)
 {
   unsigned n_written = 0;
+  dsk_boolean timer_expired = DSK_FALSE;
+  if (cmdline_debug_client)
+    dsk_warning ("write_then_read: trying to write %u bytes; timeout=%u millis", write_len, time_millis);
+  DskDispatchTimer *timer = dsk_main_add_timer_millis (time_millis, handle_timeout, &timer_expired);
 
   /* write data */
-  while (n_written < write_len)
+  while (!timer_expired && n_written < write_len)
     {
       dsk_boolean is_writable = DSK_FALSE;
-      dsk_hook_trap (&client_sink->base_instance.writable_hook, set_boolean_true, &is_writable, NULL);
+      DskHookTrap *trap = dsk_hook_trap (&client_sink->base_instance.writable_hook, set_boolean_true, &is_writable, NULL);
       unsigned nw;
-      while (!is_writable)
+      while (!is_writable && !timer_expired)
         dsk_main_run_once ();
+      if (timer_expired && !is_writable)
+        dsk_hook_trap_destroy (trap);
       switch (dsk_octet_sink_write (DSK_OCTET_SINK (client_sink), write_len - n_written, write_data + n_written, &nw, error_out))
         {
         case DSK_IO_RESULT_SUCCESS:
@@ -222,33 +243,36 @@ write_then_read (unsigned write_len,
           return DSK_FALSE;
         }
     }
-  dsk_octet_sink_shutdown (client_sink);
+  if (n_written < write_len)
+    {
+      dsk_set_error (error_out, "timer expired before data written");
+      return DSK_FALSE;
+    }
 
   /* read til EOF */
   DskBuffer readbuf = DSK_BUFFER_STATIC_INIT;
-  dsk_boolean timer_expired = DSK_FALSE;
-  DskDispatchTimer *timer = dsk_main_add_timer_millis (time_millis, handle_timeout, &timer_expired);
-  for (;;)
+  while (!timer_expired)
     {
       DskHookTrap *trap;
       dsk_boolean is_readable = DSK_FALSE;
+      if (cmdline_debug_client)
+        dsk_warning ("client: trapping readability");
       trap = dsk_hook_trap (&client_source->base_instance.readable_hook, set_boolean_true, &is_readable, NULL);
       while (!is_readable && !timer_expired)
         dsk_main_run_once ();
-      if (timer_expired)
-        {
-          if (!is_readable)
-            dsk_hook_trap_destroy (trap);
-          timer = NULL;
-          goto done_reading;
-        }
+      if (timer_expired && !is_readable)
+        dsk_hook_trap_destroy (trap);
       switch (dsk_octet_source_read_buffer (DSK_OCTET_SOURCE (client_source), &readbuf, error_out))
         {
         case DSK_IO_RESULT_SUCCESS:
+          if (cmdline_debug_client)
+            dsk_warning ("client: got success reading (pending-size=%u)",
+                         (unsigned)readbuf.size);
           break;
         case DSK_IO_RESULT_AGAIN:
           break;
         case DSK_IO_RESULT_EOF:
+          dsk_warning ("unexpected eof");
           dsk_main_remove_timer (timer);
           timer = NULL;
           goto done_reading;
@@ -259,7 +283,7 @@ write_then_read (unsigned write_len,
         }
     }
 
-  dsk_assert (timer == NULL);
+  timer = NULL;
 
   /* return result buffer */
 done_reading:
@@ -316,28 +340,50 @@ int main(int argc, char **argv)
                         0, &cmdline_tcp_port);
   dsk_cmdline_add_string ("local-path", "Unix-domain path to use for serving", "PATH",
                           0, &cmdline_local_path);
+  dsk_cmdline_add_boolean ("debug-server", "enabler debugging prints in the server implementation",
+                           NULL, 0, &cmdline_debug_server);
+  dsk_cmdline_add_boolean ("debug-client", "enabler debugging prints in the client implementation",
+                           NULL, 0, &cmdline_debug_client);
   dsk_cmdline_process_args (&argc, &argv);
 
   /* create client */
+  printf ("creating client\n");
   create_client ();
+  printf ("testing defunct client\n");
   test_client_defunct ();
 
   /* create server */
+  printf ("creating server\n");
   create_server ();
+  printf ("testing echo server (through client)\n");
   test_echo_server_up ();
+  printf ("testing echo server again\n");
   test_echo_server_up ();
+  printf ("and again\n");
   test_echo_server_up ();
 
   /* destroy server */
+  printf ("killing server\n");
   kill_server ();
+  dsk_client_stream_disconnect (client_stream);
+  printf ("testing defunct client again\n");
   test_client_defunct ();
 
   /* re-create server */
+  printf ("creating server again\n");
   create_server ();
+  printf ("dramatic pause\n");
   pause_a_moment ();
+  printf ("testing echo server up\n");
+  test_echo_server_up ();
+  printf ("killing server again\n");
   kill_server ();
+  dsk_client_stream_disconnect (client_stream);
+  printf ("testing defunct client for the third time\n");
   test_client_defunct ();
 
+  printf ("killing client\n");
   kill_client ();
+
   return 0;
 }
