@@ -149,13 +149,13 @@ recycle(DskBufferFragment* frag)
 
 /* --- Global public methods --- */
 /**
- * dsk_buffer_cleanup_recycling_bin:
+ * _dsk_buffer_cleanup_recycling_bin:
  * 
  * Free unused buffer fragments.  (Normally some are
  * kept around to reduce strain on the global allocator.)
  */
 void
-dsk_buffer_cleanup_recycling_bin ()
+_dsk_buffer_cleanup_recycling_bin ()
 {
 #if !DSK_DEBUG_BUFFER_ALLOCATIONS
   while (recycling_stack != NULL)

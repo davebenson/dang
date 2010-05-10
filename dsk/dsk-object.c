@@ -105,6 +105,8 @@ dsk_object_cast_get_class (void       *object,
   return ((DskObject*)object)->object_class;
 }
 
+static const DskObjectClass *all_instantiated_classes = NULL;
+
 void _dsk_object_class_first_instance (const DskObjectClass *c)
 {
   const DskObjectClass *at;
@@ -133,6 +135,24 @@ void _dsk_object_class_first_instance (const DskObjectClass *c)
         *fat++ = at->finalize;
     }
   cd->instantiated = DSK_TRUE;
+
+  cd->prev_instantiated = all_instantiated_classes;
+  all_instantiated_classes = c;
+}
+
+
+void
+_dsk_object_cleanup_classes (void)
+{
+  while (all_instantiated_classes)
+    {
+      const DskObjectClass *c = all_instantiated_classes;
+      DskObjectClassCacheData *cd = (DskObjectClassCacheData*) c->cache_data;
+      all_instantiated_classes = cd->prev_instantiated;
+
+      dsk_free (cd->init_funcs);
+      cd->instantiated = DSK_FALSE;
+    }
 }
 
 void

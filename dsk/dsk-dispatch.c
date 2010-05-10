@@ -6,6 +6,9 @@
  *  * kqueue() implementation
  *  * windows port (yeah, right, volunteers are DEFINITELY needed for this one...)
  */
+/* TODO:
+ *  use DskMemPoolFixed instead of recycling lists
+ */
 #include <assert.h>
 #include <alloca.h>
 #include <sys/time.h>
@@ -807,6 +810,7 @@ void  dsk_dispatch_remove_timer (DskDispatchTimer *timer)
           d->base.timeout_usecs = min->timeout_usecs;
         }
     }
+  free_timer (timer);
 }
 DskDispatchIdle *
 dsk_dispatch_add_idle (DskDispatch        *dispatch,

@@ -30,7 +30,7 @@ dsk_octet_listener_socket_accept (DskOctetListener        *listener,
 {
   DskOctetListenerSocket *s = DSK_OCTET_LISTENER_SOCKET (listener);
   struct sockaddr addr;
-  socklen_t addr_len;
+  socklen_t addr_len = sizeof (addr);
   DskFileDescriptor fd = accept (s->listening_fd, &addr, &addr_len);
   if (fd < 0)
     {
@@ -107,6 +107,12 @@ dsk_octet_listener_socket_finalize (DskOctetListenerSocket *s)
 {
   dsk_main_close_fd (s->listening_fd);
   s->listening_fd = -1;
+
+  /* XXX: this is horribly broken if the current-working directory
+     changes and s->path depends on it. */
+  if (s->path)
+    unlink (s->path);
+
   dsk_free (s->path);
   dsk_free (s->bind_iface);
 }
@@ -189,6 +195,7 @@ dsk_octet_listener_socket_new (const DskOctetListenerSocketOptions *options,
     {
       struct sockaddr_un *un = (struct sockaddr_un *) addr;
       addr_len = sizeof (struct sockaddr_un);
+      memset (un, 0, addr_len);
       un->sun_family = PF_LOCAL;
       strncpy (un->sun_path, options->local_path, sizeof (un->sun_path));
       if (!maybe_delete_stale_socket (options->local_path, addr_len, addr, error))

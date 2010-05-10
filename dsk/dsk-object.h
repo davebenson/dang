@@ -26,7 +26,7 @@ typedef void (*DskObjectFinalizeFunc) (DskObject *object);
          (DskObjectClassCacheData *) &name ## __cache_data }
 #define DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(name) \
        static DskObjectClassCacheData name##__cache_data = \
-              { DSK_FALSE, 0, NULL, 0, NULL }
+              { DSK_FALSE, 0, NULL, 0, NULL, NULL }
 struct _DskObjectClassCacheData
 {
   dsk_boolean instantiated;
@@ -34,6 +34,7 @@ struct _DskObjectClassCacheData
   DskObjectInitFunc *init_funcs;
   unsigned n_finalizer_funcs;
   DskObjectFinalizeFunc *finalizer_funcs;
+  const DskObjectClass *prev_instantiated;
 };
 
 typedef struct _DskWeakPointer DskWeakPointer;
@@ -111,6 +112,9 @@ DskWeakPointer             *dsk_object_get_weak_pointer (DskObject *);
 /* private: but need to be exposed for public macros etc */
 void dsk_object_handle_last_unref (DskObject *o);
 void _dsk_object_class_first_instance (const DskObjectClass *c);
+
+/* truly private (use dsk_cleanup() instead) */
+void _dsk_object_cleanup_classes (void);
 
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC  void      *dsk_object_new   (const void *object_class)

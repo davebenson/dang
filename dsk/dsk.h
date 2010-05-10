@@ -32,4 +32,6 @@
 
 #include "dsk-cmdline.h"
 
+#include "dsk-cleanup.h"
+
 #undef _dsk_inline_assert
