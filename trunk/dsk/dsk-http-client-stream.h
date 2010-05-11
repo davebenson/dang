@@ -16,11 +16,15 @@ struct _DskHttpClientStream
   DskBuffer outcoming_data;
   DskHttpClientStreamTransfer *first_transfer, *last_transfer;
   DskHttpClientStreamTransfer *incoming_data_transfer, *outgoing_data_transfer;
+
+  DskError *latest_error;
+  DskHook error_hook;
 };
 
 /* internals */
 typedef enum
 {
+  DSK_HTTP_CLIENT_STREAM_READ_INIT,
   DSK_HTTP_CLIENT_STREAM_READ_NEED_HEADER,
   DSK_HTTP_CLIENT_STREAM_READ_IN_BODY,
   DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF,

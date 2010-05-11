@@ -1,3 +1,4 @@
+#include "dsk.h"
 
 static inline void
 transfer_done (DskHttpClientStreamTransfer *xfer)
@@ -8,6 +9,31 @@ transfer_done (DskHttpClientStreamTransfer *xfer)
     xfer->funcs->destroy (xfer);
   dsk_free (xfer);
 }
+
+static void
+client_stream_set_error (DskHttpClientStream *stream,
+                         DskHttpClientStreamTransfer *xfer,
+                         const char          *format,
+                         ...)
+{
+  va_list args;
+  DskError *error;
+
+  va_start (args, format);
+  error = dsk_error_new_valist (format, args);
+  va_end (args);
+
+  /* set latest error */
+  if (stream->latest_error)
+    dsk_error_unref (stream->latest_error);
+  stream->latest_error = error;
+
+  /* notifications */
+  if (xfer != NULL && xfer->funcs->handle_error != NULL)
+    xfer->funcs->handle_error (xfer);
+  dsk_hook_notify (&stream->error_hook);
+}
+
 static dsk_boolean
 handle_transport_source_readable (DskOctetSource *source,
                                   void           *data)
@@ -18,7 +44,9 @@ handle_transport_source_readable (DskOctetSource *source,
   rv = dsk_octet_source_read_buffer (source, &stream->incoming_data, &error);
   if (rv < 0)
     {
-      client_stream_set_error (stream, "error reading from underlying transport: %s",
+      client_stream_set_error (stream,
+                               stream->incoming_data_transfer,
+                               "error reading from underlying transport: %s",
                                error->message);
       dsk_error_unref (error);
       return DSK_TRUE;                  /* ??? */
@@ -31,7 +59,7 @@ handle_transport_source_readable (DskOctetSource *source,
       if (xfer == NULL
        || xfer->read_state == DSK_HTTP_CLIENT_STREAM_READ_INIT)
         {
-          client_stream_set_error (stream, "got data when none expected");
+          client_stream_set_error (stream, xfer, "got data when none expected");
           do_shutdown (stream);             /* ??? */
           return DSK_TRUE;                  /* ??? */
         }
