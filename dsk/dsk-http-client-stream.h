@@ -11,7 +11,9 @@ struct _DskHttpClientStream
 {
   DskObject base_instance;
   DskOctetSink *sink;
+  DskHookTrap *write_trap;
   DskOctetSource *source;
+  DskHookTrap *read_trap;
   DskBuffer incoming_data;
   DskBuffer outcoming_data;
   DskHttpClientStreamTransfer *first_transfer, *last_transfer;

@@ -34,6 +34,47 @@ client_stream_set_error (DskHttpClientStream *stream,
   dsk_hook_notify (&stream->error_hook);
 }
 
+static void
+do_shutdown (DskHttpClientStream *stream)
+{
+  /* shutdown both sides */
+  if (stream->read_trap != NULL)
+    {
+      dsk_hook_trap_destroy (stream->read_trap);
+      stream->read_trap = NULL;
+    }
+  if (stream->write_trap != NULL)
+    {
+      dsk_hook_trap_destroy (stream->write_trap);
+      stream->write_trap = NULL;
+    }
+  if (stream->source != NULL)
+    {
+      DskOctetSource *source = stream->source;
+      stream->source = NULL;
+      dsk_octet_source_shutdown (source);
+      dsk_object_unref (source);
+    }
+  if (stream->sink != NULL)
+    {
+      DskOctetSink *sink = stream->sink;
+      stream->sink = NULL;
+      dsk_octet_sink_shutdown (sink);
+      dsk_object_unref (sink);
+    }
+
+  /* destroy all pending transfers */
+  ...
+}
+
+static dsk_boolean
+has_response_body (DskHttpRequest *request,
+                   DskHttpResponse *response)
+{
+  /* TODO: check all verbs */
+  return (request->verb != DSK_HTTP_VERB_HEAD);
+}
+
 static dsk_boolean
 handle_transport_source_readable (DskOctetSource *source,
                                   void           *data)
@@ -49,7 +90,7 @@ handle_transport_source_readable (DskOctetSource *source,
                                "error reading from underlying transport: %s",
                                error->message);
       dsk_error_unref (error);
-      return DSK_TRUE;                  /* ??? */
+      return DSK_TRUE;
     }
   if (rv == 0)
     return DSK_TRUE;
@@ -129,10 +170,10 @@ got_header:
                 ...
               }
             xfer->response = response;
-            if (has_body (xfer->request, xfer->response))
+            if (has_response_body (xfer->request, xfer->response))
               {
                 /* setup (empty) response stream */
-                ...
+                xfer->content = dsk_memory_source_new ();
 
                 if (xfer->response->transfer_encoding_chunked)
                   {
@@ -192,12 +233,14 @@ got_header:
   return DSK_TRUE;
 }
 
-static void
-handle_transport_source_read_destroy (void *data)
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskHttpClientStream);
+const DskHttpClientStreamClass dsk_http_client_stream_class =
 {
-  DskHttpClientStream *stream = data;
-  ...
-}
+  DSK_OBJECT_CLASS_DEFINE (DskHttpClientStream,
+                           &dsk_object_class,
+                           dsk_http_client_stream_init,
+                           dsk_http_client_stream_finalize)
+};
 
 DskHttpClientStream *
 dsk_http_client_stream_new     (DskOctetSink        *sink,
@@ -209,7 +252,7 @@ dsk_http_client_stream_new     (DskOctetSink        *sink,
   stream->read_trap = dsk_hook_trap_readable (&source->readable_hook,
                                               handle_transport_source_readable,
                                               stream,
-                                              handle_transport_source_read_destroy);
+                                              NULL);
   return stream;
 }
 
