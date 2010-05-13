@@ -16,6 +16,7 @@ struct _DskMemorySource
   DskOctetSource base_instance;
   DskBuffer buffer;
   DskHook buffer_empty;
+  dsk_boolean done_adding;
 };
 struct _DskMemorySinkClass
 {
@@ -30,6 +31,10 @@ struct _DskMemorySink
 
 #define dsk_memory_source_new()  (DskMemorySource *) dsk_object_new (&dsk_memory_source_class)
 #define dsk_memory_sink_new()  (DskMemorySink *) dsk_object_new (&dsk_memory_sink_class)
+
+/* used to pump data into the DskMemorySource */
+void dsk_memory_source_done_adding (DskMemorySource *source);
+void dsk_memory_source_added_data  (DskMemorySource *source);
 
 extern DskMemorySourceClass dsk_memory_source_class;
 extern DskMemorySinkClass dsk_memory_sink_class;
