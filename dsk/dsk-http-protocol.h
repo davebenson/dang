@@ -534,3 +534,11 @@ struct _DskHttpResponse
 };
 extern DskHttpRequestClass dsk_http_request_class;
 extern DskHttpResponseClass dsk_http_response_class;
+
+DskHttpRequest  *dsk_http_request_parse_buffer  (DskBuffer *buffer,
+                                                 unsigned   header_len,
+                                                 DskError **error);
+DskHttpResponse *dsk_http_response_parse_buffer (DskBuffer *buffer,
+                                                 unsigned   header_len,
+                                                 DskError **error);
+

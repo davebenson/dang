@@ -35,6 +35,22 @@ client_stream_set_error (DskHttpClientStream *stream,
 }
 
 static void
+free_transfer (DskHttpClientStreamTransfer *xfer)
+{
+  dsk_object_unref (xfer->request);
+  if (xfer->response)
+    dsk_object_unref (xfer->response);
+  if (xfer->content)
+    {
+      dsk_memory_source_done_adding (xfer->content);
+      dsk_object_unref (xfer->content);
+    }
+  if (xfer->funcs != NULL && xfer->funcs->destroy != NULL)
+    xfer->funcs->destroy (xfer);
+  dsk_free (xfer);
+}
+
+static void
 do_shutdown (DskHttpClientStream *stream)
 {
   /* shutdown both sides */
@@ -64,7 +80,15 @@ do_shutdown (DskHttpClientStream *stream)
     }
 
   /* destroy all pending transfers */
-  ...
+  DskHttpClientStreamTransfer *xfer_list = stream->first_transfer;
+  stream->first_transfer = stream->last_transfer = NULL;
+  stream->incoming_data_transfer = stream->outgoing_data_transfer = NULL;
+  while (xfer_list != NULL)
+    {
+      DskHttpClientStreamTransfer *next = xfer_list->next;
+      free_transfer (xfer_list);
+      xfer_list = next;
+    }
 }
 
 static dsk_boolean
@@ -72,6 +96,7 @@ has_response_body (DskHttpRequest *request,
                    DskHttpResponse *response)
 {
   /* TODO: check all verbs */
+  DSK_UNUSED (response);
   return (request->verb != DSK_HTTP_VERB_HEAD);
 }
 
@@ -82,6 +107,7 @@ handle_transport_source_readable (DskOctetSource *source,
   DskHttpClientStream *stream = data;
   int rv;
   DskError *error = NULL;
+  DskHttpResponse *response;
   rv = dsk_octet_source_read_buffer (source, &stream->incoming_data, &error);
   if (rv < 0)
     {
@@ -100,9 +126,10 @@ handle_transport_source_readable (DskOctetSource *source,
       if (xfer == NULL
        || xfer->read_state == DSK_HTTP_CLIENT_STREAM_READ_INIT)
         {
+          stream->read_trap = NULL;
           client_stream_set_error (stream, xfer, "got data when none expected");
-          do_shutdown (stream);             /* ??? */
-          return DSK_TRUE;                  /* ??? */
+          do_shutdown (stream);
+          return DSK_FALSE;
         }
       switch (xfer->read_state)
         {
@@ -113,21 +140,23 @@ handle_transport_source_readable (DskOctetSource *source,
           {
             DskBufferFragment *frag;
             unsigned frag_offset;
-            unsigned start = xfer->read_info.need_header.start_check;
+            unsigned start = xfer->read_info.need_header.checked;
             if (start == stream->incoming_data.size)
               break;
-            if (!dsk_buffer_peek_fragment (&stream->incoming_data, start,
-                                           &frag, &frag_offset))
-              dsk_assert_not_reached ();
+            frag = dsk_buffer_find_fragment (&stream->incoming_data, start,
+                                             &frag_offset);
+            dsk_assert (frag != NULL);
+
             /* state 0:  non-\n
                state 1:  \n
                state 2:  \n \r
              */
             unsigned state = 0;
+            uint8_t *at = frag->buf + (start - frag_offset) + frag->buf_start;
             while (frag != NULL)
               {
-                char *at = frag->buf + frag_offset;
-                char *end = frag->buf + frag->start + frag->len;
+                uint8_t *end = frag->buf + frag->buf_start + frag->buf_length;
+
                 while (at < end)
                   {
                     if (*at == '\n')
@@ -153,12 +182,29 @@ handle_transport_source_readable (DskOctetSource *source,
                     at++;
                     start++;
                   }
+
+                /* check for max header size */
+                if (xfer->read_info.need_header.checked > stream->max_header_size)
+                  {
+                    stream->read_trap = NULL;
+                    client_stream_set_error (stream, xfer,
+                                             "header too long (at least %u bytes)",
+                                             (unsigned)xfer->read_info.need_header.checked);
+                    do_shutdown (stream);
+                    return DSK_FALSE;
+                  }
+                frag = frag->next;
+                at = frag->buf + frag->buf_start;
               }
+
+            /* hmm. this could obviously get condensed,
+               but that would be some pretty magik stuff. */
             if (state == 1)
-              start--;
+              start -= 1;
             else if (state == 2)
               start -= 2;
-            xfer->read_info.need_header.start_check = start;
+            xfer->read_info.need_header.checked = start;
+
             return DSK_TRUE;
 
 got_header:
@@ -167,7 +213,12 @@ got_header:
             dsk_buffer_discard (&stream->incoming_data, start);
             if (response == NULL)
               {
-                ...
+                stream->read_trap = NULL;
+                client_stream_set_error (stream, xfer,
+                                         "parsing response header: %s",
+                                         error->message);
+                do_shutdown (stream);
+                return DSK_FALSE;
               }
             xfer->response = response;
             if (has_response_body (xfer->request, xfer->response))
@@ -244,7 +295,8 @@ const DskHttpClientStreamClass dsk_http_client_stream_class =
 
 DskHttpClientStream *
 dsk_http_client_stream_new     (DskOctetSink        *sink,
-                                DskOctetSource      *source)
+                                DskOctetSource      *source,
+                                const DskHttpClientStreamOptions *options)
 {
   DskHttpClientStream *stream = dsk_object_new (&dsk_http_client_stream_class);
   stream->sink = dsk_object_ref (sink);
@@ -253,6 +305,7 @@ dsk_http_client_stream_new     (DskOctetSink        *sink,
                                               handle_transport_source_readable,
                                               stream,
                                               NULL);
+  stream->max_header_size = options->max_header_size;
   return stream;
 }
 

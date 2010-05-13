@@ -96,6 +96,13 @@ int      dsk_buffer_readv               (DskBuffer       *write_to,
  * for the allocation and deallocation of the DskBuffer itself. */
 void     dsk_buffer_clear               (DskBuffer    *to_destroy);
 
+
+
+/* iterating through the buffer */
+DskBufferFragment *dsk_buffer_find_fragment (DskBuffer   *buffer,
+                                             unsigned     offset,
+                                             unsigned    *frag_offset_out);
+
 /* Free all unused buffer fragments. */
 void     _dsk_buffer_cleanup_recycling_bin ();
 

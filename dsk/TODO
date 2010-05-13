@@ -1,11 +1,5 @@
-x move DskDispatch parameters to the end of callback functions
-  since most code doesn't need the dispatch object (assuming
-  we add a dsk_main_* pile of API)
-_ DskClientStreamSource BUT DskOctetStreamSourceFd.
-  Fix this inconsistency and come up with a policy for naming derived classes
-  _ ownership policies for the above also need clarification
 _ HTTP implementation
-_ Mime Multipart Impl
+_ MIME Multipart Impl
 _ XML implementation
   _ xml node object
   _ parser
@@ -18,3 +12,17 @@ _ YAML implementation
   _ parser
   _ printer
 _ checksum implementations
+_ zlib filters
+
+LATER
+_ SSL and HTTPS
+
+DOCUMENTATION
+*everything needs docs, but just remind ourselves of subtle stuff*
+_ pick a documentation standard
+
+CODING STANDARDS
+_ "len" or "length"?
+_ size_t everywhere ?
+_ DskClientStreamSource BUT DskOctetStreamSourceFd.
+  Fix this inconsistency and come up with a policy for naming derived classes

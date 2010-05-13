@@ -21,6 +21,9 @@ struct _DskHttpClientStream
 
   DskError *latest_error;
   DskHook error_hook;
+
+  /* config */
+  unsigned max_header_size;
 };
 
 /* internals */
@@ -59,9 +62,21 @@ struct _DskHttpClientStreamTransfer
   } read_info;
 };
 
+typedef struct _DskHttpClientStreamOptions DskHttpClientStreamOptions;
+struct _DskHttpClientStreamOptions
+{
+  unsigned max_header_size;
+};
+
+#define DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT \
+{                                              \
+  8192                  /* max_header_size */  \
+}
+
 DskHttpClientStream *
 dsk_http_client_stream_new     (DskOctetSink        *sink,
-                                DskOctetSource      *source);
+                                DskOctetSource      *source,
+                                const DskHttpClientStreamOptions *options);
 
 typedef enum
 {
