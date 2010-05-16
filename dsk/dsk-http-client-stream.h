@@ -5,7 +5,7 @@ typedef struct _DskHttpClientStreamTransfer DskHttpClientStreamTransfer;
 
 struct _DskHttpClientStreamClass
 {
-  DskObject base_instance;
+  DskObjectClass base_class;
 };
 struct _DskHttpClientStream
 {
@@ -17,13 +17,18 @@ struct _DskHttpClientStream
   DskBuffer incoming_data;
   DskBuffer outcoming_data;
   DskHttpClientStreamTransfer *first_transfer, *last_transfer;
-  DskHttpClientStreamTransfer *incoming_data_transfer, *outgoing_data_transfer;
+  DskHttpClientStreamTransfer *outgoing_data_transfer;
 
   DskError *latest_error;
   DskHook error_hook;
 
+  /* invariant: this is the index of 'outgoing_data_transfer' in the xfer list */
+  unsigned n_pending_outgoing_requests;
+
+
   /* config */
   unsigned max_header_size;
+  unsigned max_pipelined_requests;
 };
 
 /* internals */
@@ -37,10 +42,19 @@ typedef enum
   DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK,
   DSK_HTTP_CLIENT_STREAM_READ_DONE
 } DskHttpClientStreamReadState;
+typedef enum
+{
+  DSK_HTTP_CLIENT_STREAM_WRITE_INIT,
+  DSK_HTTP_CLIENT_STREAM_WRITE_HEADER,
+  DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT,         /* in post/put data */
+  DSK_HTTP_CLIENT_STREAM_WRITE_DONE
+} DskHttpClientStreamWriteState;
+
 struct _DskHttpClientStreamTransfer
 {
   DskHttpClientStream *owner;
   DskHttpRequest *request;
+  DskOctetSource *post_data;
   DskHttpResponse *response;
   DskMemorySource *content;      
   DskHttpClientStreamTransfer *next;
@@ -56,21 +70,27 @@ struct _DskHttpClientStreamTransfer
     struct { uint64_t remaining; } in_body;
 
     /* number of bytes remaining in current chunk */
+    /* same structure for in_xfer_chunk_header */
     struct { uint64_t remaining; } in_xfer_chunk;
 
-    /* no data for IN_XFER_CHUNKED_HEADER, DONE */
+    /* no data for DONE */
   } read_info;
+
+  DskHttpClientStreamWriteState write_state;
+  DskBuffer outgoing_data;
 };
 
 typedef struct _DskHttpClientStreamOptions DskHttpClientStreamOptions;
 struct _DskHttpClientStreamOptions
 {
   unsigned max_header_size;
+  unsigned max_pipelined_requests;
 };
 
-#define DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT \
-{                                              \
-  8192                  /* max_header_size */  \
+#define DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT              \
+{                                                           \
+  8192,                 /* max_header_size */               \
+  4                     /* max_pipelined_requests */        \
 }
 
 DskHttpClientStream *

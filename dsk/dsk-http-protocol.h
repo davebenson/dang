@@ -78,6 +78,7 @@ typedef enum {
   DSK_HTTP_CONTENT_ENCODING_COMPRESS
 } DskHttpContentEncoding;
 
+#if 0
 /*
  * The Transfer-Encoding field of HTTP/1.1.
  *
@@ -94,7 +95,9 @@ typedef enum {
   DSK_HTTP_TRANSFER_ENCODING_CHUNKED = 1,
   DSK_HTTP_TRANSFER_ENCODING_UNRECOGNIZED = 0x100
 } DskHttpTransferEncoding;
+#endif
 
+#if 0
 /*
  * The Connection: header enables or disables http-keepalive.
  *
@@ -112,6 +115,7 @@ typedef enum
   DSK_HTTP_CONNECTION_CLOSE,
   DSK_HTTP_CONNECTION_KEEPALIVE
 } DskHttpConnection;
+#endif
 
 /*
  * The Cache-Control response directive.
@@ -213,6 +217,8 @@ struct _DskHttpContentEncodingOption
   DskHttpContentEncoding       encoding;
   float                        quality;       /* -1 if not present */
 };
+
+#if 0
 /*
  * for the TE: request-header.
  *
@@ -225,6 +231,7 @@ struct _DskHttpTransferEncodingOption
   DskHttpTransferEncoding      encoding;
   float                        quality;       /* -1 if not present */
 };
+#endif
 
 
 /*
@@ -363,13 +370,15 @@ struct _DskHttpRequest
 {
   DskObject base_object;
 
-  DskHttpConnection             connection_type;
+  //DskHttpConnection             connection_type;
 
-  DskHttpTransferEncoding       transfer_encoding_type;
   DskHttpContentEncoding        content_encoding_type;
 
+  unsigned transfer_encoding_chunked : 1;       /* for POST data */
   unsigned accept_range_bytes : 1; /* Accept-Ranges */
   unsigned has_date : 1;           /* Date (see date member) */
+  unsigned supports_transfer_encoding_chunked : 1;      /* for TE header */
+  unsigned connection_close : 1;
 
   /*< public >*/
   DskHttpContentEncoding content_encoding;     /* Content-Encoding */
@@ -404,8 +413,8 @@ struct _DskHttpRequest
   DskHttpCharsetOption     *charset_options;              /* Accept-CharSet */
   unsigned n_content_encoding_options;
   DskHttpContentEncodingOption*content_encoding_options;     /* Accept-Encoding */
-  unsigned n_transfer_encoding_options;
-  DskHttpTransferEncodingOption*transfer_encodings_options;  /* TE */
+  //unsigned n_transfer_encoding_options;
+  //DskHttpTransferEncodingOption*transfer_encodings_options;  /* TE */
   unsigned                  n_accept_options;
   DskHttpMediaOption      *accept_options;           /* Accept */
   DskHttpAuthorization     *authorization;                /* Authorization */
@@ -456,11 +465,11 @@ struct _DskHttpResponse
 
   uint8_t http_major_version;             /* always 1 */
   uint8_t http_minor_version;
-  DskHttpConnection connection_type;
 
-  DskHttpTransferEncoding transfer_encoding_type;
   DskHttpContentEncoding content_encoding_type;
 
+  unsigned connection_close : 1;
+  unsigned transfer_encoding_chunked : 1;
   unsigned accept_range_bytes : 1; /* Accept-Ranges */
   unsigned has_date : 1;           /* Date (see date member) */
 

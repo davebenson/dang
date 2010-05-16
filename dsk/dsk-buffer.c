@@ -521,9 +521,8 @@ dsk_buffer_peek_char(const DskBuffer *buffer)
   return * (const unsigned char *) (dsk_buffer_fragment_start ((DskBufferFragment*)frag));
 }
 
-#if 0
 /**
- * dsk_buffer_read_char:
+ * dsk_buffer_read_byte:
  * @buffer: buffer to read a single byte from.
  *
  * Get the first byte in the buffer as a positive or 0 number,
@@ -533,14 +532,11 @@ dsk_buffer_peek_char(const DskBuffer *buffer)
  * returns: an unsigned character or -1.
  */
 int
-dsk_buffer_read_char (DskBuffer *buffer)
+dsk_buffer_read_byte (DskBuffer *buffer)
 {
-  char c;
-  if (dsk_buffer_read (buffer, &c, 1) == 0)
-    return -1;
-  return (int) (uint8_t) c;
+  uint8_t c;
+  return (dsk_buffer_read (buffer, 1, &c) == 0) ? -1 : c;
 }
-#endif
 
 /**
  * dsk_buffer_discard:
