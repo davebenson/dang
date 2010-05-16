@@ -1,14 +1,10 @@
 #include "dsk.h"
+#include "../gsklistmacros.h"
 
-static inline void
-transfer_done (DskHttpClientStreamTransfer *xfer)
-{
-  if (xfer->funcs->handle_content_complete != NULL)
-    xfer->funcs->handle_content_complete (xfer);
-  if (xfer->funcs->destroy != NULL)
-    xfer->funcs->destroy (xfer);
-  dsk_free (xfer);
-}
+#define GET_STREAM_XFER_QUEUE(stream) \
+        DskHttpClientStreamTransfer *, \
+        stream->first_transfer, stream->last_transfer, \
+        next
 
 static void
 client_stream_set_error (DskHttpClientStream *stream,
@@ -50,6 +46,30 @@ free_transfer (DskHttpClientStreamTransfer *xfer)
   dsk_free (xfer);
 }
 
+static inline void
+transfer_done (DskHttpClientStreamTransfer *xfer)
+{
+  /* remove from list */
+  DskHttpClientStreamTransfer *tmp;
+  GSK_QUEUE_DEQUEUE (GET_STREAM_XFER_QUEUE (xfer->owner), tmp);
+  dsk_assert (tmp == xfer);
+
+  /* EOF for content */
+  if (xfer->content)
+    dsk_memory_source_done_adding (xfer->content);
+
+  if (xfer->funcs->handle_content_complete != NULL)
+    xfer->funcs->handle_content_complete (xfer);
+  if (xfer->funcs->destroy != NULL)
+    xfer->funcs->destroy (xfer);
+
+  if (xfer->content)
+    dsk_object_unref (xfer->content);
+  dsk_object_unref (xfer->request);
+  dsk_object_unref (xfer->response);
+  dsk_free (xfer);
+}
+
 static void
 do_shutdown (DskHttpClientStream *stream)
 {
@@ -82,7 +102,7 @@ do_shutdown (DskHttpClientStream *stream)
   /* destroy all pending transfers */
   DskHttpClientStreamTransfer *xfer_list = stream->first_transfer;
   stream->first_transfer = stream->last_transfer = NULL;
-  stream->incoming_data_transfer = stream->outgoing_data_transfer = NULL;
+  stream->outgoing_data_transfer = NULL;
   while (xfer_list != NULL)
     {
       DskHttpClientStreamTransfer *next = xfer_list->next;
@@ -112,7 +132,7 @@ handle_transport_source_readable (DskOctetSource *source,
   if (rv < 0)
     {
       client_stream_set_error (stream,
-                               stream->incoming_data_transfer,
+                               stream->first_transfer,
                                "error reading from underlying transport: %s",
                                error->message);
       dsk_error_unref (error);
@@ -239,14 +259,14 @@ got_header:
                   {
                     xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_DONE;
                     /* TODO: indicate source done */
-
-                    stream->incoming_data_transfer = xfer->next;
                   }
                 else
                   {
                     if (!xfer->response->connection_close)
                       {
-                        ...
+                        client_stream_set_error (stream, xfer,
+                                                 "neither 'Connection: close' nor 'Transfer-Encoding: chunked' nor 'Content-Length' specified");
+                        xfer->response->connection_close = 1;   /* HACK */
                       }
                     xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF;
                   }
@@ -254,7 +274,6 @@ got_header:
             else
               {
                 xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_DONE;
-                stream->incoming_data_transfer = xfer->next;
               }
             /* notify */
             if (xfer->funcs->handle_response != NULL)
@@ -264,16 +283,56 @@ got_header:
           }
           break;
         case DSK_HTTP_CLIENT_STREAM_READ_IN_BODY:
-          ...
+          xfer->read_info.in_body.remaining -= dsk_buffer_transfer (&xfer->content->buffer,
+                                                                    &stream->incoming_data,
+                                                                    xfer->read_info.in_body.remaining);
+          dsk_memory_source_added_data (xfer->content);
+          if (xfer->read_info.in_body.remaining == 0)
+            transfer_done (xfer);
           break;
         case DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF:
-          ...
+          dsk_buffer_drain (&xfer->content->buffer, &stream->incoming_data);
           break;
         case DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER:
-          ...
+          {
+            int c;
+            while ((c=dsk_buffer_read_byte (&stream->incoming_data)) != -1)
+              {
+                if (dsk_ascii_isxdigit (c))
+                  {
+                    xfer->read_info.in_xfer_chunk.remaining <<= 4;
+                    xfer->read_info.in_xfer_chunk.remaining += dsk_ascii_xdigit_value (c);
+                  }
+                else if (c == '\n')
+                  {
+                    xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK;
+                    if (xfer->read_info.in_xfer_chunk.remaining == 0)
+                      {
+                        transfer_done (xfer);
+                        xfer = NULL;            /* reduce chances of bugs */
+                      }
+                    break;
+                  }
+                else if (c == '\r')
+                  {
+                    /* ignore */
+                  }
+                else
+                  {
+                    client_stream_set_error (stream, xfer, "unexpected char 0x%02x in 'chunked' header", c);
+                    do_shutdown (stream);
+                    return DSK_FALSE;
+                  }
+              }
+          }
           break;
         case DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK:
-          ...
+          xfer->read_info.in_xfer_chunk.remaining -= 
+            dsk_buffer_transfer (&xfer->content->buffer, &stream->incoming_data,
+                                 xfer->read_info.in_xfer_chunk.remaining);
+          dsk_memory_source_added_data (xfer->content);
+          if (xfer->read_info.in_xfer_chunk.remaining == 0)
+            xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER;
           break;
         default:
           /* INIT already handled when checking if incoming_data_transfer==NULL;
@@ -282,6 +341,70 @@ got_header:
         }
     }
   return DSK_TRUE;
+}
+
+static dsk_boolean
+handle_writable (DskOctetSink *sink,
+                 DskHttpClientStream *stream)
+{
+  DskHttpClientStreamTransfer *xfer = stream->outgoing_data_transfer;
+  if (xfer == NULL)
+    {
+      stream->write_trap = NULL;
+      return DSK_FALSE;
+    }
+
+  switch (xfer->write_state)
+    {
+    case DSK_HTTP_CLIENT_STREAM_WRITE_INIT:
+      /* serialize header and try writing it */
+      ...
+    case DSK_HTTP_CLIENT_STREAM_WRITE_HEADER:
+      /* continue writing header */
+      ...
+    case DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT:
+      /* continue writing body */
+      ...
+    default:
+      dsk_assert_not_reached ();
+    }
+  return DSK_TRUE;
+
+done_writing:
+  stream->outgoing_data_transfer = xfer->next;
+  --stream->n_pending_outgoing_requests;
+  if (stream->outgoing_data_transfer == NULL)
+    {
+      dsk_assert (stream->n_pending_outgoing_requests == 0);
+      stream->write_trap = NULL;
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
+static void
+maybe_add_write_hook (DskHttpClientStream *stream)
+{
+  if (stream->write_trap != NULL)
+    return;
+  if (stream->outgoing_data_transfer == NULL)
+    return;
+  if (stream->n_pending_outgoing_requests >= stream->max_pipelined_requests)
+    return;
+
+  stream->write_trap = dsk_hook_trap (&stream->sink->writable_hook,
+                                      (DskHookFunc) handle_writable,
+                                      stream,
+                                      NULL);
+}
+
+static void dsk_http_client_stream_init (DskHttpClientStream *stream)
+{
+  DSK_UNUSED (stream);
+}
+static void dsk_http_client_stream_finalize (DskHttpClientStream *stream)
+{
+  do_shutdown (stream);
 }
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskHttpClientStream);
@@ -301,10 +424,10 @@ dsk_http_client_stream_new     (DskOctetSink        *sink,
   DskHttpClientStream *stream = dsk_object_new (&dsk_http_client_stream_class);
   stream->sink = dsk_object_ref (sink);
   stream->source = dsk_object_ref (source);
-  stream->read_trap = dsk_hook_trap_readable (&source->readable_hook,
-                                              handle_transport_source_readable,
-                                              stream,
-                                              NULL);
+  stream->read_trap = dsk_hook_trap (&source->readable_hook,
+                                     (DskHookFunc) handle_transport_source_readable,
+                                     stream,
+                                     NULL);
   stream->max_header_size = options->max_header_size;
   return stream;
 }
@@ -316,5 +439,18 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
 				DskHttpClientStreamFuncs *funcs,
 				void                     *user_data)
 {
-  ...
+  DskHttpClientStreamTransfer *xfer = dsk_malloc (sizeof (DskHttpClientStreamTransfer));
+  GSK_QUEUE_ENQUEUE (GET_STREAM_XFER_QUEUE (stream), xfer);
+  if (stream->outgoing_data_transfer == NULL)
+    stream->outgoing_data_transfer = xfer;
+  xfer->owner = stream;
+  xfer->request = dsk_object_ref (request);
+  xfer->post_data = post_data ? dsk_object_ref (post_data) : NULL;
+  xfer->funcs = funcs;
+  xfer->user_data = user_data;
+  xfer->response = NULL;
+  xfer->content = NULL;
+  xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_INIT;
+  maybe_add_write_hook (stream);
+  return xfer;
 }

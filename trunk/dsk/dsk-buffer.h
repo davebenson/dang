@@ -39,8 +39,8 @@ char    *dsk_buffer_read_line           (DskBuffer    *buffer);
 
 char    *dsk_buffer_parse_string0       (DskBuffer    *buffer);
                         /* Returns first char of buffer, or -1. */
-int      dsk_buffer_peek_char           (const DskBuffer *buffer);
-int      dsk_buffer_read_char           (DskBuffer    *buffer);
+int      dsk_buffer_peek_byte           (const DskBuffer *buffer);
+int      dsk_buffer_read_byte           (DskBuffer    *buffer);
 
 /* 
  * Appending to the buffer.
