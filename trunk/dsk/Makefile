@@ -1,7 +1,8 @@
 # just so :make works in vi
 
 BUILT_SOURCES = dsk-ascii-chartable.inc
-TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0
+TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
+	        tests/test-http-client-stream-0
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
 

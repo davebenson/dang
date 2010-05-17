@@ -8,6 +8,10 @@
 
 #define MAX_XFER_CHUNKED_EXTENSION_LENGTH               512
 
+
+/* 16-hex digits + CRLF */
+#define MAX_CHUNK_HEADER_SIZE                   18
+
 static void
 client_stream_set_error (DskHttpClientStream *stream,
                          DskHttpClientStreamTransfer *xfer,
@@ -45,6 +49,17 @@ free_transfer (DskHttpClientStreamTransfer *xfer)
     }
   if (xfer->funcs != NULL && xfer->funcs->destroy != NULL)
     xfer->funcs->destroy (xfer);
+  if (xfer->write_state == DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT
+   && xfer->write_info.in_content.post_data_trap != NULL)
+    {
+      dsk_hook_trap_destroy (xfer->write_info.in_content.post_data_trap);
+      xfer->write_info.in_content.post_data_trap = NULL;
+    }
+  if (xfer->post_data)
+    {
+      dsk_octet_source_shutdown (xfer->post_data);
+      dsk_object_unref (xfer->post_data);
+    }
   dsk_free (xfer);
 }
 
@@ -182,6 +197,29 @@ scan_for_end_of_http_header (DskBuffer *buffer,
     start -= 2;
   *checked_inout = start;
   return DSK_FALSE;
+}
+
+static unsigned
+get_chunked_header (size_t size,
+                    char  *chunked_header)
+{
+  static const char hex_digit[] = "0123456789abcdef";
+  unsigned at = 0, i;
+  size_t s = size;
+  while (s)
+    {
+      chunked_header[at++] = hex_digit[s & 0x0f];
+      s >>= 4;
+    }
+  for (i = 0; i < at / 2; i++)
+    {
+      char swap = chunked_header[i];
+      chunked_header[i] = chunked_header[at - 1 - i];
+      chunked_header[at - 1 - i] = swap;
+    }
+  chunked_header[at++] = '\r';
+  chunked_header[at++] = '\n';
+  return at;
 }
 
 static dsk_boolean
@@ -448,6 +486,78 @@ restart_processing:
   return DSK_TRUE;
 }
 
+static dsk_boolean handle_writable (DskOctetSink *sink,
+                                    DskHttpClientStream *stream);
+static void
+maybe_add_write_hook (DskHttpClientStream *stream)
+{
+  if (stream->write_trap != NULL)
+    return;
+  if (stream->outgoing_data_transfer == NULL)
+    return;
+  if (stream->n_pending_outgoing_requests >= stream->max_pipelined_requests)
+    return;
+
+  stream->write_trap = dsk_hook_trap (&stream->sink->writable_hook,
+                                      (DskHookFunc) handle_writable,
+                                      stream,
+                                      NULL);
+}
+
+static void
+write_end_transfer_encoding_chunked (DskBuffer *buffer)
+{
+  static const char terminator[] = "0\r\n"    /* last-chunk */
+                                   "\r\n"     /* trailer */
+                                   "\r\n";    /* terminate request */
+  dsk_buffer_append (buffer, sizeof (terminator), terminator);
+}
+
+static dsk_boolean
+handle_post_data_readable (DskOctetSource *source,
+                           DskHttpClientStreamTransfer *xfer)
+{
+  DskBuffer buffer = DSK_BUFFER_STATIC_INIT;
+  DskError *error = NULL;
+  DskHttpClientStream *stream = xfer->owner;
+  switch (dsk_octet_source_read_buffer (source, &buffer, &error))
+    {
+    case DSK_IO_RESULT_SUCCESS:
+      if (buffer.size == 0)
+        return DSK_TRUE;
+      if (xfer->request->transfer_encoding_chunked)
+        {
+          char chunked_header[MAX_CHUNK_HEADER_SIZE];
+          unsigned len = get_chunked_header (buffer.size, chunked_header);
+          dsk_buffer_append (&stream->outgoing_data, len, chunked_header);
+        }
+      dsk_buffer_drain (&stream->outgoing_data, &buffer);
+      maybe_add_write_hook (stream);
+      xfer->write_info.in_content.post_data_trap = NULL;
+      return DSK_FALSE;
+    case DSK_IO_RESULT_AGAIN:
+      return DSK_TRUE;
+    case DSK_IO_RESULT_EOF:
+      if (xfer->request->transfer_encoding_chunked)
+        write_end_transfer_encoding_chunked (&stream->outgoing_data);
+
+      stream->outgoing_data_transfer = xfer->next;
+
+      maybe_add_write_hook (stream);
+      xfer->write_info.in_content.post_data_trap = NULL;
+      return DSK_FALSE;
+    case DSK_IO_RESULT_ERROR:
+      client_stream_set_error (stream, xfer,
+                               "error reading post-data: %s",
+                               error->message);
+      dsk_error_unref (error);
+      xfer->write_info.in_content.post_data_trap = NULL;
+      do_shutdown (stream);
+      return DSK_FALSE;
+    }
+  dsk_return_val_if_reached ("bad io-result writing post-data", DSK_FALSE);
+}
+
 static dsk_boolean
 handle_writable (DskOctetSink *sink,
                  DskHttpClientStream *stream)
@@ -456,7 +566,8 @@ handle_writable (DskOctetSink *sink,
   dsk_boolean blocked = DSK_FALSE;
 
   while (stream->outgoing_data.size < stream->max_outgoing_data
-      && stream->outgoing_data_transfer != NULL)
+      && stream->outgoing_data_transfer != NULL
+      && !blocked)
     {
       DskHttpClientStreamTransfer *xfer = stream->outgoing_data_transfer;
       switch (xfer->write_state)
@@ -467,6 +578,8 @@ handle_writable (DskOctetSink *sink,
           if (xfer->post_data)
             {
               xfer->write_state = DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT;
+              xfer->write_info.in_content.bytes = 0;
+              xfer->write_info.in_content.post_data_trap = NULL;
             }
           else
             xfer->write_state = DSK_HTTP_CLIENT_STREAM_WRITE_DONE;
@@ -490,14 +603,14 @@ handle_writable (DskOctetSink *sink,
               case DSK_IO_RESULT_SUCCESS:
                 {
                   unsigned n_post_data = buf->size - old_buf_size;
-                  xfer->write_info.in_content += n_post_data;
+                  xfer->write_info.in_content.bytes += n_post_data;
                   if (xfer->request->content_length >= 0
-                   && xfer->write_info.in_content > (uint64_t) xfer->request->content_length)
+                   && xfer->write_info.in_content.bytes > (uint64_t) xfer->request->content_length)
                     {
                       /* post-data longer than expected */
                       client_stream_set_error (stream, xfer,
                                                "got %llu bytes for a POST whose Content-Length was %llu",
-                                               xfer->write_info.in_content,
+                                               xfer->write_info.in_content.bytes,
                                                (uint64_t) xfer->request->content_length);
                       do_shutdown (stream);
                       return DSK_FALSE;
@@ -506,23 +619,8 @@ handle_writable (DskOctetSink *sink,
                 if (xfer->request->transfer_encoding_chunked
                  && buf->size != 0)
                   {
-                    char chunked_header[18];
-                    size_t s = buf->size;
-                    unsigned at = 0, i;
-                    static const char hex_digit[] = "0123456789abcdef";
-                    while (s)
-                      {
-                        chunked_header[at++] = hex_digit[s & 0x0f];
-                        s >>= 4;
-                      }
-                    for (i = 0; i < at / 2; i++)
-                      {
-                        char swap = chunked_header[i];
-                        chunked_header[i] = chunked_header[at - 1 - i];
-                        chunked_header[at - 1 - i] = swap;
-                      }
-                    chunked_header[at++] = '\r';
-                    chunked_header[at++] = '\n';
+                    char chunked_header[MAX_CHUNK_HEADER_SIZE];
+                    unsigned at = get_chunked_header (buf->size, chunked_header);
                     dsk_buffer_append (&stream->outgoing_data, at, chunked_header);
                     dsk_buffer_drain (&stream->outgoing_data, buf);
                   }
@@ -530,23 +628,25 @@ handle_writable (DskOctetSink *sink,
               case DSK_IO_RESULT_AGAIN:
                 /* trap post-data readable */
                 blocked = DSK_TRUE;
-                ...
+                xfer->write_info.in_content.post_data_trap
+                  = dsk_hook_trap (&xfer->post_data->readable_hook,
+                                   (DskHookFunc) handle_post_data_readable,
+                                   xfer, NULL);
                 break;
               case DSK_IO_RESULT_EOF:
                 if (xfer->request->content_length >= 0
-                 && xfer->write_info.in_content < (uint64_t) xfer->request->content_length)
+                 && xfer->write_info.in_content.bytes < (uint64_t) xfer->request->content_length)
                   {
-                    ...
+                    client_stream_set_error (stream, xfer,
+                                             "got too few (%llu) bytes for a POST whose Content-Length was %llu",
+                                             xfer->write_info.in_content.bytes,
+                                             (uint64_t) xfer->request->content_length);
+                    do_shutdown (stream);
+                    return DSK_FALSE;
                   }
                 if (xfer->request->transfer_encoding_chunked)
-                  {
-                    ...
-                  }
-                else
-                  {
-                    ...
-                  }
-                ...
+                  write_end_transfer_encoding_chunked (&stream->outgoing_data);
+                stream->outgoing_data_transfer = xfer->next;
                 break;
               case DSK_IO_RESULT_ERROR:
                 client_stream_set_error (stream, xfer,
@@ -556,7 +656,7 @@ handle_writable (DskOctetSink *sink,
                 do_shutdown (stream);
                 return DSK_FALSE;
               }
-          ...
+          }
           break;
         default:
           dsk_assert_not_reached ();
@@ -573,17 +673,18 @@ handle_writable (DskOctetSink *sink,
   switch (dsk_octet_sink_write_buffer (sink, &stream->outgoing_data, &error))
     {
     case DSK_IO_RESULT_SUCCESS:
-      ...
       break;
     case DSK_IO_RESULT_AGAIN:
-      ...
       break;
     case DSK_IO_RESULT_EOF:
       /* treat as error */
       error = dsk_error_new ("writing to http-client got EOF");
       /* fall-through */
     case DSK_IO_RESULT_ERROR:
-      ...
+      client_stream_set_error (stream, stream->outgoing_data_transfer,
+                               "error writing to http-client sink: %s",
+                               error->message);
+      dsk_error_unref (error);
       break;
     }
 
@@ -594,22 +695,6 @@ handle_writable (DskOctetSink *sink,
     }
 
   return DSK_TRUE;
-}
-
-static void
-maybe_add_write_hook (DskHttpClientStream *stream)
-{
-  if (stream->write_trap != NULL)
-    return;
-  if (stream->outgoing_data_transfer == NULL)
-    return;
-  if (stream->n_pending_outgoing_requests >= stream->max_pipelined_requests)
-    return;
-
-  stream->write_trap = dsk_hook_trap (&stream->sink->writable_hook,
-                                      (DskHookFunc) handle_writable,
-                                      stream,
-                                      NULL);
 }
 
 static void dsk_http_client_stream_init (DskHttpClientStream *stream)
