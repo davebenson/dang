@@ -6,6 +6,8 @@
         stream->first_transfer, stream->last_transfer, \
         next
 
+#define MAX_XFER_CHUNKED_EXTENSION_LENGTH               512
+
 static void
 client_stream_set_error (DskHttpClientStream *stream,
                          DskHttpClientStreamTransfer *xfer,
@@ -141,6 +143,7 @@ handle_transport_source_readable (DskOctetSource *source,
     }
   if (rv == 0)
     return DSK_TRUE;
+restart_processing:
   while (stream->incoming_data.size > 0)
     {
       DskHttpClientStreamTransfer *xfer = stream->first_transfer;
@@ -243,7 +246,10 @@ got_header:
               }
             if (response->status_code == DSK_HTTP_STATUS_CONTINUE)
               {
-                ...
+                /* Someday we may want to give the user an opportunity to examine
+                   the continue header, or to know that it happened, but we don't. */
+                dsk_object_unref (response);
+                goto restart_processing;
               }
             xfer->response = response;
             if (has_response_body (xfer->request, xfer->response))
@@ -310,7 +316,6 @@ got_header:
                   }
                 else if (c == '\n')
                   {
-                    xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK;
                     if (xfer->read_info.in_xfer_chunk.remaining == 0)
                       {
                         /* XXX: don't we have to read another newline */
@@ -319,11 +324,18 @@ got_header:
                         transfer_done (xfer);
                         xfer = NULL;            /* reduce chances of bugs */
                       }
+                    else
+                      xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK;
                     break;
                   }
-                else if (c == '\r')
+                else if (c == '\r' || c == ' ')
                   {
                     /* ignore */
+                  }
+                else if (c == ';')
+                  {
+                    xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER_EXTENSION;
+                    goto in_xfer_chunked_header_extension;
                   }
                 else
                   {
@@ -334,6 +346,35 @@ got_header:
               }
           }
           break;
+        case DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER_EXTENSION:
+        in_xfer_chunked_header_extension:
+          {
+            int nl_index;
+            nl_index = dsk_buffer_index_of (&stream->incoming_data, '\n');
+            if (nl_index == -1)
+              {
+                if (stream->incoming_data.size > MAX_XFER_CHUNKED_EXTENSION_LENGTH)
+                  {
+                    client_stream_set_error (stream, xfer, "in transfer-encoding-chunked header: extension too long");
+                    do_shutdown (stream);
+                    return DSK_FALSE;
+                  }
+                return DSK_TRUE;
+              }
+            dsk_buffer_discard (&stream->incoming_data, nl_index + 1);
+            if (xfer->read_info.in_xfer_chunk.remaining == 0)
+              {
+                /* XXX: don't we have to read another newline */
+                xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNKED;
+
+                transfer_done (xfer);
+                xfer = NULL;            /* reduce chances of bugs */
+              }
+            else
+              xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK;
+            break;
+          }
+
         case DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK:
           xfer->read_info.in_xfer_chunk.remaining -= 
             dsk_buffer_transfer (&xfer->content->buffer, &stream->incoming_data,
