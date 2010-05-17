@@ -29,6 +29,9 @@ struct _DskHttpClientStream
   unsigned max_header_size;
   unsigned max_pipelined_requests;
   unsigned max_outgoing_data;
+
+  unsigned strict_keepalive : 1;
+  unsigned print_warnings : 1;
 };
 
 /* internals */
@@ -76,10 +79,15 @@ struct _DskHttpClientStreamTransfer
     /* same structure for in_xfer_chunk_header */
     struct { uint64_t remaining; } in_xfer_chunk;
 
+    struct { unsigned checked; } in_xfer_chunk_trailer;
     /* no data for DONE */
   } read_info;
 
   DskHttpClientStreamWriteState write_state;
+  union {
+    uint64_t in_content;
+  } write_info;
+
 };
 
 typedef struct _DskHttpClientStreamOptions DskHttpClientStreamOptions;
@@ -88,13 +96,17 @@ struct _DskHttpClientStreamOptions
   unsigned max_header_size;
   unsigned max_pipelined_requests;
   unsigned max_outgoing_data;
+  dsk_boolean strict_keepalive;
+  dsk_boolean print_warnings;
 };
 
 #define DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT              \
 {                                                           \
   8192,                 /* max_header_size */               \
   4                     /* max_pipelined_requests */        \
-  8192                  /* max_outgoing_data */             \
+  8192,                 /* max_outgoing_data */             \
+  DSK_FALSE,            /* strict_keepalive */              \
+  DSK_TRUE              /* print_warnings */                \
 }
 
 DskHttpClientStream *
