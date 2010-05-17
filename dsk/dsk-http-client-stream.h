@@ -85,7 +85,7 @@ struct _DskHttpClientStreamTransfer
 
   DskHttpClientStreamWriteState write_state;
   union {
-    uint64_t in_content;
+    struct { DskHookTrap *post_data_trap; uint64_t bytes; } in_content;
   } write_info;
 
 };
@@ -103,7 +103,7 @@ struct _DskHttpClientStreamOptions
 #define DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT              \
 {                                                           \
   8192,                 /* max_header_size */               \
-  4                     /* max_pipelined_requests */        \
+  4,                    /* max_pipelined_requests */        \
   8192,                 /* max_outgoing_data */             \
   DSK_FALSE,            /* strict_keepalive */              \
   DSK_TRUE              /* print_warnings */                \
