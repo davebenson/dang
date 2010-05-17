@@ -120,6 +120,7 @@ has_response_body (DskHttpRequest *request,
   return (request->verb != DSK_HTTP_VERB_HEAD);
 }
 
+
 static dsk_boolean
 handle_transport_source_readable (DskOctetSource *source,
                                   void           *data)
@@ -240,6 +241,10 @@ got_header:
                 do_shutdown (stream);
                 return DSK_FALSE;
               }
+            if (response->status_code == DSK_HTTP_STATUS_CONTINUE)
+              {
+                ...
+              }
             xfer->response = response;
             if (has_response_body (xfer->request, xfer->response))
               {
@@ -308,6 +313,9 @@ got_header:
                     xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK;
                     if (xfer->read_info.in_xfer_chunk.remaining == 0)
                       {
+                        /* XXX: don't we have to read another newline */
+                        xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNKED;
+
                         transfer_done (xfer);
                         xfer = NULL;            /* reduce chances of bugs */
                       }
@@ -334,6 +342,15 @@ got_header:
           if (xfer->read_info.in_xfer_chunk.remaining == 0)
             xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER;
           break;
+          
+        case DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_TRAILER:
+          /* We are looking for the end of content similar to the end
+             of an http-header: two consecutive newlines. */
+          ...
+          break;
+        case DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_FINAL_NEWLINE:
+          ...
+          break;
         default:
           /* INIT already handled when checking if incoming_data_transfer==NULL;
              DONE should never be encountered for incoming_data_transfer */
@@ -347,38 +364,82 @@ static dsk_boolean
 handle_writable (DskOctetSink *sink,
                  DskHttpClientStream *stream)
 {
-  DskHttpClientStreamTransfer *xfer = stream->outgoing_data_transfer;
-  if (xfer == NULL)
+  DskError *error = NULL;
+  dsk_boolean blocked = DSK_FALSE;
+
+  while (stream->outgoing_data.size < stream->max_outgoing_data
+      && stream->outgoing_data_transfer != NULL)
     {
-      stream->write_trap = NULL;
-      return DSK_FALSE;
+      DskHttpClientStreamTransfer *xfer = stream->outgoing_data_transfer;
+      switch (xfer->write_state)
+        {
+        case DSK_HTTP_CLIENT_STREAM_WRITE_INIT:
+          /* serialize header and write it to buffer */
+          dsk_http_request_write_buffer (xfer->request, &stream->outgoing_data);
+          if (xfer->post_data)
+            {
+              xfer->write_state = DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT;
+            }
+          else
+            xfer->write_state = DSK_HTTP_CLIENT_STREAM_WRITE_DONE;
+          break;
+        case DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT:
+          /* continue writing body */
+          if (xfer->request->transfer_encoding_chunked)
+            {
+              ...
+            }
+          else
+            {
+              switch (dsk_octet_source_read_buffer (xfer->post_data, &stream->outgoing_data, &error))
+                {
+                case DSK_IO_RESULT_SUCCESS:
+                  ...
+                case DSK_IO_RESULT_AGAIN:
+                  ...
+                case DSK_IO_RESULT_EOF:
+                  ...
+                case DSK_IO_RESULT_ERROR:
+                  ...
+                }
+            }
+          ...
+          break;
+        default:
+          dsk_assert_not_reached ();
+        }
+      if (xfer->write_state == DSK_HTTP_CLIENT_STREAM_WRITE_DONE)
+        {
+          stream->outgoing_data_transfer = xfer->next;
+          --stream->n_pending_outgoing_requests;
+        }
     }
 
-  switch (xfer->write_state)
-    {
-    case DSK_HTTP_CLIENT_STREAM_WRITE_INIT:
-      /* serialize header and try writing it */
-      ...
-    case DSK_HTTP_CLIENT_STREAM_WRITE_HEADER:
-      /* continue writing header */
-      ...
-    case DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT:
-      /* continue writing body */
-      ...
-    default:
-      dsk_assert_not_reached ();
-    }
-  return DSK_TRUE;
-
-done_writing:
-  stream->outgoing_data_transfer = xfer->next;
-  --stream->n_pending_outgoing_requests;
   if (stream->outgoing_data_transfer == NULL)
+    blocked = DSK_TRUE;
+  switch (dsk_octet_sink_write_buffer (sink, &stream->outgoing_data, &error))
     {
-      dsk_assert (stream->n_pending_outgoing_requests == 0);
+    case DSK_IO_RESULT_SUCCESS:
+      ...
+      break;
+    case DSK_IO_RESULT_AGAIN:
+      ...
+      break;
+    case DSK_IO_RESULT_EOF:
+      /* treat as error */
+      error = dsk_error_new ("writing to http-client got EOF");
+      /* fall-through */
+    case DSK_IO_RESULT_ERROR:
+      ...
+      break;
+    }
+
+  if (blocked && stream->outgoing_data.size == 0)
+    {
       stream->write_trap = NULL;
       return DSK_FALSE;
     }
+
   return DSK_TRUE;
 }
 
@@ -429,6 +490,8 @@ dsk_http_client_stream_new     (DskOctetSink        *sink,
                                      stream,
                                      NULL);
   stream->max_header_size = options->max_header_size;
+  stream->max_pipelined_requests = options->max_pipelined_requests;
+  stream->max_outgoing_data = options->max_outgoing_data;
   return stream;
 }
 
