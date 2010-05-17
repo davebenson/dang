@@ -466,6 +466,8 @@ struct _DskHttpResponse
   uint8_t http_major_version;             /* always 1 */
   uint8_t http_minor_version;
 
+  DskHttpStatus status_code;
+
   DskHttpContentEncoding content_encoding_type;
 
   unsigned connection_close : 1;
@@ -550,4 +552,8 @@ DskHttpRequest  *dsk_http_request_parse_buffer  (DskBuffer *buffer,
 DskHttpResponse *dsk_http_response_parse_buffer (DskBuffer *buffer,
                                                  unsigned   header_len,
                                                  DskError **error);
+void             dsk_http_request_write_buffer  (DskHttpRequest *request,
+                                                 DskBuffer *buffer);
+void             dsk_http_response_write_buffer  (DskHttpResponse *response,
+                                                 DskBuffer *buffer);
 

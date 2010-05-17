@@ -15,7 +15,7 @@ struct _DskHttpClientStream
   DskOctetSource *source;
   DskHookTrap *read_trap;
   DskBuffer incoming_data;
-  DskBuffer outcoming_data;
+  DskBuffer outgoing_data;
   DskHttpClientStreamTransfer *first_transfer, *last_transfer;
   DskHttpClientStreamTransfer *outgoing_data_transfer;
 
@@ -25,10 +25,10 @@ struct _DskHttpClientStream
   /* invariant: this is the index of 'outgoing_data_transfer' in the xfer list */
   unsigned n_pending_outgoing_requests;
 
-
   /* config */
   unsigned max_header_size;
   unsigned max_pipelined_requests;
+  unsigned max_outgoing_data;
 };
 
 /* internals */
@@ -45,7 +45,6 @@ typedef enum
 typedef enum
 {
   DSK_HTTP_CLIENT_STREAM_WRITE_INIT,
-  DSK_HTTP_CLIENT_STREAM_WRITE_HEADER,
   DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT,         /* in post/put data */
   DSK_HTTP_CLIENT_STREAM_WRITE_DONE
 } DskHttpClientStreamWriteState;
@@ -77,7 +76,6 @@ struct _DskHttpClientStreamTransfer
   } read_info;
 
   DskHttpClientStreamWriteState write_state;
-  DskBuffer outgoing_data;
 };
 
 typedef struct _DskHttpClientStreamOptions DskHttpClientStreamOptions;
@@ -85,12 +83,14 @@ struct _DskHttpClientStreamOptions
 {
   unsigned max_header_size;
   unsigned max_pipelined_requests;
+  unsigned max_outgoing_data;
 };
 
 #define DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT              \
 {                                                           \
   8192,                 /* max_header_size */               \
   4                     /* max_pipelined_requests */        \
+  8192                  /* max_outgoing_data */             \
 }
 
 DskHttpClientStream *
