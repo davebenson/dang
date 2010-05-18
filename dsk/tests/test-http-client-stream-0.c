@@ -1,3 +1,4 @@
+#include <string.h>
 #include "../dsk.h"
 
 typedef struct _RequestData RequestData;
@@ -5,12 +6,60 @@ struct _RequestData
 {
   DskMemorySource *source;
   DskMemorySink *sink;
-  DskHttpResponse *response;
+  DskHttpResponse *response_header;
   dsk_boolean content_complete;
+  DskBuffer content_buffer;
+  dsk_boolean destroyed;
 };
 #define REQUEST_DATA_DEFAULT { NULL, NULL, NULL,        \
-                               DSK_FALSE        /* content_complete */ \
+                               DSK_FALSE,       /* content_complete */ \
+                               DSK_BUFFER_STATIC_INIT, /* content_buffer */ \
+                               DSK_FALSE,       /* destroyed */ \
                              }
+
+static void
+request_data__handle_response (DskHttpClientStreamTransfer *xfer)
+{
+  RequestData *rd = xfer->user_data;
+  rd->response_header = dsk_object_ref (xfer->response);
+}
+static void
+request_data__handle_content_complete (DskHttpClientStreamTransfer *xfer)
+{
+  RequestData *rd = xfer->user_data;
+  rd->content_complete = DSK_TRUE;
+}
+static void
+request_data__destroy (DskHttpClientStreamTransfer *xfer)
+{
+  RequestData *rd = xfer->user_data;
+  rd->destroyed = DSK_TRUE;
+}
+
+static void
+request_data_clear (RequestData *rd)
+{
+  dsk_buffer_clear (&rd->content_buffer);
+  dsk_object_unref (rd->source);
+  dsk_object_unref (rd->sink);
+  if (rd->response_header)
+    dsk_object_unref (rd->response_header);
+}
+
+static dsk_boolean
+is_http_request_complete (DskBuffer *buf)
+{
+  char *slab = dsk_malloc (buf->size + 1);
+  dsk_boolean rv;
+
+  dsk_buffer_peek (buf, buf->size, slab);
+  slab[buf->size] = 0;
+
+  rv = strstr (slab, "\n\n") != NULL
+    || strstr (slab, "\n\r\n") != NULL;
+  dsk_free (slab);
+  return rv;
+}
 
 static void
 test_simple (void)
@@ -19,10 +68,19 @@ test_simple (void)
   DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
   RequestData request_data = REQUEST_DATA_DEFAULT;
   DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
+  DskHttpRequest *request;
+  DskHttpClientStreamTransfer *xfer;
+  DskHttpClientStreamFuncs request_funcs_0;
+  memset (&request_funcs_0, 0, sizeof (request_funcs_0));
+  request_funcs_0.handle_response = request_data__handle_response;
+  request_funcs_0.handle_content_complete = request_data__handle_content_complete;
+  request_funcs_0.destroy = request_data__destroy;
   request_data.source = dsk_memory_source_new ();
   request_data.sink = dsk_memory_sink_new ();
   request_data.sink->max_buffer_size = 100000000;
-  stream = dsk_http_client_stream_new (sink, source, &options);
+  stream = dsk_http_client_stream_new (DSK_OCTET_SINK (request_data.sink),
+                                       DSK_OCTET_SOURCE (request_data.source),
+                                       &options);
   req_options.host = "localhost";
   req_options.full_path = "/hello.txt";
   request = dsk_http_request_new (&req_options);
@@ -30,7 +88,7 @@ test_simple (void)
                                          &request_funcs_0, &request_data);
 
   /* read data from sink */
-  while (!is_http_request_complete (request_data.sink->buffer))
+  while (!is_http_request_complete (&request_data.sink->buffer))
     dsk_main_run_once ();
 
   /* write response */
@@ -63,7 +121,7 @@ test_simple (void)
   request_data_clear (&request_data);
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
   test_simple ();
   return 0;

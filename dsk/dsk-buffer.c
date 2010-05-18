@@ -498,7 +498,7 @@ dsk_buffer_parse_string0(DskBuffer *buffer)
 }
 
 /**
- * dsk_buffer_peek_char:
+ * dsk_buffer_peek_byte:
  * @buffer: buffer to peek a single byte from.
  *
  * Get the first byte in the buffer as a positive or 0 number.
@@ -508,7 +508,7 @@ dsk_buffer_parse_string0(DskBuffer *buffer)
  * returns: an unsigned character or -1.
  */
 int
-dsk_buffer_peek_char(const DskBuffer *buffer)
+dsk_buffer_peek_byte(const DskBuffer *buffer)
 {
   const DskBufferFragment *frag;
 
@@ -518,7 +518,7 @@ dsk_buffer_peek_char(const DskBuffer *buffer)
   for (frag = buffer->first_frag; frag; frag = frag->next)
     if (frag->buf_length > 0)
       break;
-  return * (const unsigned char *) (dsk_buffer_fragment_start ((DskBufferFragment*)frag));
+  return * (const uint8_t *) (dsk_buffer_fragment_start ((DskBufferFragment*)frag));
 }
 
 /**
