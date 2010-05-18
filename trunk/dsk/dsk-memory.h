@@ -27,6 +27,7 @@ struct _DskMemorySink
   DskOctetSink base_instance;
   DskBuffer buffer;
   DskHook buffer_nonempty;
+  unsigned max_buffer_size;
 };
 
 #define dsk_memory_source_new()  (DskMemorySource *) dsk_object_new (&dsk_memory_source_class)

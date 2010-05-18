@@ -557,3 +557,72 @@ void             dsk_http_request_write_buffer  (DskHttpRequest *request,
 void             dsk_http_response_write_buffer  (DskHttpResponse *response,
                                                  DskBuffer *buffer);
 
+/* --- construction --- */
+typedef struct _DskHttpRequestOptions DskHttpRequestOptions;
+typedef struct _DskHttpResponseOptions DskHttpResponseOptions;
+struct _DskHttpRequestOptions
+{
+  DskHttpVerb verb;
+
+  unsigned char http_major_version;
+  unsigned char http_minor_version;
+
+  /* specify either the full path */
+  char *full_path;
+
+  /* ... or its components */
+  char *path;
+  char *query;
+
+  /* --- host --- */
+  char *host;
+  
+  /* --- post-data --- */
+  /* text/plain or text/plain/utf-8 */
+  char *content_type;
+
+  /* ... or by components */
+  char *content_main_type;
+  char *content_sub_type;
+  char *content_charset;
+
+  /* --- content-length --- */
+  int64_t content_length;
+};
+DskHttpRequest *dsk_http_request_new (DskHttpRequestOptions *options);
+
+#define DSK_HTTP_REQUEST_OPTIONS_DEFAULT \
+{                                                               \
+  DSK_HTTP_VERB_GET,            /* status_code */               \
+  1,                            /* http_major_version */        \
+  1,                            /* http_minor_version */        \
+  NULL,                         /* full_path */                 \
+  NULL,                         /* path */                      \
+  NULL,                         /* query */                     \
+  NULL,                         /* host */                      \
+  NULL,                         /* content_type */              \
+  NULL,                         /* content_main_type */         \
+  NULL,                         /* content_sub_type */          \
+  NULL,                         /* content_charset */           \
+  -1LL,                         /* content_length */            \
+}
+struct _DskHttpResponseOptions
+{
+  DskHttpRequest *request;
+
+  DskHttpStatus status_code;
+  unsigned char http_major_version;
+  unsigned char http_minor_version;
+
+  /* --- post-data --- */
+  /* text/plain or text/plain/utf-8 */
+  char *content_type;
+
+  /* ... or by components */
+  char *content_main_type;
+  char *content_sub_type;
+  char *content_charset;
+
+  /* --- content-length --- */
+  int64_t content_length;
+};
