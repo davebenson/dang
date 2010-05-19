@@ -7,7 +7,7 @@ unsigned char dsk_ascii_chartable[256] =
 };
 
 /* xdigit_values and digit_values are machine-generated */
-#include "dsk-digit-chartable.inc"
+#include "dsk-digit-chartables.inc"
 
 int dsk_ascii_xdigit_value (int c)
 {
