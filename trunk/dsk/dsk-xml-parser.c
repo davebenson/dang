@@ -1,5 +1,9 @@
 #include "dsk.h"
 
+/* References:
+        The Annotated XML Specification, by Tim Bray
+        http://www.xml.com/axml/testaxml.htm
+ */
 /* Stages.
    (1) lexing
         - create a sequence of tags, text (incl cdata), comments etc
@@ -26,6 +30,17 @@ typedef enum
   LEX_OPEN_IN_ATTR_VALUE_DQ_CHAR_ENTITY, /* ...an "&" waiting for semicolon */
   LEX_LT_SLASH,                 /* just got an "</" */
   LEX_CLOSE_ELEMENT_NAME,       /* in element-name of open tag */
+  LEX_LT_BANG,
+  LEX_LT_BANG_MINUS,            /* <!- */
+  LEX_COMMENT,                  /* <!-- */
+  LEX_COMMENT_MINUS,            /* <!-- comment - */
+  LEX_COMMENT_MINUS_MINUS,      /* <!-- comment -- */
+  LEX_LT_BANG_LBRACK
+  LEX_LT_BANG_LBRACK_IN_CDATAHDR,  /* <![CD   (for example, nchar of "CDATA" given by ??? */
+  LEX_LT_BANG_LBRACK_CDATAHDR,  /* <![CD   (for example, nchar of "CDATA" given by ??? */
+  LEX_CDATA,
+  LEX_CDATA_RBRACK,
+  LEX_CDATA_RBRACK_RBRACK,
 } LexState;
 
 /* --- configuration --- */
@@ -93,12 +108,16 @@ struct _DskXmlParser
 {
   DskXmlFilename *filename;
   unsigned line_no;
+
+  /* for text, comments, etc */
   DskBuffer buffer;
 
   NsAbbrevMap *ns_map;
 
   unsigned stack_size;
   StackNode stack[MAX_DEPTH];
+
+  unsigned n_to_be_returned;
 
   DskXmlParserNamespaceConfig *config;
 };
@@ -136,6 +155,230 @@ dsk_xml_parser_config_new (DskXmlParserFlags flags,
   ...
 }
 
+/* --- routines called by the lexer --- */
+
+/* --- lexing --- */
+
+dsk_boolean
+dsk_xml_parser_feed(DskXmlParser       *parser,
+                    size_t              len,
+                    const char         *data,
+                    DskError          **error_out)
+
+{
+#define MAYBE_RETURN            do{if(len == 0) return DSK_TRUE;}while(0)
+#define ADVANCE                 do{len--; data++;}while(0)
+  if (parser->n_to_be_returned == 0
+   && (parser->stack_size == 0 || parser->stack[parser->stack_size-1].state == NULL))
+    {
+      MAYBE_RETURN;
+      /* skipping, rather than actually parsing */
+      switch (parser->lex_state)
+        {
+        case LEX_DEFAULT:
+        skip__default:
+          {
+            while (len > 0)
+              {
+                if (*data == '&')
+                  {
+                    parser->lex_state = LEX_DEFAULT_CHAR_ENTITY;
+                    ADVANCE;
+                    MAYBE_RETURN;
+                    goto skip__default_char_entity;
+                  }
+                else if (*data == '<')
+                  {
+                    parser->lex_state = LEX_LT;
+                    ADVANCE;
+                    MAYBE_RETURN;
+                    goto skip__lt;
+                  }
+                else
+                  ADVANCE;
+              }
+            return DSK_TRUE;
+          }
+        case LEX_DEFAULT_CHAR_ENTITY:
+        skip__default_char_entity:
+          /* in 'skip' mode, looking for a semicolon suffices */
+          {
+            const char *semicolon = memchr (buf, ';', len);
+            if (semicolon == NULL)
+              return DSK_TRUE;
+            len -= (semicolon + 1 - buf);
+            buf = semicolon + 1;
+            parser->lex_state = LEX_DEFAULT;
+            goto skip__default;
+          }
+        case LEX_LT:
+        skip__lt:
+          if (*buf == '!')
+            {
+              ...
+            }
+          else if (*buf == '/')
+            {
+              parser->lex_state = LEX_LT_SLASH;
+              ADVANCE;
+              MAYBE_RETURN;
+              goto skip__lt_slash;
+            }
+          else if (*buf == '?')
+            {
+              parser->lex_state = LEX_PROCESSING_INSTRUCTION;
+              ADVANCE;
+              MAYBE_RETURN;
+              goto skip__processing_instruction;
+            }
+          else if (dsk_ascii_isspace (*buf))
+            {
+              ADVANCE;
+              MAYBE_RETURN;
+              goto skip__lt;
+            }
+          else
+            {
+              dsk_buffer_append_byte (&parser->buffer, *buf);
+              ADVANCE;
+              MAYBE_RETURN;
+              goto skip__open_element_name;
+            }
+        case LEX_OPEN_ELEMENT_NAME:
+        skip__open_element_name:
+          {
+            ...
+          }
+        case LEX_OPEN_IN_ATTRS:
+        skip__open_in_attrs:
+          ...
+        case LEX_OPEN_IN_ATTR_NAME:
+          ...
+        case LEX_OPEN_AFTER_ATTR_NAME:
+          ...
+        case LEX_OPEN_AFTER_ATTR_NAME_EQ:
+          ...
+        case LEX_OPEN_IN_ATTR_VALUE_SQ:
+          ...
+        case LEX_OPEN_IN_ATTR_VALUE_DQ:
+          ...
+        case LEX_OPEN_IN_ATTR_VALUE_SQ_CHAR_ENTITY:
+          ...
+        case LEX_OPEN_IN_ATTR_VALUE_DQ_CHAR_ENTITY:
+          ...
+        case LEX_LT_SLASH:
+          ...
+        case LEX_CLOSE_ELEMENT_NAME:
+          ...
+        case LEX_LT_BANG:
+          ...
+        case LEX_LT_BANG_MINUS:
+          ...
+        case LEX_COMMENT:
+          ...
+        case LEX_COMMENT_MINUS:
+          ...
+        case LEX_COMMENT_MINUS_MINUS:
+          ...
+        case LEX_LT_BANG_LBRACK:
+          ...
+        case LEX_LT_BANG_LBRACK_IN_CDATAHDR:
+          ...
+        case LEX_LT_BANG_LBRACK_CDATAHDR:
+          ...
+        case LEX_CDATA:
+          ...
+        case LEX_CDATA_RBRACK:
+          ...
+        case LEX_CDATA_RBRACK_RBRACK:
+          ...
+        }
+    }
+  else
+    {
+      switch (parser->lex_state)
+        {
+        case LEX_DEFAULT:
+          {
+            const char *start = data;
+            while (len > 0)
+              {
+                if (*data == '&')
+                  {
+                    if (start < data)
+                      dsk_buffer_append (parser->buffer, data-start, start);
+                    ADVANCE;
+                    MAYBE_RETURN;
+                    goto no_skip__default_char_entity;
+                  }
+                else if (*data == '<')
+                  {
+                    if (start < data)
+                      dsk_buffer_append (parser->buffer, data-start, start);
+                    ADVANCE;
+                    MAYBE_RETURN;
+                    goto no_skip__lt;
+                  }
+                else
+                  ADVANCE;
+              }
+            if (start < data)
+              dsk_buffer_append (parser->buffer, data-start, start);
+            return DSK_TRUE;
+          }
+        case LEX_DEFAULT_CHAR_ENTITY:
+          ...
+        case LEX_LT:
+          ...
+        case LEX_OPEN_ELEMENT_NAME:
+          ...
+        case LEX_OPEN_IN_ATTRS:
+          ...
+        case LEX_OPEN_IN_ATTR_NAME:
+          ...
+        case LEX_OPEN_AFTER_ATTR_NAME:
+          ...
+        case LEX_OPEN_AFTER_ATTR_NAME_EQ:
+          ...
+        case LEX_OPEN_IN_ATTR_VALUE_SQ:
+          ...
+        case LEX_OPEN_IN_ATTR_VALUE_DQ:
+          ...
+        case LEX_OPEN_IN_ATTR_VALUE_SQ_CHAR_ENTITY:
+          ...
+        case LEX_OPEN_IN_ATTR_VALUE_DQ_CHAR_ENTITY:
+          ...
+        case LEX_LT_SLASH:
+          ...
+        case LEX_CLOSE_ELEMENT_NAME:
+          ...
+        case LEX_LT_BANG:
+          ...
+        case LEX_LT_BANG_MINUS:
+          ...
+        case LEX_COMMENT:
+          ...
+        case LEX_COMMENT_MINUS:
+          ...
+        case LEX_COMMENT_MINUS_MINUS:
+          ...
+        case LEX_LT_BANG_LBRACK:
+          ...
+        case LEX_LT_BANG_LBRACK_IN_CDATAHDR:
+          ...
+        case LEX_LT_BANG_LBRACK_CDATAHDR:
+          ...
+        case LEX_CDATA:
+          ...
+        case LEX_CDATA_RBRACK:
+          ...
+        case LEX_CDATA_RBRACK_RBRACK:
+          ...
+        }
+      ...
+    }
+}
+
 void
 dsk_xml_parser_config_destroy (DskXmlParserConfig *config)
 {
@@ -166,16 +409,6 @@ dsk_xml_parser_new (DskXmlParserConfig *config,
 DskXml *
 dsk_xml_parser_pop (DskXmlParser       *parser,
                     unsigned           *xpath_index_out)
-{
-  ...
-}
-
-dsk_boolean
-dsk_xml_parser_feed(DskXmlParser       *parser,
-                    size_t              len,
-                    const char         *data,
-                    DskError          **error_out)
-
 {
   ...
 }
