@@ -28,9 +28,6 @@ typedef enum
   LEX_CLOSE_ELEMENT_NAME,       /* in element-name of open tag */
 } LexState;
 
-
-
-
 /* --- configuration --- */
 typedef struct _ParseStateTransition ParseStateTransition;
 struct _ParseStateTransition
