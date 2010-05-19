@@ -27,6 +27,7 @@ struct _DskMemorySink
   DskOctetSink base_instance;
   DskBuffer buffer;
   DskHook buffer_nonempty;
+  dsk_boolean got_shutdown;
   unsigned max_buffer_size;
 };
 
@@ -36,6 +37,8 @@ struct _DskMemorySink
 /* used to pump data into the DskMemorySource */
 void dsk_memory_source_done_adding (DskMemorySource *source);
 void dsk_memory_source_added_data  (DskMemorySource *source);
+
+void dsk_memory_sink_drained (DskMemorySink *sink);
 
 extern DskMemorySourceClass dsk_memory_source_class;
 extern DskMemorySinkClass dsk_memory_sink_class;
