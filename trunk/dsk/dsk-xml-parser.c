@@ -49,6 +49,7 @@ typedef enum
   LEX_CDATA_RBRACK_RBRACK,
   LEX_PROCESSING_INSTRUCTION,
   LEX_PROCESSING_INSTRUCTION_QM,        /* after question mark in PI */
+  LEX_BANG_DIRECTIVE     /* this encompasses ELEMENT, ATTLIST, ENTITY, DOCTYPE declarations */
 } LexState;
 
 #define WHITESPACE_CASES  case ' ': case '\t': case '\r': case '\n'
@@ -84,7 +85,7 @@ struct _DskXmlParserConfig
 
   unsigned ignore_ns : 1;
   unsigned suppress_whitespace : 1;
-  unsigned suppress_comments : 1;
+  unsigned include_comments : 1;
   unsigned destroyed : 1;
 };
 
@@ -203,6 +204,37 @@ validate_and_split_xpath (const char *xmlpath,
   return rv;
 }
 
+DskXmlParserConfig *
+dsk_xml_parser_config_new (DskXmlParserFlags flags,
+			   unsigned          n_ns,
+			   const DskXmlParserNamespaceConfig *ns,
+			   unsigned          n_xpaths,
+			   char             *xpaths)
+{
+  /* copy and sort the namespace mapping, if enabled */
+  DskXmlParserNamespaceConfig *ns_slab = NULL;
+  if ((ns->flags & DSK_XML_PARSER_IGNORE_NS) == 0)
+    {
+      unsigned total_strlen = 0;
+      unsigned i;
+      char *at;
+      for (i = 0; i < n_ns; i++)
+        total_strlen += strlen (ns[i].url) + 1
+                      + strlen (ns[i].prefix) + 1;
+      ns_slab = dsk_malloc (sizeof (DskXmlParserNamespaceConfig) * n_ns
+                            + total_strlen);
+      at = (char*)(ns_slab + n_ns);
+      for (i = 0; i < n_ns; i++)
+        {
+          ns_slab[i].url = at;
+          at = dsk_stpcpy (at, ns[i].url);
+          ns_slab[i].prefix = at;
+          at = dsk_stpcpy (at, ns[i].prefix);
+        }
+    }
+
+  config = ...;
+}
 
 /* --- character entities --- */
 
@@ -294,6 +326,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
                     DskError          **error)
 {
   dsk_boolean suppress;
+#define BUFFER_CLEAR            dsk_buffer_clear (&parser->buffer)
 #define APPEND_BYTE(val)        dsk_buffer_append_byte (&parser->buffer, (val))
 #define MAYBE_RETURN            do{if(len == 0) return DSK_TRUE;}while(0)
 #define ADVANCE_NON_NL          do{len--; data++;}while(0)
@@ -632,11 +665,55 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
       switch (*data)
         {
         case '[':
+          CONSUME_NON_NL_AND_SWITCH_STATE (LEX_LT_BANG_LBRACK);
         case '-':
+          CONSUME_NON_NL_AND_SWITCH_STATE (LEX_LT_BANG_MINUS);
+        WHITESPACE_CASES:
+          ADVANCE_CHAR;
+          MAYBE_RETURN;
+          goto label__LEX_LT_BANG;
+        default:
+          BUFFER_CLEAR;
+          APPEND_BYTE (*data);
+          CONSUME_NON_NL_AND_SWITCH_STATE (LEX_BANG_DIRECTIVE);
+        }
     case LEX_LT_BANG_MINUS:
-      ...
+      switch (*data)
+        {
+        case '-':
+          if (parser->include_comments)
+            {
+              if (!suppress && parser->buffer.size > 0)
+                emit_text_node (parser);
+            }
+          dsk_buffer_clear (&parser->buffer);
+          CONSUME_CHAR_AND_SWITCH_STATE (LEX_COMMENT);
+          break;
+        default:
+          goto disallowed_char;
+        }
     case LEX_COMMENT:
-      ...
+      {
+        const char *hyphen = memchr (data, '-', len);
+        if (hyphen == NULL)
+          {
+            if (parser->include_comments)
+              dsk_buffer_append (&parser->buffer, len, data);
+            parser->line_no += count_newlines (len, data);
+            return DSK_TRUE;
+          }
+        else
+          {
+            unsigned skip;
+            if (parser->include_comments)
+              dsk_buffer_append (&parser->buffer, hyphen - data, data);
+            skip = hyphen - data;
+            parser->line_no += count_newlines (skip, data);
+            len -= skip;
+            data += skip;
+            CONSUME_CHAR_AND_SWITCH_STATE (LEX_COMMENT_MINUS);
+          }
+      }
     case LEX_COMMENT_MINUS:
       ...
     case LEX_COMMENT_MINUS_MINUS:
@@ -652,6 +729,10 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
     case LEX_CDATA_RBRACK:
       ...
     case LEX_CDATA_RBRACK_RBRACK:
+      ...
+    case LEX_BANG_DIRECTIVE:
+      /* this encompasses ELEMENT, ATTLIST, ENTITY, DOCTYPE declarations */
+      /* strategy: try every substring until one ends with '>' */
       ...
     }
 
