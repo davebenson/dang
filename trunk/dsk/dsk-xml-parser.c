@@ -47,6 +47,8 @@ typedef enum
   LEX_CDATA_RBRACK_RBRACK,
 } LexState;
 
+#define WHITESPACE_CASES  case ' ': case '\t': case '\r': case '\n'
+
 /* --- configuration --- */
 typedef struct _ParseStateTransition ParseStateTransition;
 typedef struct _ParseState ParseState;
@@ -126,6 +128,8 @@ struct _DskXmlParser
 
   unsigned n_to_be_returned;
 
+  LexState lex_state;
+
   DskXmlParserNamespaceConfig *config;
 };
 
@@ -134,7 +138,60 @@ static char **
 validate_and_split_xpath (const char *xmlpath,
                           DskError  **error)
 {
-  ...
+  dsk_boolean slash_allowed = DSK_FALSE;
+  unsigned n_slashes = 0;
+  const char *at;
+  char **rv;
+  unsigned i;
+  for (at = xmlpath; *at; at++)
+    switch (*at)
+      {
+      WHITESPACE_CASES:
+        dsk_set_error (error, "whitespace not allowed in xmlpath");
+        return NULL;
+      case '/':
+        if (!slash_allowed)
+          {
+            if (at == xmlpath)
+              dsk_set_error (error, "initial '/' in xmlpath not allowed");
+            else
+              dsk_set_error (error, "two consecutive '/'s in xmlpath not allowed");
+            return DSK_FALSE;
+          }
+        n_slashes++;
+        slash_allowed = DSK_FALSE;
+        break;
+      default:
+        slash_allowed = DSK_TRUE;
+      }
+  if (!slash_allowed && at > xmlpath)
+    {
+      dsk_set_error (error, "final '/' in xmlpath not allowed");
+      return DSK_FALSE;
+    }
+  if (!slash_allowed)
+    {
+      rv = dsk_malloc0 (sizeof (char *));
+      return rv;
+    }
+  rv = dsk_malloc (sizeof (char*) * (n_slashes + 2));
+  i = 0;
+  for (at = xmlpath; at != NULL; )
+    {
+      const char *slash = strchr (at, '/');
+      if (slash)
+        {
+          rv[i++] = dsk_strdup_slice (at, slash);
+          at = slash + 1;
+        }
+      else
+        {
+          rv[i++] = dsk_strdup (at);
+          at = NULL;
+        }
+    }
+  rv[i] = NULL;
+  return rv;
 }
 
 
@@ -144,28 +201,36 @@ dsk_boolean
 dsk_xml_parser_feed(DskXmlParser       *parser,
                           unsigned            len,
                           char               *data,
-                                  DskError          **error_out);
+                                  DskError          **error_out)
 {
+  dsk_boolean suppress;
 #define MAYBE_RETURN            do{if(len == 0) return DSK_TRUE;}while(0)
 #define ADVANCE_NOT_NL          do{len--; data++;}while(0)
 #define ADVANCE_MAYBE_NL          do{if (*data == '\n')lineno++; len--; data++;}while(0)
 #define ADVANCE_MAYBE_NL          do{if (*data == '\n')lineno++; len--; data++;}while(0)
   suppress = parser->n_to_be_returned == 0
          && (parser->stack_size == 0 || parser->stack[parser->stack_size-1].state == NULL);
-  switch (parser->state)
+  switch (parser->lex_state)
     {
+    case LEX_DEFAULT:
+    label__LEX_DEFAULT:
+      ...
     case LEX_DEFAULT_CHAR_ENTITY:
     label__LEX_DEFAULT_CHAR_ENTITY:
-      /* in 'skip' mode, looking for a semicolon suffices */
-      {
-        const char *semicolon = memchr (buf, ';', len);
-        if (semicolon == NULL)
-          return DSK_TRUE;
-        len -= (semicolon + 1 - buf);
-        buf = semicolon + 1;
-        parser->lex_state = LEX_DEFAULT;
-        goto skip__default;
-      }
+      if (suppress)
+        {
+          const char *semicolon = memchr (data, ';', len);
+          if (semicolon == NULL)
+            return DSK_TRUE;
+          len -= (semicolon + 1 - data);
+          data = semicolon + 1;
+          parser->lex_state = LEX_DEFAULT;
+          goto label__LEX_DEFAULT;;
+        }
+      else
+        {
+          ...
+        }
     case LEX_LT:
     label__LEX_LT:
       switch (*buf)
