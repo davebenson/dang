@@ -28,6 +28,9 @@
 #include "dsk-http-server-stream.h"
 #include "dsk-http-server.h"
 
+#include "dsk-xml.h"
+#include "dsk-xml-parser.h"
+
 #include "dsk-unicode.h"
 
 #include "dsk-cmdline.h"
