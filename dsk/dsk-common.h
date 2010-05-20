@@ -65,6 +65,7 @@ void dsk_error(const char *format, ...) DSK_GNUC_PRINTF(1,2);
 /* non-fatal warning message */
 void dsk_warning(const char *format, ...) DSK_GNUC_PRINTF(1,2);
 
+char *dsk_stpcpy (char *dst, const char *src);
 
 /* --- assertions */
 #ifdef DSK_DISABLE_ASSERTIONS
