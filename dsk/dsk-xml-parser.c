@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <search.h>             /* for the seldom-used lsearch() */
 #include "dsk.h"
 
 #define MAX_DEPTH       64
@@ -67,7 +68,7 @@ struct _ParseState
   unsigned n_ret;
   unsigned *ret_indices;
 
-  unsigned *n_transitions;
+  unsigned n_transitions;
   ParseStateTransition *transitions;
 
   ParseState *wildcard_transition;
@@ -140,7 +141,7 @@ struct _DskXmlParser
 
   LexState lex_state;
 
-  DskXmlParserNamespaceConfig *config;
+  DskXmlParserConfig *config;
 };
 
 /* utility: split our xml-path into components, checking for unallowed things. */
@@ -203,20 +204,140 @@ validate_and_split_xpath (const char *xmlpath,
   rv[i] = NULL;
   return rv;
 }
+static int compare_namespace_configs (const void *a, const void *b)
+{
+  const DskXmlParserNamespaceConfig *A = a;
+  const DskXmlParserNamespaceConfig *B = b;
+  return strcmp (A->url, B->url);
+}
+
+static int compare_str_to_parse_state_transition (const void *a, const void *b)
+{
+  const char *A = a;
+  const ParseStateTransition *B = b;
+  return strcmp (A, B->str);
+}
+static int compare_parse_state_transitions (const void *a, const void *b)
+{
+  const ParseStateTransition *A = a;
+  const ParseStateTransition *B = b;
+  return strcmp (A->str, B->str);
+}
+
+static ParseState *
+copy_parse_state (ParseState *src)
+{
+  ParseState *ps = dsk_malloc0 (sizeof (ParseState));
+  unsigned i;
+  ps->n_transitions = src->n_transitions;
+  ps->transitions = dsk_malloc (sizeof (ParseStateTransition) * src->n_transitions);
+  for (i = 0; i < ps->n_transitions; i++)
+    {
+      ps->transitions[i].str = dsk_strdup (src->transitions[i].str);
+      ps->transitions[i].state = copy_parse_state (src->transitions[i].state);
+    }
+  ps->n_ret = src->n_ret;
+  ps->ret_indices = dsk_memdup (sizeof (unsigned) * src->n_ret, src->ret_indices);
+  return ps;
+}
+
+/* helper function to add all ret_indices contained in src
+   to dst */
+static void
+union_copy_parse_state (ParseState *dst,
+                        ParseState *src)
+{
+  unsigned i;
+  for (i = 0; i < src->n_transitions; i++)
+    {
+      unsigned j;
+      for (j = 0; j < dst->n_transitions; j++)
+        if (strcmp (src->transitions[i].str, dst->transitions[j].str) == 0)
+          {
+            union_copy_parse_state (dst->transitions[j].state, src->transitions[i].state);
+            break;
+          }
+      if (j == dst->n_transitions)
+        {
+          dst->transitions = dsk_realloc (dst->transitions, sizeof (ParseStateTransition) * (dst->n_transitions + 1));
+          dst->transitions[dst->n_transitions].str = dsk_strdup (src->transitions[i].str);
+          dst->transitions[dst->n_transitions].state = copy_parse_state (src->transitions[i].state);
+          dst->n_transitions++;
+        }
+    }
+
+  /* add return points */
+  if (src->n_ret > 0)
+    {
+      dst->ret_indices = dsk_realloc (dst->ret_indices, sizeof (unsigned) * (src->n_ret + dst->n_ret));
+      memcpy (dst->ret_indices + dst->n_ret, src->ret_indices, src->n_ret * sizeof (unsigned));
+    }
+}
+
+/* Our goal is to integrate pure wildcards into the
+ * state-machine.  Assuming there is a wildcard tree:  it is moved
+ * into the 'wildcard_transition' member of the ParseState
+ * However, it must be replicated in each non-wildcard subtree:
+ * we must perform a union with each non-wildcard subtree.
+ * 
+ * If this state DOES NOT contain a wildcard,
+ * just recurse on the transitions.
+ */
+static void
+expand_parse_state_wildcards_recursive (ParseState *state)
+{
+  unsigned i;
+  unsigned wc_trans;
+  for (wc_trans = 0; wc_trans < state->n_transitions; wc_trans++)
+    if (strcmp (state->transitions[wc_trans].str, "*") == 0)
+      break;
+  if (wc_trans < state->n_transitions)
+    {
+      /* We have a "*" node. */
+
+      /* move transition to wildcard transition */
+      state->wildcard_transition = state->transitions[i].state;
+
+      /* union "*" subtree with each transition's subtree */
+      for (i = 0; i < state->n_transitions; i++)
+        if (i != wc_trans)
+          union_copy_parse_state (state->transitions[i].state, state->wildcard_transition);
+
+      /* remove "*" node from transition list */
+      if (wc_trans + 1 < state->n_transitions)
+        state->transitions[wc_trans] = state->transitions[state->n_transitions-1];
+      if (--state->n_transitions == 0)
+        {
+          dsk_free (state->transitions);
+          state->transitions = NULL;
+        }
+    }
+
+  qsort (state->transitions, state->n_transitions, sizeof (ParseStateTransition),
+         compare_parse_state_transitions);
+
+  /* recurse on children */
+  for (i = 0; i < state->n_transitions; i++)
+    expand_parse_state_wildcards_recursive (state->transitions[i].state);
+  if (state->wildcard_transition != NULL)
+    expand_parse_state_wildcards_recursive (state->wildcard_transition);
+}
 
 DskXmlParserConfig *
 dsk_xml_parser_config_new (DskXmlParserFlags flags,
 			   unsigned          n_ns,
 			   const DskXmlParserNamespaceConfig *ns,
-			   unsigned          n_xpaths,
-			   char             *xpaths)
+			   unsigned          n_xmlpaths,
+			   char            **xmlpaths,
+                           DskError        **error)
 {
   /* copy and sort the namespace mapping, if enabled */
   DskXmlParserNamespaceConfig *ns_slab = NULL;
-  if ((ns->flags & DSK_XML_PARSER_IGNORE_NS) == 0)
+  DskXmlParserConfig *config;
+  unsigned i;
+  if ((flags & DSK_XML_PARSER_IGNORE_NS) == 0)
     {
       unsigned total_strlen = 0;
-      unsigned i;
       char *at;
       for (i = 0; i < n_ns; i++)
         total_strlen += strlen (ns[i].url) + 1
@@ -231,9 +352,72 @@ dsk_xml_parser_config_new (DskXmlParserFlags flags,
           ns_slab[i].prefix = at;
           at = dsk_stpcpy (at, ns[i].prefix);
         }
+      qsort (ns_slab, n_ns, sizeof (DskXmlParserNamespaceConfig),
+             compare_namespace_configs);
+      for (i = 1; i < n_ns; i++)
+        if (strcmp (ns_slab[i-1].url, ns_slab[i].url) == 0)
+          {
+            dsk_free (ns_slab);
+            return NULL;
+          }
     }
 
-  config = ...;
+  config = dsk_malloc0 (sizeof (DskXmlParserConfig));
+  config->ref_count = 1;
+  config->ignore_ns = (flags & DSK_XML_PARSER_IGNORE_NS) ? 1 : 0;
+  config->include_comments = (flags & DSK_XML_PARSER_INCLUDE_COMMENTS) ? 1 : 0;
+  config->n_ns = n_ns;
+  config->ns = ns_slab;
+
+  /* in phase 1, we pretend '*' is a legitimate normal path component.
+     we rework the state machine in phase 2 to fix this. */
+  for (i = 0; i < n_xmlpaths; i++)
+    {
+      char **pieces = validate_and_split_xpath (xmlpaths[i], error);
+      ParseState *at;
+      unsigned p;
+      if (pieces == NULL)
+        {
+          dsk_xml_parser_config_destroy (config);
+          return config;
+        }
+      at = &config->base;
+      for (p = 0; pieces[p] != NULL; p++)
+        {
+          size_t tmp = at->n_transitions;
+          ParseStateTransition *trans = lsearch (pieces[i], at->transitions,
+                                                 &tmp,          /* wtf lsearch()? */
+                                                 sizeof (ParseStateTransition),
+                                                 compare_str_to_parse_state_transition);
+          if (trans == NULL)
+            {
+              at->transitions = dsk_realloc (at->transitions, sizeof (ParseStateTransition) * (1+at->n_transitions));
+              trans = &at->transitions[at->n_transitions];
+              trans->str = pieces[p];
+              trans->state = dsk_malloc0 (sizeof (ParseState));
+              at->n_transitions += 1;
+            }
+          else
+            dsk_free (pieces[p]);
+
+          at = trans->state;
+        }
+      dsk_free (pieces);
+
+      /* add to return-list */
+      at->ret_indices = dsk_realloc (at->ret_indices, sizeof (unsigned) * (at->n_ret+1));
+      at->ret_indices[at->n_ret++] = i;
+    }
+
+  /* phase 2, '*' nodes are deleted and the subtree is moved to the wildcard subtree,
+     and the subtree is copied into each siblings subtree. */
+  expand_parse_state_wildcards_recursive (&config->base);
+
+#if 0
+  /* dump tree */
+  ...
+#endif
+  return config;
 }
 
 /* --- character entities --- */
@@ -318,7 +502,23 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
                                         DskError    **error);
 static dsk_boolean handle_open_close_element (DskXmlParser *parser,
                                               DskError    **error);
+
+/* only called if we need to handle the text node (ie its in a xml element
+   we are going to return) */
+static void        handle_text_node          (DskXmlParser *parser);
+/* only called if we need to handle the comment (ie its in a xml element
+   we are going to return, and the user expresses interest in the comments) */
+static void        handle_comment            (DskXmlParser *parser);
+
 /* --- lexing --- */
+static unsigned count_newlines (unsigned len, const char *data)
+{
+  unsigned rv = 0;
+  while (len--)
+    if (*data++ == '\n')
+      rv++;
+  return rv;
+}
 dsk_boolean
 dsk_xml_parser_feed(DskXmlParser       *parser,
                     unsigned            len,
@@ -681,10 +881,10 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
       switch (*data)
         {
         case '-':
-          if (parser->include_comments)
+          if (parser->config->include_comments)
             {
               if (!suppress && parser->buffer.size > 0)
-                emit_text_node (parser);
+                handle_text_node (parser);
             }
           dsk_buffer_clear (&parser->buffer);
           CONSUME_CHAR_AND_SWITCH_STATE (LEX_COMMENT);
@@ -697,7 +897,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         const char *hyphen = memchr (data, '-', len);
         if (hyphen == NULL)
           {
-            if (!suppress && parser->include_comments)
+            if (!suppress && parser->config->include_comments)
               dsk_buffer_append (&parser->buffer, len, data);
             parser->line_no += count_newlines (len, data);
             return DSK_TRUE;
@@ -705,7 +905,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         else
           {
             unsigned skip;
-            if (!suppress && parser->include_comments)
+            if (!suppress && parser->config->include_comments)
               dsk_buffer_append (&parser->buffer, hyphen - data, data);
             skip = hyphen - data;
             parser->line_no += count_newlines (skip, data);
@@ -730,13 +930,13 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         switch (*data)
           {
           case '-':
-            if (!suppress && parser->include_comments)
+            if (!suppress && parser->config->include_comments)
               APPEND_BYTE('-');
             CONSUME_NON_NL_AND_SWITCH_STATE (LEX_COMMENT_MINUS_MINUS);
           case '>':
-            if (!suppress && parser->include_comments)
+            if (!suppress && parser->config->include_comments)
               {
-                end_comment (parser);
+                handle_comment (parser);
                 BUFFER_CLEAR;
               }
             CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT);
@@ -771,7 +971,13 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
 
 #undef MAYBE_RETURN
 #undef CONSUME_CHAR_AND_SWITCH_STATE
-#undef ADVANCE
+#undef ADVANCE_CHAR
+#undef ADVANCE_NL
+#undef ADVANCE_NON_NL
+#undef CONSUME_CHAR_AND_SWITCH_STATE
+#undef CONSUME_NL_AND_SWITCH_STATE
+#undef CONSUME_NON_NL_AND_SWITCH_STATE
+#undef APPEND_BYTE
 }
 
 void
@@ -800,6 +1006,7 @@ dsk_xml_parser_new (DskXmlParserConfig *config,
 {
   DskXmlParser *parser;
   dsk_assert (config != NULL);
+  dsk_assert (!config->destroyed);
   parser = dsk_malloc (sizeof (DskXmlParser));
 
   parser->filename = display_filename ? new_filename (display_filename) : NULL;

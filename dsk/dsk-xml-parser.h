@@ -17,15 +17,16 @@ typedef enum
 {
   DSK_XML_PARSER_IGNORE_NS           = (1<<0),
   DSK_XML_PARSER_SUPPRESS_WHITESPACE = (1<<1),
-  DSK_XML_PARSER_SUPPRESS_COMMENTS   = (1<<2)
+  DSK_XML_PARSER_INCLUDE_COMMENTS    = (1<<2)
 } DskXmlParserFlags;
 
 DskXmlParserConfig *
 dsk_xml_parser_config_new (DskXmlParserFlags flags,
 			   unsigned          n_ns,
 			   const DskXmlParserNamespaceConfig *ns,
-			   unsigned          n_xpaths,
-			   char             *xpaths);
+			   unsigned          n_xmlpaths,
+			   char            **xmlpaths,
+                           DskError        **error);
 void
 dsk_xml_parser_config_destroy (DskXmlParserConfig *config);
 
