@@ -4,6 +4,11 @@
 #include <search.h>             /* for the seldom-used lsearch() */
 #include "dsk.h"
 
+/* TODO:
+   _ check for NUL
+   _ beef up "directive" handling
+ */
+
 #define MAX_DEPTH       64
 
 /* References:
@@ -160,6 +165,14 @@ struct _StackNode
 
 #define MAX_ENTITY_REF_LENGTH  16
 
+typedef struct _ResultQueueNode ResultQueueNode;
+struct _ResultQueueNode
+{
+  unsigned index;
+  DskXml *xml;
+  ResultQueueNode *next;
+};
+
 struct _DskXmlParser
 {
   DskXmlFilename *filename;
@@ -176,7 +189,11 @@ struct _DskXmlParser
   char entity_buf[MAX_ENTITY_REF_LENGTH];
   unsigned entity_buf_len;
 
+  /* the number of xml-nodes we are in the middle of constructing */
   unsigned n_to_be_returned;
+
+  /* queue of completed xml nodes waiting to be popped off */
+  ResultQueueNode *first_result, *last_result;
 
   LexState lex_state;
 
@@ -547,11 +564,96 @@ handle_char_entity (DskXmlParser *parser,
 /* --- handling open/close tags --- */
 
 static dsk_boolean handle_open_element (DskXmlParser *parser,
-                                        DskError    **error);
+                                        DskError    **error)
+{
+  ParseState *cur_state = (parser->stack_size == 0) ? &parser->base : parser->stack[parser->stack_size-1].state;
+  ParseState *new_state;
+  ParseStateTransition *trans;
+
+  /* do UTF-8 validation (and other checks) */
+  ...
+
+  /* do xmlns namespace translation (unless suppressed) */
+  ...
+
+  /* are we going to want to return this node to an end-user? */
+  if (cur_state == NULL)
+    {
+      new_state = NULL;
+      trans = NULL;
+    }
+  else
+    {
+      ParseStateTransition *trans = bsearch (name, cur_state->transitions, cur_state->n_transitions, sizeof (ParseStateTransition),
+                                             compare_str_to_parse_state_transition);
+      if (trans != NULL)
+        new_state = trans->state;
+      else
+        new_state = cur_state->wildcard_transition;
+    }
+  if (new_state->n_ret > 0)
+    {
+      ...
+    }
+
+  /* push entry onto stack */
+  if (parser->stack_size == MAX_DEPTH)
+    {
+      ...
+    }
+  StackNode *st;
+  st = &parser->stack[parser->stack_size++];
+  st->name = ...;
+  st->state = new_state;
+  st->defined_list = ...;
+  st->n_children = 0;
+  st->children = NULL;
+  st->children_alloced = 0;
+  if (parser->n_to_be_returned > 0)
+    {
+      /* include attributes */
+      st->kv = ...;
+      ...
+    }
+  else
+    {
+      /* no need for attributes */
+      st->kv = NULL;
+      /* anything to free ? */
+      ...
+    }
+}
+
 static dsk_boolean handle_close_element (DskXmlParser *parser,
-                                        DskError    **error);
-static dsk_boolean handle_open_close_element (DskXmlParser *parser,
-                                              DskError    **error);
+                                        DskError    **error)
+{
+  /* do UTF-8 validation (and other checks) */
+  ...
+
+  /* do xmlns namespace translation (unless suppressed) */
+  ...
+
+  /* check that it matches the top of the stack */
+  ...
+
+  /* see if we need to return this element (either to
+     an end-user or just the next node down on the stack, or both);
+     construct xml node if so */
+  ...
+
+  /* push any results on the queue if needed */
+  ...
+
+  /* pop the stack */
+  ...
+}
+
+static dsk_boolean handle_empty_element (DskXmlParser *parser,
+                                         DskError    **error)
+{
+  ...
+}
+
 
 /* only called if we need to handle the text node (ie its in a xml element
    we are going to return) */
@@ -929,7 +1031,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         case '>':
           if (!IS_SUPPRESSED)
             {
-              if (!handle_open_close_element (parser, error))
+              if (!handle_empty_element (parser, error))
                 return DSK_FALSE;
             }
           CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT);
@@ -1293,12 +1395,40 @@ DskXml *
 dsk_xml_parser_pop (DskXmlParser       *parser,
                     unsigned           *xpath_index_out)
 {
-  ...
+  ResultQueueNode *n = parser->first_result;
+  DskXml *xml;
+  if (n == NULL)
+    return NULL;
+  *xpath_index_out = n->index;
+  xml = n->xml;
+  parser->first_result = n->next;
+  if (parser->first_result == NULL)
+    parser->last_result = NULL;
+  dsk_free (n);                 /* TO CONSIDER: recycle n? */
+  return xml;
 }
 
 void
 dsk_xml_parser_free(DskXmlParser       *parser)
 {
-  ...
+  while (parser->first_result)
+    {
+      ResultQueueNode *n = parser->first_result;
+      parser->first_result = n->next;
+
+      dsk_xml_unref (n->xml);
+      dsk_free (n);
+    }
+  parser->last_result = NULL;
+
+  /* free stack */
+  ///...
+
+  /* free config */
+  dsk_xml_parser_config_unref (parser->config);
+
+  /* TODO: audit / use valgrind to ensure no leakage */
+
+  dsk_free (parser);
 }
 
