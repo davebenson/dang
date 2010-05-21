@@ -566,7 +566,7 @@ handle_char_entity (DskXmlParser *parser,
 static dsk_boolean handle_open_element (DskXmlParser *parser,
                                         DskError    **error)
 {
-  ParseState *cur_state = (parser->stack_size == 0) ? &parser->base : parser->stack[parser->stack_size-1].state;
+  ParseState *cur_state = (parser->stack_size == 0) ? &parser->config->base : parser->stack[parser->stack_size-1].state;
   ParseState *new_state;
   ParseStateTransition *trans;
 
@@ -574,7 +574,10 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
   ...
 
   /* do xmlns namespace translation (unless suppressed) */
-  ...
+  if (!parser->config->ignore_ns)
+    {
+      ...
+    }
 
   /* are we going to want to return this node to an end-user? */
   if (cur_state == NULL)
