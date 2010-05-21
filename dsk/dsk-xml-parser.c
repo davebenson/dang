@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <search.h>             /* for the seldom-used lsearch() */
 #include "dsk.h"
 
@@ -22,7 +23,7 @@
 typedef enum
 {
   LEX_DEFAULT,                  /* the usual state parsing text */
-  LEX_DEFAULT_CHAR_ENTITY,      /* the usual state parsing text */
+  LEX_DEFAULT_ENTITY_REF,      /* the usual state parsing text */
   LEX_LT,                       /* just got an "<" */
   LEX_OPEN_ELEMENT_NAME,        /* in element-name of open tag */
   LEX_OPEN_IN_ATTRS,            /* waiting for attribute-name or ">" */
@@ -31,8 +32,8 @@ typedef enum
   LEX_OPEN_AFTER_ATTR_NAME_EQ,  /* after attribute name= */
   LEX_OPEN_IN_ATTR_VALUE_SQ,    /* in single-quoted attribute name */
   LEX_OPEN_IN_ATTR_VALUE_DQ,    /* in double-quoted attribute name */
-  LEX_OPEN_IN_ATTR_VALUE_SQ_CHAR_ENTITY, /* in attribute-value, having      */
-  LEX_OPEN_IN_ATTR_VALUE_DQ_CHAR_ENTITY, /* ...an "&" waiting for semicolon */
+  LEX_OPEN_IN_ATTR_VALUE_SQ_ENTITY_REF, /* in attribute-value, having      */
+  LEX_OPEN_IN_ATTR_VALUE_DQ_ENTITY_REF, /* ...an "&" waiting for semicolon */
   LEX_LT_SLASH,                 /* just got an "</" */
   LEX_CLOSE_ELEMENT_NAME,       /* in element-name of close tag */
   LEX_AFTER_CLOSE_ELEMENT_NAME,       /* after element-name of close tag */
@@ -52,6 +53,44 @@ typedef enum
   LEX_PROCESSING_INSTRUCTION_QM,        /* after question mark in PI */
   LEX_BANG_DIRECTIVE     /* this encompasses ELEMENT, ATTLIST, ENTITY, DOCTYPE declarations */
 } LexState;
+static const char *
+lex_state_description (LexState state)
+{
+  switch (state)
+    {
+    case LEX_DEFAULT:                           return "the usual state parsing text";
+    case LEX_DEFAULT_ENTITY_REF:               return "the usual state parsing text";
+    case LEX_LT:                                return "after '<'";
+    case LEX_OPEN_ELEMENT_NAME:                 return "in element-name of open tag";
+    case LEX_OPEN_IN_ATTRS:                     return "waiting for attribute-name or '>'";
+    case LEX_OPEN_IN_ATTR_NAME:
+    case LEX_OPEN_AFTER_ATTR_NAME:
+    case LEX_OPEN_AFTER_ATTR_NAME_EQ:
+    case LEX_OPEN_IN_ATTR_VALUE_SQ:
+    case LEX_OPEN_IN_ATTR_VALUE_DQ:
+    case LEX_OPEN_IN_ATTR_VALUE_SQ_ENTITY_REF:
+    case LEX_OPEN_IN_ATTR_VALUE_DQ_ENTITY_REF: return "in attributes";
+    case LEX_LT_SLASH:                          return "aftert '</'";
+    case LEX_CLOSE_ELEMENT_NAME:                return "in element-name of close tag";
+    case LEX_AFTER_CLOSE_ELEMENT_NAME:          return "after element-name of close tag";
+    case LEX_OPEN_CLOSE:                        return "got a slash after an open tag";
+    case LEX_LT_BANG:
+    case LEX_LT_BANG_MINUS:
+    case LEX_COMMENT_MINUS:
+    case LEX_COMMENT_MINUS_MINUS:
+    case LEX_COMMENT:                           return "in comment";
+    case LEX_LT_BANG_LBRACK:
+    case LEX_LT_BANG_LBRACK_IN_CDATAHDR:
+    case LEX_LT_BANG_LBRACK_CDATAHDR:           return "beginning cdata block";
+    case LEX_CDATA:
+    case LEX_CDATA_RBRACK:
+    case LEX_CDATA_RBRACK_RBRACK:               return "in CDATA";
+    case LEX_PROCESSING_INSTRUCTION:
+    case LEX_PROCESSING_INSTRUCTION_QM:         return "in processing-instruction";
+    case LEX_BANG_DIRECTIVE:                    return "various directives";
+    }
+  return NULL;
+}
 
 #define WHITESPACE_CASES  case ' ': case '\t': case '\r': case '\n'
 
@@ -119,7 +158,7 @@ struct _StackNode
   DskXml **children;
 };
 
-#define MAX_CHAR_ENTITY_LENGTH  16
+#define MAX_ENTITY_REF_LENGTH  16
 
 struct _DskXmlParser
 {
@@ -134,7 +173,7 @@ struct _DskXmlParser
   unsigned stack_size;
   StackNode stack[MAX_DEPTH];
 
-  char entity_buf[MAX_CHAR_ENTITY_LENGTH];
+  char entity_buf[MAX_ENTITY_REF_LENGTH];
   unsigned entity_buf_len;
 
   unsigned n_to_be_returned;
@@ -222,6 +261,12 @@ static int compare_parse_state_transitions (const void *a, const void *b)
   const ParseStateTransition *A = a;
   const ParseStateTransition *B = b;
   return strcmp (A->str, B->str);
+}
+static int compare_uint (const void *a, const void *b)
+{
+  const unsigned *A = a;
+  const unsigned *B = b;
+  return (*A < *B) ? -1 : (*A > *B) ? 1 : 0;
 }
 
 static ParseState *
@@ -315,6 +360,11 @@ expand_parse_state_wildcards_recursive (ParseState *state)
 
   qsort (state->transitions, state->n_transitions, sizeof (ParseStateTransition),
          compare_parse_state_transitions);
+
+  /* not really necessary, since we don't care if identical xml nodes are returned
+     in any particular order to they various ret-indices.  predicatibility is
+     slightly useful though, so may as well. */
+  qsort (state->ret_indices, state->n_ret, sizeof (unsigned), compare_uint);
 
   /* recurse on children */
   for (i = 0; i < state->n_transitions; i++)
@@ -510,6 +560,24 @@ static void        handle_text_node          (DskXmlParser *parser);
    we are going to return, and the user expresses interest in the comments) */
 static void        handle_comment            (DskXmlParser *parser);
 
+
+typedef enum
+{
+  TRY_DIRECTIVE__NEEDS_MORE,
+  TRY_DIRECTIVE__SUCCESS,
+  TRY_DIRECTIVE__ERROR
+} TryDirectiveResult;
+static TryDirectiveResult try_directive (DskXmlParser *parser,
+                                         DskError    **error)
+{
+  /* FIXME: this does no validation at all of directives. */
+  /* FIXME: we actually want to handle internal and external entities. */
+  /* FIXME: we should probably handle conditionals??? */
+  /* FIXME: this wont work right for directives that are nested... */
+  DSK_UNUSED (parser);
+  DSK_UNUSED (error);
+  return TRY_DIRECTIVE__SUCCESS;
+}
 /* --- lexing --- */
 static unsigned count_newlines (unsigned len, const char *data)
 {
@@ -525,7 +593,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
                     const char               *data,
                     DskError          **error)
 {
-  dsk_boolean suppress;
+  //dsk_boolean suppress;
 #define BUFFER_CLEAR            dsk_buffer_clear (&parser->buffer)
 #define APPEND_BYTE(val)        dsk_buffer_append_byte (&parser->buffer, (val))
 #define MAYBE_RETURN            do{if(len == 0) return DSK_TRUE;}while(0)
@@ -535,9 +603,19 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
 #define CONSUME_CHAR_AND_SWITCH_STATE(STATE) do{ parser->lex_state = STATE; ADVANCE_CHAR; MAYBE_RETURN; goto label__##STATE; }while(0)
 #define CONSUME_NL_AND_SWITCH_STATE(STATE) do{ parser->lex_state = STATE; ADVANCE_NL; MAYBE_RETURN; goto label__##STATE; }while(0)
 #define CONSUME_NON_NL_AND_SWITCH_STATE(STATE) do{ parser->lex_state = STATE; ADVANCE_NON_NL; MAYBE_RETURN; goto label__##STATE; }while(0)
-#define CUT_TO_BUFFER           do {if (!suppress && start < data) dsk_buffer_append (&parser->buffer, data-start, start); }while(0)
-  suppress = parser->n_to_be_returned == 0
-         && (parser->stack_size == 0 || parser->stack[parser->stack_size-1].state == NULL);
+#define IS_SUPPRESSED           (parser->n_to_be_returned == 0)
+#define CUT_TO_BUFFER           do {if (!IS_SUPPRESSED && start < data) dsk_buffer_append (&parser->buffer, data-start, start); }while(0)
+#define CHECK_ENTITY_TOO_LONG(newlen)                                      \
+        do { if (newlen > MAX_ENTITY_REF_LENGTH)                           \
+          {                                                                \
+            memcpy (parser->entity_buf + parser->entity_buf_len,           \
+                    data,                                                  \
+                    MAX_ENTITY_REF_LENGTH - parser->entity_buf_len);       \
+            goto entity_ref_too_long;                                      \
+          } } while (0)
+  //suppress = parser->n_to_be_returned == 0
+         //&& (parser->stack_size == 0 || parser->stack[parser->stack_size-1].state == NULL);
+  MAYBE_RETURN;
   switch (parser->lex_state)
     {
     case LEX_DEFAULT:
@@ -552,20 +630,19 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           case '&':
             CUT_TO_BUFFER;
             parser->entity_buf_len = 0;
-            CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT_CHAR_ENTITY);
+            CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT_ENTITY_REF);
           default:
             ADVANCE_CHAR;
             if (len == 0)
               {
-                if (!suppress)
-                  CUT_TO_BUFFER;
+                CUT_TO_BUFFER;
                 return DSK_TRUE;
               }
           }
       }
 
-    case LEX_DEFAULT_CHAR_ENTITY:
-    label__LEX_DEFAULT_CHAR_ENTITY:
+    case LEX_DEFAULT_ENTITY_REF:
+    label__LEX_DEFAULT_ENTITY_REF:
       {
         const char *semicolon = memchr (data, ';', len);
         unsigned new_elen;
@@ -573,9 +650,8 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           new_elen = parser->entity_buf_len + len;
         else
           new_elen = parser->entity_buf_len + (semicolon - data);
-        if (new_elen > MAX_CHAR_ENTITY_LENGTH)
-          goto char_entity_too_long;
-        if (suppress)
+        CHECK_ENTITY_TOO_LONG(new_elen);
+        if (IS_SUPPRESSED)
           {
             if (semicolon == NULL)
               {
@@ -721,7 +797,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
             CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_IN_ATTRS);
           case '&':
             parser->entity_buf_len = 0;
-            CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_IN_ATTR_VALUE_SQ_CHAR_ENTITY);
+            CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_IN_ATTR_VALUE_SQ_ENTITY_REF);
           default:
             APPEND_BYTE (*data);
             ADVANCE_CHAR;
@@ -739,7 +815,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
             CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_IN_ATTRS);
           case '&':
             parser->entity_buf_len = 0;
-            CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_IN_ATTR_VALUE_DQ_CHAR_ENTITY);
+            CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_IN_ATTR_VALUE_DQ_ENTITY_REF);
           default:
             APPEND_BYTE (*data);
             ADVANCE_CHAR;
@@ -747,10 +823,10 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
             goto label__LEX_OPEN_IN_ATTR_VALUE_DQ;
           }
       }
-    case LEX_OPEN_IN_ATTR_VALUE_SQ_CHAR_ENTITY:
-    case LEX_OPEN_IN_ATTR_VALUE_DQ_CHAR_ENTITY:
-    label__LEX_OPEN_IN_ATTR_VALUE_SQ_CHAR_ENTITY:
-    label__LEX_OPEN_IN_ATTR_VALUE_DQ_CHAR_ENTITY:
+    case LEX_OPEN_IN_ATTR_VALUE_SQ_ENTITY_REF:
+    case LEX_OPEN_IN_ATTR_VALUE_DQ_ENTITY_REF:
+    label__LEX_OPEN_IN_ATTR_VALUE_SQ_ENTITY_REF:
+    label__LEX_OPEN_IN_ATTR_VALUE_DQ_ENTITY_REF:
       {
         const char *semicolon = memchr (data, ';', len);
         unsigned new_elen;
@@ -758,9 +834,8 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           new_elen = parser->entity_buf_len + len;
         else
           new_elen = parser->entity_buf_len + (semicolon - data);
-        if (new_elen > MAX_CHAR_ENTITY_LENGTH)
-          goto char_entity_too_long;
-        if (suppress)
+        CHECK_ENTITY_TOO_LONG(new_elen);
+        if (IS_SUPPRESSED)
           {
             if (semicolon == NULL)
               {
@@ -782,7 +857,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           }
         len -= (semicolon + 1 - data);
         data = semicolon + 1;
-        if (parser->lex_state == LEX_OPEN_IN_ATTR_VALUE_SQ_CHAR_ENTITY)
+        if (parser->lex_state == LEX_OPEN_IN_ATTR_VALUE_SQ_ENTITY_REF)
           {
             parser->lex_state = LEX_OPEN_IN_ATTR_VALUE_SQ;
             MAYBE_RETURN;
@@ -852,7 +927,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           MAYBE_RETURN;
           goto label__LEX_OPEN_CLOSE;
         case '>':
-          if (!suppress)
+          if (!IS_SUPPRESSED)
             {
               if (!handle_open_close_element (parser, error))
                 return DSK_FALSE;
@@ -862,6 +937,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           goto disallowed_char;
         }
     case LEX_LT_BANG:
+    label__LEX_LT_BANG:
       switch (*data)
         {
         case '[':
@@ -878,12 +954,13 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           CONSUME_NON_NL_AND_SWITCH_STATE (LEX_BANG_DIRECTIVE);
         }
     case LEX_LT_BANG_MINUS:
+    label__LEX_LT_BANG_MINUS:
       switch (*data)
         {
         case '-':
           if (parser->config->include_comments)
             {
-              if (!suppress && parser->buffer.size > 0)
+              if (!IS_SUPPRESSED && parser->buffer.size > 0)
                 handle_text_node (parser);
             }
           dsk_buffer_clear (&parser->buffer);
@@ -893,11 +970,12 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           goto disallowed_char;
         }
     case LEX_COMMENT:
+    label__LEX_COMMENT:
       {
         const char *hyphen = memchr (data, '-', len);
         if (hyphen == NULL)
           {
-            if (!suppress && parser->config->include_comments)
+            if (!IS_SUPPRESSED && parser->config->include_comments)
               dsk_buffer_append (&parser->buffer, len, data);
             parser->line_no += count_newlines (len, data);
             return DSK_TRUE;
@@ -905,7 +983,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         else
           {
             unsigned skip;
-            if (!suppress && parser->config->include_comments)
+            if (!IS_SUPPRESSED && parser->config->include_comments)
               dsk_buffer_append (&parser->buffer, hyphen - data, data);
             skip = hyphen - data;
             parser->line_no += count_newlines (skip, data);
@@ -915,6 +993,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           }
       }
     case LEX_COMMENT_MINUS:
+    label__LEX_COMMENT_MINUS:
       {
         switch (*data)
           {
@@ -926,15 +1005,16 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           }
       }
     case LEX_COMMENT_MINUS_MINUS:
+    label__LEX_COMMENT_MINUS_MINUS:
       {
         switch (*data)
           {
           case '-':
-            if (!suppress && parser->config->include_comments)
+            if (!IS_SUPPRESSED && parser->config->include_comments)
               APPEND_BYTE('-');
             CONSUME_NON_NL_AND_SWITCH_STATE (LEX_COMMENT_MINUS_MINUS);
           case '>':
-            if (!suppress && parser->config->include_comments)
+            if (!IS_SUPPRESSED && parser->config->include_comments)
               {
                 handle_comment (parser);
                 BUFFER_CLEAR;
@@ -945,6 +1025,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           }
       }
     case LEX_LT_BANG_LBRACK:
+    label__LEX_LT_BANG_LBRACK:
       switch (*data)
         {
         case 'c': case 'C':
@@ -954,23 +1035,143 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           goto disallowed_char;
         }
     case LEX_LT_BANG_LBRACK_IN_CDATAHDR:
-      ...
+    label__LEX_LT_BANG_LBRACK_IN_CDATAHDR:
+      if (*data == "cdata"[parser->entity_buf_len] || *data == "CDATA"[parser->entity_buf_len])
+        {
+          if (++parser->entity_buf_len == 5)
+            CONSUME_NON_NL_AND_SWITCH_STATE (LEX_LT_BANG_LBRACK_CDATAHDR);
+          ADVANCE_NON_NL;
+          MAYBE_RETURN;
+          goto label__LEX_LT_BANG_LBRACK_IN_CDATAHDR;
+        }
+      else
+        goto disallowed_char;
     case LEX_LT_BANG_LBRACK_CDATAHDR:
-      ...
+    label__LEX_LT_BANG_LBRACK_CDATAHDR:
+      switch (*data)
+        {
+        WHITESPACE_CASES:
+          ADVANCE_CHAR;
+          MAYBE_RETURN;
+          goto label__LEX_LT_BANG_LBRACK_CDATAHDR;
+        case '[':
+          CONSUME_CHAR_AND_SWITCH_STATE (LEX_CDATA);
+        default:
+          goto disallowed_char;
+        }
     case LEX_CDATA:
-      ...
+    label__LEX_CDATA:
+      {
+        const char *rbracket = memchr (data, ']', len);
+        if (rbracket == NULL)
+          {
+            if (!IS_SUPPRESSED)
+              dsk_buffer_append (&parser->buffer, len, data);
+            parser->line_no += count_newlines (len, data);
+            return DSK_TRUE;
+          }
+        else
+          {
+            unsigned skip = rbracket - data;
+            if (!IS_SUPPRESSED)
+              dsk_buffer_append (&parser->buffer, skip, data);
+            parser->line_no += count_newlines (skip, data);
+            data = rbracket;
+            len -= skip;
+            CONSUME_NON_NL_AND_SWITCH_STATE (LEX_CDATA_RBRACK);
+          }
+      }
     case LEX_CDATA_RBRACK:
-      ...
+    label__LEX_CDATA_RBRACK:
+      if (*data == ']')
+        CONSUME_NON_NL_AND_SWITCH_STATE (LEX_CDATA_RBRACK_RBRACK);
+      else
+        {
+          if (!IS_SUPPRESSED)
+            {
+              APPEND_BYTE (']');
+              APPEND_BYTE (*data);
+            }
+          CONSUME_CHAR_AND_SWITCH_STATE (LEX_CDATA);
+        }
     case LEX_CDATA_RBRACK_RBRACK:
-      ...
+    label__LEX_CDATA_RBRACK_RBRACK:
+      switch (*data)
+        {
+        case ']':
+          if (!IS_SUPPRESSED)
+            APPEND_BYTE (']');
+          ADVANCE_NON_NL;
+          MAYBE_RETURN;
+          goto label__LEX_CDATA_RBRACK_RBRACK;
+        case '>':
+          CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT);
+        default:
+          dsk_buffer_append (&parser->buffer, 2, "]]");
+          APPEND_BYTE (*data);
+          CONSUME_CHAR_AND_SWITCH_STATE (LEX_CDATA);
+        }
     case LEX_BANG_DIRECTIVE:
+    label__LEX_BANG_DIRECTIVE:
       /* this encompasses ELEMENT, ATTLIST, ENTITY, DOCTYPE declarations */
       /* strategy: try every substring until one ends with '>' */
-      ...
+      {
+        const char *rangle = memchr (data, '>', len);
+        if (rangle == NULL)
+          {
+            dsk_buffer_append (&parser->buffer, len, data);
+            return DSK_TRUE;
+          }
+        else
+          {
+            unsigned append = rangle + 1 - data;
+            dsk_buffer_append (&parser->buffer, append, data);
+            parser->line_no += count_newlines (append, data);
+            len -= append;
+            data += append;
+            switch (try_directive (parser, error))
+              {
+              case TRY_DIRECTIVE__NEEDS_MORE:
+                MAYBE_RETURN;
+                goto label__LEX_BANG_DIRECTIVE;
+              case TRY_DIRECTIVE__SUCCESS:
+                parser->lex_state = LEX_DEFAULT;
+                MAYBE_RETURN;
+                goto label__LEX_DEFAULT;
+              case TRY_DIRECTIVE__ERROR:
+                return DSK_FALSE;
+              }
+          }
+      }
+    case LEX_PROCESSING_INSTRUCTION:
+    label__LEX_PROCESSING_INSTRUCTION:
+      switch (*data)
+        {
+        case '?':
+          CONSUME_NON_NL_AND_SWITCH_STATE (LEX_PROCESSING_INSTRUCTION_QM);
+        default:
+          ADVANCE_CHAR;
+          MAYBE_RETURN;
+          goto label__LEX_PROCESSING_INSTRUCTION;
+        }
+    case LEX_PROCESSING_INSTRUCTION_QM:
+    label__LEX_PROCESSING_INSTRUCTION_QM:
+      switch (*data)
+        {
+        case '?':
+          ADVANCE_NON_NL;
+          MAYBE_RETURN;
+          goto label__LEX_PROCESSING_INSTRUCTION_QM;
+        case '>':
+          CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT);
+        default:
+          CONSUME_CHAR_AND_SWITCH_STATE (LEX_PROCESSING_INSTRUCTION);
+        }
     }
 
+  dsk_assert_not_reached ();
+
 #undef MAYBE_RETURN
-#undef CONSUME_CHAR_AND_SWITCH_STATE
 #undef ADVANCE_CHAR
 #undef ADVANCE_NL
 #undef ADVANCE_NON_NL
@@ -978,6 +1179,64 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
 #undef CONSUME_NL_AND_SWITCH_STATE
 #undef CONSUME_NON_NL_AND_SWITCH_STATE
 #undef APPEND_BYTE
+
+disallowed_char:
+  {
+    char dcname[16];
+    dsk_assert (len > 0);
+    switch (*data)
+      {
+      case 0: strcpy (dcname, "nul"); break;
+      case '\t': strcpy (dcname, "tab"); break;
+      case '\n': strcpy (dcname, "newline"); break;
+      case '\r': strcpy (dcname, "CR (\\r)"); break;
+      case ' ': strcpy (dcname, "SPACE"); break;
+      default:
+       if (*data <= 26)
+         {
+           dcname[0] = '^';
+           dcname[1] = *data+'A'-1;
+         }
+       else if (*data < 32 || *(uint8_t*)data >= 128)
+         sprintf (dcname, "byte 0x%02x", *(uint8_t*)data);
+       else
+         {
+           dcname[0] = *data;
+           dcname[1] = 0;
+         }
+      }
+    dsk_set_error (error,
+                   "unexpected character %s in %s, line %u (%s)",
+                   dcname,
+                   parser->filename ? parser->filename->filename : "string",
+                   parser->line_no,
+                   lex_state_description (parser->lex_state));
+    return DSK_FALSE;
+  }
+
+entity_ref_too_long:
+  {
+    dsk_set_error (error,
+                   "entity reference &%.*s... too long in %s, line %u",
+                   (int)(MAX_ENTITY_REF_LENGTH - 3), parser->entity_buf,
+                   parser->filename ? parser->filename->filename : "string",
+                   parser->line_no);
+    return DSK_FALSE;
+  }
+}
+
+static void
+destruct_parse_state_recursive (ParseState *state)
+{
+  unsigned i;
+  for (i = 0; i < state->n_transitions; i++)
+    {
+      destruct_parse_state_recursive (state->transitions[i].state);
+      dsk_free (state->transitions[i].state);
+      dsk_free (state->transitions[i].str);
+    }
+  dsk_free (state->transitions);
+  dsk_free (state->ret_indices);
 }
 
 void
@@ -998,6 +1257,16 @@ dsk_xml_parser_config_destroy (DskXmlParserConfig *config)
   dsk_assert (!config->destroyed);
   config->destroyed = 1;
   dsk_xml_parser_config_unref (config);
+}
+
+static DskXmlFilename *new_filename (const char *str)
+{
+  unsigned len = strlen (str);
+  DskXmlFilename *filename = dsk_malloc (sizeof (DskXmlFilename) + len + 1);
+  memcpy (filename + 1, str, len + 1);
+  filename->filename = (char*)(filename+1);
+  filename->ref_count = 1;
+  return filename;
 }
 
 DskXmlParser *
@@ -1032,5 +1301,4 @@ dsk_xml_parser_free(DskXmlParser       *parser)
 {
   ...
 }
-
 
