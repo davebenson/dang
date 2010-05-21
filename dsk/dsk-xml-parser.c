@@ -697,7 +697,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         const char *hyphen = memchr (data, '-', len);
         if (hyphen == NULL)
           {
-            if (parser->include_comments)
+            if (!suppress && parser->include_comments)
               dsk_buffer_append (&parser->buffer, len, data);
             parser->line_no += count_newlines (len, data);
             return DSK_TRUE;
@@ -705,7 +705,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         else
           {
             unsigned skip;
-            if (parser->include_comments)
+            if (!suppress && parser->include_comments)
               dsk_buffer_append (&parser->buffer, hyphen - data, data);
             skip = hyphen - data;
             parser->line_no += count_newlines (skip, data);
@@ -715,11 +715,44 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           }
       }
     case LEX_COMMENT_MINUS:
-      ...
+      {
+        switch (*data)
+          {
+          case '-':
+            CONSUME_CHAR_AND_SWITCH_STATE (LEX_COMMENT_MINUS_MINUS);
+          default:
+            APPEND_BYTE ('-');
+            CONSUME_CHAR_AND_SWITCH_STATE (LEX_COMMENT);
+          }
+      }
     case LEX_COMMENT_MINUS_MINUS:
-      ...
+      {
+        switch (*data)
+          {
+          case '-':
+            if (!suppress && parser->include_comments)
+              APPEND_BYTE('-');
+            CONSUME_NON_NL_AND_SWITCH_STATE (LEX_COMMENT_MINUS_MINUS);
+          case '>':
+            if (!suppress && parser->include_comments)
+              {
+                end_comment (parser);
+                BUFFER_CLEAR;
+              }
+            CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT);
+          default:
+            CONSUME_CHAR_AND_SWITCH_STATE (LEX_COMMENT);
+          }
+      }
     case LEX_LT_BANG_LBRACK:
-      ...
+      switch (*data)
+        {
+        case 'c': case 'C':
+          parser->entity_buf_len = 1;
+          CONSUME_NON_NL_AND_SWITCH_STATE (LEX_LT_BANG_LBRACK_IN_CDATAHDR);
+        default:
+          goto disallowed_char;
+        }
     case LEX_LT_BANG_LBRACK_IN_CDATAHDR:
       ...
     case LEX_LT_BANG_LBRACK_CDATAHDR:
