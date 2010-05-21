@@ -563,20 +563,195 @@ handle_char_entity (DskXmlParser *parser,
 
 /* --- handling open/close tags --- */
 
+typedef struct _AttrOffset AttrOffset;
+struct _AttrOffset
+{
+  DskBufferFragment *frag;
+  unsigned frag_offset, length;
+};
+
+/* utf8_state:
+     0: default
+     1: 2-byte codes
+     2,3: 3-byte codes
+     4,5,6: 4-byte codes
+     7: error
+ */
+
+static dsk_boolean is_valid_ascii_char (unsigned c, dsk_boolean strict)
+{
+  ...
+}
+static dsk_boolean is_valid_unichar2 (unsigned c, dsk_boolean strict)
+{
+  ...
+}
+static dsk_boolean is_valid_unichar3 (unsigned c, dsk_boolean strict)
+{
+  ...
+}
+static dsk_boolean is_valid_unichar4 (unsigned c, dsk_boolean strict)
+{
+  ...
+}
+
+static dsk_boolean utf_validate_open_element (DskXmlParser *parser,
+                                              AttrOffset   *attr_offsets,
+                                              DskError    **error)
+{
+  /* do UTF-8 validation (and other checks) */
+  DskBufferFragment *frag;
+  unsigned utf8_state = 0;
+  unsigned cur;
+  unsigned line_offset = 0;
+  unsigned ao_i = 0;
+  dsk_boolean is_strict = DSK_TRUE;
+  unsigned offset = 0;
+  for (frag = parser->buffer.first_frag; frag != NULL; frag = frag->next)
+    {
+      unsigned rem = frag->buf_length;
+      uint8_t *start_at = frag->buf + frag->buf_start;
+      uint8_t *at = start_at;
+      if (rem == 0)
+        continue;
+handle_next_char:
+      if (utf8_state == 0)
+        {
+          if ((*at & 0x80) == 0)
+            {
+              if (*at == 0)
+                {
+                  attr_offsets[ao_i].frag = frag;
+                  attr_offsets[ao_i].frag_offset = at - start_at;
+
+                  /* we store the overall buffer offset in 'length',
+                     then subtract once we get the next offset. */
+                  attr_offsets[ao_i].length = offset;
+                  if (ao_i > 0)                 /* fixup the previous length */
+                    attr_offsets[ao_i-1].length
+                      = offset - attr_offsets[ao_i-1].length;
+                  ao_i++;
+
+                  /* odd elements other than the first are all strict */
+                  is_strict = ao_i & 1;
+                }
+              utf8_state = 0;
+              if (!is_valid_ascii_char (*at, is_strict))
+                goto bad_character;
+              if (*at == '\n')
+                line_offset++;
+            }
+          else if ((*at & 0xe0) == 0xb0)
+            {
+              cur = *at & 0x1f;
+              state = 1;
+            }
+          else if ((*at & 0xf0) == 0xe0)
+            {
+              cur = *at & 0xf;
+              state = 2;
+            }
+          else if ((*at & 0xf8) == 0xf0)
+            {
+              cur = *at & 0x7;
+              state = 4;
+            }
+          else
+            goto bad_utf8;
+        }
+      else
+        switch (utf8_state)
+          {
+            /* bytes neither terminal nor initial are handled the same: */
+          case 2:
+          case 4:
+          case 5:
+            if ((*at & 0xb0) != 0x80)
+              goto bad_utf8;
+            cur <<= 6;
+            cur |= *at & 0x3f;
+            ++utf8_state;
+            break;
+          case 1: /* terminal byte for 2-byte code-point */
+            if ((*at & 0xb0) != 0x80)
+              goto bad_utf8;
+            cur <<= 6;
+            cur |= *at & 0x3f;
+            if (cur < 0x80)
+              goto bad_utf8;
+            if (!is_valid_unichar2 (cur, is_strict))
+              goto bad_character;
+            break;
+          case 3: /* terminal byte for 3-byte code-point */
+            if ((*at & 0xb0) != 0x80)
+              goto bad_utf8;
+            cur <<= 6;
+            cur |= *at & 0x3f;
+            if (cur < 0x800)
+              goto bad_utf8;
+            if (!is_valid_unichar3 (cur, is_strict))
+              goto bad_character;
+            break;
+          case 6: /* terminal byte for 4-byte code-point */
+            if ((*at & 0xb0) != 0x80)
+              goto bad_utf8;
+            cur <<= 6;
+            cur |= *at & 0x3f;
+            if (cur < 0x10000)
+              goto bad_utf8;
+            if (!is_valid_unichar4 (cur, is_strict))
+              goto bad_character;
+            break;
+          }
+      offset++;
+      if (--rem != 0)
+        {
+          at++;
+          goto handle_next_char;
+        }
+    }
+  /* fixup the last length */
+  if (ao_i > 0)
+    attr_offsets[ao_i-1].length = offset - attr_offsets[ao_i-1].length;
+
+}
+
 static dsk_boolean handle_open_element (DskXmlParser *parser,
                                         DskError    **error)
 {
   ParseState *cur_state = (parser->stack_size == 0) ? &parser->config->base : parser->stack[parser->stack_size-1].state;
   ParseState *new_state;
   ParseStateTransition *trans;
+  unsigned n_attrs = parser->n_attrs;
+  AttrOffset *attr_offsets = alloca (sizeof (AttrOffset) * n_attrs * 2);
 
-  /* do UTF-8 validation (and other checks) */
-  ...
+  /* perform UTF-8 and character validation;
+     find attribute locations. */
+  if (!utf_validate_open_element (parser, attr_offsets, error))
+    {
+      ...
+    }
 
   /* do xmlns namespace translation (unless suppressed) */
   if (!parser->config->ignore_ns)
     {
-      ...
+      for (i = 0; i < n_attrs; i++)
+        {
+          if (dsk_buffer_fragment_peek (attr_offsets[2*i].frag,
+                                        attr_offsets[2*i].frag_offset,
+                                        6, tmp_buf) != 6)
+            continue;
+          if (memcmp (tmp_buf, "xmlns", 6) == 0)
+            {
+              /* default ns */
+              ...
+            }
+          else (memcmp (tmp_buf, "xmlns:", 6) == 0)
+            {
+              /* prefixed-namespace */
+              ...
+            }
+        }
     }
 
   /* are we going to want to return this node to an end-user? */
@@ -795,6 +970,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           goto label__LEX_LT;
         default:
           APPEND_BYTE (*data);
+          parser->n_attrs = 0;
           CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_ELEMENT_NAME);
         }
 
@@ -837,6 +1013,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
             goto disallowed_char;
           default:
             APPEND_BYTE (*data);
+            ++(parser->n_attrs);
             CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_IN_ATTR_NAME);
           }
       }
