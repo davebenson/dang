@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <search.h>             /* for the seldom-used lsearch() */
 #include "dsk.h"
+#include "../gskrbtreemacros.h"
 
 /* TODO:
    _ check for NUL
@@ -138,10 +139,16 @@ struct _DskXmlParserConfig
 typedef struct _NsAbbrevMap NsAbbrevMap;
 struct _NsAbbrevMap
 {
-  char *abbrev;         /* used in source doc */
+  char *abbrev;         /* used in source doc; NULL for default ns */
   DskXmlParserNamespaceConfig *translate;
 
-  /* list of namespace abbreviations defined at a single element */
+  /* containing namespace abbreviation (that we are overriding);
+     so called b/c this abbreviation is masking the one outside
+     our XML element */
+  NsAbbrevMap *masking;
+
+  /* list of namespace abbreviations defined at a single element
+     (owned by the stack-node) */
   NsAbbrevMap *defined_list_next;
 
   /* rbtree by name */
@@ -181,7 +188,14 @@ struct _DskXmlParser
   /* for text, comments, etc */
   DskBuffer buffer;
 
+  /* line-no when buffer was started */
+  unsigned start_line;
+
+  /* if parsing an open tag, this is the number of attributes so far */
+  unsigned n_attrs;
+
   NsAbbrevMap *ns_map;
+  NsAbbrevMap *default_ns;
 
   unsigned stack_size;
   StackNode stack[MAX_DEPTH];
@@ -199,6 +213,10 @@ struct _DskXmlParser
 
   DskXmlParserConfig *config;
 };
+#define COMPARE_NS_ABBREV_TREE_NODES(a,b,rv) rv = strcmp (a->abbrev, b->abbrev)
+#define GET_NS_ABBREV_TREE(parser) \
+  (parser)->ns_map, NsAbbrevMap *, GSK_STD_GET_IS_RED, GSK_STD_SET_IS_RED, \
+  parent, left, right, COMPARE_NS_ABBREV_TREE_NODES
 
 /* utility: split our xml-path into components, checking for unallowed things. */
 static char **
@@ -259,6 +277,12 @@ validate_and_split_xpath (const char *xmlpath,
     }
   rv[i] = NULL;
   return rv;
+}
+static int compare_str_to_namespace_configs (const void *a, const void *b)
+{
+  const char *A = a;
+  const DskXmlParserNamespaceConfig *B = b;
+  return strcmp (A, B->url);
 }
 static int compare_namespace_configs (const void *a, const void *b)
 {
@@ -580,19 +604,27 @@ struct _AttrOffset
 
 static dsk_boolean is_valid_ascii_char (unsigned c, dsk_boolean strict)
 {
-  ...
+  DSK_UNUSED (strict);
+  return c > 32;
 }
 static dsk_boolean is_valid_unichar2 (unsigned c, dsk_boolean strict)
 {
-  ...
+  DSK_UNUSED (strict);
+  DSK_UNUSED (c);
+  return DSK_TRUE;
 }
 static dsk_boolean is_valid_unichar3 (unsigned c, dsk_boolean strict)
 {
-  ...
+  DSK_UNUSED (strict);
+  if (! (c <= 0xd7ff || (0xe000 <= c && c <= 0xfffd)
+        || (c > 0x10000)))
+    return DSK_FALSE;
+  return DSK_TRUE;
 }
 static dsk_boolean is_valid_unichar4 (unsigned c, dsk_boolean strict)
 {
-  ...
+  DSK_UNUSED (strict);
+  return c <= 0x10ffff;
 }
 
 static dsk_boolean utf_validate_open_element (DskXmlParser *parser,
@@ -607,6 +639,10 @@ static dsk_boolean utf_validate_open_element (DskXmlParser *parser,
   unsigned ao_i = 0;
   dsk_boolean is_strict = DSK_TRUE;
   unsigned offset = 0;
+  attr_offsets[ao_i].frag = parser->buffer.first_frag;
+  attr_offsets[ao_i].frag_offset = 0;
+  attr_offsets[ao_i].length = 0;
+  ao_i++;
   for (frag = parser->buffer.first_frag; frag != NULL; frag = frag->next)
     {
       unsigned rem = frag->buf_length;
@@ -627,9 +663,7 @@ handle_next_char:
                   /* we store the overall buffer offset in 'length',
                      then subtract once we get the next offset. */
                   attr_offsets[ao_i].length = offset;
-                  if (ao_i > 0)                 /* fixup the previous length */
-                    attr_offsets[ao_i-1].length
-                      = offset - attr_offsets[ao_i-1].length;
+                  attr_offsets[ao_i-1].length = offset - attr_offsets[ao_i-1].length;
                   ao_i++;
 
                   /* odd elements other than the first are all strict */
@@ -644,17 +678,17 @@ handle_next_char:
           else if ((*at & 0xe0) == 0xb0)
             {
               cur = *at & 0x1f;
-              state = 1;
+              utf8_state = 1;
             }
           else if ((*at & 0xf0) == 0xe0)
             {
               cur = *at & 0xf;
-              state = 2;
+              utf8_state = 2;
             }
           else if ((*at & 0xf8) == 0xf0)
             {
               cur = *at & 0x7;
-              state = 4;
+              utf8_state = 4;
             }
           else
             goto bad_utf8;
@@ -681,6 +715,7 @@ handle_next_char:
               goto bad_utf8;
             if (!is_valid_unichar2 (cur, is_strict))
               goto bad_character;
+            utf8_state = 0;
             break;
           case 3: /* terminal byte for 3-byte code-point */
             if ((*at & 0xb0) != 0x80)
@@ -691,6 +726,7 @@ handle_next_char:
               goto bad_utf8;
             if (!is_valid_unichar3 (cur, is_strict))
               goto bad_character;
+            utf8_state = 0;
             break;
           case 6: /* terminal byte for 4-byte code-point */
             if ((*at & 0xb0) != 0x80)
@@ -701,6 +737,7 @@ handle_next_char:
               goto bad_utf8;
             if (!is_valid_unichar4 (cur, is_strict))
               goto bad_character;
+            utf8_state = 0;
             break;
           }
       offset++;
@@ -710,10 +747,50 @@ handle_next_char:
           goto handle_next_char;
         }
     }
-  /* fixup the last length */
-  if (ao_i > 0)
-    attr_offsets[ao_i-1].length = offset - attr_offsets[ao_i-1].length;
+  if (utf8_state != 0)
+    goto bad_utf8;
 
+  /* fixup the last length */
+  attr_offsets[ao_i-1].length = offset - attr_offsets[ao_i-1].length;
+
+  dsk_assert (ao_i != parser->n_attrs * 2 + 1);
+  return DSK_TRUE;
+
+bad_utf8:
+  /* TODO: this doesn't count whitespace added between the attributes!!!!!! */
+  dsk_set_error (error, "bad UTF-8 at %s, line %u, in open-tag",
+                 parser->filename ? parser->filename->filename : "string",
+                 parser->start_line + line_offset);
+  return DSK_FALSE;
+
+bad_character:
+  /* TODO: this doesn't count whitespace added between the attributes!!!!!! */
+  dsk_set_error (error, "bad character at %s, line %u, in open-tag",
+                 parser->filename ? parser->filename->filename : "string",
+                 parser->start_line + line_offset);
+  return DSK_FALSE;
+
+}
+
+static DskXmlParserNamespaceConfig *
+lookup_translation (AttrOffset *attr,
+                    DskXmlParser *parser,
+                    DskError    **error)
+{
+  char *url;
+  DskXmlParserNamespaceConfig *rv;
+  if (attr->length < 1024)
+    url = alloca (attr->length + 1);
+  else
+    url = dsk_malloc (attr->length + 1);
+  dsk_buffer_fragment_peek (attr->frag, attr->frag_offset, attr->length, url);
+  url[attr->length] = 0;
+  rv = bsearch (url, parser->config->ns, parser->config->n_ns, sizeof (DskXmlParserNamespaceConfig),
+                compare_str_to_namespace_configs);
+  dsk_set_error (error, "unhandled namespace URL '%s' encountered", url);
+  if (attr->length >= 1024)
+    dsk_free (url);
+  return rv;
 }
 
 static dsk_boolean handle_open_element (DskXmlParser *parser,
@@ -724,34 +801,90 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
   ParseStateTransition *trans;
   unsigned n_attrs = parser->n_attrs;
   AttrOffset *attr_offsets = alloca (sizeof (AttrOffset) * n_attrs * 2);
+  NsAbbrevMap *defined_list = NULL;      /* namespace defs in this element */
 
   /* perform UTF-8 and character validation;
      find attribute locations. */
   if (!utf_validate_open_element (parser, attr_offsets, error))
-    {
-      ...
-    }
+    return DSK_FALSE;
 
   /* do xmlns namespace translation (unless suppressed) */
   if (!parser->config->ignore_ns)
     {
+      unsigned i;
+      DskXmlParserNamespaceConfig **xlats = alloca (sizeof(void*) * n_attrs);
       for (i = 0; i < n_attrs; i++)
         {
+          char tmp_buf[6];
           if (dsk_buffer_fragment_peek (attr_offsets[2*i].frag,
                                         attr_offsets[2*i].frag_offset,
                                         6, tmp_buf) != 6)
-            continue;
-          if (memcmp (tmp_buf, "xmlns", 6) == 0)
             {
-              /* default ns */
-              ...
+              xlats[i] = NULL;
+              continue;
             }
-          else (memcmp (tmp_buf, "xmlns:", 6) == 0)
+          if (memcmp (tmp_buf, "xmlns", 5) == 0
+           && (tmp_buf[5] == 0 || tmp_buf[5] == ':'))
             {
-              /* prefixed-namespace */
-              ...
+              /* get url and see if we have a translation for it. */
+              xlats[i] = lookup_translation (attr_offsets + (2*i+1), parser, error);
+              if (xlats[i] == NULL)
+                {
+                  dsk_add_error_prefix (error, "at %s, line %u",
+                                        parser->filename ? parser->filename->filename : "string",
+                                        parser->start_line);
+                  return DSK_FALSE;
+                }
             }
         }
+      for (i = 0; i < n_attrs; i++)
+        if (xlats[i] != NULL)
+          {
+            if (attr_offsets[2*i].length == 5)
+              {
+                /* default ns */
+                NsAbbrevMap *map;
+                map = dsk_malloc (sizeof (NsAbbrevMap));
+                map->abbrev = NULL;
+                map->translate = xlats[i];
+
+                /* add map to list for stack-node */
+                map->defined_list_next = defined_list;
+                defined_list = map;
+
+                /* set/replace default ns */
+                map->masking = parser->default_ns;
+                parser->default_ns = map;
+              }
+            else
+              {
+                /* prefixed-namespace */
+                NsAbbrevMap *map;
+                DskBufferFragment *frag = attr_offsets[2*i].frag;
+                NsAbbrevMap *existing;
+                unsigned frag_offset = attr_offsets[2*i].frag_offset;
+                unsigned abbrev_len = attr_offsets[2*i].length - 6;
+                map = dsk_malloc (sizeof (NsAbbrevMap) + abbrev_len + 1);
+                dsk_buffer_fragment_advance (&frag, &frag_offset, 6);
+                map->abbrev = (char*)(map+1);
+                dsk_buffer_fragment_peek (frag, frag_offset, abbrev_len, map->abbrev);
+                memmove (map->abbrev, map->abbrev + 6, abbrev_len);
+                map->abbrev[abbrev_len] = 0;
+
+                /* add map to list for stack-node */
+                map->defined_list_next = defined_list;
+                defined_list = map;
+
+                /* insert/replace tree node */
+                GSK_RBTREE_INSERT (GET_NS_ABBREV_TREE (parser), map, existing);
+                map->masking = existing;
+                if (existing != NULL)
+                  GSK_RBTREE_REPLACE_NODE (GET_NS_ABBREV_TREE (parser), existing, map);
+              }
+          }
+
+      /* rewrite element name and attribute names to use namespace config */
+      ...
     }
 
   /* are we going to want to return this node to an end-user? */
@@ -783,22 +916,21 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
   st = &parser->stack[parser->stack_size++];
   st->name = ...;
   st->state = new_state;
-  st->defined_list = ...;
+  st->defined_list = defined_list;
   st->n_children = 0;
   st->children = NULL;
   st->children_alloced = 0;
   if (parser->n_to_be_returned > 0)
     {
       /* include attributes */
-      st->kv = ...;
+      st->kv = attributes;
       ...
     }
   else
     {
       /* no need for attributes */
       st->kv = NULL;
-      /* anything to free ? */
-      ...
+      dsk_free (attributes);
     }
 }
 
@@ -971,6 +1103,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         default:
           APPEND_BYTE (*data);
           parser->n_attrs = 0;
+          parser->start_line = parser->line_no;
           CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_ELEMENT_NAME);
         }
 

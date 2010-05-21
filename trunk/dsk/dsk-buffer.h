@@ -109,3 +109,11 @@ void     _dsk_buffer_cleanup_recycling_bin ();
 
 /* misc */
 int dsk_buffer_index_of(DskBuffer *buffer, char char_to_find);
+
+unsigned dsk_buffer_fragment_peek (DskBufferFragment *frag,
+                                   unsigned           offset,
+                                   unsigned           len,
+                                   void              *buf);
+dsk_boolean dsk_buffer_fragment_advance (DskBufferFragment **frag_inout,
+                                         unsigned           *offset_inout,
+                                         unsigned            skip);

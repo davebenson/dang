@@ -1410,3 +1410,71 @@ dsk_buffer_iterator_skip      (DskBufferIterator *iterator,
   return max_length - out_remaining;
 }
 #endif
+
+unsigned
+dsk_buffer_fragment_peek (DskBufferFragment *frag,
+                          unsigned           offset,
+                          unsigned           len,
+                          void              *buf)
+{
+  char *b = buf;
+  unsigned rv = 0;
+  if (frag->buf_length == offset)
+    {
+      offset = 0;
+      frag = frag->next;
+    }
+  if (frag->buf_length >= len + offset)
+    {
+      memcpy (buf, frag->buf + frag->buf_start + offset, len);
+      return len;
+    }
+  rv = frag->buf_length - len;
+  memcpy (buf, frag->buf + frag->buf_start + offset, rv);
+  frag = frag->next;
+  b += rv;
+  while (frag)
+    {
+      if (frag->buf_length >= len - rv)
+        {
+          memcpy (b, frag->buf + frag->buf_start, len - rv);
+          return len;
+        }
+      else
+        {
+          memcpy (b, frag->buf + frag->buf_start, frag->buf_length);
+          rv += frag->buf_length;
+          b += frag->buf_length;
+          frag = frag->next;
+        }
+    }
+  return rv;
+}
+
+dsk_boolean dsk_buffer_fragment_advance (DskBufferFragment **frag_inout,
+                                         unsigned           *offset_inout,
+                                         unsigned            skip)
+{
+  DskBufferFragment *frag = *frag_inout;
+  if (frag->buf_length >= *offset_inout + skip)
+    {
+      *offset_inout += skip;
+      return DSK_TRUE;
+    }
+  skip -= (frag->buf_length - *offset_inout);
+  while (skip > 0 && frag != NULL)
+    {
+      if (skip >= frag->buf_length)
+        {
+          skip -= frag->buf_length;
+          frag = frag->next;
+        }
+      else
+        {
+          *offset_inout = skip;
+          *frag_inout = frag;
+          return DSK_TRUE;
+        }
+    }
+  return DSK_FALSE;
+}
