@@ -59,6 +59,9 @@
  *         Find the last node in the tree which is before or equal to 'key'.
  *   SUPREMUM(tree, key, out)
  *         Find the first node in the tree which is after or equal to 'key'.
+ *   REPLACE_NODE(tree, old, replacement)
+ *         Replace 'old' with 'replacement'; ensuring that the replacement
+ *         is equal to key (or at least PREV(old) < replacement < NEXT(old).)
  *
  * XXX: how about rename INFIMUM, SUPREMUM as LOOKUP_LE, LOOKUP_GE * respectively?
  * That is, LOOKUP_LE returns the largest elt less-than-or-equal-to the key
@@ -109,6 +112,8 @@
   GSK_RBTREE_INSERT_(tree, node, collision_node)
 #define GSK_RBTREE_INSERT_AT(tree, parent, is_red, node)                      \
   GSK_RBTREE_INSERT_AT_(tree, parent, is_right, node)
+#define GSK_RBTREE_REPLACE_NODE(tree, old, replacement)                       \
+  GSK_RBTREE_REPLACE_NODE_(tree, old, replacement)
 #define GSK_RBTREE_REMOVE(tree, node)                                         \
   GSK_RBTREE_REMOVE_(tree, node)
 #define GSK_RBTREE_LOOKUP(tree, key, out)                                     \
@@ -309,6 +314,27 @@ G_STMT_START{                                                                 \
         }                                                                     \
       set_is_red((top), 0);                                                   \
     }                                                                         \
+}G_STMT_END
+#define GSK_RBTREE_REPLACE_NODE_(top,type,is_red,set_is_red,parent,left,right,comparator, old_node,replacement_node) \
+G_STMT_START{                                                                 \
+    int _gsk_old_is_red = is_red (old_node);                                  \
+    set_is_red (replacement_node, _gsk_old_is_red);                           \
+    if (old_node->parent)                                                     \
+      {                                                                       \
+        if (old_node->parent->left == old_node)                               \
+          old_node->parent->left = replacement_node;                          \
+        else                                                                  \
+          old_node->parent->right = replacement_node;                         \
+      }                                                                       \
+    else                                                                      \
+      top = replacement_node;                                                 \
+    replacement_node->left = old_node->left;                                  \
+    replacement_node->right = old_node->right;                                \
+    replacement_node->parent = old_node->parent;                              \
+    if (replacement_node->left)                                               \
+      replacement_node->left->parent = replacement_node;                      \
+    if (replacement_node->right)                                              \
+      replacement_node->right->parent = replacement_node;                     \
 }G_STMT_END
 
 #define GSK_RBTREE_REMOVE_(top,type,is_red,set_is_red,parent,left,right,comparator, node) \
