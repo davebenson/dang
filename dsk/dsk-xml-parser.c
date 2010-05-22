@@ -793,6 +793,15 @@ lookup_translation (AttrOffset *attr,
   return rv;
 }
 
+static dsk_boolean
+has_ns_prefix (AttrOffset *attr,
+               unsigned   *prefix_len_out,
+               DskXmlParserNamespaceConfig **trans_out)
+{
+  /* search for ':' in attr */
+  ...
+}
+
 static dsk_boolean handle_open_element (DskXmlParser *parser,
                                         DskError    **error)
 {
@@ -816,8 +825,8 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
       for (i = 0; i < n_attrs; i++)
         {
           char tmp_buf[6];
-          if (dsk_buffer_fragment_peek (attr_offsets[2*i].frag,
-                                        attr_offsets[2*i].frag_offset,
+          if (dsk_buffer_fragment_peek (attr_offsets[2*i+1].frag,
+                                        attr_offsets[2*i+1].frag_offset,
                                         6, tmp_buf) != 6)
             {
               xlats[i] = NULL;
@@ -827,7 +836,7 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
            && (tmp_buf[5] == 0 || tmp_buf[5] == ':'))
             {
               /* get url and see if we have a translation for it. */
-              xlats[i] = lookup_translation (attr_offsets + (2*i+1), parser, error);
+              xlats[i] = lookup_translation (attr_offsets + (2*i+2), parser, error);
               if (xlats[i] == NULL)
                 {
                   dsk_add_error_prefix (error, "at %s, line %u",
@@ -840,7 +849,7 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
       for (i = 0; i < n_attrs; i++)
         if (xlats[i] != NULL)
           {
-            if (attr_offsets[2*i].length == 5)
+            if (attr_offsets[2*i+1].length == 5)
               {
                 /* default ns */
                 NsAbbrevMap *map;
@@ -860,10 +869,10 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
               {
                 /* prefixed-namespace */
                 NsAbbrevMap *map;
-                DskBufferFragment *frag = attr_offsets[2*i].frag;
+                DskBufferFragment *frag = attr_offsets[2*i+1].frag;
                 NsAbbrevMap *existing;
-                unsigned frag_offset = attr_offsets[2*i].frag_offset;
-                unsigned abbrev_len = attr_offsets[2*i].length - 6;
+                unsigned frag_offset = attr_offsets[2*i+1].frag_offset;
+                unsigned abbrev_len = attr_offsets[2*i+1].length - 6;
                 map = dsk_malloc (sizeof (NsAbbrevMap) + abbrev_len + 1);
                 dsk_buffer_fragment_advance (&frag, &frag_offset, 6);
                 map->abbrev = (char*)(map+1);
@@ -884,6 +893,38 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
           }
 
       /* rewrite element name and attribute names to use namespace config */
+      for (i = 0; i < n_attrs; i++)
+        if (xlats[i] == NULL)
+          {
+            /* is there a namespace prefix on this attr? */
+            DskXmlParserNamespaceConfig *ns_config;
+            if (has_ns_prefix (attr_offsets[2*i+1], &prefix_len, &ns_config))
+              {
+                if (ns_config == NULL)
+                  {
+                    if (!parser->config->passthrough_bad_ns_prefixes)
+                      {
+                        char *prefix = ...;
+                        dsk_set_error (error,
+                                       "bad namespace prefix '%s' at %s, line %u",
+                                       prefix,
+                                       parser->filename ? parser->filename->filename : "string",
+                                       parser->start_line);
+                        return DSK_FALSE;
+                      }
+                  }
+                else
+                  {
+                    /* stash away/mod data */
+                    ...
+                    attr_offsets[...];
+                  }
+              }
+            else
+              space += attr_offsets[2*i+1].length + 1;
+
+            space += attr_offsets[2*i+2].length + 1;
+          }
       ...
     }
 
