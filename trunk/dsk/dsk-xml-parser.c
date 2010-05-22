@@ -8,6 +8,7 @@
 /* TODO:
    _ check for NUL
    _ beef up "directive" handling
+   _ replace DskBuffer with simple array length/alloced/data
  */
 
 #define MAX_DEPTH       64
@@ -132,6 +133,7 @@ struct _DskXmlParserConfig
   unsigned ignore_ns : 1;
   unsigned suppress_whitespace : 1;
   unsigned include_comments : 1;
+  unsigned passthrough_bad_ns_prefixes : 1;
   unsigned destroyed : 1;
 };
 
@@ -180,13 +182,58 @@ struct _ResultQueueNode
   ResultQueueNode *next;
 };
 
+/* simple-buffer: a trivial one-slab buffer */
+typedef struct _SimpleBuffer SimpleBuffer;
+struct _SimpleBuffer
+{
+  uint8_t *data;
+  unsigned len, alloced;
+};
+static inline void simple_buffer_init (SimpleBuffer *sb)
+{
+  sb->len = 0;
+  sb->alloced = 128;
+  sb->data = dsk_malloc (sb->alloced);
+}
+static inline void
+simple_buffer_append (SimpleBuffer *sb, unsigned len, const void *data)
+{
+  unsigned alloced = sb->alloced;
+  unsigned needed = len + sb->len;
+  if (needed > alloced)
+    {
+      alloced += alloced;
+      while (alloced < needed)
+        alloced += alloced;
+      sb->data = dsk_realloc (sb->data, alloced);
+      sb->alloced = alloced;
+    }
+  memcpy (sb->data + sb->len, data, len);
+  sb->len += len;
+}
+static inline void
+simple_buffer_append_byte (SimpleBuffer *sb, uint8_t byte)
+{
+  if (sb->len == sb->alloced)
+    {
+      sb->alloced *= 2;
+      sb->data = dsk_realloc (sb->data, sb->alloced);
+    }
+  sb->data[sb->len++] = byte;
+}
+static inline void
+simple_buffer_clear (SimpleBuffer *sb)
+{
+  dsk_free (sb);
+}
+
 struct _DskXmlParser
 {
   DskXmlFilename *filename;
   unsigned line_no;
 
   /* for text, comments, etc */
-  DskBuffer buffer;
+  SimpleBuffer buffer;
 
   /* line-no when buffer was started */
   unsigned start_line;
@@ -213,6 +260,7 @@ struct _DskXmlParser
 
   DskXmlParserConfig *config;
 };
+#define COMPARE_STR_TO_NS_ABBREV_TREE(a,b,rv) rv = strcmp (a, b->abbrev)
 #define COMPARE_NS_ABBREV_TREE_NODES(a,b,rv) rv = strcmp (a->abbrev, b->abbrev)
 #define GET_NS_ABBREV_TREE(parser) \
   (parser)->ns_map, NsAbbrevMap *, GSK_STD_GET_IS_RED, GSK_STD_SET_IS_RED, \
@@ -457,6 +505,7 @@ dsk_xml_parser_config_new (DskXmlParserFlags flags,
   config->ref_count = 1;
   config->ignore_ns = (flags & DSK_XML_PARSER_IGNORE_NS) ? 1 : 0;
   config->include_comments = (flags & DSK_XML_PARSER_INCLUDE_COMMENTS) ? 1 : 0;
+  config->passthrough_bad_ns_prefixes = 0;
   config->n_ns = n_ns;
   config->ns = ns_slab;
 
@@ -587,13 +636,6 @@ handle_char_entity (DskXmlParser *parser,
 
 /* --- handling open/close tags --- */
 
-typedef struct _AttrOffset AttrOffset;
-struct _AttrOffset
-{
-  DskBufferFragment *frag;
-  unsigned frag_offset, length;
-};
-
 /* utf8_state:
      0: default
      1: 2-byte codes
@@ -632,7 +674,6 @@ static dsk_boolean utf_validate_open_element (DskXmlParser *parser,
                                               DskError    **error)
 {
   /* do UTF-8 validation (and other checks) */
-  DskBufferFragment *frag;
   unsigned utf8_state = 0;
   unsigned cur;
   unsigned line_offset = 0;
@@ -794,12 +835,61 @@ lookup_translation (AttrOffset *attr,
 }
 
 static dsk_boolean
-has_ns_prefix (AttrOffset *attr,
+has_ns_prefix (DskXmlParser *parser,
+               AttrOffset *attr,
+               AttrOffset *end_prefix_out,
                unsigned   *prefix_len_out,
                DskXmlParserNamespaceConfig **trans_out)
 {
   /* search for ':' in attr */
-  ...
+  unsigned offset = attr->frag_offset;
+  DskBufferFragment *frag = attr->frag;
+  unsigned len = 0;
+  while (frag)
+    {
+      uint8_t *start = frag->buf + frag->buf_start;
+      uint8_t *at = start + offset;
+      uint8_t *end = start + frag->buf_length;
+      while (at < end)
+        {
+          if (*at == ':')
+            {
+              char *pref = alloca (len + 1);
+              NsAbbrevMap *abbrev;
+              dsk_buffer_fragment_peek (attr->frag, attr->frag_offset, len, pref);
+              pref[len] = 0;
+              GSK_RBTREE_LOOKUP_COMPARATOR (GET_NS_ABBREV_TREE (parser), pref, COMPARE_STR_TO_NS_ABBREV_TREE, abbrev);
+              if (abbrev == NULL)
+                *trans_out = NULL;
+              else
+                *trans_out = abbrev->translate;
+
+              end_prefix_out->length = attr->length - len - 1;
+              end_prefix_out->frag = frag;
+              *prefix_len_out = len;
+
+              return DSK_TRUE;
+            }
+          else if (*at == 0)
+            return DSK_FALSE;
+          at++;
+          len++;
+        }
+      frag = frag->next;
+      offset = 0;
+    }
+  dsk_return_val_if_reached (NULL, DSK_FALSE);
+}
+
+static char *
+buffer_fragment_get_string (DskBufferFragment *frag,
+                            unsigned           frag_offset,
+                            unsigned           len)
+{
+  char *rv = dsk_malloc (len + 1);
+  dsk_buffer_fragment_peek (frag, frag_offset, len, rv);
+  rv[len] = 0;
+  return rv;
 }
 
 static dsk_boolean handle_open_element (DskXmlParser *parser,
@@ -898,18 +988,21 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
           {
             /* is there a namespace prefix on this attr? */
             DskXmlParserNamespaceConfig *ns_config;
-            if (has_ns_prefix (attr_offsets[2*i+1], &prefix_len, &ns_config))
+            unsigned prefix_len;
+            AttrOffset end_prefix;
+            if (has_ns_prefix (parser, &attr_offsets[2*i+1], &end_prefix, &prefix_len, &ns_config))
               {
                 if (ns_config == NULL)
                   {
                     if (!parser->config->passthrough_bad_ns_prefixes)
                       {
-                        char *prefix = ...;
+                        char *prefix = buffer_fragment_get_string (attr_offsets[2*i+1].frag, attr_offsets[2*i+1].frag_offset, prefix_len);
                         dsk_set_error (error,
                                        "bad namespace prefix '%s' at %s, line %u",
                                        prefix,
                                        parser->filename ? parser->filename->filename : "string",
                                        parser->start_line);
+                        dsk_free (prefix);
                         return DSK_FALSE;
                       }
                   }
