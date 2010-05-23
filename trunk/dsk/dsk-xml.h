@@ -32,6 +32,8 @@ DskXml *dsk_xml_ref   (DskXml *xml);
 void    dsk_xml_unref (DskXml *xml);
 
 /* --- TODO: add wad of constructors --- */
+DskXml *dsk_xml_text_new_len (unsigned len,
+                              const char *data);
 
 
 

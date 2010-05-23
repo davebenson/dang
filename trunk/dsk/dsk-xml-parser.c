@@ -782,6 +782,86 @@ bad_character:
   return DSK_FALSE;
 
 }
+static dsk_boolean utf_validate_text (DskXmlParser *parser,
+                                      DskError    **error)
+{
+  /* do UTF-8 validation (and other checks) */
+  unsigned utf8_state = 0;
+  unsigned cur;
+  unsigned line_offset = 0;
+  char *at = (char*)(parser->buffer.data);
+  char *end = at + parser->buffer.len;
+  unsigned attr_index = 0;
+  while (at < end)
+    {
+      if ((*at & 0x80) == 0)
+        {
+          utf8_state = 0;
+          if (*at == '\n')
+            line_offset++;
+          at++;
+        }
+      else if ((*at & 0xe0) == 0xb0)
+        {
+          unsigned cur;
+          utf8_state = 1;
+          if ((at[1] & 0xb0) != 0x80)
+            goto bad_utf8;
+          cur = ((at[0] & 0x1f) << 6) | (at[1] & 0x3f);
+          if (cur < 0x80)
+            goto bad_utf8;
+          if (!is_valid_unichar2 (cur, DSK_FALSE))
+            goto bad_character;
+          at += 2;
+        }
+      else if ((*at & 0xf0) == 0xe0)
+        {
+          if ((at[1] & 0xb0) != 0x80 || (at[2] & 0xb0) != 0x80)
+            goto bad_utf8;
+          cur = ((at[0] & 0xf) << 12) | ((at[1] & 0x3f) << 6)
+                       | (at[2] & 0x3f);
+          if (cur < 0x800)
+            goto bad_utf8;
+          if (!is_valid_unichar3 (cur, DSK_FALSE))
+            goto bad_character;
+          at += 3;
+        }
+      else if ((*at & 0xf8) == 0xf0)
+        {
+          if ((at[1] & 0xb0) != 0x80 || (at[2] & 0xb0) != 0x80
+           || (at[3] & 0xb0) != 0x80)
+            goto bad_utf8;
+          cur = ((at[0] & 0xf) << 18) | ((at[1] & 0x3f) << 12)
+                        | ((at[2] & 0x3f) << 6) | (at[3] & 0x3f);
+          if (cur < 0x10000)
+            goto bad_utf8;
+          if (!is_valid_unichar4 (cur, DSK_FALSE))
+            goto bad_character;
+          at += 4;
+        }
+      else
+        goto bad_utf8;
+    }
+  if (utf8_state != 0)
+    goto bad_utf8;
+
+  dsk_assert (attr_index == parser->n_attrs * 2 + 1);
+  return DSK_TRUE;
+
+bad_utf8:
+  /* TODO: this doesn't count whitespace added between the attributes!!!!!! */
+  dsk_set_error (error, "bad UTF-8 at %s, line %u, in open-tag",
+                 parser->filename ? parser->filename->filename : "string",
+                 parser->start_line + line_offset);
+  return DSK_FALSE;
+
+bad_character:
+  /* TODO: this doesn't count whitespace added between the attributes!!!!!! */
+  dsk_set_error (error, "bad character at %s, line %u, in open-tag",
+                 parser->filename ? parser->filename->filename : "string",
+                 parser->start_line + line_offset);
+  return DSK_FALSE;
+}
 
 static DskXmlParserNamespaceConfig *
 lookup_xmlns_translation (const char   *url,
@@ -1286,10 +1366,13 @@ static dsk_boolean handle_empty_element (DskXmlParser *parser,
 
 /* only called if we need to handle the text node (ie its in a xml element
    we are going to return) */
-static void        handle_text_node          (DskXmlParser *parser)
+static dsk_boolean        handle_text_node          (DskXmlParser *parser,
+                                                     DskError    **error)
 {
+  DskXml *node;
   /* UTF-8 validate buffer */
-  ...
+  if (!utf_validate_text (parser, error))
+    return DSK_FALSE;
 
   node = dsk_xml_text_new_len (parser->buffer.len, parser->buffer.data);
   _dsk_xml_set_position (node, parser->filename, parser->start_line);
@@ -1706,7 +1789,10 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           if (parser->config->include_comments)
             {
               if (!IS_SUPPRESSED && parser->buffer.len > 0)
-                handle_text_node (parser);
+                {
+                  if (!handle_text_node (parser, error))
+                    return DSK_FALSE;
+                }
             }
           parser->buffer.len = 0;
           CONSUME_CHAR_AND_SWITCH_STATE (LEX_COMMENT);
