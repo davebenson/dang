@@ -33,3 +33,17 @@ void    dsk_xml_unref (DskXml *xml);
 
 /* --- TODO: add wad of constructors --- */
 
+
+
+/* FOR INTERNAL USE ONLY: create an xml node from a packed set of
+   attributes, and a set of children, which we will take ownership of.
+   We will do text-node compacting.
+ */
+DskXml *_dsk_xml_new_elt_parse (unsigned n_attrs,
+                                unsigned name_kv_space,
+                                const char *name_and_attrs,
+                                unsigned n_children,
+                                DskXml **children);
+void _dsk_xml_set_position (DskXml *xml,
+                            DskXmlFilename *filename,
+                            unsigned line_no);
