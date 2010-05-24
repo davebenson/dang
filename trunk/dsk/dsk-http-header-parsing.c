@@ -188,6 +188,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
 {
   char scratch[4096];
   ParseInfo pi;
+  char *at;
   DskHttpRequestOptions options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
   if (!parse_info_init (&pi, buffer, header_len, 
                         sizeof (scratch), scratch,
@@ -203,6 +204,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
        || (pi.slab[3] == 'd' || pi.slab[3] == 'D'))
         {
           options.verb = DSK_HTTP_VERB_HEAD;
+          at = pi.slab + 4;
           break;
         }
       goto handle_unknown_verb;
@@ -211,6 +213,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
        || (pi.slab[2] == 't' || pi.slab[2] == 'T'))
         {
           options.verb = DSK_HTTP_VERB_GET;
+          at = pi.slab + 3;
           break;
         }
       goto handle_unknown_verb;
@@ -220,12 +223,14 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
        || (pi.slab[3] == 't' || pi.slab[3] == 'T'))
         {
           options.verb = DSK_HTTP_VERB_POST;
+          at = pi.slab + 4;
           break;
         }
       if ((pi.slab[1] == 'u' || pi.slab[1] == 'U')
        || (pi.slab[2] == 't' || pi.slab[2] == 'T'))
         {
           options.verb = DSK_HTTP_VERB_PUT;
+          at = pi.slab + 3;
           break;
         }
       goto handle_unknown_verb;
@@ -238,6 +243,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
        || (pi.slab[6] == 't' || pi.slab[6] == 'T'))
         {
           options.verb = DSK_HTTP_VERB_CONNECT;
+          at = pi.slab + 7;
           break;
         }
       goto handle_unknown_verb;
@@ -249,6 +255,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
        || (pi.slab[5] == 'e' || pi.slab[5] == 'E'))
         {
           options.verb = DSK_HTTP_VERB_DELETE;
+          at = pi.slab + 6;
           break;
         }
       goto handle_unknown_verb;
@@ -261,12 +268,13 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
        || (pi.slab[6] == 's' || pi.slab[6] == 'S'))
         {
           options.verb = DSK_HTTP_VERB_OPTIONS;
+          at = pi.slab + 7;
           break;
         }
       goto handle_unknown_verb;
     default: handle_unknown_verb:
       {
-        char *at = pi.slab;
+        at = pi.slab;
         while (dsk_ascii_isalnum (*at))
           at++;
         *at = 0;
@@ -276,14 +284,64 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
       }
     }
 
+  /* skip space after verb */
+  while (*at == ' ' || *at == '\t')
+    at++;
+
   /* scan path */
-  ...
+  for (;;)
+    {
+      while (*at && *at != ' ' && *at != '\t')
+        at++;
+      if (*at == 0)
+        {
+          dsk_set_error (error, "missing HTTP after PATH");
+          parse_info_clear (&pi);
+          return NULL;
+        }
+      while (*at == ' ' || *at == '\t')
+        at++;
+      if ((at[0] == 'h' || at[0] == 'H')
+       && (at[1] == 't' || at[1] == 'T')
+       && (at[2] == 't' || at[2] == 'T')
+       && (at[3] == 'p' || at[3] == 'P')
+       &&  at[4] == '/')
+        {
+          break;
+        }
+    }
 
   /* parse HTTP version */
-  ...
+  at += 5;              /* skip 'http/' */
+  if (!dsk_ascii_isdigit (at[0])
+    || at[1] != '.'
+    || !dsk_ascii_isdigit (at[2]))
+    {
+      dsk_set_error (error, "error parsing HTTP version");
+      parse_info_clear (&pi);
+      return NULL;
+    }
+  options.http_major_version = at[0] - '0';
+  options.http_minor_version = at[2] - '0';
 
   /* parse key-value pairs */
-  ...
+  for (i = 0; i < pi.n_kv_pairs; i++)
+    {
+      /* name has already been lowercased */
+      const char *name = pi.kv_pairs[2*i];
+      unsigned name_len = strlen (name);
+#define CASE(first, second, count, last) \
+      case ((int)first<<24) + ((int)second<<16) + (count)<<8 + (int)(last)
+      CASE('c', 'o', 14, 'h'):
+        if (strcmp (name, "content-length") == 0)
+          {
+            if (!handle_content_length (value, &options.content_length, error))
+              goto FAIL;
+            continue;
+          }
+        break;
+
+    }
 
   rv = dsk_http_request_new (&options);
   parse_info_clear (&pi);
