@@ -41,15 +41,27 @@ parse_info_init (ParseInfo *pi,
                  char      *scratch_pad,
                  DskError **error)
 {
+  if (header_len < 4)
+    {
+      ...
+    }
   pi->scratch_remaining = scratch_len;
   pi->scratch = scratch_pad;
   pi->free_list = NULL;
   pi->slab = parse_info_alloc (pi, header_len+1);
   dsk_buffer_peek (buffer, header_len, pi->slab);
-  pi->slab[header_len] = 0;
 
   /* get rid of blank terminal line, if supplied */
-  ...
+  if (pi->slab[header_len-1] == '\n'
+   && pi->slab[header_len-2] == '\n')
+    header_len--;
+  else if (pi->slab[header_len-1] == '\n'
+      &&   pi->slab[header_len-2] == '\r'
+      &&   pi->slab[header_len-3] == '\n'
+    header_len -= 2;
+
+  /* add NUL */
+  pi->slab[header_len] = 0;
 
   /* count newlines */
   n_newlines = 0;
