@@ -1,5 +1,6 @@
 
 
+typedef struct _DskDate DskDate;
 struct _DskDate
 {
   unsigned year;	/* the year (like tm_year+1900) */
@@ -41,6 +42,7 @@ dsk_boolean dsk_date_parse_timezone (const char *at,
 				     int *zone_offset_out);
 
 
+#if 0
 /* UNIMPLEMENTED:  this is the API to deal with localtime
    fully..  To use it requires being able to parse zoneinfo files.
    Which is too much work for a feature we basically don't need. */
@@ -51,3 +53,4 @@ dsk_boolean dsk_timezone_query (DskTimezone *timezone,
                                 int         *minutes_offset_out,
                                 const char **timezone_name_out,
                                 DskError   **error);
+#endif

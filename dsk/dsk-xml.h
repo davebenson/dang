@@ -37,6 +37,10 @@ DskXml *dsk_xml_text_new_len (unsigned len,
 
 
 
+/* --- comments (not recommended much) --- */
+DskXml *dsk_xml_comment_new_len (unsigned len,
+                                 const char *text);
+
 /* FOR INTERNAL USE ONLY: create an xml node from a packed set of
    attributes, and a set of children, which we will take ownership of.
    We will do text-node compacting.
