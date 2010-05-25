@@ -1374,17 +1374,31 @@ static dsk_boolean        handle_text_node          (DskXmlParser *parser,
   if (!utf_validate_text (parser, error))
     return DSK_FALSE;
 
-  node = dsk_xml_text_new_len (parser->buffer.len, parser->buffer.data);
+  node = dsk_xml_text_new_len (parser->buffer.len, (char*)parser->buffer.data);
   _dsk_xml_set_position (node, parser->filename, parser->start_line);
 
   /* add to children stack */
   add_to_child_stack__take (parser, node);
+  return DSK_TRUE;
 }
 
 /* only called if we need to handle the comment (ie its in a xml element
    we are going to return, and the user expresses interest in the comments) */
-static void        handle_comment            (DskXmlParser *parser);
+static dsk_boolean     handle_comment            (DskXmlParser *parser,
+                                                  DskError    **error)
+{
+  DskXml *node;
+  /* UTF-8 validate buffer */
+  if (!utf_validate_text (parser, error))
+    return DSK_FALSE;
 
+  node = dsk_xml_comment_new_len (parser->buffer.len, (char*)parser->buffer.data);
+  _dsk_xml_set_position (node, parser->filename, parser->start_line);
+
+  /* add to children stack */
+  add_to_child_stack__take (parser, node);
+  return DSK_TRUE;
+}
 
 typedef enum
 {
@@ -1847,7 +1861,8 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           case '>':
             if (!IS_SUPPRESSED && parser->config->include_comments)
               {
-                handle_comment (parser);
+                if (!handle_comment (parser, error))
+                  return DSK_FALSE;
                 BUFFER_CLEAR;
               }
             CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT);

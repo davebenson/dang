@@ -420,7 +420,7 @@ struct _DskHttpRequest
   DskHttpAuthorization     *authorization;                /* Authorization */
   unsigned                  n_language_options;
   DskHttpLanguageOption    *languages_options;             /* Accept-Languages */
-  char                     *host;                         /* Host */
+  char                     *host;                 /* Host */
 
   dsk_boolean               had_if_match;
   char                    **if_match;             /* If-Match */
@@ -564,8 +564,8 @@ struct _DskHttpRequestOptions
 {
   DskHttpVerb verb;
 
-  unsigned char http_major_version;
-  unsigned char http_minor_version;
+  unsigned http_major_version;
+  unsigned http_minor_version;
 
   /* specify either the full path */
   char *full_path;
@@ -588,6 +588,18 @@ struct _DskHttpRequestOptions
 
   /* --- content-length --- */
   int64_t content_length;
+
+  /* --- date --- */
+  dsk_boolean has_date;
+  uint64_t date;
+
+  /* --- various headers, mostly uninterpreted --- */
+  char *referrer;
+  char *user_agent;
+
+  /* --- unparsed headers --- */
+  unsigned n_misc_headers;
+  char **misc_headers;          /* key-value pairs */
 };
 DskHttpRequest *dsk_http_request_new (DskHttpRequestOptions *options);
 
@@ -605,14 +617,18 @@ DskHttpRequest *dsk_http_request_new (DskHttpRequestOptions *options);
   NULL,                         /* content_sub_type */          \
   NULL,                         /* content_charset */           \
   -1LL,                         /* content_length */            \
+  DSK_FALSE, 0LL,               /* has_date, date */            \
+  NULL,                         /* referrer */                  \
+  NULL,                         /* user_agent */                \
+  0, NULL,                      /* n_misc_headers, misc_headers  */\
 }
 struct _DskHttpResponseOptions
 {
   DskHttpRequest *request;
 
   DskHttpStatus status_code;
-  unsigned char http_major_version;
-  unsigned char http_minor_version;
+  unsigned http_major_version;
+  unsigned http_minor_version;
 
   /* --- post-data --- */
   /* text/plain or text/plain/utf-8 */
@@ -625,4 +641,32 @@ struct _DskHttpResponseOptions
 
   /* --- content-length --- */
   int64_t content_length;
+
+  /* --- date --- */
+  dsk_boolean has_date;
+  uint64_t date;
+
+  /* --- misc strings --- */
+  char *server;
+
+  /* --- unparsed headers --- */
+  unsigned n_misc_headers;
+  char **misc_headers;          /* key-value pairs */
 };
+#define DSK_HTTP_RESPONSE_OPTIONS_DEFAULT                       \
+{                                                               \
+  NULL,                         /* request */                   \
+  200,                          /* status_code */               \
+  1,                            /* http_major_version */        \
+  1,                            /* http_minor_version */        \
+  NULL,                         /* content_type */              \
+  NULL,                         /* content_main_type */         \
+  NULL,                         /* content_sub_type */          \
+  NULL,                         /* content_charset */           \
+  -1LL,                         /* content_length */            \
+  DSK_FALSE,                    /* has_date */                  \
+  0LL,                          /* date */                      \
+  NULL,                         /* server */                    \
+  0, NULL,                      /* n_misc_headers, misc_headers  */\
+}
+DskHttpResponse *dsk_http_response_new (DskHttpResponseOptions *options);
