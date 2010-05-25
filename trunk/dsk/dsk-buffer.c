@@ -1411,6 +1411,29 @@ dsk_buffer_iterator_skip      (DskBufferIterator *iterator,
 }
 #endif
 
+DskBufferFragment *dsk_buffer_find_fragment (DskBuffer   *buffer,
+                                             unsigned     offset,
+                                             unsigned    *frag_offset_out)
+{
+  DskBufferFragment *frag = buffer->first_frag;
+  dsk_assert (offset <= buffer->size);
+  while (offset != 0)
+    {
+      if (offset >= frag->buf_length)
+        {
+          offset -= frag->buf_length;
+          frag = frag->next;
+        }
+      else
+        {
+          *frag_offset_out = offset;
+          return frag;
+        }
+    }
+  *frag_offset_out = 0;
+  return frag;
+}
+
 unsigned
 dsk_buffer_fragment_peek (DskBufferFragment *frag,
                           unsigned           offset,
