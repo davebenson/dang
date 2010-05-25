@@ -222,6 +222,18 @@ get_chunked_header (size_t size,
   return at;
 }
 
+static void
+transfer_content (DskHttpClientStreamTransfer *xfer,
+                  unsigned                     amount)
+{
+  /* TODO: handle compressing */
+
+  dsk_buffer_transfer (&xfer->content->buffer,
+                       &xfer->owner->incoming_data,
+                       amount);
+  dsk_memory_source_added_data (xfer->content);
+}
+
 static dsk_boolean
 handle_transport_source_readable (DskOctetSource *source,
                                   void           *data)
@@ -342,13 +354,19 @@ restart_processing:
           }
           break;
         case DSK_HTTP_CLIENT_STREAM_READ_IN_BODY:
-          xfer->read_info.in_body.remaining -= dsk_buffer_transfer (&xfer->content->buffer,
-                                                                    &stream->incoming_data,
-                                                                    xfer->read_info.in_body.remaining);
-          dsk_memory_source_added_data (xfer->content);
-          if (xfer->read_info.in_body.remaining == 0)
-            transfer_done (xfer);
-          break;
+          {
+            unsigned amount = xfer->read_info.in_body.remaining;
+            size_t old_size;
+            if (amount > stream->incoming_data.size)
+              amount = stream->incoming_data.size;
+            xfer->read_info.in_body.remaining -= amount;
+            old_size = xfer->content->buffer.size;
+            transfer_content (xfer, xfer->read_info.in_body.remaining);
+            dsk_memory_source_added_data (xfer->content);
+            if (xfer->read_info.in_body.remaining == 0)
+              transfer_done (xfer);
+            break;
+          }
         case DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF:
           dsk_buffer_drain (&xfer->content->buffer, &stream->incoming_data);
           break;

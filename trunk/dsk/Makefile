@@ -17,7 +17,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	  dsk-buffer.o dsk-main.o dsk-octet-connection.o dsk-octet-listener.o \
 	  dsk-octet-listener-socket.o dsk-cleanup.o \
 	  dsk-http-client-stream.o dsk-memory-source.o dsk-memory-sink.o \
-	  dsk-http-header-parsing.o \
+	  dsk-http-header-parsing.o dsk-http-protocol.o \
 	  dsk-date.o \
 	  dsk-xml-parser.o
 	ar cru $@ $^
