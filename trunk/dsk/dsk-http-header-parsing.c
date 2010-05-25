@@ -441,7 +441,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
   DskHttpRequest *rv;
 #define DEFAULT_INIT_N_MISC_HEADERS             8       /* must be power-of-two */
   char *misc_header_padding[DEFAULT_INIT_N_MISC_HEADERS*2];
-  options.misc_headers = misc_header_padding;
+  options.unparsed_headers = misc_header_padding;
   
   if (!parse_info_init (&pi, buffer, header_len, 
                         sizeof (scratch), scratch,
@@ -641,20 +641,20 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
       /* insert as misc-header */
 
       /* maybe we need to grow the array */
-      if (options.n_misc_headers == DEFAULT_INIT_N_MISC_HEADERS
-       && (options.n_misc_headers & (options.n_misc_headers-1)) == 0)
+      if (options.n_unparsed_headers == DEFAULT_INIT_N_MISC_HEADERS
+       && (options.n_unparsed_headers & (options.n_unparsed_headers-1)) == 0)
         {
-          unsigned new_alloced = options.n_misc_headers == 0 ? 1 : options.n_misc_headers * 2;
-          char **misc_headers = parse_info_alloc (&pi, sizeof (char*) * new_alloced * 2);
-          memcpy (misc_headers, options.misc_headers, options.n_misc_headers * sizeof(char*) * 2);
-          options.misc_headers = misc_headers;
+          unsigned new_alloced = options.n_unparsed_headers == 0 ? 1 : options.n_unparsed_headers * 2;
+          char **unparsed_headers = parse_info_alloc (&pi, sizeof (char*) * new_alloced * 2);
+          memcpy (unparsed_headers, options.unparsed_headers, options.n_unparsed_headers * sizeof(char*) * 2);
+          options.unparsed_headers = unparsed_headers;
         }
-      options.misc_headers[options.n_misc_headers*2] = name;
-      options.misc_headers[options.n_misc_headers*2+1] = strip_string (value);
-      options.n_misc_headers++;
+      options.unparsed_headers[options.n_unparsed_headers*2] = name;
+      options.unparsed_headers[options.n_unparsed_headers*2+1] = strip_string (value);
+      options.n_unparsed_headers++;
     }
 
-  rv = dsk_http_request_new (&options);
+  rv = dsk_http_request_new (&options, error);
   parse_info_clear (&pi);
   return rv;
 
@@ -671,11 +671,10 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
   char scratch[4096];
   ParseInfo pi;
   char *at;
-  char *tmp;
   DskHttpResponseOptions options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
   DskHttpResponse *rv;
   char *misc_header_padding[DEFAULT_INIT_N_MISC_HEADERS*2];
-  options.misc_headers = misc_header_padding;
+  options.unparsed_headers = misc_header_padding;
   
   if (!parse_info_init (&pi, buffer, header_len, 
                         sizeof (scratch), scratch,
@@ -759,20 +758,20 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
       /* insert as misc-header */
 
       /* maybe we need to grow the array */
-      if (options.n_misc_headers == DEFAULT_INIT_N_MISC_HEADERS
-       && (options.n_misc_headers & (options.n_misc_headers-1)) == 0)
+      if (options.n_unparsed_headers == DEFAULT_INIT_N_MISC_HEADERS
+       && (options.n_unparsed_headers & (options.n_unparsed_headers-1)) == 0)
         {
-          unsigned new_alloced = options.n_misc_headers == 0 ? 1 : options.n_misc_headers * 2;
-          char **misc_headers = parse_info_alloc (&pi, sizeof (char*) * new_alloced * 2);
-          memcpy (misc_headers, options.misc_headers, options.n_misc_headers * sizeof(char*) * 2);
-          options.misc_headers = misc_headers;
+          unsigned new_alloced = options.n_unparsed_headers == 0 ? 1 : options.n_unparsed_headers * 2;
+          char **unparsed_headers = parse_info_alloc (&pi, sizeof (char*) * new_alloced * 2);
+          memcpy (unparsed_headers, options.unparsed_headers, options.n_unparsed_headers * sizeof(char*) * 2);
+          options.unparsed_headers = unparsed_headers;
         }
-      options.misc_headers[options.n_misc_headers*2] = name;
-      options.misc_headers[options.n_misc_headers*2+1] = strip_string (value);
-      options.n_misc_headers++;
+      options.unparsed_headers[options.n_unparsed_headers*2] = name;
+      options.unparsed_headers[options.n_unparsed_headers*2+1] = strip_string (value);
+      options.n_unparsed_headers++;
     }
 
-  rv = dsk_http_response_new (&options);
+  rv = dsk_http_response_new (&options, error);
   parse_info_clear (&pi);
   return rv;
 

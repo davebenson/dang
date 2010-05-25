@@ -156,6 +156,7 @@ struct _DskHttpResponse
   unsigned has_date : 1;           /* Date (see date member) */
   unsigned content_encoding_gzip : 1;
   unsigned has_last_modified : 1;
+  unsigned has_expires : 1;
 
   /* Content-Type */
   char *content_type;
@@ -169,11 +170,7 @@ struct _DskHttpResponse
   /* From the Content-Length header; -1 to disable */
   int64_t content_length;
 
-  /* Key/value searchable header lines.
-     Sorted by key, then instance of occurance.
-     All keys are lowercased.
-     When serialized, the unparsed headers are written in alphabetical order */
-  unsigned n_unparsed_header;
+  unsigned n_unparsed_headers;
   DskHttpHeaderMisc *unparsed_headers;
   
   /* initially allowed_verbs == 0;
@@ -194,11 +191,7 @@ struct _DskHttpResponse
   /* The `Location' to redirect to. */
   char                     *location;
 
-  /* -1 for no expiration */
   dsk_time_t                expires;
-
-  /* The ``Entity-Tag'', cf RFC 2616, Sections 14.24, 14.26, 14.44. */
-  char                     *etag;
 
 #if 0
   DskHttpAuthenticate      *proxy_authenticate;
@@ -213,6 +206,8 @@ struct _DskHttpResponse
   int64_t                   last_modified;
 
   char                     *server;        /* The Server: header */
+
+  char *_slab;
 };
 extern DskHttpRequestClass dsk_http_request_class;
 extern DskHttpResponseClass dsk_http_response_class;
@@ -272,7 +267,8 @@ struct _DskHttpRequestOptions
   unsigned n_unparsed_headers;
   char **unparsed_headers;          /* key-value pairs */
 };
-DskHttpRequest *dsk_http_request_new (DskHttpRequestOptions *options);
+DskHttpRequest *dsk_http_request_new (DskHttpRequestOptions *options,
+                                      DskError             **error);
 
 #define DSK_HTTP_REQUEST_OPTIONS_DEFAULT \
 {                                                               \
@@ -317,8 +313,13 @@ struct _DskHttpResponseOptions
   dsk_boolean has_date;
   uint64_t date;
 
+  /* --- expires --- */
+  dsk_boolean has_expires;
+  uint64_t expires;
+
   /* --- unparsed strings --- */
   char *server;
+  char *location;
 
   /* --- unparsed headers --- */
   unsigned n_unparsed_headers;
@@ -337,7 +338,10 @@ struct _DskHttpResponseOptions
   -1LL,                         /* content_length */            \
   DSK_FALSE,                    /* has_date */                  \
   0LL,                          /* date */                      \
+  DSK_FALSE,                    /* has_expires */                  \
+  0LL,                          /* expires */                      \
   NULL,                         /* server */                    \
+  NULL,                         /* location */                  \
   0, NULL,                      /* n_unparsed_headers, unparsed_headers  */\
 }
 DskHttpResponse *dsk_http_response_new (DskHttpResponseOptions *options,

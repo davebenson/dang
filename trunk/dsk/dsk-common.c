@@ -146,3 +146,12 @@ is_false:
   *out = DSK_FALSE;
   return DSK_TRUE;
 }
+char *dsk_stpcpy (char *dst, const char *src)
+{
+  while ((*dst = *src) != '\0')
+    {
+      src++;
+      dst++;
+    }
+  return dst;
+}

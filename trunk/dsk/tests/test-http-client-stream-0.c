@@ -71,6 +71,7 @@ test_simple (void)
   DskHttpRequest *request;
   DskHttpClientStreamTransfer *xfer;
   DskHttpClientStreamFuncs request_funcs_0;
+  DskError *error = NULL;
   memset (&request_funcs_0, 0, sizeof (request_funcs_0));
   request_funcs_0.handle_response = request_data__handle_response;
   request_funcs_0.handle_content_complete = request_data__handle_content_complete;
@@ -83,7 +84,7 @@ test_simple (void)
                                        &options);
   req_options.host = "localhost";
   req_options.full_path = "/hello.txt";
-  request = dsk_http_request_new (&req_options);
+  request = dsk_http_request_new (&req_options, &error);
   xfer = dsk_http_client_stream_request (stream, request, NULL, 
                                          &request_funcs_0, &request_data);
 
