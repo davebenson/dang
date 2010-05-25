@@ -1,6 +1,49 @@
 #include <string.h>
 #include "dsk.h"
 
+/* --- object cruft and raw initialization --- */
+static void
+dsk_http_request_init (DskHttpRequest *request)
+{
+  request->content_length = -1;
+}
+
+static void
+dsk_http_request_finalize (DskHttpRequest *request)
+{
+  dsk_free (request->_slab);
+}
+
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskHttpRequest);
+DskHttpRequestClass dsk_http_request_class =
+{
+  DSK_OBJECT_CLASS_DEFINE (DskHttpRequest, &dsk_object_class,
+                           dsk_http_request_init,
+                           dsk_http_request_finalize),
+};
+
+static void
+dsk_http_response_init (DskHttpResponse *response)
+{
+  response->content_length = -1;
+}
+
+static void
+dsk_http_response_finalize (DskHttpResponse *response)
+{
+  dsk_free (response->_slab);
+}
+
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskHttpResponse);
+DskHttpResponseClass dsk_http_response_class =
+{
+  DSK_OBJECT_CLASS_DEFINE (DskHttpResponse, &dsk_object_class,
+                           dsk_http_response_init,
+                           dsk_http_response_finalize),
+};
+
+
+/* --- construction --- */
 typedef struct _ToCopy ToCopy;
 struct _ToCopy
 {
@@ -166,10 +209,11 @@ dsk_http_request_new (DskHttpRequestOptions *options,
         request->transfer_encoding_chunked = 1;
       else
         {
-          ...
+          dsk_set_error (error, "POST/PUT data must use Transfer-Encoding: chunked (requires HTTP/1.1) or Content-length");
+          dsk_object_unref (request);
+          return NULL;
         }
     }
-  ...
 
   unsigned unparsed_headers_start;
   unparsed_headers_start
@@ -210,6 +254,81 @@ DskHttpResponse *
 dsk_http_response_new (DskHttpResponseOptions *options,
                        DskError              **error)
 {
-  ...
+  unsigned aligned_alloc = 0;
+  unsigned str_alloc = 0;
+  unsigned n_to_copy = 0;
+  ToCopy to_copy[MAX_TO_COPY];
+  unsigned n_fixups = 0;
+  StrFixup fixups[MAX_STR_FIXUPS];
+  DskHttpResponse *response = dsk_object_new (&dsk_http_response_class);
+
+
+  /* ---- Pass 1:  compute memory needed ---- */
+  /* We try to store as much information as we can
+     in the "to_copy" and "fixups" arrays,
+     to minimize the amount of custom work to be done in phase 2. */
+  if (options->content_type)
+    {
+      ADD_STR (options->content_type, content_type);
+    }
+  else if (options->content_main_type)
+    {
+      ADD_STR (options->content_type, content_type);
+      APPEND_CHAR_THEN_STR ('/', STR_DEFAULT (options->content_sub_type, "*"));
+      if (options->content_charset)
+        APPEND_CHAR_THEN_STR ('/', options->content_charset);
+    }
+  MAYBE_ADD_STR (options->location, location);
+
+  if (options->has_date)
+    {
+      response->has_date = 1;
+      response->date = options->date;
+    }
+  if (options->has_expires)
+    {
+      response->has_expires = 1;
+      response->expires = options->expires;
+    }
+  if (options->content_length >= 0)
+    response->content_length = options->content_length;
+  else if (options->http_minor_version >= 1)
+    response->transfer_encoding_chunked = 1;
+  else
+    response->connection_close = 1;
+
+  /* TODO: gzip encoding? */
+
+  unsigned unparsed_headers_start;
+  unparsed_headers_start
+    = phase1_handle_unparsed_headers (options->n_unparsed_headers,
+                                  options->unparsed_headers,
+                                  &str_alloc, &aligned_alloc);
+
+  /* allocate memory */
+  char *slab;
+  char *aligned_at;
+  char *str_slab;
+  slab = dsk_malloc (aligned_alloc + str_alloc);
+  aligned_at = slab;
+  str_slab = slab + aligned_alloc;
+
+  /* ---- phase 2:  initialize structure ---- */
+  response->_slab = slab;
+  apply_copies_and_fixups (response,
+                           n_to_copy, to_copy, n_fixups, fixups,
+                           str_slab);
+
+  /* NOTE: any special cases can go here */
+
+  /* - Handle uninterpreted headers - */
+  response->n_unparsed_headers = options->n_unparsed_headers;
+  response->unparsed_headers
+    = phase2_handle_unparsed_headers (options->n_unparsed_headers,
+                                  options->unparsed_headers,
+                                  &aligned_at,
+                                  str_slab + unparsed_headers_start);
+
+  return response;
 }
 #undef ObjectType
