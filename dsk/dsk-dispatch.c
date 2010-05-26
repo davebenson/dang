@@ -348,6 +348,8 @@ deallocate_change_index (RealDispatch *d,
   unsigned ch_ind = fm->change_index;
   unsigned from = d->base.n_changes - 1;
   DskFileDescriptor from_fd;
+  fm->change_index = -1;
+  dsk_assert (ch_ind < d->base.n_changes);
   if (ch_ind == from)
     {
       d->base.n_changes--;
