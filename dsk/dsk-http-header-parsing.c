@@ -79,6 +79,9 @@ parse_info_init (ParseInfo *pi,
   /* add NUL */
   pi->slab[header_len] = 0;
 
+  dsk_warning ("header='%s'", pi->slab);
+  dsk_warning ("last-char=%s", dsk_ascii_byte_name (pi->slab[header_len-1]));
+
   /* count newlines */
   unsigned n_newlines;
   unsigned i;
@@ -133,8 +136,9 @@ parse_info_init (ParseInfo *pi,
           switch ((ident_chartable[a/4] >> (a%4*2)) & 3)
             {
             case 0: /* invalid */
-              dsk_set_error (error, "invalid character %s in HTTP header",
-                             dsk_ascii_byte_name (a));
+              dsk_set_error (error, "invalid character %s in HTTP header [offset %d]",
+                             dsk_ascii_byte_name (a),
+                             (int)(at - pi->slab));
               goto FAIL;
             case 1: /* passthough */
             case 2: /* lowercase -- NO LONGER LOWERCASING */
@@ -436,6 +440,60 @@ parse_http_version (char **at_inout,
     | (((unsigned)(uint8_t)(c)) << 8)     \
     | (((unsigned)(uint8_t)(d))) )
 
+/* Implementations of headers that are shared between
+   requests and responses */
+#define HANDLE_CONNECTION_CASE                                   \
+          case UNSIGNED_FROM_4_BYTES('c', 'o', 10, 'n'):         \
+            if (ascii_caseless_equals (name, "connection"))      \
+              {                                                  \
+                if (ascii_caseless_equals (value, "close"))      \
+                  {                                              \
+                    options.parsed_connection_close = 1;         \
+                    continue;                                    \
+                  }                                              \
+              }                                                  \
+            break;
+#define HANDLE_CONTENT_LENGTH_CASE                               \
+          case UNSIGNED_FROM_4_BYTES('c', 'o', 14, 'h'):         \
+            if (ascii_caseless_equals (name, "content-length"))  \
+              {                                                  \
+                if (!handle_content_length (value,               \
+                                            &options.content_length, \
+                                            error))              \
+                  goto FAIL;                                     \
+                continue;                                        \
+              }                                                  \
+            break;
+#define HANDLE_CONTENT_TYPE_CASE                                 \
+          case UNSIGNED_FROM_4_BYTES('c', 'o', 12, 'e'):         \
+            if (ascii_caseless_equals (name, "content-type"))    \
+              {                                                  \
+                options.content_type = parse_content_type (value, error); \
+                if (options.content_type == NULL)                \
+                  goto FAIL;                                     \
+                continue;                                        \
+              }                                                  \
+            break;
+#define HANDLE_DATE_CASE                                         \
+          case UNSIGNED_FROM_4_BYTES('d', 'a', 4, 'e'):          \
+            if (ascii_caseless_equals (name, "date"))            \
+              {                                                  \
+                if (!handle_date ("Date", value, &options.date, error)) \
+                  goto FAIL;                                     \
+                options.has_date = DSK_TRUE;                     \
+                continue;                                        \
+              }                                                  \
+            break;
+#define HANDLE_TRANSFER_ENCODING_HEADER                          \
+          case UNSIGNED_FROM_4_BYTES('t', 'r', 17, 'g'):         \
+            if (ascii_caseless_equals (name, "transfer-encoding"))\
+              {                                                  \
+                char *tmp = strip_string (value);                \
+                if (ascii_caseless_equals (tmp, "chunked"))      \
+                  options.parsed_transfer_encoding_chunked = 1;  \
+                continue;                                        \
+              }                                                  \
+            break;
 DskHttpRequest  *
 dsk_http_request_parse_buffer  (DskBuffer *buffer,
                                 unsigned   header_len,
@@ -605,42 +663,10 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
                                  to_lowercase (name[name_len-1]));
       switch (v)
         {
-          case UNSIGNED_FROM_4_BYTES('c', 'o', 14, 'h'):
-            if (ascii_caseless_equals (name, "content-length"))
-              {
-                if (!handle_content_length (value, &options.content_length, error))
-                  goto FAIL;
-                continue;
-              }
-            break;
-          case UNSIGNED_FROM_4_BYTES('c', 'o', 12, 'e'):
-            if (ascii_caseless_equals (name, "content-type"))
-              {
-                options.content_type = parse_content_type (value, error);
-                if (options.content_type == NULL)
-                  goto FAIL;
-                continue;
-              }
-            break;
-          case UNSIGNED_FROM_4_BYTES('c', 'o', 10, 'n'):
-            if (ascii_caseless_equals (name, "connection"))
-              {
-                if (ascii_caseless_equals (value, "close"))
-                  {
-                    options.parsed_connection_close = 1;
-                    continue;
-                  }
-              }
-            break;
-          case UNSIGNED_FROM_4_BYTES('d', 'a', 4, 'e'):
-            if (ascii_caseless_equals (name, "date"))
-              {
-                if (!handle_date ("Date", value, &options.date, error))
-                  goto FAIL;
-                options.has_date = DSK_TRUE;
-                continue;
-              }
-            break;
+          HANDLE_CONNECTION_CASE        /* Connection header */
+          HANDLE_CONTENT_LENGTH_CASE    /* Content-Length header */
+          HANDLE_CONTENT_TYPE_CASE              /* Content-Type header */
+          HANDLE_DATE_CASE                      /* Date header */
           case UNSIGNED_FROM_4_BYTES('h', 'o', 4, 't'):
             if (ascii_caseless_equals (name, "host"))
               {
@@ -648,6 +674,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
                 continue;
               }
             break;
+          HANDLE_TRANSFER_ENCODING_HEADER      /* Transfer-Encoding header */
           case UNSIGNED_FROM_4_BYTES('u', 's', 10, 't'):
             if (ascii_caseless_equals (name, "user-agent"))
               {
@@ -747,44 +774,13 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
                                  to_lowercase (name[name_len-1]));
       switch (v)
         {
-          case UNSIGNED_FROM_4_BYTES('c', 'o', 14, 'h'):
-            if (ascii_caseless_equals (name, "content-length"))
-              {
-                if (!handle_content_length (value, &options.content_length, error))
-                  goto FAIL;
-                continue;
-              }
-            break;
-          case UNSIGNED_FROM_4_BYTES('c', 'o', 10, 'n'):
-            if (ascii_caseless_equals (name, "connection"))
-              {
-                if (ascii_caseless_equals (value, "close"))
-                  {
-                    options.parsed_connection_close = 1;
-                    continue;
-                  }
-              }
-            break;
-          case UNSIGNED_FROM_4_BYTES('c', 'o', 12, 'e'):
-            if (ascii_caseless_equals (name, "content-type"))
-              {
-                options.content_type = parse_content_type (value, error);
-                if (options.content_type == NULL)
-                  goto FAIL;
-                continue;
-              }
-            break;
-          case UNSIGNED_FROM_4_BYTES('d', 'a', 4, 'e'):
-            if (ascii_caseless_equals (name, "date"))
-              {
-                if (!handle_date ("Date", value, &options.date, error))
-                  goto FAIL;
-                options.has_date = DSK_TRUE;
-                continue;
-              }
-            break;
+          HANDLE_CONNECTION_CASE                /* Connection header */
+          HANDLE_CONTENT_TYPE_CASE              /* Content-Type header */
+          HANDLE_CONTENT_LENGTH_CASE            /* Content-Length header */
+          HANDLE_DATE_CASE                      /* Date header */
+          HANDLE_TRANSFER_ENCODING_HEADER       /* Transfer-Encoding header */
           case UNSIGNED_FROM_4_BYTES('s', 'e', 6, 'r'):
-            if (ascii_caseless_equals (name, "user-agent"))
+            if (ascii_caseless_equals (name, "server"))
               {
                 options.server = strip_string (value);
                 continue;
