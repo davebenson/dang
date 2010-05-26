@@ -14,13 +14,15 @@ typedef dsk_boolean (*DskPrintAppendFunc) (unsigned   length,
 
 typedef struct _DskPrint DskPrint;
 
-/* 'close_func' should be NULL, fclose or pclose */
-DskPrint *dsk_print_new_fp (FILE *fp,
-			    int (*close_func)(FILE*));
 DskPrint *dsk_print_new    (DskPrintAppendFunc append,
                             void              *data,
 			    DskDestroyNotify   destroy);
 void      dsk_print_free   (DskPrint *print);
+
+/* stdio.h support */
+DskPrint *dsk_print_new_fp (void *file_pointer);
+DskPrint *dsk_print_new_fp_fclose (void *file_pointer);
+DskPrint *dsk_print_new_fp_pclose (void *file_pointer);
 
 /* Setting variables for interpolation */
 void dsk_print_set_string          (DskPrint    *context,
