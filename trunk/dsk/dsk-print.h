@@ -6,8 +6,6 @@
    dsk_print_context_free (codegen);
  */
 
-#include <stdio.h>
-
 typedef dsk_boolean (*DskPrintAppendFunc) (unsigned   length,
                                            void      *data,
 					   DskError **error);
