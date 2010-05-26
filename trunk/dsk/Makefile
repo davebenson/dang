@@ -20,7 +20,8 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	  dsk-http-header-parsing.o dsk-http-protocol.o \
 	  dsk-http-header-printing.o \
 	  dsk-date.o \
-	  dsk-xml-parser.o
+	  dsk-xml-parser.o \
+	  dsk-print.o
 	ar cru $@ $^
 
 %.o: %.c

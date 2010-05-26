@@ -2,7 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include "dsk.h"
-#include "dsk-flagged-pointer.h"
 #include "../gskrbtreemacros.h"
 #include "../gsklistmacros.h"
 
