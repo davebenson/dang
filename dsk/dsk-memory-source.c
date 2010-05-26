@@ -66,7 +66,6 @@ void dsk_memory_source_added_data  (DskMemorySource *source)
   dsk_assert (!source->done_adding);
   if (source->buffer.size != 0)
     {
-      dsk_warning ("dsk_memory_source_added_data: trap_count=%u", DSK_OCTET_SOURCE (source)->readable_hook.trap_count);
       dsk_hook_set_idle_notify (&DSK_OCTET_SOURCE (source)->readable_hook, DSK_TRUE);
       dsk_hook_set_idle_notify (&source->buffer_empty, DSK_FALSE);
     }

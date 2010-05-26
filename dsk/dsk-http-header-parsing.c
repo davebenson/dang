@@ -79,9 +79,6 @@ parse_info_init (ParseInfo *pi,
   /* add NUL */
   pi->slab[header_len] = 0;
 
-  dsk_warning ("header='%s'", pi->slab);
-  dsk_warning ("last-char=%s", dsk_ascii_byte_name (pi->slab[header_len-1]));
-
   /* count newlines */
   unsigned n_newlines;
   unsigned i;
@@ -685,7 +682,6 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
         }
 
       /* insert as misc-header */
-      dsk_warning ("handling misc-header: %s", name);
 
       /* maybe we need to grow the array */
       if (options.n_unparsed_headers == DEFAULT_INIT_N_MISC_HEADERS
@@ -730,8 +726,6 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
     return NULL;
   at = pi.slab;
 
-  dsk_warning ("first-line=%s", at);
-
   /* parse HTTP version */
   if (!parse_http_version (&at, &options.http_major_version,
                            &options.http_minor_version, error))
@@ -760,8 +754,6 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
       unsigned name_len = strlen (name);
       unsigned v;
       char *value = pi.kv_pairs[2*i+1];
-
-      dsk_warning ("response parse: %s => %s", name, value);
 
       if (name_len == 0)
         {
