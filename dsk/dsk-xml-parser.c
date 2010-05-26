@@ -2028,32 +2028,10 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
 
 disallowed_char:
   {
-    char dcname[16];
     dsk_assert (len > 0);
-    switch (*data)
-      {
-      case 0: strcpy (dcname, "nul"); break;
-      case '\t': strcpy (dcname, "tab"); break;
-      case '\n': strcpy (dcname, "newline"); break;
-      case '\r': strcpy (dcname, "CR (\\r)"); break;
-      case ' ': strcpy (dcname, "SPACE"); break;
-      default:
-       if (*data <= 26)
-         {
-           dcname[0] = '^';
-           dcname[1] = *data+'A'-1;
-         }
-       else if (*data < 32 || *(uint8_t*)data >= 128)
-         sprintf (dcname, "byte 0x%02x", *(uint8_t*)data);
-       else
-         {
-           dcname[0] = *data;
-           dcname[1] = 0;
-         }
-      }
     dsk_set_error (error,
                    "unexpected character %s in %s, line %u (%s)",
-                   dcname,
+                   dsk_ascii_byte_name (*data),
                    parser->filename ? parser->filename->filename : "string",
                    parser->line_no,
                    lex_state_description (parser->lex_state));

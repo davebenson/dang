@@ -1,3 +1,11 @@
+TESTS:
+_ request header parsing
+_ response header parsing
+_ http client stream: connection-close
+_ http client stream: transfer-encoding chunked POST data
+_ http client stream: transfer-encoding chunked content data
+
+TODO:
 _ HTTP implementation
 _ MIME Multipart Impl
 _ XML implementation

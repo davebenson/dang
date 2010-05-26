@@ -22,6 +22,14 @@ dsk_boolean dsk_date_parse   (const char *str,
                               DskDate    *out,
                               DskError  **error);
 
+#define DSK_DATE_MAX_LENGTH 64
+void        dsk_date_print_rfc822 (DskDate *date,
+                                   char    *buf);
+void        dsk_date_print_rfc850 (DskDate *date,
+                                   char    *buf);
+void        dsk_date_print_iso8601 (DskDate *date,
+                                   char    *buf);
+
 /* 'unixtime' here is seconds since epoch.
    If the date is before the epoch (Jan 1, 1970 00:00 GMT),
    then it is negative. */
@@ -41,6 +49,7 @@ dsk_boolean dsk_date_parse_timezone (const char *at,
                                      char **end,
 				     int *zone_offset_out);
 
+unsigned dsk_date_get_days_since_epoch (DskDate *);
 
 #if 0
 /* UNIMPLEMENTED:  this is the API to deal with localtime

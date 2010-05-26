@@ -27,6 +27,7 @@ static inline char dsk_ascii_toupper (int c)
 {
   return 'a' <= c && c <= 'z' ? (c - ('a' - 'A')) : c;
 }
+const char *dsk_ascii_byte_name(unsigned char byte);
 
 #define DSK_ASCII_SKIP_SPACE(ptr) \
       do { while (dsk_ascii_isspace (*(ptr))) ptr++; } while(0)

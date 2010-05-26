@@ -41,6 +41,8 @@ dsk_hook_notify (DskHook *hook)
           if (destroy)
             destroy (destroy_data);
           hook->trap.destroy_in_notify = 0;
+          if (--hook->trap_count == 0)
+            _dsk_hook_trap_count_zero (hook);
         }
       hook->trap.is_notifying = 0;
     }
@@ -142,6 +144,7 @@ run_idle_notifications (void *data)
 {
   DskHook idle_notify_guard;
   DSK_UNUSED (data);
+#if 0
   if (dsk_hook_idle_first == NULL)
     {
       if (idle_handler)
@@ -151,6 +154,8 @@ run_idle_notifications (void *data)
         }
       return;
     }
+#endif
+  idle_handler = NULL;
   idle_notify_guard.idle_prev = dsk_hook_idle_last;
   idle_notify_guard.idle_next = NULL;
   dsk_hook_idle_last->idle_next = &idle_notify_guard;
@@ -167,6 +172,11 @@ run_idle_notifications (void *data)
       dsk_hook_notify (at);
     }
   GSK_LIST_REMOVE_FIRST (GET_IDLE_HOOK_LIST ());
+
+  if (idle_handler == NULL && dsk_hook_idle_first != NULL)
+    idle_handler = dsk_dispatch_add_idle (dsk_dispatch_default (),
+                                          run_idle_notifications,
+                                          NULL);
 }
 void _dsk_hook_trap_count_nonzero (DskHook *hook)
 {

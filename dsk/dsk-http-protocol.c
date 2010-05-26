@@ -1,6 +1,22 @@
 #include <string.h>
 #include "dsk.h"
 
+const char *dsk_http_verb_name (DskHttpVerb verb)
+{
+  switch (verb)
+    {
+    case DSK_HTTP_VERB_GET: return "GET";
+    case DSK_HTTP_VERB_POST: return "POST";
+    case DSK_HTTP_VERB_PUT: return "PUT";
+    case DSK_HTTP_VERB_HEAD: return "HEAD";
+    case DSK_HTTP_VERB_OPTIONS: return "OPTIONS";
+    case DSK_HTTP_VERB_DELETE: return "DELETE";
+    case DSK_HTTP_VERB_TRACE: return "TRACE";
+    case DSK_HTTP_VERB_CONNECT: return "CONNECT";
+    default: return "*BAD_VERB*";
+    }
+}
+
 /* --- object cruft and raw initialization --- */
 static void
 dsk_http_request_init (DskHttpRequest *request)
@@ -91,7 +107,7 @@ phase1_handle_unparsed_headers(unsigned  n_unparsed,
   unsigned unparsed_headers_start = *str_alloc_inout;
   for (i = 0; i < n_unparsed * 2; i++)
     *str_alloc_inout += strlen (unparsed[i]) + 1;
-  *aligned_alloc_inout += n_unparsed * 2 * sizeof (char*);
+  *aligned_alloc_inout += n_unparsed * sizeof (DskHttpHeaderMisc);
   return unparsed_headers_start;
 }
 
@@ -103,13 +119,13 @@ phase2_handle_unparsed_headers (unsigned n_unparsed, char **unparsed,
   char *at = str_slab_at;
   DskHttpHeaderMisc *unparsed_headers = (DskHttpHeaderMisc *) (*aligned_slab_at);
   unsigned i;
-  *aligned_slab_at += sizeof (DskHttpHeaderMisc) * n_unparsed * 2;
+  *aligned_slab_at += sizeof (DskHttpHeaderMisc) * n_unparsed;
   for (i = 0; i < n_unparsed; i++)
     {
       unparsed_headers[i].key = at;
-      at = dsk_stpcpy (at, unparsed[i]) + 1;
+      at = dsk_stpcpy (at, unparsed[2*i+0]) + 1;
       unparsed_headers[i].value = at;
-      at = dsk_stpcpy (at, unparsed[i]) + 1;
+      at = dsk_stpcpy (at, unparsed[2*i+1]) + 1;
     }
   return unparsed_headers;
 }
@@ -195,13 +211,24 @@ dsk_http_request_new (DskHttpRequestOptions *options,
     }
   MAYBE_ADD_STR (options->referrer, referrer);
   MAYBE_ADD_STR (options->user_agent, user_agent);
+  request->http_major_version = options->http_major_version;
+  request->http_minor_version = options->http_minor_version;
 
   if (options->has_date)
     {
       request->has_date = 1;
       request->date = options->date;
     }
-  if (has_request_body (options->verb))
+  if (options->parsed)
+    {
+      if (options->content_length >= 0)
+        request->content_length = options->content_length;
+      if (options->parsed_transfer_encoding_chunked)
+        request->transfer_encoding_chunked = 1;
+      if (options->parsed_connection_close)
+        request->connection_close = 1;
+    }
+  else if (has_request_body (options->verb))
     {
       if (options->content_length >= 0)
         request->content_length = options->content_length;
@@ -280,6 +307,8 @@ dsk_http_response_new (DskHttpResponseOptions *options,
     }
   MAYBE_ADD_STR (options->location, location);
 
+  response->http_major_version = options->http_major_version;
+  response->http_minor_version = options->http_minor_version;
   if (options->has_date)
     {
       response->has_date = 1;
@@ -290,12 +319,29 @@ dsk_http_response_new (DskHttpResponseOptions *options,
       response->has_expires = 1;
       response->expires = options->expires;
     }
-  if (options->content_length >= 0)
-    response->content_length = options->content_length;
-  else if (options->http_minor_version >= 1)
-    response->transfer_encoding_chunked = 1;
+  dsk_warning ("content-length=%lld, http-version=%u.%u",
+               options->content_length,
+               options->http_major_version,
+               options->http_minor_version);
+  if (options->parsed)
+    {
+      if (options->content_length >= 0)
+        response->content_length = options->content_length;
+      if (options->parsed_transfer_encoding_chunked)
+        response->transfer_encoding_chunked = 1;
+      if (options->parsed_connection_close)
+        response->connection_close = 1;
+    }
   else
-    response->connection_close = 1;
+    {
+      if (options->content_length >= 0)
+        response->content_length = options->content_length;
+      else if (options->http_minor_version >= 1)
+        response->transfer_encoding_chunked = 1;
+      else
+        response->connection_close = 1;
+    }
+
 
   /* TODO: gzip encoding? */
 
