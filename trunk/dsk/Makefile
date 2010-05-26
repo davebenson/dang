@@ -1,7 +1,7 @@
 # just so :make works in vi
 
 BUILT_SOURCES = dsk-ascii-chartable.inc dsk-digit-chartables.inc \
-                dsk-http-ident-chartable.inc
+                dsk-http-ident-chartable.inc dsk-byte-name-table.inc
 TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 	        tests/test-http-client-stream-0
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host
@@ -18,6 +18,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	  dsk-octet-listener-socket.o dsk-cleanup.o \
 	  dsk-http-client-stream.o dsk-memory-source.o dsk-memory-sink.o \
 	  dsk-http-header-parsing.o dsk-http-protocol.o \
+	  dsk-http-header-printing.o \
 	  dsk-date.o \
 	  dsk-xml-parser.o
 	ar cru $@ $^
@@ -31,6 +32,9 @@ dsk-digit-chartables.inc: mk-digit-chartables.pl
 	./mk-digit-chartables.pl > dsk-digit-chartables.inc
 dsk-http-ident-chartable.inc: mk-http-ident-chartable.pl
 	./mk-http-ident-chartable.pl > dsk-http-ident-chartable.inc
+dsk-byte-name-table.inc: mk-byte-name-table.pl
+	./mk-byte-name-table.pl > dsk-byte-name-table.inc
+
 
 clean:
 	rm *.o libdsk.a tests/test-dns-protocol

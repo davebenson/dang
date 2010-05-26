@@ -96,6 +96,10 @@ parse_info_init (ParseInfo *pi,
   at = pi->slab;
   at = strchr (at, '\n');    /* skip initial line (not key-value format) */
   dsk_assert (at != NULL);
+  if (at > pi->slab && *(at-1) == '\r')
+    *(at-1) = 0;
+  else
+    *at = 0;
   at++;
 
   /* is that the end of the header? */
@@ -129,7 +133,8 @@ parse_info_init (ParseInfo *pi,
           switch ((ident_chartable[a/4] >> (a%4*2)) & 3)
             {
             case 0: /* invalid */
-              dsk_set_error (error, "invalid character '%c' 0x%02x in HTTP header", a,a);
+              dsk_set_error (error, "invalid character %s in HTTP header",
+                             dsk_ascii_byte_name (a));
               goto FAIL;
             case 1: /* passthough */
             case 2: /* lowercase -- NO LONGER LOWERCASING */
@@ -143,7 +148,7 @@ parse_info_init (ParseInfo *pi,
             }
         }
     at_colon:
-      at++;
+      *at++ = 0;
       while (*at == ' ' || *at == '\t')
         at++;
       pi->kv_pairs[n_kv*2+1] = at;
@@ -240,7 +245,8 @@ parse_content_type (char *value,
     {
       if (!dsk_ascii_istoken (*value))
         {
-          dsk_set_error (error, "bad character in content-type '%c'", *value);
+          dsk_set_error (error, "bad character %s in content-type",
+                         dsk_ascii_byte_name (*value));
           return NULL;
         }
       if (dsk_ascii_isupper (*value))
@@ -260,8 +266,8 @@ parse_content_type (char *value,
         break;
       if (*value != ';')
         {
-          dsk_set_error (error, "expected ';' or end-of-string, got '%c' in content-type",
-                         *value);
+          dsk_set_error (error, "expected ';' or end-of-string, got %s in content-type",
+                         dsk_ascii_byte_name (*value));
           return DSK_FALSE;
         }
       value++;
@@ -272,7 +278,8 @@ parse_content_type (char *value,
         value++;
       if (*value != '=')
         {
-          dsk_set_error (error, "expected '=', got '%c' in content-type", *value);
+          dsk_set_error (error, "expected '=', got %s in content-type",
+                         dsk_ascii_byte_name (*value));
           return DSK_FALSE;
         }
       *value++ = 0;
@@ -299,8 +306,8 @@ parse_content_type (char *value,
             {
               if (*value != ';' && !dsk_ascii_isspace (*value))
                 {
-                  dsk_set_error (error, "bad character '%c' in unquoted parameter value for %s in Content-Type",
-                                 *value, pname);
+                  dsk_set_error (error, "bad character %s in unquoted parameter value for %s in Content-Type",
+                                 dsk_ascii_byte_name (*value), pname);
                   return DSK_FALSE;
                 }
               *value++ = 0;
@@ -328,7 +335,7 @@ parse_content_type (char *value,
 static dsk_boolean
 handle_date (const char *header_name,
              const char *value,
-             uint64_t   *date_out,
+             dsk_time_t *date_out,
              DskError  **error)
 {
   DskDate date;
@@ -378,11 +385,11 @@ parse_http_version (char **at_inout,
                     DskError **error)
 {
   char *at = *at_inout;
-  if ((at[0] == 'h' || at[0] == 'H')
-   && (at[1] == 't' || at[1] == 'T')
-   && (at[2] == 't' || at[2] == 'T')
-   && (at[3] == 'p' || at[3] == 'P')
-   && at[4] == '/')
+  if (!(at[0] == 'h' || at[0] == 'H')
+   || !(at[1] == 't' || at[1] == 'T')
+   || !(at[2] == 't' || at[2] == 'T')
+   || !(at[3] == 'p' || at[3] == 'P')
+   || at[4] != '/')
     {
       dsk_set_error (error, "expected HTTP/#.#");
       return DSK_FALSE;
@@ -406,6 +413,7 @@ parse_http_version (char **at_inout,
       dsk_set_error (error, "expecting . after HTTP/#");
       return DSK_FALSE;
     }
+  at++;
   if (!dsk_ascii_isdigit (*at))
     {
       dsk_set_error (error, "expecting digit after HTTP/#.");
@@ -442,6 +450,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
 #define DEFAULT_INIT_N_MISC_HEADERS             8       /* must be power-of-two */
   char *misc_header_padding[DEFAULT_INIT_N_MISC_HEADERS*2];
   options.unparsed_headers = misc_header_padding;
+  options.parsed = DSK_TRUE;
   
   if (!parse_info_init (&pi, buffer, header_len, 
                         sizeof (scratch), scratch,
@@ -613,6 +622,16 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
                 continue;
               }
             break;
+          case UNSIGNED_FROM_4_BYTES('c', 'o', 10, 'n'):
+            if (ascii_caseless_equals (name, "connection"))
+              {
+                if (ascii_caseless_equals (value, "close"))
+                  {
+                    options.parsed_connection_close = 1;
+                    continue;
+                  }
+              }
+            break;
           case UNSIGNED_FROM_4_BYTES('d', 'a', 4, 'e'):
             if (ascii_caseless_equals (name, "date"))
               {
@@ -639,6 +658,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
         }
 
       /* insert as misc-header */
+      dsk_warning ("handling misc-header: %s", name);
 
       /* maybe we need to grow the array */
       if (options.n_unparsed_headers == DEFAULT_INIT_N_MISC_HEADERS
@@ -675,11 +695,15 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
   DskHttpResponse *rv;
   char *misc_header_padding[DEFAULT_INIT_N_MISC_HEADERS*2];
   options.unparsed_headers = misc_header_padding;
+  options.parsed = DSK_TRUE;
   
   if (!parse_info_init (&pi, buffer, header_len, 
                         sizeof (scratch), scratch,
                         error))
     return NULL;
+  at = pi.slab;
+
+  dsk_warning ("first-line=%s", at);
 
   /* parse HTTP version */
   if (!parse_http_version (&at, &options.http_major_version,
@@ -709,6 +733,9 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
       unsigned name_len = strlen (name);
       unsigned v;
       char *value = pi.kv_pairs[2*i+1];
+
+      dsk_warning ("response parse: %s => %s", name, value);
+
       if (name_len == 0)
         {
           dsk_set_error (error, "empty key in HTTP request (approx line %u)", 2+i);
@@ -726,6 +753,16 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
                 if (!handle_content_length (value, &options.content_length, error))
                   goto FAIL;
                 continue;
+              }
+            break;
+          case UNSIGNED_FROM_4_BYTES('c', 'o', 10, 'n'):
+            if (ascii_caseless_equals (name, "connection"))
+              {
+                if (ascii_caseless_equals (value, "close"))
+                  {
+                    options.parsed_connection_close = 1;
+                    continue;
+                  }
               }
             break;
           case UNSIGNED_FROM_4_BYTES('c', 'o', 12, 'e'):

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #include "dsk.h"
 
 #define EPOCH_YEAR              1970
@@ -46,7 +47,7 @@ parse_generic (const char *format,
           format++;
           continue;
         }
-      if (*format == '-' || *format == ':' || *format == ',')
+      if (*format == '-' || *format == ':' || *format == ',' || *format == 'T')
         {
           if (*at != *format)
             {
@@ -55,6 +56,7 @@ parse_generic (const char *format,
             }
           at++;
           format++;
+          continue;
         }
       dsk_assert (*format == '%');
       switch (format[1])
@@ -142,6 +144,8 @@ parse_generic (const char *format,
                              (unsigned)(at-str));
               return DSK_FALSE;
             }
+          format += 2;
+          at += 3;
           break;
         case 'm':
           /* accept 2-digit month number */
@@ -269,6 +273,20 @@ dsk_boolean dsk_date_parse   (const char *str,
       return DSK_FALSE;
     }
 }
+static const unsigned month_starts_in_days[12]
+                               = { 0,         /* jan has 31 */
+                                   31,        /* feb has 28 */
+                                   59,        /* mar has 31 */
+                                   90,        /* apr has 30 */
+                                   120,       /* may has 31 */
+                                   151,       /* jun has 30 */
+                                   181,       /* jul has 31 */
+                                   212,       /* aug has 31 */
+                                   243,       /* sep has 30 */
+                                   273,       /* oct has 31 */
+                                   304,       /* nov has 30 */
+                                   334,       /* dec has 31 */
+                                   /*365*/ };
 
 /* 'unixtime' here is seconds since epoch.
    If the date is before the epoch (Jan 1, 1970 00:00 GMT),
@@ -281,37 +299,7 @@ dsk_boolean dsk_date_parse   (const char *str,
 /* dsk_unixtime_to_date() always sets the date_out->zone_offset to 0 (ie GMT) */
 int64_t     dsk_date_to_unixtime (DskDate *date)
 {
-  static const unsigned month_starts_in_days[12]
-                                 = { 0,         /* jan has 31 */
-                                     31,        /* feb has 28 */
-                                     59,        /* mar has 31 */
-                                     90,        /* apr has 30 */
-                                     120,       /* may has 31 */
-                                     151,       /* jun has 30 */
-                                     181,       /* jul has 31 */
-                                     212,       /* aug has 31 */
-                                     243,       /* sep has 30 */
-                                     273,       /* oct has 31 */
-                                     304,       /* nov has 30 */
-                                     334,       /* dec has 31 */
-                                     /*365*/ };
-  unsigned year = date->year;
   unsigned days_since_epoch, secs_since_midnight;
-
-  /* we need to find the number of leap years between 1970
-     and ly_year inclusive.  Therefore, the current year
-     is included only if the date falls after Feb 28. */
-  dsk_boolean before_leap = (date->month <= 2);  /* jan and feb are before leap */
-  unsigned ly_year = year - (before_leap ? 1 : 0);
-
-  /* Number of leap years before the date in question, since epoch.
-   *
-   * There is a leap year every 4 years, except every 100 years,
-   * except every 400 years.  see "Gregorian calendar" on wikipedia.
-   */
-  unsigned n_leaps = ((ly_year / 4) - (EPOCH_YEAR / 4))
-                   - ((ly_year / 100) - (EPOCH_YEAR / 100))
-                   + ((ly_year / 400) - (EPOCH_YEAR / 400));
 
   if ((unsigned)date->month > 12
    || date->day < 1 || date->day > 31
@@ -320,10 +308,7 @@ int64_t     dsk_date_to_unixtime (DskDate *date)
    || date->second >= 61)   /* ??? are leap seconds meaningful in gmt */
     return (int64_t) -1;
 
-  days_since_epoch = (year - EPOCH_YEAR) * 365
-                   + n_leaps
-                   + month_starts_in_days[date->month - 1]
-                   + (date->day - 1);
+  days_since_epoch = dsk_date_get_days_since_epoch (date);
   secs_since_midnight = date->hour * 3600
                       + date->minute * 60
                       + date->second;
@@ -581,5 +566,65 @@ dsk_boolean dsk_date_parse_timezone (const char *at,
       return DSK_FALSE;
     }
 }
+static dsk_boolean
+is_leap_year (unsigned year)
+{
+  return (year % 4 == 0)
+     && ((year % 100 != 0) || (year % 400 == 0));
+}
 
+unsigned    dsk_date_get_day_of_year (DskDate *date)
+{
+  dsk_boolean is_after_leap = date->month >= 3 && is_leap_year (date->year);
+  dsk_assert (1 <= date->month && date->month <= 12);
+  return month_starts_in_days[date->month-1] + date->day - 1
+       + (is_after_leap ? 1 : 0);
+}
 
+unsigned    dsk_date_get_days_since_epoch (DskDate *date)
+{
+  unsigned year = date->year;
+  /* we need to find the number of leap years between 1970
+     and ly_year inclusive.  Therefore, the current year
+     is included only if the date falls after Feb 28. */
+  dsk_boolean before_leap = (date->month <= 2);  /* jan and feb are before leap */
+  unsigned ly_year = year - (before_leap ? 1 : 0);
+
+  /* Number of leap years before the date in question, since epoch.
+   *
+   * There is a leap year every 4 years, except every 100 years,
+   * except every 400 years.  see "Gregorian calendar" on wikipedia.
+   */
+  unsigned n_leaps = ((ly_year / 4) - (EPOCH_YEAR / 4))
+                   - ((ly_year / 100) - (EPOCH_YEAR / 100))
+                   + ((ly_year / 400) - (EPOCH_YEAR / 400));
+
+  return (year - EPOCH_YEAR) * 365
+       + n_leaps
+       + month_starts_in_days[date->month - 1]
+       + (date->day - 1);
+}
+
+unsigned
+dsk_date_get_day_of_week (DskDate *date)
+{
+  unsigned day = dsk_date_get_days_since_epoch (date);
+
+  /* day 0 was a thursday; we want day 0 == sunday.
+     Hence we want thursday == 4 */
+  return (day + 4) % 7;
+}
+
+void        dsk_date_print_rfc822 (DskDate *date,
+                                   char    *buf)
+{
+  static const char days_of_week[] = "SunMonTueWedThuFriSat";
+  static const char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  memcpy (buf, days_of_week + dsk_date_get_day_of_week (date)*3, 3);
+  buf[3] = ',';
+  buf[4] = ' ';
+  memcpy (buf + 5, months + (date->month-1) * 3, 3);
+  buf[8] = ' ';
+  snprintf (buf, 15, "%02u:%02u:%02u ", date->hour, date->minute, date->second);
+  strcpy (buf + 24, "GMT");
+}

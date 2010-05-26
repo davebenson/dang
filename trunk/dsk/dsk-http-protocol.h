@@ -71,6 +71,7 @@ typedef enum
   DSK_HTTP_VERB_TRACE,
   DSK_HTTP_VERB_CONNECT
 } DskHttpVerb;
+const char *dsk_http_verb_name (DskHttpVerb verb);
 
 #if 0
 /* A single `Cookie' or `Set-Cookie' header.
@@ -110,23 +111,24 @@ struct _DskHttpRequest
 
   //DskHttpConnection             connection_type;
   //DskHttpContentEncoding        content_encoding_type;
+  DskHttpVerb verb;       /* the command: GET, PUT, POST, HEAD, etc */
+  /* Note that HTTP/1.1 servers must accept the entire
+   * URL being included in `path'! (maybe including http:// ... */
+  char *path;
+  unsigned char http_minor_version;
+  unsigned char http_major_version;
 
   unsigned transfer_encoding_chunked : 1;       /* for POST data */
   unsigned has_date : 1;           /* Date (see date member) */
-  unsigned supports_transfer_encoding_chunked : 1;      /* for TE header */
   unsigned connection_close : 1;
   unsigned content_encoding_gzip : 1;
   unsigned supports_content_encoding_gzip : 1;
 
   char *content_type;  /* Content-Type: text/plain or text/plain/UTF-8 */
-  int64_t date;        /* Date header, if "has_date" */
+  dsk_time_t date;        /* Date header, if "has_date" */
 
   int64_t content_length; /* From the Content-Length header; -1 to disable */
-  DskHttpVerb verb;       /* the command: GET, PUT, POST, HEAD, etc */
 
-  /* Note that HTTP/1.1 servers must accept the entire
-   * URL being included in `path'! (maybe including http:// ... */
-  char *path;
   char *host;                 /* Host */
   char *user_agent;           /* User-Agent */
   char *referrer;             /* Referer */
@@ -152,7 +154,7 @@ struct _DskHttpResponse
 
   unsigned connection_close : 1;
   unsigned transfer_encoding_chunked : 1;
-  unsigned accept_range_bytes : 1; /* Accept-Ranges */
+  unsigned accept_ranges : 1; /* Accept-Ranges */
   unsigned has_date : 1;           /* Date (see date member) */
   unsigned content_encoding_gzip : 1;
   unsigned has_last_modified : 1;
@@ -160,24 +162,17 @@ struct _DskHttpResponse
 
   /* Content-Type */
   char *content_type;
-  char *content_subtype;
-  char *content_charset;
 
   /* the 'Date' header, parsed into unix-time, i.e.
      seconds since epoch (if the has_date flag is set) */
-  int64_t date;
+  dsk_time_t date;
 
   /* From the Content-Length header; -1 to disable */
-  int64_t content_length;
+  dsk_time_t content_length;
 
   unsigned n_unparsed_headers;
   DskHttpHeaderMisc *unparsed_headers;
   
-  /* initially allowed_verbs == 0;
-   * since it is an error not to allow any verbs;
-   * otherwise it is a bitwise-OR: (1 << GSK_HTTP_VERB_*)
-   */
-  unsigned                  allowed_verbs;
 
   unsigned                  has_md5sum : 1;
   unsigned char             md5sum[16];           /* Content-MD5 (14.15) */
@@ -203,7 +198,7 @@ struct _DskHttpResponse
   /* The Last-Modified header.  If != -1, this is the unix-time
    * the message-body-contents were last modified. (RFC 2616, section 14.29)
    */
-  int64_t                   last_modified;
+  dsk_time_t                last_modified;
 
   char                     *server;        /* The Server: header */
 
@@ -218,9 +213,9 @@ DskHttpRequest  *dsk_http_request_parse_buffer  (DskBuffer *buffer,
 DskHttpResponse *dsk_http_response_parse_buffer (DskBuffer *buffer,
                                                  unsigned   header_len,
                                                  DskError **error);
-void             dsk_http_request_write_buffer  (DskHttpRequest *request,
+void             dsk_http_request_print_buffer  (DskHttpRequest *request,
                                                  DskBuffer *buffer);
-void             dsk_http_response_write_buffer  (DskHttpResponse *response,
+void             dsk_http_response_print_buffer  (DskHttpResponse *response,
                                                  DskBuffer *buffer);
 
 /* --- construction --- */
@@ -257,7 +252,7 @@ struct _DskHttpRequestOptions
 
   /* --- date --- */
   dsk_boolean has_date;
-  uint64_t date;
+  dsk_time_t date;
 
   /* --- various headers, mostly uninterpreted --- */
   char *referrer;
@@ -266,6 +261,11 @@ struct _DskHttpRequestOptions
   /* --- unparsed headers --- */
   unsigned n_unparsed_headers;
   char **unparsed_headers;          /* key-value pairs */
+
+  /* --- parser interface --- */
+  dsk_boolean parsed;
+  dsk_boolean parsed_transfer_encoding_chunked;
+  dsk_boolean parsed_connection_close;
 };
 DskHttpRequest *dsk_http_request_new (DskHttpRequestOptions *options,
                                       DskError             **error);
@@ -288,6 +288,9 @@ DskHttpRequest *dsk_http_request_new (DskHttpRequestOptions *options,
   NULL,                         /* referrer */                  \
   NULL,                         /* user_agent */                \
   0, NULL,                      /* n_unparsed_headers, unparsed_headers  */\
+  DSK_FALSE,                    /* parsed */                    \
+  DSK_FALSE,                    /* parsed_transfer_encoding_chunked */ \
+  DSK_FALSE,                    /* parsed_connection_close   */ \
 }
 struct _DskHttpResponseOptions
 {
@@ -311,11 +314,11 @@ struct _DskHttpResponseOptions
 
   /* --- date --- */
   dsk_boolean has_date;
-  uint64_t date;
+  dsk_time_t date;
 
   /* --- expires --- */
   dsk_boolean has_expires;
-  uint64_t expires;
+  dsk_time_t expires;
 
   /* --- unparsed strings --- */
   char *server;
@@ -324,6 +327,11 @@ struct _DskHttpResponseOptions
   /* --- unparsed headers --- */
   unsigned n_unparsed_headers;
   char **unparsed_headers;          /* key-value pairs */
+
+  /* --- parser interface --- */
+  dsk_boolean parsed;
+  dsk_boolean parsed_transfer_encoding_chunked;
+  dsk_boolean parsed_connection_close;
 };
 #define DSK_HTTP_RESPONSE_OPTIONS_DEFAULT                       \
 {                                                               \
@@ -343,6 +351,9 @@ struct _DskHttpResponseOptions
   NULL,                         /* server */                    \
   NULL,                         /* location */                  \
   0, NULL,                      /* n_unparsed_headers, unparsed_headers  */\
+  DSK_FALSE,                    /* parsed */                    \
+  DSK_FALSE,                    /* parsed_transfer_encoding_chunked */ \
+  DSK_FALSE,                    /* parsed_connection_close   */ \
 }
 DskHttpResponse *dsk_http_response_new (DskHttpResponseOptions *options,
                                         DskError              **error);
