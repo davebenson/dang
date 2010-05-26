@@ -8,10 +8,12 @@ struct _RequestData
   DskMemorySink *sink;
   DskHttpResponse *response_header;
   dsk_boolean content_complete;
+  DskBuffer content;
   dsk_boolean destroyed;
 };
 #define REQUEST_DATA_DEFAULT { NULL, NULL, NULL,        \
                                DSK_FALSE,       /* content_complete */ \
+                               DSK_BUFFER_STATIC_INIT, \
                                DSK_FALSE,       /* destroyed */ \
                              }
 
@@ -25,6 +27,7 @@ static void
 request_data__handle_content_complete (DskHttpClientStreamTransfer *xfer)
 {
   RequestData *rd = xfer->user_data;
+  dsk_buffer_drain (&rd->content, &xfer->content->buffer);
   rd->content_complete = DSK_TRUE;
 }
 static void
@@ -112,11 +115,11 @@ test_simple (void)
   while (!request_data.content_complete)
     dsk_main_run_once ();
 
-  dsk_assert (request_data.sink->buffer.size == 7);
+  dsk_assert (request_data.content.size == 7);
   {
     char buf[7];
-    dsk_buffer_peek (&request_data.sink->buffer, 7, buf);
-    dsk_assert (memcmp (buf, "hi mom", 7) == 0);
+    dsk_buffer_peek (&request_data.content, 7, buf);
+    dsk_assert (memcmp (buf, "hi mom\n", 7) == 0);
   }
 
   request_data_clear (&request_data);
