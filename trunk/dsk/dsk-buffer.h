@@ -99,6 +99,8 @@ void     dsk_buffer_clear               (DskBuffer    *to_destroy);
 
 
 /* iterating through the buffer */
+/* 'frag_offset_out' is the offset of the returned fragment in the whole
+   buffer. */
 DskBufferFragment *dsk_buffer_find_fragment (DskBuffer   *buffer,
                                              unsigned     offset,
                                              unsigned    *frag_offset_out);

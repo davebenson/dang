@@ -1416,21 +1416,21 @@ DskBufferFragment *dsk_buffer_find_fragment (DskBuffer   *buffer,
                                              unsigned    *frag_offset_out)
 {
   DskBufferFragment *frag = buffer->first_frag;
-  dsk_assert (offset <= buffer->size);
-  while (offset != 0)
+  unsigned frag_offset = 0;
+  while (frag_offset < offset)
     {
-      if (offset >= frag->buf_length)
+      if (offset >= frag_offset + frag->buf_length)
         {
-          offset -= frag->buf_length;
+          frag_offset += frag->buf_length;
           frag = frag->next;
         }
       else
         {
-          *frag_offset_out = offset;
+          *frag_offset_out = frag_offset;
           return frag;
         }
     }
-  *frag_offset_out = 0;
+  *frag_offset_out = frag_offset;
   return frag;
 }
 
