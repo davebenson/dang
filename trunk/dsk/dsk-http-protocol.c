@@ -319,10 +319,6 @@ dsk_http_response_new (DskHttpResponseOptions *options,
       response->has_expires = 1;
       response->expires = options->expires;
     }
-  dsk_warning ("content-length=%lld, http-version=%u.%u",
-               options->content_length,
-               options->http_major_version,
-               options->http_minor_version);
   if (options->parsed)
     {
       if (options->content_length >= 0)

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #include "../dsk.h"
 
 typedef struct _RequestData RequestData;
@@ -51,7 +52,6 @@ is_http_request_complete (DskBuffer *buf)
 {
   char *slab = dsk_malloc (buf->size + 1);
   dsk_boolean rv;
-  dsk_warning ("is_http_request_complete");
 
   dsk_buffer_peek (buf, buf->size, slab);
   slab[buf->size] = 0;
@@ -92,8 +92,6 @@ test_simple (dsk_boolean byte_by_byte)
   /* read data from sink */
   while (!is_http_request_complete (&request_data.sink->buffer))
     dsk_main_run_once ();
-
-  dsk_warning ("got request");
 
   /* write response */
   static const char *content = 
@@ -141,6 +139,9 @@ test_simple (dsk_boolean byte_by_byte)
   request_data_clear (&request_data);
 }
 
+static void test_simple_bigwrite() { test_simple(DSK_FALSE); }
+static void test_simple_bytebybyte() { test_simple(DSK_TRUE); }
+
 static void
 test_transfer_encoding_chunked (void)
 {
@@ -164,7 +165,6 @@ test_transfer_encoding_chunked (void)
                                        &options);
   req_options.host = "localhost";
   req_options.full_path = "/hello.txt";
-  dsk_warning ("got request");
 
   /* write response */
   unsigned pass;
@@ -191,14 +191,12 @@ test_transfer_encoding_chunked (void)
       switch (pass)
         {
         case 0:
-          dsk_warning ("pass1: adding data in one chunk");
           dsk_buffer_append_string (&request_data.source->buffer, content);
           dsk_memory_source_added_data (request_data.source);
           break;
         case 1:
           {
             const char *at = content;
-            dsk_warning ("pass2: adding 1 char at a time");
             while (*at)
               {
                 dsk_buffer_append_byte (&request_data.source->buffer, *at++);
@@ -206,7 +204,6 @@ test_transfer_encoding_chunked (void)
                 while (request_data.source->buffer.size)
                   dsk_main_run_once ();
               }
-            dsk_warning ("pass2: done adding");
           }
           break;
         }
@@ -243,12 +240,28 @@ test_transfer_encoding_chunked (void)
   request_data_clear (&request_data);
 }
 
+
+static struct 
+{
+  const char *name;
+  void (*test)(void);
+} tests[] =
+{
+  { "simple connection-close", test_simple_bigwrite },
+  { "simple connection-close byte-by-byte", test_simple_bytebybyte },
+  { "transfer-encoding chunked content", test_transfer_encoding_chunked },
+  // { "transfer-encoding chunked POST", test_transfer_encoding_chunked_post },
+  // { "content-encoding gzip", test_content_encoding_gzip },
+};
+
 int main(void)
 {
-  dsk_warning ("===== test_simple ====\n");
-  test_simple (DSK_FALSE);
-  test_simple (DSK_TRUE);
-  dsk_warning ("===== test_transfer_encoding_chunked ====\n");
-  test_transfer_encoding_chunked ();
+  unsigned i;
+  for (i = 0; i < sizeof(tests)/sizeof(tests[0]); i++)
+    {
+      fprintf (stderr, "Test: %s... ", tests[i].name);
+      tests[i].test ();
+      fprintf (stderr, " done.\n");
+    }
   return 0;
 }

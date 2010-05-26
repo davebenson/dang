@@ -40,7 +40,6 @@ client_stream_set_error (DskHttpClientStream *stream,
 static void
 free_transfer (DskHttpClientStreamTransfer *xfer)
 {
-  dsk_warning ("free_transfer");
   dsk_object_unref (xfer->request);
   if (xfer->response)
     dsk_object_unref (xfer->response);
@@ -72,7 +71,6 @@ transfer_done (DskHttpClientStreamTransfer *xfer)
   DskHttpClientStreamTransfer *tmp;
   GSK_QUEUE_DEQUEUE (GET_STREAM_XFER_QUEUE (xfer->owner), tmp);
   dsk_assert (tmp == xfer);
-  dsk_warning ("transfer_done");
 
   /* EOF for content */
   if (xfer->content)
@@ -263,7 +261,6 @@ handle_transport_source_readable (DskOctetSource *source,
   DskHttpResponse *response;
   dsk_boolean got_eof = DSK_FALSE;
 
-  dsk_warning ("handle_transport_source_readable");
   switch (dsk_octet_source_read_buffer (source, &stream->incoming_data, &error))
     {
     case DSK_IO_RESULT_SUCCESS:
@@ -281,7 +278,6 @@ handle_transport_source_readable (DskOctetSource *source,
       got_eof = DSK_TRUE;
       break;
     }
-  dsk_warning ("handle_transport_source_readable: stream->incoming_data.size=%u", (unsigned)stream->incoming_data.size);
 restart_processing:
   while (stream->incoming_data.size > 0)
     {
@@ -320,14 +316,12 @@ restart_processing:
                   }
                 goto return_true;
               }
-            dsk_warning ("scan_for_end_of_http_header returned true");
             /* parse header */
             unsigned header_len = xfer->read_info.need_header.checked;
             response = dsk_http_response_parse_buffer (&stream->incoming_data, header_len, &error);
             dsk_buffer_discard (&stream->incoming_data, header_len);
             if (response == NULL)
               {
-                dsk_warning ("error parsing response: %s", error->message);
                 stream->read_trap = NULL;
                 client_stream_set_error (stream, xfer,
                                          "parsing response header: %s",
@@ -350,19 +344,16 @@ restart_processing:
 
                 if (xfer->response->transfer_encoding_chunked)
                   {
-                    dsk_warning ("entering DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER");
                     xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER;
                     xfer->read_info.in_xfer_chunk.remaining = 0;
                   }
                 else if (xfer->response->content_length > 0)
                   {
-                    dsk_warning ("entering DSK_HTTP_CLIENT_STREAM_READ_IN_BODY");
                     xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_BODY;
                     xfer->read_info.in_body.remaining = xfer->response->content_length;
                   }
                 else if (xfer->response->content_length == 0)
                   {
-                    dsk_warning ("entering DSK_HTTP_CLIENT_STREAM_READ_DONE (conent_length=0)");
                     xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_DONE;
                     /* TODO: indicate source done */
                   }
@@ -374,13 +365,11 @@ restart_processing:
                                                  "neither 'Connection: close' nor 'Transfer-Encoding: chunked' nor 'Content-Length' specified");
                         xfer->response->connection_close = 1;   /* HACK */
                       }
-                    dsk_warning ("entering DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF");
                     xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF;
                   }
               }
             else
               {
-                    dsk_warning ("entering DSK_HTTP_CLIENT_STREAM_READ_DONE");
                 xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_DONE;
               }
             /* notify */
@@ -398,7 +387,6 @@ restart_processing:
               amount = stream->incoming_data.size;
             xfer->read_info.in_body.remaining -= amount;
             old_size = xfer->content->buffer.size;
-            dsk_warning ("transfer_content: %u bytes",amount);
             transfer_content (xfer, amount);
             dsk_memory_source_added_data (xfer->content);
             if (xfer->read_info.in_body.remaining == 0)
@@ -523,7 +511,6 @@ restart_processing:
             {
               goto return_true;
             }
-          dsk_warning ("trailer: discarding %u bytes", xfer->read_info.in_xfer_chunk_trailer.checked);
           dsk_buffer_discard (&stream->incoming_data,
                               xfer->read_info.in_xfer_chunk_trailer.checked);
           xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_FINAL_NEWLINE;
@@ -578,7 +565,6 @@ static dsk_boolean handle_writable (DskOctetSink *sink,
 static void
 maybe_add_write_hook (DskHttpClientStream *stream)
 {
-  dsk_warning ("maybe_add_write_hook: write_trap=%p, outgoing_data_transfer=%p, n_pending_outgoing_requests=%u, max_pipelined_requests=%u", stream->write_trap, stream->outgoing_data_transfer, stream->n_pending_outgoing_requests, stream->max_pipelined_requests);
   if (stream->write_trap != NULL)
     return;
   if (stream->outgoing_data_transfer == NULL)
@@ -654,8 +640,6 @@ handle_writable (DskOctetSink *sink,
 {
   DskError *error = NULL;
   dsk_boolean blocked = DSK_FALSE;
-
-  dsk_warning ("handle_writable");
 
   while (stream->outgoing_data.size < stream->max_outgoing_data
       && stream->outgoing_data_transfer != NULL
@@ -783,7 +767,6 @@ handle_writable (DskOctetSink *sink,
 
   if (blocked && stream->outgoing_data.size == 0)
     {
-      dsk_warning ("removing write-trap");
       stream->write_trap = NULL;
       return DSK_FALSE;
     }
