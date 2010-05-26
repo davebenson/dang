@@ -3,7 +3,7 @@
 BUILT_SOURCES = dsk-ascii-chartable.inc dsk-digit-chartables.inc \
                 dsk-http-ident-chartable.inc dsk-byte-name-table.inc
 TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
-	        tests/test-http-client-stream-0
+	        tests/test-http-client-stream-0 tests/test-xml-parser-0
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
 
