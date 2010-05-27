@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #include "../gskrbtreemacros.h"
 #include "dsk.h"
 #include "dsk-print.h"

@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <search.h>             /* for the seldom-used lsearch() */
+#include <search.h>             /* for the seldom-used lfind() */
 #include "dsk.h"
 #include "../gskrbtreemacros.h"
 
@@ -12,6 +12,8 @@
  */
 
 #define MAX_DEPTH       64
+
+#define DEBUG_PARSE_STATE_TREE     0
 
 /* References:
         The Annotated XML Specification, by Tim Bray
@@ -66,7 +68,7 @@ lex_state_description (LexState state)
   switch (state)
     {
     case LEX_DEFAULT:                           return "the usual state parsing text";
-    case LEX_DEFAULT_ENTITY_REF:               return "the usual state parsing text";
+    case LEX_DEFAULT_ENTITY_REF:                return "the usual state parsing text in entity";
     case LEX_LT:                                return "after '<'";
     case LEX_OPEN_ELEMENT_NAME:                 return "in element-name of open tag";
     case LEX_OPEN_IN_ATTRS:                     return "waiting for attribute-name or '>'";
@@ -168,7 +170,8 @@ struct _StackNode
   unsigned n_attrs;
   ParseState *state;
   NsAbbrevMap *defined_list;
-  dsk_boolean needed;
+  unsigned char needed;
+  unsigned char condense_text;
   unsigned n_children;          /* children should only be added if 'needed' */
 };
 
@@ -371,6 +374,7 @@ union_copy_parse_state (ParseState *dst,
     {
       dst->ret_indices = dsk_realloc (dst->ret_indices, sizeof (unsigned) * (src->n_ret + dst->n_ret));
       memcpy (dst->ret_indices + dst->n_ret, src->ret_indices, src->n_ret * sizeof (unsigned));
+      dst->n_ret += src->n_ret;
     }
 }
 
@@ -396,7 +400,8 @@ expand_parse_state_wildcards_recursive (ParseState *state)
       /* We have a "*" node. */
 
       /* move transition to wildcard transition */
-      state->wildcard_transition = state->transitions[i].state;
+      state->wildcard_transition = state->transitions[wc_trans].state;
+      dsk_free (state->transitions[wc_trans].str);
 
       /* union "*" subtree with each transition's subtree */
       for (i = 0; i < state->n_transitions; i++)
@@ -428,6 +433,32 @@ expand_parse_state_wildcards_recursive (ParseState *state)
     expand_parse_state_wildcards_recursive (state->wildcard_transition);
 }
 
+#if DEBUG_PARSE_STATE_TREE
+static void
+dump_parse_state_recursive (ParseState *state,
+                            unsigned    depth)
+{
+  unsigned i;
+  if (state->n_ret > 0)
+    {
+      fprintf(stderr, "%*sreturn", depth*2, "");
+      for (i = 0; i < state->n_ret; i++)
+        fprintf(stderr, " %u", state->ret_indices[i]);
+      fprintf(stderr, "\n");
+    }
+  for (i = 0; i < state->n_transitions; i++)
+    {
+      fprintf(stderr, "%*s%s ->\n", depth*2, "", state->transitions[i].str);
+      dump_parse_state_recursive (state->transitions[i].state, depth+1);
+    }
+  if (state->wildcard_transition)
+    {
+      fprintf(stderr, "%*s* ->\n", depth*2, "");
+      dump_parse_state_recursive (state->wildcard_transition, depth+1);
+    }
+}
+#endif
+
 DskXmlParserConfig *
 dsk_xml_parser_config_new (DskXmlParserFlags flags,
 			   unsigned          n_ns,
@@ -453,9 +484,9 @@ dsk_xml_parser_config_new (DskXmlParserFlags flags,
       for (i = 0; i < n_ns; i++)
         {
           ns_slab[i].url = at;
-          at = dsk_stpcpy (at, ns[i].url);
+          at = dsk_stpcpy (at, ns[i].url) + 1;
           ns_slab[i].prefix = at;
-          at = dsk_stpcpy (at, ns[i].prefix);
+          at = dsk_stpcpy (at, ns[i].prefix) + 1;
         }
       qsort (ns_slab, n_ns, sizeof (DskXmlParserNamespaceConfig),
              compare_namespace_configs);
@@ -463,6 +494,8 @@ dsk_xml_parser_config_new (DskXmlParserFlags flags,
         if (strcmp (ns_slab[i-1].url, ns_slab[i].url) == 0)
           {
             dsk_free (ns_slab);
+            dsk_warning ("creating parser-config: two mappings for %s",
+                         ns_slab[i-1].url);
             return NULL;
           }
     }
@@ -491,10 +524,10 @@ dsk_xml_parser_config_new (DskXmlParserFlags flags,
       for (p = 0; pieces[p] != NULL; p++)
         {
           size_t tmp = at->n_transitions;
-          ParseStateTransition *trans = lsearch (pieces[i], at->transitions,
-                                                 &tmp,          /* wtf lsearch()? */
-                                                 sizeof (ParseStateTransition),
-                                                 compare_str_to_parse_state_transition);
+          ParseStateTransition *trans = lfind (pieces[p], at->transitions,
+                                               &tmp,          /* wtf lsearch()? */
+                                               sizeof (ParseStateTransition),
+                                               compare_str_to_parse_state_transition);
           if (trans == NULL)
             {
               at->transitions = dsk_realloc (at->transitions, sizeof (ParseStateTransition) * (1+at->n_transitions));
@@ -519,9 +552,9 @@ dsk_xml_parser_config_new (DskXmlParserFlags flags,
      and the subtree is copied into each siblings subtree. */
   expand_parse_state_wildcards_recursive (&config->base);
 
-#if 0
+#if DEBUG_PARSE_STATE_TREE
   /* dump tree */
-  ...
+  dump_parse_state_recursive (&config->base, 0);
 #endif
   return config;
 }
@@ -577,7 +610,7 @@ simple_buffer_append_byte (SimpleBuffer *sb, uint8_t byte)
 static inline void
 simple_buffer_clear (SimpleBuffer *sb)
 {
-  dsk_free (sb);
+  dsk_free (sb->data);
 }
 
 
@@ -695,7 +728,7 @@ static dsk_boolean utf_validate_open_element (DskXmlParser *parser,
                                               DskError    **error)
 {
   /* do UTF-8 validation (and other checks) */
-  unsigned utf8_state = 0;
+  //unsigned utf8_state = 0;
   unsigned cur;
   unsigned line_offset = 0;
   dsk_boolean is_strict = DSK_TRUE;
@@ -713,17 +746,19 @@ static dsk_boolean utf_validate_open_element (DskXmlParser *parser,
               /* event elements are all strict */
               is_strict = (attr_index & 1) ^ 1;
             }
-          utf8_state = 0;
-          if (!is_valid_ascii_char (*at, is_strict))
-            goto bad_character;
-          if (*at == '\n')
-            line_offset++;
+          else
+            {
+              if (!is_valid_ascii_char (*at, is_strict))
+                goto bad_character;
+              if (*at == '\n')
+                line_offset++;
+            }
           at++;
         }
       else if ((*at & 0xe0) == 0xb0)
         {
           unsigned cur;
-          utf8_state = 1;
+          //utf8_state = 1;
           if ((at[1] & 0xb0) != 0x80)
             goto bad_utf8;
           cur = ((at[0] & 0x1f) << 6) | (at[1] & 0x3f);
@@ -761,8 +796,6 @@ static dsk_boolean utf_validate_open_element (DskXmlParser *parser,
       else
         goto bad_utf8;
     }
-  if (utf8_state != 0)
-    goto bad_utf8;
 
   dsk_assert (attr_index == parser->n_attrs * 2 + 1);
   return DSK_TRUE;
@@ -776,7 +809,8 @@ bad_utf8:
 
 bad_character:
   /* TODO: this doesn't count whitespace added between the attributes!!!!!! */
-  dsk_set_error (error, "bad character at %s, line %u, in open-tag",
+  dsk_set_error (error, "bad character %s at %s, line %u, in open-tag",
+                 dsk_ascii_byte_name (*at),
                  parser->filename ? parser->filename->filename : "string",
                  parser->start_line + line_offset);
   return DSK_FALSE;
@@ -786,17 +820,16 @@ static dsk_boolean utf_validate_text (DskXmlParser *parser,
                                       DskError    **error)
 {
   /* do UTF-8 validation (and other checks) */
-  unsigned utf8_state = 0;
   unsigned cur;
   unsigned line_offset = 0;
   char *at = (char*)(parser->buffer.data);
   char *end = at + parser->buffer.len;
-  unsigned attr_index = 0;
   while (at < end)
     {
       if ((*at & 0x80) == 0)
         {
-          utf8_state = 0;
+          if (*at == 0)
+            goto bad_character;
           if (*at == '\n')
             line_offset++;
           at++;
@@ -804,7 +837,6 @@ static dsk_boolean utf_validate_text (DskXmlParser *parser,
       else if ((*at & 0xe0) == 0xb0)
         {
           unsigned cur;
-          utf8_state = 1;
           if ((at[1] & 0xb0) != 0x80)
             goto bad_utf8;
           cur = ((at[0] & 0x1f) << 6) | (at[1] & 0x3f);
@@ -842,22 +874,19 @@ static dsk_boolean utf_validate_text (DskXmlParser *parser,
       else
         goto bad_utf8;
     }
-  if (utf8_state != 0)
-    goto bad_utf8;
-
-  dsk_assert (attr_index == parser->n_attrs * 2 + 1);
   return DSK_TRUE;
 
 bad_utf8:
   /* TODO: this doesn't count whitespace added between the attributes!!!!!! */
-  dsk_set_error (error, "bad UTF-8 at %s, line %u, in open-tag",
+  dsk_set_error (error, "bad UTF-8 at %s, line %u, in text",
                  parser->filename ? parser->filename->filename : "string",
                  parser->start_line + line_offset);
   return DSK_FALSE;
 
 bad_character:
   /* TODO: this doesn't count whitespace added between the attributes!!!!!! */
-  dsk_set_error (error, "bad character at %s, line %u, in open-tag",
+  dsk_set_error (error, "bad character %s at %s, line %u, in text",
+                 dsk_ascii_byte_name (*at),
                  parser->filename ? parser->filename->filename : "string",
                  parser->start_line + line_offset);
   return DSK_FALSE;
@@ -871,17 +900,19 @@ lookup_xmlns_translation (const char   *url,
   DskXmlParserNamespaceConfig *rv;
   rv = bsearch ((void*)url, parser->config->ns, parser->config->n_ns, sizeof (DskXmlParserNamespaceConfig),
                 compare_str_to_namespace_configs);
-  dsk_set_error (error, "unhandled namespace URL '%s' encountered", url);
+  if (rv == NULL)
+    dsk_set_error (error, "unhandled namespace URL '%s' encountered", url);
   return rv;
 }
 
 
 static void
 add_to_child_stack__take (DskXmlParser *parser,
-                          DskXml *node)
+                          DskXml *node,
+                          unsigned frame)
 {
-  StackNode *stack = parser->stack + (parser->stack_size-1);
-  (stack-1)->n_children += 1;
+  StackNode *stack = parser->stack + frame;
+  stack->n_children += 1;
   if (parser->n_stack_children == parser->stack_children_alloced)
     {
       parser->stack_children_alloced *= 2;
@@ -1014,6 +1045,8 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
                     }
                 }
             }
+          else
+            xlats[i] = NULL;
         }
       for (i = 0; i < n_attrs; i++)
         if (xlats[i] != NULL)
@@ -1033,6 +1066,7 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
                 /* set/replace default ns */
                 map->masking = parser->default_ns;
                 parser->default_ns = map;
+
               }
             else
               {
@@ -1044,6 +1078,7 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
                 map = dsk_malloc (sizeof (NsAbbrevMap) + abbrev_len);
                 memcpy (map + 1, abbrev_name, abbrev_len);
                 map->abbrev = (char*)(map+1);
+                map->translate = xlats[i];
 
                 /* add map to list for stack-node */
                 map->defined_list_next = defined_list;
@@ -1077,7 +1112,7 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
           NsAbbrevMap *abbrev;
           const char *name_prefix;
           *colon = 0;
-          GSK_RBTREE_LOOKUP_COMPARATOR (GET_NS_ABBREV_TREE (parser), attrs[0], COMPARE_STR_TO_NS_ABBREV_TREE, abbrev);
+          GSK_RBTREE_LOOKUP_COMPARATOR (GET_NS_ABBREV_TREE (parser), (char*)parser->buffer.data, COMPARE_STR_TO_NS_ABBREV_TREE, abbrev);
           *colon = ':';
           name_prefix = abbrev->translate->prefix;
           if (name_prefix[0] != 0)
@@ -1194,6 +1229,11 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
   st->defined_list = defined_list;
   st->n_children = 0;
   st->needed = (st-1)->needed || new_state->n_ret != 0;
+  st->condense_text = 0;
+
+  /* clear buffer */
+  parser->buffer.len = 0;
+
   return DSK_TRUE;
 }
 
@@ -1210,7 +1250,8 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
     }
   /* do UTF-8 validation (and other checks) */
   parser->n_attrs = 0;
-  if (!utf_validate_open_element (parser, NULL, error))
+  char *end_of_name;
+  if (!utf_validate_open_element (parser, &end_of_name, error))
     return DSK_FALSE;
 
   /* do xmlns namespace translation (unless suppressed) */
@@ -1230,6 +1271,7 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
       GSK_RBTREE_LOOKUP_COMPARATOR (GET_NS_ABBREV_TREE (parser), orig, COMPARE_STR_TO_NS_ABBREV_TREE, abbrev);
       if (abbrev)
         prefix = abbrev->translate->prefix;
+      suffix = colon + 1;
     }
   if (prefix && prefix[0] == 0)
     prefix = NULL;
@@ -1237,7 +1279,7 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
   /* check that prefix+suffix matches the top of the stack */
   char *stack_end = (char*) simple_buffer_end_data (&parser->stack_tag_strs);
   char *open_name_attrs = stack_end - stack->name_kv_space;
-  if (prefix != NULL)
+  if (prefix == NULL)
     {
       if (strcmp (suffix, open_name_attrs) != 0)
         {
@@ -1284,8 +1326,10 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
       node = _dsk_xml_new_elt_parse (stack->n_attrs,
                                      stack->name_kv_space,
                                      open_name_attrs,
-                                     n_children, children);
-      _dsk_xml_set_position (node, parser->filename, parser->line_no);
+                                     n_children, children,
+                                     stack->condense_text);
+      if (parser->filename)
+        _dsk_xml_set_position (node, parser->filename, parser->line_no);
       parser->n_stack_children -= n_children;
 
       /* push results on queue */
@@ -1306,7 +1350,7 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
       /* add to parent's children array if useful */
       if ((stack-1)->needed)
         {
-          add_to_child_stack__take (parser, node);
+          add_to_child_stack__take (parser, node, parser->stack_size-2);
         }
       else
         dsk_xml_unref (node);
@@ -1375,10 +1419,12 @@ static dsk_boolean        handle_text_node          (DskXmlParser *parser,
     return DSK_FALSE;
 
   node = dsk_xml_text_new_len (parser->buffer.len, (char*)parser->buffer.data);
-  _dsk_xml_set_position (node, parser->filename, parser->start_line);
+  if (parser->filename)
+    _dsk_xml_set_position (node, parser->filename, parser->start_line);
 
   /* add to children stack */
-  add_to_child_stack__take (parser, node);
+  add_to_child_stack__take (parser, node, parser->stack_size-1);
+  parser->buffer.len = 0;
   return DSK_TRUE;
 }
 
@@ -1396,7 +1442,7 @@ static dsk_boolean     handle_comment            (DskXmlParser *parser,
   _dsk_xml_set_position (node, parser->filename, parser->start_line);
 
   /* add to children stack */
-  add_to_child_stack__take (parser, node);
+  add_to_child_stack__take (parser, node, parser->stack_size-1);
   return DSK_TRUE;
 }
 
@@ -1433,12 +1479,17 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
                     DskError          **error)
 {
   //dsk_boolean suppress;
+
+  //dsk_warning ("dsk_xml_parser_feed: '%.*s'", len,data);
+
+#define DEBUG_ADVANCE           //dsk_warning ("dsk_xml_parser_feed: ADVANCE %s [%p] [%s]", dsk_ascii_byte_name (*data),data,lex_state_description(parser->lex_state))
+
 #define BUFFER_CLEAR            parser->buffer.len = 0
 #define APPEND_BYTE(val)        simple_buffer_append_byte (&parser->buffer, (val))
 #define MAYBE_RETURN            do{if(len == 0) return DSK_TRUE;}while(0)
-#define ADVANCE_NON_NL          do{len--; data++;}while(0)
-#define ADVANCE_CHAR            do{if (*data == '\n')parser->line_no++; len--; data++;}while(0)
-#define ADVANCE_NL              do{parser->line_no++; len--; data++;}while(0)
+#define ADVANCE_NON_NL          do{DEBUG_ADVANCE; len--; data++;}while(0)
+#define ADVANCE_CHAR            do{DEBUG_ADVANCE; if (*data == '\n')parser->line_no++; len--; data++;}while(0)
+#define ADVANCE_NL              do{DEBUG_ADVANCE; parser->line_no++; len--; data++;}while(0)
 #define CONSUME_CHAR_AND_SWITCH_STATE(STATE) do{ parser->lex_state = STATE; ADVANCE_CHAR; MAYBE_RETURN; goto label__##STATE; }while(0)
 #define CONSUME_NL_AND_SWITCH_STATE(STATE) do{ parser->lex_state = STATE; ADVANCE_NL; MAYBE_RETURN; goto label__##STATE; }while(0)
 #define CONSUME_NON_NL_AND_SWITCH_STATE(STATE) do{ parser->lex_state = STATE; ADVANCE_NON_NL; MAYBE_RETURN; goto label__##STATE; }while(0)
@@ -1461,10 +1512,21 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
     label__LEX_DEFAULT:
       {
         const char *start = data;
+      continue_default:
         switch (*data)
           {
           case '<':
-            CUT_TO_BUFFER;
+              if (!IS_SUPPRESSED)
+                {
+                  CUT_TO_BUFFER;
+                  if (parser->buffer.len > 0)
+                    {
+                      if (!handle_text_node (parser, error))
+                        return DSK_FALSE;
+                    }
+                }
+              else
+                parser->buffer.len = 0;
             CONSUME_NON_NL_AND_SWITCH_STATE (LEX_LT);
           case '&':
             CUT_TO_BUFFER;
@@ -1477,6 +1539,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
                 CUT_TO_BUFFER;
                 return DSK_TRUE;
               }
+            goto continue_default;
           }
       }
 
@@ -1522,7 +1585,9 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         {
         case '!': CONSUME_CHAR_AND_SWITCH_STATE (LEX_LT_BANG);
         case '/': CONSUME_CHAR_AND_SWITCH_STATE (LEX_LT_SLASH);
-        case '?': CONSUME_CHAR_AND_SWITCH_STATE (LEX_PROCESSING_INSTRUCTION);
+        case '?':
+                  parser->stack[parser->stack_size-1].condense_text = 1;
+                  CONSUME_CHAR_AND_SWITCH_STATE (LEX_PROCESSING_INSTRUCTION);
         WHITESPACE_CASES: 
           ADVANCE_CHAR;
           MAYBE_RETURN;
@@ -1736,6 +1801,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         case '<': case '=':
           goto disallowed_char;
         case '>':
+          APPEND_BYTE (0);
           if (!handle_close_element (parser, error))
             return DSK_FALSE;
           CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT);
@@ -1754,6 +1820,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           MAYBE_RETURN;
           goto label__LEX_AFTER_CLOSE_ELEMENT_NAME;
         case '>':
+          APPEND_BYTE (0);
           if (!handle_close_element (parser, error))
             return DSK_FALSE;
           CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT);
@@ -1769,11 +1836,8 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           MAYBE_RETURN;
           goto label__LEX_OPEN_CLOSE;
         case '>':
-          if (!IS_SUPPRESSED)
-            {
-              if (!handle_empty_element (parser, error))
-                return DSK_FALSE;
-            }
+          if (!handle_empty_element (parser, error))
+            return DSK_FALSE;
           CONSUME_NON_NL_AND_SWITCH_STATE (LEX_DEFAULT);
         default:
           goto disallowed_char;
@@ -1793,6 +1857,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         default:
           BUFFER_CLEAR;
           APPEND_BYTE (*data);
+          parser->stack[parser->stack_size-1].condense_text = 1;
           CONSUME_NON_NL_AND_SWITCH_STATE (LEX_BANG_DIRECTIVE);
         }
     case LEX_LT_BANG_MINUS:
@@ -1802,13 +1867,9 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
         case '-':
           if (parser->config->include_comments)
             {
-              if (!IS_SUPPRESSED && parser->buffer.len > 0)
-                {
-                  if (!handle_text_node (parser, error))
-                    return DSK_FALSE;
-                }
             }
           parser->buffer.len = 0;
+          parser->stack[parser->stack_size-1].condense_text = 1;
           CONSUME_CHAR_AND_SWITCH_STATE (LEX_COMMENT);
           break;
         default:
@@ -1901,6 +1962,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           MAYBE_RETURN;
           goto label__LEX_LT_BANG_LBRACK_CDATAHDR;
         case '[':
+          parser->stack[parser->stack_size-1].condense_text = 1;
           CONSUME_CHAR_AND_SWITCH_STATE (LEX_CDATA);
         default:
           goto disallowed_char;
@@ -2059,6 +2121,11 @@ destruct_parse_state_recursive (ParseState *state)
       dsk_free (state->transitions[i].state);
       dsk_free (state->transitions[i].str);
     }
+  if (state->wildcard_transition)
+    {
+      destruct_parse_state_recursive (state->wildcard_transition);
+      dsk_free (state->wildcard_transition);
+    }
   dsk_free (state->transitions);
   dsk_free (state->ret_indices);
 }
@@ -2104,6 +2171,7 @@ dsk_xml_parser_new (DskXmlParserConfig *config,
 
   parser->filename = display_filename ? new_filename (display_filename) : NULL;
   parser->line_no = 1;
+  parser->lex_state = LEX_DEFAULT;
   simple_buffer_init (&parser->buffer);
   simple_buffer_init (&parser->stack_tag_strs);
   parser->ns_map = NULL;
@@ -2111,15 +2179,17 @@ dsk_xml_parser_new (DskXmlParserConfig *config,
   parser->stack[0].needed = DSK_FALSE;
   parser->stack[0].name_kv_space = 0;
   parser->stack[0].n_attrs = 0;
-  parser->stack[0].state = &parser->config->base;
+  parser->stack[0].state = &config->base;
   parser->stack[0].defined_list = NULL;
   parser->stack[0].n_children = 0;
   parser->stack_children_alloced = 8;
   parser->stack_children = dsk_malloc (sizeof (DskXml *) * parser->stack_children_alloced);
   parser->n_stack_children = 0;
   parser->config = config;
+  parser->default_ns = NULL;
   parser->max_ns_expand = 0;
   parser->max_ns_attr_expand = 0;
+  parser->last_result = parser->first_result = NULL;
   config->ref_count += 1;
   return parser;
 }
@@ -2133,7 +2203,8 @@ dsk_xml_parser_pop (DskXmlParser       *parser,
   DskXml *xml;
   if (n == NULL)
     return NULL;
-  *xpath_index_out = n->index;
+  if (xpath_index_out)
+    *xpath_index_out = n->index;
   xml = n->xml;
   parser->first_result = n->next;
   if (parser->first_result == NULL)
@@ -2145,6 +2216,7 @@ dsk_xml_parser_pop (DskXmlParser       *parser,
 void
 dsk_xml_parser_free(DskXmlParser       *parser)
 {
+  unsigned i;
   while (parser->first_result)
     {
       ResultQueueNode *n = parser->first_result;
@@ -2156,7 +2228,22 @@ dsk_xml_parser_free(DskXmlParser       *parser)
   parser->last_result = NULL;
 
   /* free stack */
-  ///...
+  for (i = 0; i < parser->stack_size; i++)
+    {
+      NsAbbrevMap *d = parser->stack[i].defined_list;
+      while (d)
+        {
+          NsAbbrevMap *n = d->defined_list_next;
+          dsk_free (d->abbrev);
+          dsk_free (d);
+          d = n;
+        }
+    }
+  for (i = 0; i < parser->n_stack_children; i++)
+    dsk_xml_unref (parser->stack_children[i]);
+  dsk_free (parser->stack_children);
+  simple_buffer_clear (&parser->stack_tag_strs);
+  simple_buffer_clear (&parser->buffer);
 
   /* free config */
   dsk_xml_parser_config_unref (parser->config);

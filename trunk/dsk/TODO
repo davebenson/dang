@@ -1,18 +1,30 @@
 TESTS:
 _ request header parsing
 _ response header parsing
-_ http client stream: connection-close
+x http client stream: connection-close
+_ http client stream: content-length POST data
+_ http client stream: content-length content keepalive data
 _ http client stream: transfer-encoding chunked POST data
-_ http client stream: transfer-encoding chunked content data
+x http client stream: transfer-encoding chunked content data
+_ date parsing (each of the three formats)
+_ date printing RFC-822
+_ converting unixtime <=> DskDate 
+x XML Parser: basics
+_ XML Parser: ignore doctype and processing-instructions
+x XML Parser: multiple return paths
+x XML Parser: namespace support
 
 TODO:
-_ HTTP implementation
+_ HTTP Client implementation
+_ HTTP Client Stream
+  _ content-encoding gzip
+_ HTTP Server Stream implementation
+_ HTTP Server implementation
 _ MIME Multipart Impl
 _ XML implementation
-  _ xml node object
-  _ parser
+  x xml node object
+  x parser
   _ printer / pretty-printer
-  _ NS
 _ JSON implementation
   _ parser
   _ printer
