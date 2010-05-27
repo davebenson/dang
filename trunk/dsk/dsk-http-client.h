@@ -55,6 +55,9 @@ struct _DskHttpClientRequestOptions
   char *path;
   char *query;
 
+  /* TODO: POST-data CGI variables? */
+  /* TODO: GET CGI variables? */
+
   /* May we attempt to pipeline this request? (default: yes) */
   dsk_boolean pipeline;
 
@@ -71,18 +74,27 @@ struct _DskHttpClientRequestOptions
   dsk_boolean gzip_post_data;
 
   /* TODO: authentication support */
-  /* TODO: proxy authentication support */
-  /* TODO: provide POST-data MD5Sum */
-  /* TODO: retry support */
-  /* TODO: MD5Sum checking support */
-  /* TODO: POST-data CGI variables? */
-  /* TODO: GET CGI variables? */
+  /* TODO: way to send Basic-Auth preemptively (w/o "challenge") */
+
+  /* Provide POST-data MD5Sum */
+  dsk_boolean has_postdata_md5sum;
+  uint8_t postdata_md5sum_binary[16];
+  char *postdata_md5sum_hex;
+
+  /* Retry support */
+  int max_retries;
+  unsigned retry_sleep_millis;
+
+  /* Redirect support */
+  unsigned max_redirects;
+
+  /* MD5Sum checking support */
+  dsk_boolean check_md5sum;
+
   /* TODO: max memory/disk or streaming */
   /* TODO: timeout[s] (wget provides 'dns_timeout') */
-  /* TODO: ipv4 or ipv6? (options: ipv4,ipv6,system) */
   /* TODO: option to request server not to use cache (--no-cache in wget) */
   /* TODO: cookie support */
-  /* TODO: way to send Basic-Auth preemptively (w/o "challenge") */
 
   /* TODO TODO: SSL options (for HTTPS obviously..) */
 };
