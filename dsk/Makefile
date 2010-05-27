@@ -56,7 +56,8 @@ check: $(TEST_PROGRAMS)
 	else \
 	  echo "$$nfail out of $$ntest tests failed." ; \
 	fi
-
+check-valgrind:
+	$(MAKE) check TEST_RUN_PREFIX='valgrind --show-reachable=yes --leak-check=full --leak-resolution=high'
 
 # HACK
 missing-refs:
