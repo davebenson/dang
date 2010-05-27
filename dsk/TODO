@@ -6,16 +6,27 @@ _ http client stream: content-length POST data
 _ http client stream: content-length content keepalive data
 _ http client stream: transfer-encoding chunked POST data
 x http client stream: transfer-encoding chunked content data
+_ http client stream: error conditions:
+  _ extra blank space at front of request
+  _ bad response code
+  _ bad transfer-encoding chunked format
+  _ bad gzip data
 _ date parsing (each of the three formats)
 _ date printing RFC-822
 _ converting unixtime <=> DskDate 
 x XML Parser: basics
+x XML Parser: big documents
+x XML Parser: error conditions
+_ XML Parser: comments
 _ XML Parser: ignore doctype and processing-instructions
 x XML Parser: multiple return paths
 x XML Parser: namespace support
+_ XML Parser: parse errors
+_ XML Parser: strip whitespace (not implemented yet) 
+_ XML Parser: search for existing conformance test
 
 TODO:
-_ HTTP Client implementation
+_ HTTP Client implementation (search for TODO in dsk-http-client.h)
 _ HTTP Client Stream
   _ content-encoding gzip
 _ HTTP Server Stream implementation
@@ -24,6 +35,8 @@ _ MIME Multipart Impl
 _ XML implementation
   x xml node object
   x parser
+  _ parser: suppress whitespace
+  _ parser: UTF-16
   _ printer / pretty-printer
 _ JSON implementation
   _ parser
