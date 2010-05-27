@@ -39,7 +39,10 @@ dsk-byte-name-table.inc: mk-byte-name-table.pl
 
 
 clean:
-	rm *.o libdsk.a tests/test-dns-protocol
+	rm *.o libdsk.a
+	rm -f $(TEST_PROGRAMS)
+	rm -f $(BUILT_SOURCES)
+	rm -f $(PROGRAMS)
 
 check: $(TEST_PROGRAMS)
 	@nfail=0; ntest=0; \
