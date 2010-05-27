@@ -49,7 +49,8 @@ DskXml *_dsk_xml_new_elt_parse (unsigned n_attrs,
                                 unsigned name_kv_space,
                                 const char *name_and_attrs,
                                 unsigned n_children,
-                                DskXml **children);
+                                DskXml **children,
+                                dsk_boolean condense_text_nodes);
 void _dsk_xml_set_position (DskXml *xml,
                             DskXmlFilename *filename,
                             unsigned line_no);

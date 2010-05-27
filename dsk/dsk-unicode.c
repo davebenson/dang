@@ -21,5 +21,5 @@ int dsk_ascii_digit_value (int c)
 #include "dsk-byte-name-table.inc"
 const char *dsk_ascii_byte_name(unsigned char byte)
 {
-  return byte_name_str + byte_name_offsets[byte];
+  return byte_name_str + (byte_name_offsets[byte]);
 }
