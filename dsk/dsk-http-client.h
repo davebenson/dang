@@ -1,12 +1,7 @@
 
 typedef struct _DskHttpClient DskHttpClient;
 typedef struct _DskHttpClientClass DskHttpClientClass;
-
 typedef struct _DskHttpClientRequestOptions DskHttpClientRequestOptions;
-struct _DskHttpClientRequestOptions
-{
-  unsigned max_redirects;
-};
 
 typedef DskHttpClientStreamTransfer DskHttpClientTransfer;
 
