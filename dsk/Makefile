@@ -44,7 +44,7 @@ check: $(TEST_PROGRAMS)
 	@nfail=0; ntest=0; \
 	for p in $(TEST_PROGRAMS) ; do \
 	  echo "--- $$p ---" ; \
-	  if $$p ; then \
+	  if $(TEST_RUN_PREFIX) $$p ; then \
 	    echo "$$p SUCCESS" ; \
 	  else \
 	    { echo "$$p FAIL" ; nfail=$$(($$nfail + 1)) ; } ; \
