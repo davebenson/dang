@@ -1,57 +1,5 @@
-typedef struct _DskHttpServerStreamClass DskHttpServerStreamClass;
-typedef struct _DskHttpServerStream DskHttpServerStream;
-typedef struct _DskHttpServerStreamFuncs DskHttpServerStreamFuncs;
-typedef struct _DskHttpServerStreamTransfer DskHttpServerStreamTransfer;
-
-struct _DskHttpServerStreamClass
-{
-  DskObject base_instance;
-};
-struct _DskHttpServerStream
-{
-  DskObject base_instance;
-  DskOctetSink *sink;
-  DskOctetSource *source;
-  DskBuffer incoming_data;
-  DskBuffer outcoming_data;
-  DskHttpServerStreamTransfer *first_transfer, *last_transfer;
-  DskHttpServerStreamTransfer *incoming_data_transfer, *outgoing_data_transfer;
-};
-
-/* internals */
-typedef enum
-{
-  DSK_HTTP_SERVER_STREAM_READ_NEED_HEADER,
-  DSK_HTTP_SERVER_STREAM_READ_IN_BODY,
-  DSK_HTTP_SERVER_STREAM_READ_IN_BODY_EOF,
-  DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNKED_HEADER,
-  DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNK,
-  DSK_HTTP_SERVER_STREAM_READ_DONE
-} DskHttpServerStreamReadState;
-struct _DskHttpServerStreamTransfer
-{
-  DskHttpServerStream *owner;
-  DskHttpRequest *request;
-  DskHttpResponse *response;
-  DskMemorySource *content;      
-  DskHttpServerStreamTransfer *next;
-  DskHttpServerStreamFuncs *funcs;
-  void *user_data;
-  DskHttpServerStreamReadState read_state;
-  /* branch of union depends on 'read_state' */
-  union {
-    /* number of bytes we've already checked for end of header. */
-    struct { unsigned checked; } need_header;
-
-    /* number of bytes remaining in content-length */
-    struct { uint64_t remaining; } in_body;
-
-    /* number of bytes remaining in current chunk */
-    struct { uint64_t remaining; } in_xfer_chunk;
-
-    /* no data for IN_XFER_CHUNKED_HEADER, DONE */
-  } read_info;
-};
+#include "dsk.h"
+#include "dsk-http-internals.h"
 
 static dsk_boolean
 handle_source_readable (DskOctetSource *source,
@@ -63,9 +11,14 @@ handle_source_readable (DskOctetSource *source,
     case DSK_IO_RESULT_AGAIN:
       return DSK_TRUE;
     case DSK_IO_RESULT_EOF:
-      ...
+      if (ss->first_transfer)
+        server_set_error (...);
+      do_shutdown (ss);
+      return DSK_FALSE;
     case DSK_IO_RESULT_ERROR:
-      ...
+      server_set_error (...);
+      do_shutdown (ss);
+      return DSK_FALSE;
     }
   if (ss->incoming_data.size == 0)
     return DSK_TRUE;
@@ -92,7 +45,7 @@ restart_processing:
         if (start == stream->incoming_data.size)
           break;
 
-        if (!scan_for_end_of_http_header (&stream->incoming_data, 
+        if (!_dsk_http_scan_for_end_of_header (&stream->incoming_data, 
                                           &xfer->read_info.need_header.checked,
                                           DSK_FALSE))
           {
