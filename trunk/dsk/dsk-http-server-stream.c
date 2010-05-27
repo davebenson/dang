@@ -1,6 +1,23 @@
 #include "dsk.h"
 #include "dsk-http-internals.h"
 
+static void
+server_set_error (DskHttpServer *server,
+                  const char    *format,
+                  ...)
+{
+  while ((xfer = server->first_transfer) != NULL)
+    {
+      ...
+    }
+}
+
+static void
+do_shutdown (DskHttpServer *server)
+{
+  ...
+}
+
 static dsk_boolean
 handle_source_readable (DskOctetSource *source,
                         DskHttpServerStream *ss)
@@ -63,20 +80,36 @@ restart_processing:
           }
       }
     case DSK_HTTP_SERVER_STREAM_READ_IN_POST:
-      ...
+      {
+        unsigned amount = ss->incoming_data.size;
+        if (amount > xfer->read_info.in_post.remaining)
+          amount = xfer->read_info.in_post.remaining;
+
+        if (xfer->post_data != NULL)
+          dsk_buffer_transfer (&xfer->post_data->buffer, &ss->incoming_data, amount);
+        else
+          dsk_buffer_discard (&ss->incoming_data, amount);
+        xfer->read_info.in_post.remaining -= amount;
+        if (xfer->read_info.in_post.remaining == 0)
+          {
+            /* done reading post data */
+            ...
+          }
+        goto return_true;
+      }
     case DSK_HTTP_SERVER_STREAM_READ_IN_POST_EOF:
       ...
-    case DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER:
+    case DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNKED_HEADER:
       ...
-    case DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER_EXTENSION:
+    case DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNKED_HEADER_EXTENSION:
       ...
-    case DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK:
+    case DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNK:
       ...
-    case DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNK:
+    case DSK_HTTP_SERVER_STREAM_READ_AFTER_XFER_CHUNK:
       ...
-    case DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNKED:
+    case DSK_HTTP_SERVER_STREAM_READ_AFTER_XFER_CHUNKED:
       ...
-    case DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_TRAILER:
+    case DSK_HTTP_SERVER_STREAM_READ_XFER_CHUNK_TRAILER:
       ...
     case DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_FINAL_NEWLINE:
       ...
