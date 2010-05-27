@@ -47,8 +47,8 @@ struct _DskHttpServerStreamTransfer
 {
   DskHttpServerStream *owner;
   DskHttpRequest *request;
+  DskMemorySource *post_data;      
   DskHttpResponse *response;
-  DskMemorySource *content;      
   DskHttpServerStreamTransfer *next;
   DskHttpServerStreamReadState read_state;
   /* branch of union depends on 'read_state' */
@@ -57,7 +57,7 @@ struct _DskHttpServerStreamTransfer
     struct { unsigned checked; } need_header;
 
     /* number of bytes remaining in content-length */
-    struct { uint64_t remaining; } in_body;
+    struct { uint64_t remaining; } in_post;
 
     /* number of bytes remaining in current chunk */
     struct { uint64_t remaining; } in_xfer_chunk;
