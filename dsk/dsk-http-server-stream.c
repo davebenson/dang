@@ -20,6 +20,7 @@ server_set_error (DskHttpServerStream *server,
 static void
 do_shutdown (DskHttpServerStream *server)
 {
+  while (server->first_transfer)
   ...
 }
 
@@ -54,6 +55,7 @@ handle_source_readable (DskOctetSource *source,
       xfer->content = NULL;
       xfer->read_state = DSK_HTTP_SERVER_STREAM_READ_NEED_HEADER;
       xfer->read_info.need_header.checked = 0;
+      xfer->returned = xfer->responded = 0;
 
       GSK_QUEUE_APPEND (GET_XFER_QUEUE (ss), xfer);
       ss->read_transfer = xfer;
@@ -83,6 +85,23 @@ restart_processing:
               }
             goto return_true;
           }
+        else
+          {
+            /* parse header */
+            ...
+
+            if (!server->wait_for_post_complete)
+              {
+                if (server->next_response_to_return == NULL)
+                  server->next_response_to_return = xfer;
+
+                /* notify that we have a header */
+                dsk_hook_set_idle_notify (&ss->request_available, DSK_TRUE);
+              }
+
+            /* transition states */
+            ...
+          }
       }
     case DSK_HTTP_SERVER_STREAM_READ_IN_POST:
       {
@@ -102,12 +121,54 @@ restart_processing:
           }
         goto return_true;
       }
-    case DSK_HTTP_SERVER_STREAM_READ_IN_POST_EOF:
-      ...
     case DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNKED_HEADER:
-      ...
+      {
+        while ((c=dsk_buffer_read_byte (&ss->incoming_data)) != -1)
+          {
+            if (dsk_ascii_isxdigit (c))
+              {
+                ss->read_state.in_xfer_chunk.remaining <<= 4;
+                ss->read_state.in_xfer_chunk.remaining += dsk_ascii_xdigit_value (c);
+              }
+            else if (c == '\n')
+              {
+                /* switch state */
+                ...
+              }
+            else if (dsk_ascii_isspace (c))
+              {
+                /* do nothing */
+              }
+            else if (c == ';')
+              {
+                xfer->read_state = DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNKED_HEADER_EXTENSION;
+                goto in_xfer_chunked_header_extension;
+              }
+            else
+              {
+                server_set_error (ss, "unexpected character %s in chunked POST data",
+                                  dsk_ascii_byte_name (c));
+                do_shutdown (ss);
+                return DSK_FALSE;
+              }
+          }
+        goto return_true;
+      }
     case DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNKED_HEADER_EXTENSION:
-      ...
+    in_xfer_chunked_header_extension:
+      while ((c=dsk_buffer_read_byte (&ss->incoming_data)) != -1)
+        {
+          if (c == '\n')
+            {
+              /* switch state */
+              ...
+            }
+          else
+            {
+              /* do nothing */
+            }
+        }
+      goto return_true;
     case DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNK:
       ...
     case DSK_HTTP_SERVER_STREAM_READ_AFTER_XFER_CHUNK:
@@ -140,6 +201,9 @@ DskHttpServerStreamTransfer *
 dsk_http_server_stream_get_request (DskHttpServerStream *stream)
 {
   ...
+  
+  if (stream->next_response_to_return == NULL)
+    dsk_hook_set_idle_notify (&ss->request_available, DSK_FALSE);
 }
 
 #if 0           /* for detecting if POST data is done? */
