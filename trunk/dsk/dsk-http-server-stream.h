@@ -33,7 +33,6 @@ typedef enum
 {
   DSK_HTTP_SERVER_STREAM_READ_NEED_HEADER,
   DSK_HTTP_SERVER_STREAM_READ_IN_POST,
-  DSK_HTTP_SERVER_STREAM_READ_IN_POST_EOF,
   DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNKED_HEADER,
   DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNKED_HEADER_EXTENSION,
   DSK_HTTP_SERVER_STREAM_READ_IN_XFER_CHUNK,
@@ -50,6 +49,8 @@ struct _DskHttpServerStreamTransfer
   DskMemorySource *post_data;      
   DskHttpResponse *response;
   DskHttpServerStreamTransfer *next;
+  unsigned returned : 1;   /* has this transfer been returned by get_request? */
+  unsigned responded : 1;  /* has this transfer been responded to? */
   DskHttpServerStreamReadState read_state;
   /* branch of union depends on 'read_state' */
   union {
