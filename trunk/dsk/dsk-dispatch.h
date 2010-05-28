@@ -108,10 +108,6 @@ struct _DskDispatch
   unsigned long timeout_secs;
   unsigned timeout_usecs;
 
-  /* true if there is an idle function, in which case polling with
-     timeout 0 is appropriate */
-  dsk_boolean has_idle;
-
   unsigned long last_dispatch_secs;
   unsigned last_dispatch_usecs;
 

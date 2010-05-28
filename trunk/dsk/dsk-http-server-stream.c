@@ -2,18 +2,23 @@
 #include "dsk-http-internals.h"
 
 static void
-server_set_error (DskHttpServer *server,
-                  const char    *format,
+server_set_error (DskHttpServerStream *server,
+                  const char          *format,
                   ...)
 {
+  DskHttpServerStreamTransfer *xfer;
   while ((xfer = server->first_transfer) != NULL)
     {
+      /* mark all transfers as defunct */
       ...
+
     }
+
+
 }
 
 static void
-do_shutdown (DskHttpServer *server)
+do_shutdown (DskHttpServerStream *server)
 {
   ...
 }
@@ -130,3 +135,28 @@ dsk_http_server_stream_new     (DskOctetSink        *sink,
                                  ss, NULL);
   return ss;
 }
+
+DskHttpServerStreamTransfer *
+dsk_http_server_stream_get_request (DskHttpServerStream *stream)
+{
+  ...
+}
+
+#if 0           /* for detecting if POST data is done? */
+void
+dsk_http_server_stream_set_funcs (DskHttpServerStreamTransfer      *transfer,
+                                  DskHttpServerStreamResponseFuncs *funcs,
+                                  void                             *func_data);
+{
+  ...
+}
+#endif
+
+
+void
+dsk_http_server_stream_respond (DskHttpServerStreamTransfer *transfer,
+                                DskHttpServerStreamResponseOptions *options)
+{
+  ...
+}
+

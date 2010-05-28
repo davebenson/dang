@@ -26,6 +26,8 @@ _ XML Parser: strip whitespace (not implemented yet)
 _ XML Parser: search for existing conformance test
 
 TODO:
+_ Review dsk-dispatch API... has_idle and has_timeout are clearly bogus...
+  implement epoll support.
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)
 _ HTTP Client Stream
   _ content-encoding gzip
