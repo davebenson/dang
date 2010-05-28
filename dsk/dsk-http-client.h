@@ -50,11 +50,29 @@ struct _DskHttpClientRequestOptions
   char *path;
   char *query;
 
+  /* hint to skip DNS lookups, give a direct address instead */
+  dsk_boolean has_ip_address;
+  DskIpAddress ip_address;
+
+  /* use a local socket (aka a unix-domain socket) 
+     instead of the actual IP address/dns lookup.
+     This is mostly for testing. */
+  char *local_socket_path;
+
   /* TODO: POST-data CGI variables? */
   /* TODO: GET CGI variables? */
 
   /* May we attempt to pipeline this request? (default: yes) */
-  dsk_boolean pipeline;
+  unsigned pipeline_head : 1;
+  unsigned pipeline_get : 1;
+  unsigned pipeline_post : 1;
+  unsigned pipeline_put : 1;
+  unsigned pipeline_delete : 1;
+
+  /* overrides */
+  unsigned pipeline : 1;    /* equivalent to setting all pipeline flags */
+  unsigned no_pipeline : 1; /* equivalent to unsetting all pipeline flags */
+                                                    
 
   /* Number of milliseconds to keepalive this connection */
   int keepalive_millis;
@@ -86,9 +104,22 @@ struct _DskHttpClientRequestOptions
   /* MD5Sum checking support */
   dsk_boolean check_md5sum;
 
+  /* --- timeouts --- */
+
+  /* max for a single HTTP request (from the DNS lookup starting
+     to the response finishing) */
+  int max_request_time_millis;
+
+  /* max time for the content download to start */
+  int max_start_millis;
+
+  /* max time for the content download to finish */
+  int max_millis;
+
   /* TODO: max memory/disk or streaming */
-  /* TODO: timeout[s] (wget provides 'dns_timeout') */
+
   /* TODO: option to request server not to use cache (--no-cache in wget) */
+
   /* TODO: cookie support */
 
   /* TODO TODO: SSL options (for HTTPS obviously..) */
