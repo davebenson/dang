@@ -27,6 +27,9 @@ typedef void (*DskObjectFinalizeFunc) (DskObject *object);
 #define DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(name) \
        static DskObjectClassCacheData name##__cache_data = \
               { DSK_FALSE, 0, NULL, 0, NULL, NULL }
+#define DSK_OBJECT(object) DSK_OBJECT_CAST(DskObject, object, &dsk_object_class)
+#define DSK_OBJECT_CLASS(object) DSK_OBJECT_CLASS_CAST(DskObject, object, &dsk_object_class)
+#define DSK_OBJECT_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskObject, object, &dsk_object_class)
 struct _DskObjectClassCacheData
 {
   dsk_boolean instantiated;
@@ -75,6 +78,10 @@ DSK_INLINE_FUNC void      *dsk_object_ref   (void *object);
                                               const void *isa_class,
                                               const char *filename,
                                               unsigned line);
+                 void       *dsk_object_class_cast (void *object_class,
+                                              const void *isa_class,
+                                              const char *filename,
+                                              unsigned line);
 const            void       *dsk_object_cast_get_class (void *object,
                                               const void *isa_class,
                                               const char *filename,
@@ -99,11 +106,15 @@ DskWeakPointer             *dsk_object_get_weak_pointer (DskObject *);
 #ifdef DSK_DISABLE_CAST_CHECKS
 #define DSK_OBJECT_CAST(type, object, isa_class)                               \
   ((type*)(object))
+#define DSK_OBJECT_CLASS_CAST(type, class, isa_class)                          \
+  ((type##Class*)(class))
 #define DSK_OBJECT_CAST_GET_CLASS(type, object, isa_class)                     \
     ((type##Class*)(((DskObject*)(object))->object_class))
 #else
 #define DSK_OBJECT_CAST(type, object, isa_class)                               \
   ((type*)dsk_object_cast(object, isa_class, __FILE__, __LINE__))
+#define DSK_OBJECT_CLASS_CAST(type, class, isa_class)                          \
+  ((type*)dsk_object_class_cast(class, isa_class, __FILE__, __LINE__))
 #define DSK_OBJECT_CAST_GET_CLASS(type, object, isa_class)                     \
   ((type##Class*)dsk_object_cast_get_class(object, isa_class,                  \
                                            __FILE__, __LINE__))
