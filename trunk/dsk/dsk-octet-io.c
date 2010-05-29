@@ -102,3 +102,18 @@ dsk_octet_stream_set_last_error (DskOctetStream  *stream,
   va_end (args);
 }
 
+
+/* HACK */
+int64_t
+dsk_octet_source_get_length (DskOctetSource *source)
+{
+  void *class = DSK_OBJECT_GET_CLASS (source);
+  if (class == &dsk_memory_source_class)
+    {
+      DskMemorySource *msource = DSK_MEMORY_SOURCE (source);
+      if (msource->done_adding)
+        return msource->buffer.size;
+    }
+  else
+    return -1;
+}

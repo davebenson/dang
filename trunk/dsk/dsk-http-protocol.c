@@ -16,6 +16,15 @@ const char *dsk_http_verb_name (DskHttpVerb verb)
     default: return "*BAD_VERB*";
     }
 }
+dsk_boolean dsk_http_has_response_body (DskHttpVerb request_verb,
+                                        DskHttpStatus response_status_code)
+{
+  /* See RFC 2616, 4.3 */
+  return request_verb != DSK_HTTP_VERB_HEAD
+      && response_status_code >= 200
+      && response_status_code != 204
+      && response_status_code != 304;
+}
 
 /* --- object cruft and raw initialization --- */
 static void

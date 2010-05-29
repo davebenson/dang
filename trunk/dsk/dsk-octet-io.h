@@ -101,6 +101,7 @@ DSK_INLINE_FUNC DskIOResult dsk_octet_sink_write_buffer  (void           *octet_
 DSK_INLINE_FUNC void dsk_octet_sink_shutdown     (void           *octet_sink);
 
 
+int64_t dsk_octet_source_get_length (DskOctetSource *source); /* BIG HACK; may return -1 */
 
 typedef struct _DskOctetConnectionClass DskOctetConnectionClass;
 typedef struct _DskOctetConnection DskOctetConnection;

@@ -2,6 +2,8 @@ typedef struct _DskHttpServerStreamClass DskHttpServerStreamClass;
 typedef struct _DskHttpServerStream DskHttpServerStream;
 typedef struct _DskHttpServerStreamFuncs DskHttpServerStreamFuncs;
 typedef struct _DskHttpServerStreamTransfer DskHttpServerStreamTransfer;
+typedef struct _DskHttpServerStreamOptions DskHttpServerStreamOptions;
+typedef struct _DskHttpServerStreamResponseOptions DskHttpServerStreamResponseOptions;
 
 struct _DskHttpServerStreamClass
 {
@@ -35,7 +37,6 @@ struct _DskHttpServerStream
   unsigned max_pipelined_requests;
 };
 
-typedef struct _DskHttpServerStreamOptions DskHttpServerStreamOptions;
 struct _DskHttpServerStreamOptions
 {
   dsk_boolean wait_for_content_complete;
@@ -64,6 +65,7 @@ struct _DskHttpServerStreamTransfer
   DskHttpResponse *response;
   unsigned returned : 1;   /* has this transfer been returned by get_request? */
   unsigned responded : 1;  /* has this transfer been responded to? */
+  unsigned failed : 1;
   DskHttpServerStreamReadState read_state;
   /* branch of union depends on 'read_state' */
   union {
@@ -76,7 +78,8 @@ struct _DskHttpServerStreamTransfer
     /* number of bytes remaining in current chunk */
     struct { uint64_t remaining; } in_xfer_chunk;
 
-    /* no data for IN_XFER_CHUNKED_HEADER, DONE */
+    struct { unsigned checked; } in_xfer_chunk_trailer;
+    /* no data for DONE */
   } read_info;
 
   DskHttpServerStreamFuncs *funcs;
@@ -99,10 +102,33 @@ DskHttpServerStream *
 dsk_http_server_stream_new     (DskOctetSink        *sink,
                                 DskOctetSource      *source);
 
+/* You may only assume the transfer is alive until
+   you call transfer_respond() below.
+   You must dsk_object_ref() post_data if you want to keep it around;
+   we only retain a weak-reference */
 DskHttpServerStreamTransfer *
 dsk_http_server_stream_get_request (DskHttpServerStream *stream);
-
 void
 dsk_http_server_stream_transfer_set_funcs (DskHttpServerStreamTransfer *xfer,
                                            DskHttpServerStreamFuncs    *funcs,
                                            void                        *data);
+
+struct  _DskHttpServerStreamResponseOptions
+{
+  /* Provide either an HTTP response or the Options you want to copy into the new response */
+  DskHttpResponseOptions *header_options;
+  DskHttpResponse *header;
+
+  /* Content handling */
+  DskOctetSource *content_stream;
+  int64_t content_length;            /* -1 means "no content_data */
+  const uint8_t *content_data;
+};
+
+/* Even if this returns FALSE the transfer is still destroyed */
+dsk_boolean
+dsk_http_server_stream_respond (DskHttpServerStreamTransfer *transfer,
+                                DskHttpServerStreamResponseOptions *options,
+                                DskError **error);
+
+extern DskHttpServerStreamClass dsk_http_server_stream_class;

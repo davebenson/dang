@@ -11,6 +11,7 @@ _ http client stream: error conditions:
   _ bad response code
   _ bad transfer-encoding chunked format
   _ bad gzip data
+  _ random data tests
 _ date parsing (each of the three formats)
 _ date printing RFC-822
 _ converting unixtime <=> DskDate 
@@ -57,7 +58,7 @@ DOCUMENTATION
 _ pick a documentation standard
 
 CODING STANDARDS
-_ "len" or "length"?
+_ "len" or "length"?  ANSWER: length
 _ size_t everywhere ?
 _ DskClientStreamSource BUT DskOctetStreamSourceFd.
   Fix this inconsistency and come up with a policy for naming derived classes
