@@ -89,6 +89,22 @@ dsk_object_cast (void       *object,
   return object;
 }
 
+void *
+dsk_object_class_cast (void       *object_class,
+                       const void *isa_class,
+                       const char *filename,
+                       unsigned    line)
+{
+  if (!dsk_object_class_is_a (object_class, isa_class))
+    {
+      dsk_warning ("attempt to cast class %p (type %s) to %s invalid (%s:%u)",
+                   object_class, ((DskObjectClass*)(object_class))->name,
+                   dsk_object_class_get_name (isa_class),
+                   filename, line);
+    }
+  return object_class;
+}
+
 const void *
 dsk_object_cast_get_class (void       *object,
                            const void *isa_class,

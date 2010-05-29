@@ -429,7 +429,7 @@ restart_processing:
                     break;
                   }
                 if (c == -1)
-                  return DSK_TRUE;
+                  goto return_true;
                 client_stream_set_error (stream, xfer, "unexpected char %s after 'chunked' header", dsk_ascii_byte_name (c));
                 do_shutdown (stream);
                 return DSK_FALSE;
