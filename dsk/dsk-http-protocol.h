@@ -73,6 +73,8 @@ typedef enum
 } DskHttpVerb;
 const char *dsk_http_verb_name (DskHttpVerb verb);
 
+dsk_boolean dsk_http_has_response_body (DskHttpVerb request_verb,
+                                        DskHttpStatus response_status_code);
 #if 0
 /* A single `Cookie' or `Set-Cookie' header.
  *
