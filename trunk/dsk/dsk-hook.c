@@ -22,6 +22,7 @@ dsk_hook_notify (DskHook *hook)
   void *object = hook->object;
   DskHookFuncs *funcs = hook->funcs;
   dsk_assert (hook->magic == DSK_HOOK_MAGIC);
+  dsk_assert (!hook->in_set_poll);
   if (hook->is_notifying || hook->is_cleared)
     return;
   hook->is_notifying = 1;
@@ -192,7 +193,11 @@ void _dsk_hook_trap_count_nonzero (DskHook *hook)
                                               NULL);
     }
   if (hook->funcs->set_poll != NULL)
-    hook->funcs->set_poll (hook->object, DSK_TRUE);
+    {
+      hook->in_set_poll = 1;
+      hook->funcs->set_poll (hook->object, DSK_TRUE);
+      hook->in_set_poll = 0;
+    }
 }
 void _dsk_hook_trap_count_zero (DskHook *hook)
 {
@@ -202,7 +207,11 @@ void _dsk_hook_trap_count_zero (DskHook *hook)
       GSK_LIST_REMOVE (GET_IDLE_HOOK_LIST (), hook);
     }
   if (hook->funcs->set_poll != NULL)
-    hook->funcs->set_poll (hook->object, DSK_FALSE);
+    {
+      hook->in_set_poll = 1;
+      hook->funcs->set_poll (hook->object, DSK_FALSE);
+      hook->in_set_poll = 0;
+    }
 }
 
 void _dsk_hook_add_to_idle_notify_list (DskHook *hook)

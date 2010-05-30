@@ -15,7 +15,11 @@ struct _DskMemorySource
 {
   DskOctetSource base_instance;
   DskBuffer buffer;
-  DskHook buffer_empty;
+
+  /* emit 'buffer_low' while buffer.size <= buffer_low_amount */
+  DskHook buffer_low;
+  unsigned buffer_low_amount;
+
   dsk_boolean done_adding;
 };
 struct _DskMemorySinkClass

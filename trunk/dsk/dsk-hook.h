@@ -42,6 +42,7 @@ struct _DskHook
   unsigned char is_cleared : 1;
   unsigned char is_notifying : 1;
   unsigned char clear_in_notify : 1;
+  unsigned char in_set_poll : 1;
   unsigned char magic;
   unsigned short trap_count;
   DskHookTrap trap;

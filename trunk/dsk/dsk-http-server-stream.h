@@ -15,7 +15,7 @@ struct _DskHttpServerStream
   DskOctetSink *sink;
   DskOctetSource *source;
   DskBuffer incoming_data;
-  DskBuffer outcoming_data;
+  DskBuffer outgoing_data;
   DskHookTrap *read_trap;
   DskHookTrap *write_trap;
 
@@ -35,6 +35,9 @@ struct _DskHttpServerStream
 
   unsigned max_header_size;
   unsigned max_pipelined_requests;
+  unsigned max_post_data_pending;
+  uint64_t max_post_data_size;
+  unsigned max_outgoing_buffer_size;
 };
 
 struct _DskHttpServerStreamOptions
@@ -42,6 +45,9 @@ struct _DskHttpServerStreamOptions
   dsk_boolean wait_for_content_complete;
   unsigned max_header_size;
   unsigned max_pipelined_requests;
+  unsigned max_post_data_pending;
+  uint64_t max_post_data_size;
+  unsigned max_outgoing_buffer_size;
 };
 
 /* internals */
@@ -63,9 +69,13 @@ struct _DskHttpServerStreamTransfer
   DskHttpRequest *request;
   DskMemorySource *post_data;      
   DskHttpResponse *response;
+  DskOctetSource *content;
+  DskHookTrap *content_readable_trap;
+  DskHookTrap *buffer_low_trap;         /* notify us when we are unblocked */
   unsigned returned : 1;   /* has this transfer been returned by get_request? */
   unsigned responded : 1;  /* has this transfer been responded to? */
   unsigned failed : 1;
+  unsigned blocked_content : 1;
   DskHttpServerStreamReadState read_state;
   /* branch of union depends on 'read_state' */
   union {

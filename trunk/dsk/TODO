@@ -12,6 +12,8 @@ _ http client stream: error conditions:
   _ bad transfer-encoding chunked format
   _ bad gzip data
   _ random data tests
+  _ transport errors reading/writing
+  _ post-data stream read errors
 _ date parsing (each of the three formats)
 _ date printing RFC-822
 _ converting unixtime <=> DskDate 
