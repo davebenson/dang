@@ -52,6 +52,23 @@ dsk_object_is_a (void *object,
   return DSK_FALSE;
 }
 
+dsk_boolean
+dsk_object_class_is_a (const void *object_class,
+                       const void *isa_class)
+{
+  const DskObjectClass *c = object_class;
+  const DskObjectClass *ic = isa_class;
+  ASSERT_OBJECT_CLASS_MAGIC (ic);
+  ASSERT_OBJECT_CLASS_MAGIC (c);
+  while (c != NULL)
+    {
+      if (c == ic)
+        return DSK_TRUE;
+      c = c->parent_class;
+    }
+  return DSK_FALSE;
+}
+
 static inline const char *
 dsk_object_get_class_name (void *object)
 {
