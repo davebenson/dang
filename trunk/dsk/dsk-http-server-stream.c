@@ -16,6 +16,7 @@ handle_post_data_finalize (void *data)
   dsk_assert (xfer->post_data != NULL);
   xfer->post_data = NULL;
 }
+static void start_transfer (DskHttpServerStreamTransfer *transfer);
 static void
 free_transfer (DskHttpServerStreamTransfer *xfer)
 {
@@ -707,20 +708,21 @@ handle_content_readable (DskOctetSource *content,
   if (got_eof)
     {
       dsk_boolean close = xfer->response->connection_close;
+      DskHttpServerStream *ss = xfer->owner;
 
       /* destroy transfer */
-      dsk_assert (xfer == xfer->owner->first_transfer);
-      xfer->owner->first_transfer = xfer->next;
+      dsk_assert (xfer == ss->first_transfer);
+      ss->first_transfer = xfer->next;
       if (xfer->next == NULL)
-        xfer->owner->first_transfer = NULL;
+        ss->last_transfer = NULL;
       free_transfer (xfer);
 
       if (close)
-        do_shutdown (xfer->owner, NULL);
-      else if (xfer->owner->first_transfer != NULL)
+        do_shutdown (ss, NULL);
+      else if (ss->first_transfer != NULL)
         { 
-          /* dump header / trap content */
-          ...
+          /* dump header / trap content / trap writable */
+          start_transfer (ss->first_transfer);
         }
 
       return DSK_FALSE;
@@ -728,6 +730,38 @@ handle_content_readable (DskOctetSource *content,
   return DSK_TRUE;
 }
 
+static void
+start_transfer (DskHttpServerStreamTransfer *transfer)
+{
+  DskHttpServerStream *ss = transfer->owner;
+  /* shove header into outgoing buffer */
+  dsk_http_response_print_buffer (transfer->response,
+                                  &ss->outgoing_data);
+
+  /* ensure we have a write-trap */
+  if (ss->write_trap == NULL)
+    {
+      ss->write_trap = dsk_hook_trap (&ss->sink->writable_hook,
+                                                   (DskHookFunc) handle_sink_writable,
+                                                   transfer->owner,
+                                                   NULL);
+    }
+
+  /* trap content readable */
+  if (transfer->content)
+    {
+      transfer->content_readable_trap = dsk_hook_trap (&transfer->content->readable_hook,
+                                                   (DskHookFunc) handle_content_readable,
+                                                   transfer,
+                                                   NULL);
+
+      /* XXX: this is actually a good implementation of kickstarting
+         the reading process rather than waiting for the hook to idle-notify,
+         as it might. However, it's a rather creative use of dsk_hook_notify() */
+      /* XXX: Maybe an impl of dsk_hook_trap_notify() would be safer? */
+      dsk_hook_notify (&transfer->content->readable_hook);
+    }
+}
 dsk_boolean
 dsk_http_server_stream_respond (DskHttpServerStreamTransfer *transfer,
                                 DskHttpServerStreamResponseOptions *options,
@@ -837,32 +871,7 @@ invalid_arguments:
 
   if (transfer->owner->first_transfer == transfer)
     {
-      /* shove header into outgoing buffer */
-      dsk_http_response_print_buffer (header, &transfer->owner->outgoing_data);
-
-      /* ensure we have a write-trap */
-      if (transfer->owner->write_trap == NULL)
-        {
-          transfer->owner->write_trap = dsk_hook_trap (&transfer->owner->sink->writable_hook,
-                                                       (DskHookFunc) handle_sink_writable,
-                                                       transfer->owner,
-                                                       NULL);
-        }
-
-      /* trap content readable */
-      if (transfer->content)
-        {
-          transfer->content_readable_trap = dsk_hook_trap (&transfer->content->readable_hook,
-                                                       (DskHookFunc) handle_content_readable,
-                                                       transfer,
-                                                       NULL);
-
-          /* XXX: this is actually a good implementation of kickstarting
-             the reading process rather than waiting for the hook to idle-notify,
-             as it might. However, it's a rather creative use of dsk_hook_notify() */
-          /* XXX: Maybe an impl of dsk_hook_trap_notify() would be safer? */
-          dsk_hook_notify (&transfer->content->readable_hook);
-        }
+      start_transfer (transfer);
     }
   else
     {
