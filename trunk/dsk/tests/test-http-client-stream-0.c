@@ -350,7 +350,7 @@ static struct
 int main(void)
 {
   unsigned i;
-  for (i = 0; i < sizeof(tests)/sizeof(tests[0]); i++)
+  for (i = 0; i < DSK_N_ELEMENTS (tests); i++)
     {
       fprintf (stderr, "Test: %s... ", tests[i].name);
       tests[i].test ();

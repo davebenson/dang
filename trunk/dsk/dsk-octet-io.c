@@ -114,6 +114,5 @@ dsk_octet_source_get_length (DskOctetSource *source)
       if (msource->done_adding)
         return msource->buffer.size;
     }
-  else
-    return -1;
+  return -1;
 }
