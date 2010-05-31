@@ -164,7 +164,30 @@ test_simple (void)
             dsk_main_run_once ();
 
           /* analyse response (header+body) */
-          ...
+          char *line;
+          line = dsk_buffer_read_line (&csink->buffer);
+          dsk_assert (line != NULL);
+          dsk_assert (strncmp (line, "HTTP/1.", 7) == 0);
+          dsk_assert (line[7] == '0' || line[7] == '1');
+          dsk_assert (line[8] == ' ');
+          dsk_assert (strncmp (line+9, "200", 3) == 0);
+          dsk_assert (line[12] == 0 || dsk_ascii_isspace (line[12]));
+          dsk_free (line);
+          while ((line=dsk_buffer_read_line (&csink->buffer)) != NULL)
+            {
+              if (line[0] == '\r' || line[0] == 0)
+                {
+                  dsk_free (line);
+                  break;
+                }
+              /* TODO: process header line? */
+              dsk_free (line);
+            }
+          dsk_assert (line != NULL);
+          line = dsk_buffer_read_line (&csink->buffer);
+          dsk_assert (strcmp (line, "hi mom") == 0);
+          dsk_free (line);
+          dsk_assert (csink->buffer.size == 0);
 
           /* cleanup */
           dsk_object_unref (csource);
