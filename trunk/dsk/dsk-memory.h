@@ -16,7 +16,9 @@ struct _DskMemorySource
   DskOctetSource base_instance;
   DskBuffer buffer;
 
-  /* emit 'buffer_low' while buffer.size <= buffer_low_amount */
+  /* emit 'buffer_low' while buffer.size <= buffer_low_amount
+     (so buffer_low_amount==0 means the hook
+     is emitted iff the buffer is empty) */
   DskHook buffer_low;
   unsigned buffer_low_amount;
 

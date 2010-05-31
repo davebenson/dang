@@ -1,4 +1,26 @@
+#include <string.h>
+#include <stdio.h>
 #include "../dsk.h"
+
+static dsk_boolean set_boolean_true (void *obj, void *pbool)
+{
+  DSK_UNUSED (obj);
+  * (dsk_boolean *) pbool = DSK_TRUE;
+  return DSK_FALSE;
+}
+
+static unsigned bbb_rem;
+static const uint8_t *bbb_at;
+static void
+add_byte_to_memory_source (void *data)
+{
+  DskMemorySource *csource = DSK_MEMORY_SOURCE (data);
+  dsk_buffer_append_byte (&csource->buffer, *bbb_at++);
+  bbb_rem--;
+  if (bbb_rem > 0)
+    dsk_main_add_idle (add_byte_to_memory_source, csource);
+  dsk_memory_source_added_data (csource);
+}
 
 static void
 test_simple (void)
@@ -14,7 +36,7 @@ test_simple (void)
       "Host: localhost\r\n"
       "\r\n"
     };
-  unsigned header_i, iter;
+  unsigned header_i, iter, resp_iter;
 
   for (header_i = 0; header_i < DSK_N_ELEMENTS (headers); header_i++)
     for (iter = 0; iter < 2; iter++)
@@ -22,12 +44,20 @@ test_simple (void)
         {
           const char *hdr = headers[header_i];
           unsigned hdr_len = strlen (hdr);
+          DskError *error = NULL;
           DskMemorySource *csource = dsk_memory_source_new ();
           DskMemorySink *csink = dsk_memory_sink_new ();
           DskHttpServerStream *stream;
-          DskHttpServerStreamResponseOptions resp_opts
+          DskHttpServerStreamOptions server_opts 
+            = DSK_HTTP_SERVER_STREAM_OPTIONS_DEFAULT;
+          DskHttpResponseOptions resp_opts
+            = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
+          DskHttpServerStreamResponseOptions stream_resp_opts
             = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
-          stream = dsk_http_server_stream_new (csink, csource);
+          csink->max_buffer_size = 128*1024;
+          stream = dsk_http_server_stream_new (DSK_OCTET_SINK (csink),
+                                               DSK_OCTET_SOURCE (csource),
+                                               &server_opts);
           if (iter == 0)
             {
               /* Feed data to server in one bite */
@@ -50,13 +80,15 @@ test_simple (void)
               dsk_memory_source_done_adding (csource);
             }
           /* wait til we receive the request */
+          dsk_boolean got_notify;
           got_notify = DSK_FALSE;
-          dsk_hook_trap (&server->request_available,
+          dsk_hook_trap (&stream->request_available,
                          set_boolean_true,
                          &got_notify,
                          NULL);
           while (!got_notify)
             dsk_main_run_once ();
+          DskHttpServerStreamTransfer *xfer;
           xfer = dsk_http_server_stream_get_request (stream);
           dsk_assert (xfer != NULL);
           dsk_assert (dsk_http_server_stream_get_request (stream) == NULL);
@@ -78,32 +110,66 @@ test_simple (void)
               break;
             }
 
+          DskMemorySource *content_source = NULL;
+
           /* send a response */
           switch (resp_iter)
             {
             case 0:
               stream_resp_opts.header_options = &resp_opts;
               stream_resp_opts.content_length = 7;
-              stream_resp_opts.content_data = "hi mom\n";
+              stream_resp_opts.content_data = (const uint8_t *) "hi mom\n";
               break;
             case 1:
+              /* streaming data, no content-length;
+                 relies on Connection-Close */
               stream_resp_opts.header_options = &resp_opts;
-              stream_resp_opts.content_stream = dsk_memory_source_new ();
-              dsk_main_add_idle (...);
+
+              /* setting content_source will cause us to write the 
+                 content in byte-by-byte below */
+              content_source = dsk_memory_source_new ();
+              stream_resp_opts.content_stream = DSK_OCTET_SOURCE (content_source);
               break;
             case 2:
+              /* streaming data, no content-length;
+                 relies on Connection-Close */
               stream_resp_opts.header_options = &resp_opts;
               stream_resp_opts.content_length = 7;
-              stream_resp_opts.content_stream = dsk_memory_source_new ();
-              dsk_main_add_idle (...);
+
+              /* setting content_source will cause us to write the 
+                 content in byte-by-byte below */
+              content_source = dsk_memory_source_new ();
+              stream_resp_opts.content_stream = DSK_OCTET_SOURCE (content_source);
               break;
+            }
+          if (!dsk_http_server_stream_respond (xfer, &stream_resp_opts, &error))
+            dsk_die ("error responding to request: %s", error->message);
+
+          /* We retain content_source only so we can
+             add the content byte-by-byte */
+          if (content_source != NULL)
+            {
+              bbb_at = (const uint8_t *) "hi mom\n";
+              bbb_rem = 7;
+              dsk_main_add_idle (add_byte_to_memory_source, content_source);
+              while (bbb_rem > 0)
+                dsk_main_run_once ();
+              dsk_memory_source_done_adding (content_source);
+              dsk_object_unref (content_source);
+              content_source = NULL;
             }
 
           /* read until EOF from sink */
-          ...
+          while (!csink->got_shutdown)
+            dsk_main_run_once ();
 
           /* analyse response (header+body) */
           ...
+
+          /* cleanup */
+          dsk_object_unref (csource);
+          dsk_object_unref (csink);
+          dsk_object_unref (stream);
         }
 }
 

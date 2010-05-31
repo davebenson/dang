@@ -35,7 +35,6 @@ struct _DskHttpServerStream
 
   unsigned max_header_size;
   unsigned max_pipelined_requests;
-  unsigned max_post_data_pending;
   uint64_t max_post_data_size;
   unsigned max_outgoing_buffer_size;
 };
@@ -49,6 +48,15 @@ struct _DskHttpServerStreamOptions
   uint64_t max_post_data_size;
   unsigned max_outgoing_buffer_size;
 };
+#define DSK_HTTP_SERVER_STREAM_OPTIONS_DEFAULT          \
+{                                                       \
+  DSK_TRUE,             /* wait_for_content_complete */ \
+  16*1024,              /* max_header_size */           \
+  6,                    /* max_pipelined_requests */    \
+  8192,                 /* max_post_data_pending */     \
+  64*1024,              /* max_post_data_size */        \
+  64*1024               /* max_outgoing_buffer_size */  \
+}
 
 /* internals */
 typedef enum
@@ -110,7 +118,8 @@ struct _DskHttpServerStreamFuncs
 
 DskHttpServerStream *
 dsk_http_server_stream_new     (DskOctetSink        *sink,
-                                DskOctetSource      *source);
+                                DskOctetSource      *source,
+                                DskHttpServerStreamOptions *options);
 
 /* You may only assume the transfer is alive until
    you call transfer_respond() below.
@@ -134,6 +143,14 @@ struct  _DskHttpServerStreamResponseOptions
   int64_t content_length;            /* -1 means "no content_data */
   const uint8_t *content_data;
 };
+#define DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT \
+{                                                       \
+  NULL,                 /* header_options */            \
+  NULL,                 /* header */                    \
+  NULL,                 /* content_stream */            \
+  -1LL,                 /* content_length */            \
+  NULL,                 /* content_data */              \
+}
 
 /* Even if this returns FALSE the transfer is still destroyed */
 dsk_boolean
