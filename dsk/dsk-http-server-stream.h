@@ -7,7 +7,7 @@ typedef struct _DskHttpServerStreamResponseOptions DskHttpServerStreamResponseOp
 
 struct _DskHttpServerStreamClass
 {
-  DskObject base_instance;
+  DskObjectClass base_instance;
 };
 struct _DskHttpServerStream
 {
