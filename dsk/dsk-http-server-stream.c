@@ -858,8 +858,14 @@ invalid_arguments:
         opts.request = transfer->request;
         opts.status_code = 500;
         opts.content_type = "text/plain";
-        dsk_buffer_printf (&msource->buffer, "dsk_http_server_stream_respond failed: %s\n",
-                           error ? (*error)->message : "no error message");
+        dsk_buffer_append_string (&msource->buffer,
+                                  "dsk_http_server_stream_respond failed: ");
+        if (error)
+          dsk_buffer_append_string (&msource->buffer, (*error)->message);
+        else
+          dsk_buffer_append_string (&msource->buffer,
+                                    "no error message available");
+        dsk_buffer_append_byte (&msource->buffer, '\n');
         dsk_memory_source_added_data (msource);
         dsk_memory_source_done_adding (msource);
         opts.content_length = msource->buffer.size;
