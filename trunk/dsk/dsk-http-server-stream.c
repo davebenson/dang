@@ -487,11 +487,17 @@ return_false:
 
 DskHttpServerStream *
 dsk_http_server_stream_new     (DskOctetSink        *sink,
-                              DskOctetSource      *source)
+                              DskOctetSource      *source,
+                              DskHttpServerStreamOptions *options)
 {
   DskHttpServerStream *ss = dsk_object_new (&dsk_http_server_stream_class);
   ss->sink = dsk_object_ref (sink);
   ss->source = dsk_object_ref (source);
+  ss->max_header_size = options->max_header_size;
+  ss->max_pipelined_requests = options->max_pipelined_requests;
+  ss->max_post_data_size = options->max_post_data_size;
+  ss->max_outgoing_buffer_size = options->max_outgoing_buffer_size;
+  ss->wait_for_content_complete = options->wait_for_content_complete ? 1 : 0;
   ss->read_trap = dsk_hook_trap (&source->readable_hook,
                                  (DskHookFunc) handle_source_readable,
                                  ss, NULL);
@@ -881,3 +887,23 @@ invalid_arguments:
 
 }
 
+static void
+dsk_http_server_stream_init (DskHttpServerStream *stream)
+{
+  dsk_hook_init (&stream->request_available, stream);
+}
+static void
+dsk_http_server_stream_finalize (DskHttpServerStream *stream)
+{
+  do_shutdown (stream, NULL);
+  dsk_hook_clear (&stream->request_available);
+}
+
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskHttpServerStream);
+DskHttpServerStreamClass dsk_http_server_stream_class =
+{
+  DSK_OBJECT_CLASS_DEFINE (DskHttpServerStream,
+                           &dsk_object_class,
+                           dsk_http_server_stream_init,
+                           dsk_http_server_stream_finalize)
+};
