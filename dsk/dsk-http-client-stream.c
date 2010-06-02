@@ -552,7 +552,7 @@ handle_post_data_readable (DskOctetSource *source,
 
       /* Dump buffer */
       dsk_print_push (NULL);
-      dsk_print_set_dsk_buffer (NULL, "buffer", &stream->outgoing_data,
+      dsk_print_set_quoted_buffer (NULL, "buffer", &stream->outgoing_data,
                                 DSK_PRINT_STRING_C_QUOTED);
       dsk_print (NULL, "handle_post_data_readable: now outgoing buffer is $buffer");
       dsk_print_pop (NULL);
