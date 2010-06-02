@@ -552,7 +552,8 @@ dsk_cmdline_try_process_args (int *argc_inout,
     }
 
   /* check that all mandatory arguments are used */
-  if (!check_mandatory_args_recursive (cmdline_arg_tree, error))
+  if (cmdline_arg_tree != NULL
+   && !check_mandatory_args_recursive (cmdline_arg_tree, error))
     return DSK_FALSE;
 
   return DSK_TRUE;

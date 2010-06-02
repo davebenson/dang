@@ -22,8 +22,13 @@ dsk_memory_source_read        (DskOctetSource *source,
   DskMemorySource *msource = DSK_MEMORY_SOURCE (source);
   DSK_UNUSED (error);
   *bytes_read_out = dsk_buffer_read (&msource->buffer, max_len, data_out);
-  if (msource->buffer.size <= msource->buffer_low_amount)
-    dsk_hook_set_idle_notify (&msource->buffer_low, DSK_TRUE);
+  if (!msource->done_adding)
+    {
+      if (msource->buffer.size <= msource->buffer_low_amount)
+        dsk_hook_set_idle_notify (&msource->buffer_low, DSK_TRUE);
+      if (msource->buffer.size == 0)
+        dsk_hook_set_idle_notify (&source->readable_hook, DSK_FALSE);
+    }
   return *bytes_read_out == 0 ? DSK_IO_RESULT_AGAIN : DSK_IO_RESULT_SUCCESS;
 }
 
@@ -34,10 +39,15 @@ dsk_memory_source_read_buffer (DskOctetSource *source,
 {
   DskMemorySource *msource = DSK_MEMORY_SOURCE (source);
   DSK_UNUSED (error);
+  if (msource->buffer.size == 0 && msource->done_adding)
+    return DSK_IO_RESULT_EOF;
   if (dsk_buffer_drain (read_buffer, &msource->buffer) == 0)
     return DSK_IO_RESULT_AGAIN;
-  dsk_hook_set_idle_notify (&msource->buffer_low, DSK_TRUE);
-  dsk_hook_set_idle_notify (&source->readable_hook, DSK_FALSE);
+  if (!msource->done_adding)
+    {
+      dsk_hook_set_idle_notify (&msource->buffer_low, DSK_TRUE);
+      dsk_hook_set_idle_notify (&source->readable_hook, DSK_FALSE);
+    }
   return DSK_IO_RESULT_SUCCESS;
 }
 
@@ -58,6 +68,7 @@ DskMemorySourceClass dsk_memory_source_class =
 void dsk_memory_source_done_adding (DskMemorySource *source)
 {
   source->done_adding = DSK_TRUE;
+  dsk_hook_set_idle_notify (&source->buffer_low, DSK_FALSE);
   dsk_hook_set_idle_notify (&DSK_OCTET_SOURCE (source)->readable_hook, DSK_TRUE);
 }
 

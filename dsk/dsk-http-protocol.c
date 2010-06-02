@@ -316,8 +316,22 @@ dsk_http_response_new (DskHttpResponseOptions *options,
     }
   MAYBE_ADD_STR (options->location, location);
 
+  if (options->connection_close
+   || (options->request != NULL && options->request->connection_close))
+    response->connection_close = DSK_TRUE;
   response->http_major_version = options->http_major_version;
   response->http_minor_version = options->http_minor_version;
+  response->status_code = options->status_code;
+  if (options->request != NULL)
+    {
+      if (options->request->http_minor_version == 0)
+        {
+          response->http_minor_version = 0;
+          response->connection_close = 1;
+        }
+      if (options->request->connection_close)
+        response->connection_close = 1;
+    }
   if (options->has_date)
     {
       response->has_date = 1;
@@ -341,7 +355,8 @@ dsk_http_response_new (DskHttpResponseOptions *options,
     {
       if (options->content_length >= 0)
         response->content_length = options->content_length;
-      else if (options->http_minor_version >= 1)
+      else if (response->http_minor_version >= 1
+            && !response->connection_close)
         response->transfer_encoding_chunked = 1;
       else
         response->connection_close = 1;
