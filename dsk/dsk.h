@@ -22,6 +22,8 @@
 
 #include "dsk-udp-socket.h"
 
+#include "dsk-print.h"
+
 #include "dsk-date.h"
 
 #include "dsk-http-protocol.h"

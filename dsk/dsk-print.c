@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include "../gskrbtreemacros.h"
 #include "dsk.h"
-#include "dsk-print.h"
 
 typedef struct _VarDef VarDef;
 typedef struct _StackNode StackNode;
@@ -34,8 +33,8 @@ struct _DskPrint
 {
   /* output */
   DskPrintAppendFunc append;
-  void              *data;
-  DskDestroyNotify   destroy;
+  void              *append_data;
+  DskDestroyNotify   append_destroy;
 
   /* dynamically-scoped variables */
   StackNode *top;
@@ -50,8 +49,8 @@ DskPrint *dsk_print_new    (DskPrintAppendFunc append,
 {
   DskPrint *rv = dsk_malloc (sizeof (DskPrint));
   rv->append = append;
-  rv->data = data;
-  rv->destroy = destroy;
+  rv->append_data = data;
+  rv->append_destroy = destroy;
   rv->top = &rv->bottom;
   rv->tree = NULL;
   return rv;
@@ -73,8 +72,8 @@ void      dsk_print_free   (DskPrint *print)
         break;
       dsk_free (stack);
     }
-  if (print->destroy)
-    print->destroy (print->data);
+  if (print->append_destroy)
+    print->append_destroy (print->append_data);
   dsk_free (print);
 }
 
@@ -148,4 +147,130 @@ void dsk_print_pop (DskPrint *context)
         GSK_RBTREE_REPLACE_NODE (GET_VARDEF_TREE (context), vd, vd->next_with_same_key);
     }
   dsk_free (old);
+}
+
+/* --- implementation of print --- */
+static dsk_boolean
+handle_template_expression (DskPrint *context,
+                            const char *expr,
+                            unsigned   *expr_len_out,
+                            DskError **error)
+{
+  /* For now, the only type of template expr is $variable */
+  ...
+}
+
+static dsk_boolean
+print__internal (DskPrint   *context,
+                 const char *str,
+                 DskError  **error)
+{
+  const char *at = str;
+  const char *last_at = at;
+  while (*at)
+    {
+      if (*at == '$')
+        {
+          if (at[1] == '$')
+            {
+              /* call append - include the '$' */
+              if (!context->append (at-last_at+1, (uint8_t*) last_at, 
+                                    context->append_data, error))
+                return DSK_FALSE;
+
+              at += 2;
+              last_at = at;
+            }
+          else
+            {
+              unsigned expr_len;
+              /* call append on any uninterpreted data */
+              if (at > last_at
+               && !context->append (at-last_at, (uint8_t*) last_at, 
+                                    context->append_data, error))
+                return DSK_FALSE;
+
+              /* parse template expression */
+              if (!handle_template_expression (context, at, &expr_len, error))
+                return DSK_FALSE;
+              at += expr_len;
+            }
+        }
+      else
+        at++;
+    }
+  if (last_at != at)
+    {
+      if (!context->append (at-last_at, (uint8_t*) last_at, 
+                            context->append_data, error))
+        return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
+void
+dsk_print (DskPrint *context,
+           const char *template_string)
+{
+  DskError *error = NULL;
+  if (context == NULL)
+    context = get_default_context ();
+  if (!print__internal (context, template_string, &error)
+   || !context->append (1, "\n", context->append_data, &error))
+    {
+      dsk_warning ("error in dsk_print: %s", error->message);
+      dsk_error_unref (error);
+    }
+}
+
+/* --- quoting support --- */
+void dsk_print_set_quoted_buffer   (DskPrint    *context,
+                                    const char  *variable_name,
+			            const DskBuffer *buffer,
+                                    DskPrintStringQuoting quoting_method)
+{
+  if (buffer->size == 0)
+    {
+      dsk_print_set_string (context, variable_name, "");
+      return;
+    }
+  switch (quoting_method)
+    {
+    case DSK_PRINT_STRING_C_QUOTED:
+      ...
+    case DSK_PRINT_STRING_HEX:
+      ...
+    case DSK_PRINT_STRING_HEX_PAIRS:
+      ...
+    case DSK_PRINT_STRING_RAW:
+      ...
+    case DSK_PRINT_STRING_MYSTERIOUSLY:
+      ...
+    }
+}
+void dsk_print_set_quoted_string   (DskPrint    *context,
+                                    const char  *variable_name,
+			            const char  *raw_string,
+                                    DskPrintStringQuoting quoting_method)
+{
+  dsk_print_set_quoted_binary (context, variable_name,
+                               strlen (raw_string_length), raw_string,
+                               quoting_method);
+}
+
+void dsk_print_set_quoted_binary   (DskPrint    *context,
+                                    const char  *variable_name,
+                                    size_t       raw_string_length,
+			            const char  *raw_string,
+                                    DskPrintStringQuoting quoting_method)
+{
+  DskBuffer buf;
+  DskBufferFragment frag;
+  frag.buf_start = 0;
+  frag.buf = (uint8_t*) raw_string;
+  frag.buf_length = strlen (raw_string);
+  frag.next = NULL;
+  buf.first_frag = buf.last_frag = &frag;
+  buf.size = frag.buf_length;
+  dsk_print_set_quoted_buffer (content, variable_name, &buf, quoting_method);
 }
