@@ -166,6 +166,7 @@ run_idle_notifications (void *data)
     {
       /* move idle handler to end of list */
       DskHook *at = dsk_hook_idle_first;
+      dsk_assert (at->is_idle_notify);
       GSK_LIST_REMOVE_FIRST (GET_IDLE_HOOK_LIST ());
       GSK_LIST_APPEND (GET_IDLE_HOOK_LIST (), at);
 

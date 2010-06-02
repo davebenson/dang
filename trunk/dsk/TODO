@@ -14,6 +14,16 @@ _ http client stream: error conditions:
   _ random data tests
   _ transport errors reading/writing
   _ post-data stream read errors
+_ http server stream: content-length POST data
+_ http server stream: transfer-encoding-chunked POST data
+_ http server stream: transfer-encoding-chunked content
+_ http server stream: error conditions:
+  _ extra blank space at front of request
+  _ bad transfer-encoding chunked format
+  _ bad gzip data
+  _ random data tests
+  _ transport errors reading/writing
+  _ post-data stream read errors
 _ date parsing (each of the three formats)
 _ date printing RFC-822
 _ converting unixtime <=> DskDate 

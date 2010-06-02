@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "../dsk.h"
 
+static dsk_boolean cmdline_verbose = DSK_FALSE;
+
 static dsk_boolean set_boolean_true (void *obj, void *pbool)
 {
   DSK_UNUSED (obj);
@@ -36,6 +38,9 @@ test_simple (void)
       "Host: localhost\r\n"
       "\r\n"
     };
+  static const char *header_blurbs[] = { "1.1/close", "1.0/default" };
+  static const char *iter_blurbs[] = { "byte-by-byte", "one-chunk" };
+  static const char *response_blurbs[] = { "data block", "buffer-stream", "byte-by-byte content" };
   unsigned header_i, iter, resp_iter;
 
   for (header_i = 0; header_i < DSK_N_ELEMENTS (headers); header_i++)
@@ -55,6 +60,11 @@ test_simple (void)
           DskHttpServerStreamResponseOptions stream_resp_opts
             = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
           csink->max_buffer_size = 128*1024;
+          if (cmdline_verbose)
+            dsk_warning ("request style: %s; writing data mode: %s; response style: %s",
+                         header_blurbs[header_i], iter_blurbs[iter], response_blurbs[resp_iter]);
+          else
+            fprintf (stderr, ".");
           stream = dsk_http_server_stream_new (DSK_OCTET_SINK (csink),
                                                DSK_OCTET_SOURCE (csource),
                                                &server_opts);
@@ -63,7 +73,7 @@ test_simple (void)
               /* Feed data to server in one bite */
               dsk_buffer_append (&csource->buffer, hdr_len, hdr);
               dsk_memory_source_added_data (csource);
-              dsk_memory_source_done_adding (csource);
+              //dsk_memory_source_done_adding (csource);
             }
           else
             {
@@ -77,7 +87,7 @@ test_simple (void)
                   while (csource->buffer.size > 0)
                     dsk_main_run_once ();
                 }
-              dsk_memory_source_done_adding (csource);
+              //dsk_memory_source_done_adding (csource);
             }
           /* wait til we receive the request */
           dsk_boolean got_notify;
@@ -216,13 +226,18 @@ int main(int argc, char **argv)
   dsk_cmdline_init ("test HTTP server stream",
                     "Test the low-level HTTP server interface",
                     NULL, 0);
+  dsk_cmdline_add_boolean ("verbose", "extra logging", NULL, 0,
+                           &cmdline_verbose);
   dsk_cmdline_process_args (&argc, &argv);
 
   for (i = 0; i < DSK_N_ELEMENTS (tests); i++)
     {
       fprintf (stderr, "Test: %s... ", tests[i].name);
+      if (cmdline_verbose)
+        fprintf (stderr, "\n");
       tests[i].test ();
       fprintf (stderr, " done.\n");
     }
+  dsk_cleanup ();
   return 0;
 }

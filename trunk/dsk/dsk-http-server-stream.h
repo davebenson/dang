@@ -20,6 +20,8 @@ struct _DskHttpServerStream
   DskHookTrap *write_trap;
 
   unsigned wait_for_content_complete : 1;
+  unsigned no_more_transfers : 1;
+  unsigned deferred_shutdown : 1;
 
   /* front of list */
   DskHttpServerStreamTransfer *first_transfer;

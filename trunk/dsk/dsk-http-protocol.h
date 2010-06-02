@@ -301,6 +301,7 @@ struct _DskHttpResponseOptions
   DskHttpStatus status_code;
   unsigned http_major_version;
   unsigned http_minor_version;
+  dsk_boolean connection_close;
 
   /* --- post-data --- */
   /* text/plain or text/plain/utf-8 */
@@ -341,6 +342,7 @@ struct _DskHttpResponseOptions
   200,                          /* status_code */               \
   1,                            /* http_major_version */        \
   1,                            /* http_minor_version */        \
+  DSK_FALSE,                    /* connection_close */          \
   NULL,                         /* content_type */              \
   NULL,                         /* content_main_type */         \
   NULL,                         /* content_sub_type */          \

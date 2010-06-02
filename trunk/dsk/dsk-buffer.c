@@ -510,15 +510,10 @@ dsk_buffer_parse_string0(DskBuffer *buffer)
 int
 dsk_buffer_peek_byte(const DskBuffer *buffer)
 {
-  const DskBufferFragment *frag;
-
-  if (buffer->size == 0)
+  if (buffer->first_frag == NULL)
     return -1;
-
-  for (frag = buffer->first_frag; frag; frag = frag->next)
-    if (frag->buf_length > 0)
-      break;
-  return * (const uint8_t *) (dsk_buffer_fragment_start ((DskBufferFragment*)frag));
+  else
+    return * dsk_buffer_fragment_start ((DskBufferFragment *) buffer->first_frag);
 }
 
 /**

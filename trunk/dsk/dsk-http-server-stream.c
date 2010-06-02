@@ -9,6 +9,10 @@
   (server_stream)->last_transfer,     \
   next
 
+/* warn if a content-body is provided for HEAD;
+   or if not provided for any other verb. */
+#define DEBUG_ODD_VERB_USE              1
+
 static void
 handle_post_data_finalize (void *data)
 {
@@ -30,6 +34,11 @@ free_transfer (DskHttpServerStreamTransfer *xfer)
         //dsk_hook_trap_unblock (xfer->content_readable_trap);
       dsk_hook_trap_destroy (xfer->content_readable_trap);
       xfer->content_readable_trap = NULL;
+    }
+  if (xfer->content)
+    {
+      dsk_octet_source_shutdown (xfer->content);
+      dsk_object_unref (xfer->content);
     }
   if (xfer->post_data)
     {
@@ -99,6 +108,14 @@ do_shutdown (DskHttpServerStream *ss,
 }
 
 static void
+do_deferred_shutdown (DskHttpServerStream *ss)
+{
+  ss->deferred_shutdown = DSK_TRUE;
+  if (ss->outgoing_data.size == 0)
+    do_shutdown (ss, NULL);
+}
+
+static void
 server_set_error (DskHttpServerStream *server,
                   const char          *format,
                   ...)
@@ -118,6 +135,8 @@ done_reading_post_data (DskHttpServerStream *ss)
   DskHttpServerStreamTransfer *xfer = ss->read_transfer;
   dsk_assert (xfer != NULL);
   dsk_assert (xfer->next == NULL);
+  if (xfer->request->connection_close)
+    ss->no_more_transfers = DSK_TRUE;
 
   xfer->read_state = DSK_HTTP_SERVER_STREAM_READ_DONE;
   if (xfer->funcs != NULL && xfer->funcs->post_data_complete != NULL)
@@ -188,6 +207,7 @@ handle_source_readable (DskOctetSource *source,
   switch (dsk_octet_source_read_buffer (source, &ss->incoming_data, &error))
     {
     case DSK_IO_RESULT_SUCCESS:
+      break;
     case DSK_IO_RESULT_AGAIN:
       return DSK_TRUE;
     case DSK_IO_RESULT_EOF:
@@ -203,6 +223,13 @@ restart_processing:
     return DSK_TRUE;
   if (ss->read_transfer == NULL)
     {
+      if (ss->no_more_transfers)
+        {
+          dsk_buffer_clear (&ss->incoming_data);
+          ss->read_trap = NULL;
+          return DSK_FALSE;
+        }
+
       /* new transfer */
       xfer = dsk_malloc0 (sizeof (DskHttpServerStreamTransfer));
       xfer->owner = ss;
@@ -246,6 +273,7 @@ restart_processing:
                                   error->message);
                 goto return_false;
               }
+            xfer->request = request;
             dsk_buffer_discard (&ss->incoming_data, header_len);
             has_content = request->verb == DSK_HTTP_VERB_PUT
                        || request->verb == DSK_HTTP_VERB_POST;
@@ -270,6 +298,8 @@ restart_processing:
                   dsk_memory_source_done_adding (xfer->post_data);
                 dsk_assert (xfer->next == NULL);
                 ss->read_transfer = NULL;
+                if (xfer->request->connection_close)
+                  ss->no_more_transfers = DSK_TRUE;
               }
             else
               {
@@ -525,8 +555,10 @@ dsk_http_server_stream_get_request (DskHttpServerStream *stream)
     {
       rv->returned = DSK_TRUE;
       stream->next_request = rv->next;
-      if (!is_ready_to_return (stream, stream->next_request))
-          stream->next_request = NULL;
+
+      if (stream->next_request != NULL
+       && !is_ready_to_return (stream, stream->next_request))
+        stream->next_request = NULL;
 
         /* If the ref-count of the post-data gets to 0,
            we will see the finalizer handler get called,
@@ -639,7 +671,16 @@ handle_sink_writable (DskOctetSink *sink,
       if (stream->outgoing_data.size == 0)
         {
           stream->write_trap = NULL;
+          if (stream->deferred_shutdown)
+            do_shutdown (stream, NULL);
           return DSK_FALSE;
+        }
+      if (stream->outgoing_data.size <= stream->max_outgoing_buffer_size
+       && stream->first_transfer != NULL
+       && stream->first_transfer->blocked_content)
+        {
+          stream->first_transfer->blocked_content = DSK_FALSE;
+          dsk_hook_trap_unblock (stream->first_transfer->content_readable_trap);
         }
       return DSK_TRUE;
     case DSK_IO_RESULT_EOF:
@@ -724,7 +765,7 @@ handle_content_readable (DskOctetSource *content,
       free_transfer (xfer);
 
       if (close)
-        do_shutdown (ss, NULL);
+        do_deferred_shutdown (ss);
       else if (ss->first_transfer != NULL)
         { 
           /* dump header / trap content / trap writable */
@@ -743,6 +784,7 @@ start_transfer (DskHttpServerStreamTransfer *transfer)
   /* shove header into outgoing buffer */
   dsk_http_response_print_buffer (transfer->response,
                                   &ss->outgoing_data);
+  dsk_buffer_append (&ss->outgoing_data, 2, "\r\n");
 
   /* ensure we have a write-trap */
   if (ss->write_trap == NULL)
@@ -767,7 +809,16 @@ start_transfer (DskHttpServerStreamTransfer *transfer)
       /* XXX: Maybe an impl of dsk_hook_trap_notify() would be safer? */
       dsk_hook_notify (&transfer->content->readable_hook);
     }
+  else
+    {
+      if (transfer->response->connection_close)
+        {
+          do_deferred_shutdown (transfer->owner);
+        }
+    }
 }
+
+/* TODO: mark no_more_transfers as needed */
 dsk_boolean
 dsk_http_server_stream_respond (DskHttpServerStreamTransfer *transfer,
                                 DskHttpServerStreamResponseOptions *options,
@@ -839,7 +890,7 @@ dsk_http_server_stream_respond (DskHttpServerStreamTransfer *transfer,
     {
       /* what to do: ignore or drain or error? */
       dsk_octet_source_shutdown (options->content_stream);
-#if 1
+#if DEBUG_ODD_VERB_USE
       if (transfer->request->verb == DSK_HTTP_VERB_HEAD)
         dsk_warning ("content-stream provided for HEAD request");
       else
@@ -880,6 +931,8 @@ invalid_arguments:
     }
 
   transfer->response = header;
+  if (header->connection_close)
+    transfer->owner->no_more_transfers = DSK_TRUE;
 
   if (transfer->owner->first_transfer == transfer)
     {
