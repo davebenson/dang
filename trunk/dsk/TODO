@@ -6,6 +6,7 @@ _ http client stream: content-length POST data
 _ http client stream: content-length content keepalive data
 _ http client stream: transfer-encoding chunked POST data
 x http client stream: transfer-encoding chunked content data
+_ http client stream: keepalive
 _ http client stream: error conditions:
   _ extra blank space at front of request
   _ bad response code
@@ -47,6 +48,7 @@ _ HTTP Client Stream
 _ HTTP Server Stream implementation
 _ HTTP Server implementation
 _ MIME Multipart Impl
+_ dsk_buffer_validate()
 _ XML implementation
   x xml node object
   x parser

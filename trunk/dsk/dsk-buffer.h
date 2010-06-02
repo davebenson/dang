@@ -7,7 +7,7 @@ struct _DskBufferFragment
   uint8_t              *buf;
   unsigned              buf_max_size;	/* allocation size of buf */
   unsigned              buf_start;	/* offset in buf of valid data */
-  unsigned              buf_length;	/* length of valid data in buf */
+  unsigned              buf_length;	/* length of valid data in buf; != 0 */
   
   dsk_boolean           is_foreign;
   DskDestroyNotify      destroy;

@@ -170,6 +170,7 @@ get_chunked_header (size_t size,
       chunked_header[i] = chunked_header[at - 1 - i];
       chunked_header[at - 1 - i] = swap;
     }
+  dsk_warning ("chunked_header=%.*s", at, chunked_header);
   chunked_header[at++] = '\r';
   chunked_header[at++] = '\n';
   return at;
@@ -548,6 +549,14 @@ handle_post_data_readable (DskOctetSource *source,
       dsk_buffer_drain (&stream->outgoing_data, &buffer);
       if (xfer->request->transfer_encoding_chunked)
         dsk_buffer_append (&stream->outgoing_data, 2, "\r\n");
+
+      /* Dump buffer */
+      dsk_print_push (NULL);
+      dsk_print_set_dsk_buffer (NULL, "buffer", &stream->outgoing_data,
+                                DSK_PRINT_STRING_C_QUOTED);
+      dsk_print (NULL, "handle_post_data_readable: now outgoing buffer is $buffer");
+      dsk_print_pop (NULL);
+
       maybe_add_write_hook (stream);
       if (stream->outgoing_data.size > stream->max_outgoing_data)
         {
@@ -560,7 +569,7 @@ handle_post_data_readable (DskOctetSource *source,
       dsk_warning ("post-data blocks");
       return DSK_TRUE;
     case DSK_IO_RESULT_EOF:
-      dsk_warning ("got EOF");
+      dsk_warning ("handle_post_data_readable: got EOF");
       if (xfer->request->transfer_encoding_chunked)
         write_end_transfer_encoding_chunked (&stream->outgoing_data);
 
@@ -652,7 +661,7 @@ handle_writable (DskOctetSink *sink,
                  && buf->size != 0)
                   {
                     char chunked_header[MAX_CHUNK_HEADER_SIZE];
-                    dsk_warning ("chunked header for %u bytes",buf->size);
+                    dsk_warning ("chunked header for %u bytes [first_char=%c]",buf->size,buf->first_frag->buf[buf->first_frag->buf_start]);
                     unsigned at = get_chunked_header (buf->size, chunked_header);
                     dsk_buffer_append (&stream->outgoing_data, at, chunked_header);
                     dsk_buffer_drain (&stream->outgoing_data, buf);
@@ -668,6 +677,7 @@ handle_writable (DskOctetSink *sink,
                                    xfer, NULL);
                 break;
               case DSK_IO_RESULT_EOF:
+                dsk_warning ("handle_writable: got post-data EOF");
                 if (xfer->request->content_length >= 0
                  && xfer->write_info.in_content.bytes < (uint64_t) xfer->request->content_length)
                   {
