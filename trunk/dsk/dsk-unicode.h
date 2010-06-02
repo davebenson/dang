@@ -18,6 +18,7 @@ extern unsigned char dsk_ascii_chartable[256];
 
 int dsk_ascii_xdigit_value (int c);
 int dsk_ascii_digit_value (int c);
+extern char dsk_ascii_hex_digits[16];
 
 static inline char dsk_ascii_tolower (int c)
 {
