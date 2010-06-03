@@ -465,8 +465,10 @@ restart_processing:
         }
       dsk_buffer_discard (&ss->incoming_data,
                           xfer->read_info.in_xfer_chunk_trailer.checked);
-      xfer->read_state = DSK_HTTP_SERVER_STREAM_READ_XFER_CHUNK_FINAL_NEWLINE;
-      /* fallthrough */
+      done_reading_post_data (ss);
+      xfer = NULL;            /* reduce chances of bugs */
+      goto restart_processing;
+#if 0
     case DSK_HTTP_SERVER_STREAM_READ_XFER_CHUNK_FINAL_NEWLINE:
       {
         int c;
@@ -499,6 +501,7 @@ restart_processing:
           }
         goto return_true;
       }
+#endif
     case DSK_HTTP_SERVER_STREAM_READ_DONE:
       dsk_assert_not_reached ();
       break;

@@ -2,13 +2,16 @@ TESTS:
 _ request header parsing
 _ response header parsing
 x http client stream: connection-close
-_ http client stream: content-length POST data
-_ http client stream: content-length content keepalive data
-_ http client stream: transfer-encoding chunked POST data
+x http client stream: content-length POST data, connection-close
+x http client stream: transfer-encoding chunked POST data
 x http client stream: transfer-encoding chunked content data
-_ http client stream: keepalive
+x http client stream: keepalive (GET,POST,content-length,chunked)
+_ http client stream: oddballs
+  x transfer-encoding chunk extensions
+  x transfer-encoding chunk trailer
+  _ multiline header lines (w/ indent)
 _ http client stream: error conditions:
-  _ extra blank space at front of request
+  x extra blank space at front of request [ignored blank space]
   _ bad response code
   _ bad transfer-encoding chunked format
   _ bad gzip data
@@ -25,6 +28,7 @@ _ http server stream: error conditions:
   _ random data tests
   _ transport errors reading/writing
   _ post-data stream read errors
+_ tie http-server and client together with pipes
 _ date parsing (each of the three formats)
 _ date printing RFC-822
 _ converting unixtime <=> DskDate 
@@ -39,16 +43,21 @@ _ XML Parser: parse errors
 _ XML Parser: strip whitespace (not implemented yet) 
 _ XML Parser: search for existing conformance test
 
+WARNING CONDITIONS:
+_ high trap counts?
+
 TODO:
 _ Review dsk-dispatch API... has_idle and has_timeout are clearly bogus...
   implement epoll support.
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)
 _ HTTP Client Stream
   _ content-encoding gzip
+_ XML Parser: UTF-16 support
 _ HTTP Server Stream implementation
+  _ content-encoding gzip
 _ HTTP Server implementation
 _ MIME Multipart Impl
-_ dsk_buffer_validate()
+_ dsk_buffer_validate() -- assert all fragments are non-zero length
 _ XML implementation
   x xml node object
   x parser

@@ -46,7 +46,7 @@ typedef enum
   DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNK,
   DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNKED, /* after final chunk */
   DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_TRAILER,
-  DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_FINAL_NEWLINE,
+  //DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_FINAL_NEWLINE,
   DSK_HTTP_CLIENT_STREAM_READ_DONE
 } DskHttpClientStreamReadState;
 typedef enum
@@ -67,6 +67,7 @@ struct _DskHttpClientStreamTransfer
   DskHttpClientStreamFuncs *funcs;
   void *user_data;
   DskHttpClientStreamReadState read_state;
+  dsk_boolean failed;
   /* branch of union depends on 'read_state' */
   union {
     /* number of bytes we've already checked for end of header. */
