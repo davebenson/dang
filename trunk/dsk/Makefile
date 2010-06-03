@@ -7,11 +7,12 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-http-server-stream-0 \
 		tests/test-http-loopback \
 		tests/test-xml-parser-0
-PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host
+PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
+           programs/dsk-octet-filter
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
 
 CC_FLAGS =  -W -Wall -g -O0 -DDSK_DEBUG=1
-LINK_FLAGS = -g
+LINK_FLAGS = -g -lz
 
 tests/%: tests/%.c libdsk.a
 	gcc $(CC_FLAGS) $(LINK_FLAGS) -o $@ $^
@@ -22,6 +23,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	  dsk-fd.o dsk-octet-io.o dsk-octet-fd.o dsk-octet-pipe.o \
 	  dsk-unicode.o dsk-client-stream.o \
 	  dsk-buffer.o dsk-main.o dsk-octet-connection.o dsk-octet-listener.o \
+	  dsk-octet-filter.o \
 	  dsk-octet-listener-socket.o dsk-cleanup.o \
 	  dsk-http-client-stream.o dsk-http-server-stream.o \
 	  dsk-memory-source.o dsk-memory-sink.o \
@@ -30,6 +32,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	  dsk-http-header-printing.o \
 	  dsk-date.o \
 	  dsk-xml-parser.o dsk-xml.o \
+	  dsk-zlib.o \
 	  dsk-print.o
 	ar cru $@ $^
 

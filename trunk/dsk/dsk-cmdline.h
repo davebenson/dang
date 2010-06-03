@@ -16,6 +16,16 @@ typedef enum
   _DSK_CMDLINE_IS_FOUR_BYTES = (1<<16)
 } DskCmdlineFlags;
 
+typedef dsk_boolean (*DskCmdlineCallback) (const char *arg_name,
+                                           const char *arg_value,
+                                           void       *callback_data,
+                                           DskError  **error);
+#define DSK_CMDLINE_CALLBACK_DECLARE(name) \
+        dsk_boolean          name         (const char *arg_name, \
+                                           const char *arg_value, \
+                                           void       *callback_data, \
+                                           DskError  **error)
+
 void dsk_cmdline_init        (const char     *static_short_desc,
                               const char     *long_desc,
                               const char     *non_option_arg_desc,
@@ -46,6 +56,12 @@ void dsk_cmdline_add_string  (const char     *static_option_name,
 			      const char     *static_arg_description,
                               DskCmdlineFlags flags,
                               char          **value_out);
+void dsk_cmdline_add_func    (const char     *static_option_name,
+                              const char     *static_description,
+			      const char     *static_arg_description,
+                              DskCmdlineFlags flags,
+                              DskCmdlineCallback callback,
+                              void           *callback_data);
 void dsk_cmdline_permit_unknown_options (dsk_boolean permit);
 void dsk_cmdline_permit_extra_arguments (dsk_boolean permit);
 

@@ -35,6 +35,8 @@
 #include "dsk-xml.h"
 #include "dsk-xml-parser.h"
 
+#include "dsk-zlib.h"
+
 #include "dsk-unicode.h"
 
 #include "dsk-cmdline.h"

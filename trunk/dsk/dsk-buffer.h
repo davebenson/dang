@@ -119,3 +119,12 @@ unsigned dsk_buffer_fragment_peek (DskBufferFragment *frag,
 dsk_boolean dsk_buffer_fragment_advance (DskBufferFragment **frag_inout,
                                          unsigned           *offset_inout,
                                          unsigned            skip);
+
+/* HACKS */
+/* NOTE: the buffer is INVALID after this call, since no empty
+   fragments are allowed.  You MUST deal with this if you do 
+   not actually add data to the buffer */
+void dsk_buffer_append_empty_fragment (DskBuffer *buffer);
+
+/* a way to delete the fragment from dsk_buffer_append_empty_fragment() */
+void dsk_buffer_fragment_free (DskBufferFragment *fragment);

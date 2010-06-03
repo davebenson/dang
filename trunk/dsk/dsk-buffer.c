@@ -1495,3 +1495,20 @@ dsk_boolean dsk_buffer_fragment_advance (DskBufferFragment **frag_inout,
     }
   return DSK_FALSE;
 }
+
+void
+dsk_buffer_append_empty_fragment (DskBuffer *buffer)
+{
+  DskBufferFragment *frag = new_native_fragment ();
+  if (buffer->last_frag)
+    buffer->last_frag->next = frag;
+  else
+    buffer->first_frag = frag;
+  buffer->last_frag = frag;
+}
+
+void
+dsk_buffer_fragment_free (DskBufferFragment *frag)
+{
+  recycle (frag);
+}
