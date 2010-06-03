@@ -35,7 +35,7 @@
  * On the other hand, this can mask over some abuses (eg stack-based
  * foreign buffer fragment bugs) so we disable it by default.
  */ 
-#define DSK_DEBUG_BUFFER_ALLOCATIONS	1
+#define DSK_DEBUG_BUFFER_ALLOCATIONS	(0 && DSK_DEBUG)
 
 #include <alloca.h>
 #include <sys/types.h>

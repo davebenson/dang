@@ -20,6 +20,10 @@ typedef int dsk_boolean;
 #define DSK_UNLIKELY(condition)   (condition)
 #define DSK_UNUSED(var)           ((void)(var))
 
+#ifndef DSK_DEBUG
+#define DSK_DEBUG 0
+#endif
+
 /* Seconds since 1970 GMT (aka the epoch).
    Note that many platforms define time_t as a 32-bit quantity--
    it is always 64-bit in dsk. */

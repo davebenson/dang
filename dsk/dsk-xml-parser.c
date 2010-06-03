@@ -1376,6 +1376,7 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
           else
             GSK_RBTREE_REMOVE (GET_NS_ABBREV_TREE (parser), kill);
         }
+      dsk_free (kill);
     }
 
   /* pop the stack */
@@ -1439,7 +1440,8 @@ static dsk_boolean     handle_comment            (DskXmlParser *parser,
     return DSK_FALSE;
 
   node = dsk_xml_comment_new_len (parser->buffer.len, (char*)parser->buffer.data);
-  _dsk_xml_set_position (node, parser->filename, parser->start_line);
+  if (parser->filename)
+    _dsk_xml_set_position (node, parser->filename, parser->start_line);
 
   /* add to children stack */
   add_to_child_stack__take (parser, node, parser->stack_size-1);

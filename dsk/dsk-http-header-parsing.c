@@ -48,6 +48,58 @@ parse_info_alloc (ParseInfo *pi, unsigned size)
     }
 }
 
+static void
+normalize_whitespace (char *inout)
+{
+  const char *in = inout;
+  char *out = inout;
+  while (dsk_ascii_isspace (*in))
+    in++;
+  dsk_boolean allow_space = DSK_FALSE;
+  while (in == out)
+    {
+      if (dsk_ascii_isspace (*in))
+        {
+          if (allow_space)
+            {
+              in++;
+              *out++ = ' ';
+              allow_space = DSK_FALSE;
+            }
+          else
+            in++;
+        }
+      else if (*in == 0)
+        break;
+      else
+        {
+          allow_space = DSK_TRUE;
+          in++;
+          out++;
+        }
+    }
+  while (*in)
+    {
+      if (dsk_ascii_isspace (*in))
+        {
+          if (allow_space)
+            {
+              in++;
+              *out++ = ' ';
+              allow_space = DSK_FALSE;
+            }
+          else
+            in++;
+        }
+      else
+        {
+          allow_space = DSK_TRUE;
+          *out++ = *in++;
+        }
+    }
+  *out = 0;
+}
+
 static dsk_boolean
 parse_info_init (ParseInfo *pi,
                  DskBuffer *buffer,
@@ -148,6 +200,7 @@ parse_info_init (ParseInfo *pi,
               goto at_colon;
             }
         }
+
     at_colon:
       *at++ = 0;
       while (*at == ' ' || *at == '\t')
@@ -180,6 +233,7 @@ parse_info_init (ParseInfo *pi,
 
       /* mark end of value */
       *end = 0;
+      normalize_whitespace (pi->kv_pairs[n_kv*2-1]);
     }
   pi->n_kv_pairs = n_kv;
   return DSK_TRUE;

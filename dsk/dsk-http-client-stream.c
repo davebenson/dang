@@ -79,6 +79,13 @@ transfer_done (DskHttpClientStreamTransfer *xfer)
   GSK_QUEUE_DEQUEUE (GET_STREAM_XFER_QUEUE (xfer->owner), tmp);
   dsk_assert (tmp == xfer);
 
+#if 0           /* content gzip support here */
+  if (xfer->content_filter)
+    {
+      ...
+    }
+#endif
+
   /* EOF for content */
   if (xfer->content)
     dsk_memory_source_done_adding (xfer->content);
@@ -581,15 +588,24 @@ handle_post_data_readable (DskOctetSource *source,
     case DSK_IO_RESULT_SUCCESS:
       if (buffer.size == 0)
         return DSK_TRUE;
-      if (xfer->request->transfer_encoding_chunked)
+#if  0 /* POST data content compession goes here */
+      if (xfer->post_data_filter)
         {
-          char chunked_header[MAX_CHUNK_HEADER_SIZE];
-          unsigned len = get_chunked_header (buffer.size, chunked_header);
-          dsk_buffer_append (&stream->outgoing_data, len, chunked_header);
+          ...
         }
-      dsk_buffer_drain (&stream->outgoing_data, &buffer);
-      if (xfer->request->transfer_encoding_chunked)
-        dsk_buffer_append (&stream->outgoing_data, 2, "\r\n");
+      else
+#endif
+        {
+          if (xfer->request->transfer_encoding_chunked)
+            {
+              char chunked_header[MAX_CHUNK_HEADER_SIZE];
+              unsigned len = get_chunked_header (buffer.size, chunked_header);
+              dsk_buffer_append (&stream->outgoing_data, len, chunked_header);
+            }
+          dsk_buffer_drain (&stream->outgoing_data, &buffer);
+          if (xfer->request->transfer_encoding_chunked)
+            dsk_buffer_append (&stream->outgoing_data, 2, "\r\n");
+        }
 
 #if 0 /* DEBUG: Dump buffer */
       dsk_print_push (NULL);

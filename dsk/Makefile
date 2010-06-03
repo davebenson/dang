@@ -8,10 +8,13 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
 
+CC_FLAGS =  -W -Wall -g -O0 -DDSK_DEBUG=1
+LINK_FLAGS = -W -Wall -g
+
 tests/%: tests/%.c libdsk.a
-	gcc -W -Wall -g -o $@ $^
+	gcc $(LINK_FLAGS) -o $@ $^
 programs/%: programs/%.c libdsk.a
-	gcc -W -Wall -g -o $@ $^
+	gcc $(LINK_FLAGS) -o $@ $^
 libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socket.o dsk-dispatch.o dsk-hook.o \
 	  dsk-cmdline.o dsk-ip-address.o dsk-dns-client.o dsk-mem-pool.o \
 	  dsk-fd.o dsk-octet-io.o dsk-octet-fd.o dsk-unicode.o dsk-client-stream.o \
@@ -28,7 +31,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	ar cru $@ $^
 
 %.o: %.c
-	gcc -W -Wall -g -c -O0 $^
+	gcc $(CC_FLAGS) -c $^
 
 dsk-ascii-chartable.inc: mk-ascii-chartable.pl
 	./mk-ascii-chartable.pl > dsk-ascii-chartable.inc

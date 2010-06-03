@@ -77,9 +77,11 @@ void dsk_octet_stream_set_last_error (DskOctetStream  *stream,
 #define DSK_OCTET_SOURCE(object) DSK_OBJECT_CAST(DskOctetSource, object, &dsk_octet_source_class)
 #define DSK_OCTET_SINK(object) DSK_OBJECT_CAST(DskOctetSink, object, &dsk_octet_sink_class)
 #define DSK_OCTET_STREAM(object) DSK_OBJECT_CAST(DskOctetStream, object, &dsk_octet_stream_class)
+#define DSK_OCTET_FILTER(object) DSK_OBJECT_CAST(DskOctetFilter, object, &dsk_octet_filter_class)
 #define DSK_OCTET_SOURCE_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetSource, object, &dsk_octet_source_class)
 #define DSK_OCTET_SINK_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetSink, object, &dsk_octet_sink_class)
 #define DSK_OCTET_STREAM_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetStream, object, &dsk_octet_stream_class)
+#define DSK_OCTET_FILTER_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetFilter, object, &dsk_octet_filter_class)
 
 DSK_INLINE_FUNC DskIOResult dsk_octet_source_read (void         *octet_source,
                                                    unsigned      max_len,
@@ -151,10 +153,46 @@ DskOctetConnection *dsk_octet_connection_new (DskOctetSource *source,
 void                dsk_octet_connection_shutdown (DskOctetConnection *);
 void                dsk_octet_connection_disconnect (DskOctetConnection *);
 
+/* --- pipes --- */
+/* Pipes are the opposite of connections, in some sense.
+   In a connection, it tries to read from a source and write on a sink.
+   In a pipe, data written to the sink will appear on a source;
+*/
+
+/* --- filters --- */
+typedef struct _DskOctetFilterClass DskOctetFilterClass;
+typedef struct _DskOctetFilter DskOctetFilter;
+struct _DskOctetFilterClass
+{
+  DskObjectClass base_class;
+  dsk_boolean (*process) (DskOctetFilter *filter,
+                          DskBuffer      *out,
+                          DskBuffer      *in,
+                          unsigned        in_length,
+                          DskError      **error);
+  dsk_boolean (*finish)  (DskOctetFilter *filter,
+                          DskBuffer      *out,
+                          DskError      **error);
+};
+struct _DskOctetFilter
+{
+  DskObject base_instance;
+};
+DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_process (DskOctetFilter *filter,
+                                                      DskBuffer      *out,
+                                                      DskBuffer      *in,
+                                                      unsigned        in_length,
+                                                      DskError      **error);
+DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_finish  (DskOctetFilter *filter,
+                                                      DskBuffer      *out,
+                                                      DskError      **error);
+
+
 extern const DskOctetSourceClass dsk_octet_source_class;
 extern const DskOctetSinkClass dsk_octet_sink_class;
 extern const DskOctetStreamClass dsk_octet_stream_class;
 extern const DskOctetConnectionClass dsk_octet_connection_class;
+extern const DskOctetFilterClass dsk_octet_filter_class;
 
 #if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
 DSK_INLINE_FUNC DskIOResult dsk_octet_source_read (void         *octet_source,
@@ -207,4 +245,24 @@ DSK_INLINE_FUNC void dsk_octet_connect       (DskOctetSource *source,
 {
   dsk_object_unref (dsk_octet_connection_new (source, sink, opt));
 }
+DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_process (DskOctetFilter *filter,
+                                                      DskBuffer      *out,
+                                                      DskBuffer      *in,
+                                                      unsigned        in_length,
+                                                      DskError      **error)
+{
+  DskOctetFilterClass *c = DSK_OCTET_FILTER_GET_CLASS (filter);
+  return c->process (filter, out, in, in_length, error);
+}
+
+DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_finish  (DskOctetFilter *filter,
+                                                      DskBuffer      *out,
+                                                      DskError      **error)
+{
+  DskOctetFilterClass *c = DSK_OCTET_FILTER_GET_CLASS (filter);
+  if (c->finish == NULL)
+    return DSK_TRUE;
+  return c->finish (filter, out, error);
+}
+
 #endif

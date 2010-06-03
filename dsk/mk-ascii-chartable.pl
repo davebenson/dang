@@ -4,7 +4,7 @@ my @tqble = ();
 for (my $i = 0; $i < 256; $i++) { push @table, 0 }
 
 # set spaces
-for (' ', "\t", "\n") { $table[ord($_)] |= 1 }
+for (' ', "\r", "\t", "\n") { $table[ord($_)] |= 1 }
 
 # set islower bits
 for ('a'..'z', 'A'..'Z') { $table[ord($_)] |= 2 }
