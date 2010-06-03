@@ -273,6 +273,7 @@ print__internal (DskPrint   *context,
               if (!handle_template_expression (context, at, &expr_len, error))
                 return DSK_FALSE;
               at += expr_len;
+              last_at = at;
             }
         }
       else

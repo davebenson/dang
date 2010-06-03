@@ -17,7 +17,7 @@ _dsk_http_scan_for_end_of_header (DskBuffer *buffer,
      state 1:  \n
      state 2:  \n \r
    */
-  unsigned state = permit_empty ? 1 : 0;
+  unsigned state = (permit_empty && *checked_inout == 0) ? 1 : 0;
   uint8_t *at = frag->buf + (start - frag_offset) + frag->buf_start;
   while (frag != NULL)
     {

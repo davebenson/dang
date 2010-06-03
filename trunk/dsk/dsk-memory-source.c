@@ -38,17 +38,20 @@ dsk_memory_source_read_buffer (DskOctetSource *source,
                                DskError      **error)
 {
   DskMemorySource *msource = DSK_MEMORY_SOURCE (source);
+  DskIOResult rv;
   DSK_UNUSED (error);
   if (msource->buffer.size == 0 && msource->done_adding)
     return DSK_IO_RESULT_EOF;
   if (dsk_buffer_drain (read_buffer, &msource->buffer) == 0)
-    return DSK_IO_RESULT_AGAIN;
+    rv = DSK_IO_RESULT_AGAIN;
+  else
+    rv = DSK_IO_RESULT_SUCCESS;
   if (!msource->done_adding)
     {
       dsk_hook_set_idle_notify (&msource->buffer_low, DSK_TRUE);
       dsk_hook_set_idle_notify (&source->readable_hook, DSK_FALSE);
     }
-  return DSK_IO_RESULT_SUCCESS;
+  return rv;
 }
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskMemorySource);
