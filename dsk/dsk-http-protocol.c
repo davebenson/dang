@@ -285,6 +285,20 @@ dsk_http_request_new (DskHttpRequestOptions *options,
 }
 #undef ObjectType 
 
+static dsk_boolean
+is_valid_status_code (int code)
+{
+  switch (code/100)
+    {
+    case 1: return code<=101;
+    case 2: return code<=206;
+    case 3: return code<=306;
+    case 4: return code<=417;
+    case 5: return code<=505;
+    default: return DSK_FALSE;
+    }
+}
+
 #define ObjectType DskHttpResponse
 DskHttpResponse *
 dsk_http_response_new (DskHttpResponseOptions *options,
@@ -321,6 +335,12 @@ dsk_http_response_new (DskHttpResponseOptions *options,
     response->connection_close = DSK_TRUE;
   response->http_major_version = options->http_major_version;
   response->http_minor_version = options->http_minor_version;
+  if (!is_valid_status_code (options->status_code))
+    {
+      dsk_set_error (error, "invalid status code %u", options->status_code);
+      dsk_object_unref (response);
+      return NULL;
+    }
   response->status_code = options->status_code;
   if (options->request != NULL)
     {

@@ -741,6 +741,11 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
       dsk_set_error (error, "expected HTTP status code- got %.3s", at);
       goto FAIL;
     }
+  if (dsk_ascii_isdigit (at[3]))
+    {
+      dsk_set_error (error, "HTTP status code must be exactly three digits");
+      goto FAIL;
+    }
   options.status_code = dsk_ascii_digit_value(at[0]) * 100
                       + dsk_ascii_digit_value(at[1]) * 10
                       + dsk_ascii_digit_value(at[2]);
