@@ -57,6 +57,7 @@ request_data_clear (RequestData *rd)
     dsk_error_unref (rd->error);
   if (rd->response_header)
     dsk_object_unref (rd->response_header);
+  dsk_buffer_clear (&rd->content);
 }
 
 static dsk_boolean
@@ -166,6 +167,8 @@ test_simple (dsk_boolean byte_by_byte)
     dsk_assert (memcmp (buf, "hi mom\n", 7) == 0);
   }
 
+  dsk_object_unref (stream);
+  dsk_object_unref (request);
   request_data_clear (&request_data);
 }
 
@@ -293,7 +296,9 @@ test_transfer_encoding_chunked (void)
           dsk_object_unref (request_data.response_header);
           request_data.response_header = NULL;
           dsk_buffer_clear (&request_data.sink->buffer);
+          dsk_object_unref (request);
         }
+      dsk_object_unref (stream);
       request_data_clear (&request_data);
     }
 }
@@ -332,6 +337,7 @@ test_simple_post (void)
   xfer = dsk_http_client_stream_request (stream, request, DSK_OCTET_SOURCE (post_data),
                                          &request_funcs_0, &request_data);
   dsk_object_unref (post_data);
+  dsk_object_unref (request);
 
   /* read data from sink; pluck off POST Data */
   unsigned len;
@@ -376,6 +382,7 @@ test_simple_post (void)
     dsk_assert (memcmp (buf, "hi mom\n", 7) == 0);
   }
 
+  dsk_object_unref (stream);
   request_data_clear (&request_data);
 }
 
@@ -455,7 +462,9 @@ test_transfer_encoding_chunked_post (void)
         }
       xfer = dsk_http_client_stream_request (stream, request, DSK_OCTET_SOURCE (post_data),
                                              &request_funcs_0, &request_data);
-      if (iter == 1)
+      if (iter == 0)
+        dsk_object_unref (post_data);
+      else if (iter == 1)
         {
           dsk_buffer_append_string (&post_data->buffer, post_data_str);
           dsk_memory_source_added_data (post_data);
@@ -544,6 +553,8 @@ test_transfer_encoding_chunked_post (void)
         dsk_assert (memcmp (buf, "hi mom\n", 7) == 0);
       }
 
+      dsk_object_unref (request);
+      dsk_object_unref (stream);
       request_data_clear (&request_data);
     }
 }
@@ -630,6 +641,7 @@ test_keepalive_full (dsk_boolean add_postcontent_newlines)
                 xfer = dsk_http_client_stream_request (stream, request,
                                                        NULL,
                                                 &request_funcs_0, rd);
+                dsk_object_unref (request);
                 (void) xfer;            /* hmm */
               }
               break;
@@ -654,6 +666,8 @@ test_keepalive_full (dsk_boolean add_postcontent_newlines)
                 dsk_memory_source_added_data (post_data);
                 dsk_memory_source_done_adding (post_data);
                 (void) xfer;            /* hmm */
+                dsk_object_unref (request);
+                dsk_object_unref (post_data);
               }
               break;
             case 'T':
@@ -807,6 +821,8 @@ test_bad_response (const char *response)
   dsk_assert (request_data.error != NULL);
   error = dsk_error_ref (request_data.error);
   request_data_clear (&request_data);
+  dsk_object_unref (stream);
+  dsk_object_unref (request);
   return error;
 }
 
@@ -890,5 +906,6 @@ int main(int argc, char **argv)
       tests[i].test ();
       fprintf (stderr, " done.\n");
     }
+  dsk_cleanup ();
   return 0;
 }

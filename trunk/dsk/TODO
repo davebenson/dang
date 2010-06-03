@@ -12,8 +12,8 @@ _ http client stream: oddballs
   _ multiline header lines (w/ indent)
 _ http client stream: error conditions:
   x extra blank space at front of request [ignored blank space]
-  _ bad response code
-  _ bad transfer-encoding chunked format
+  x bad response code
+  x bad transfer-encoding chunked format
   _ bad gzip data
   _ random data tests
   _ transport errors reading/writing

@@ -35,7 +35,7 @@
  * On the other hand, this can mask over some abuses (eg stack-based
  * foreign buffer fragment bugs) so we disable it by default.
  */ 
-#define DSK_DEBUG_BUFFER_ALLOCATIONS	0
+#define DSK_DEBUG_BUFFER_ALLOCATIONS	1
 
 #include <alloca.h>
 #include <sys/types.h>
@@ -75,7 +75,7 @@ new_native_fragment()
 {
   DskBufferFragment *frag;
 #if DSK_DEBUG_BUFFER_ALLOCATIONS
-  frag = (DskBufferFragment *) g_malloc (BUF_CHUNK_SIZE);
+  frag = (DskBufferFragment *) dsk_malloc (BUF_CHUNK_SIZE);
   frag->buf_max_size = BUF_CHUNK_SIZE - sizeof (DskBufferFragment);
 #else  /* optimized (?) */
   if (recycling_stack)
@@ -117,12 +117,11 @@ new_foreign_fragment (unsigned             length,
 }
 
 #if DSK_DEBUG_BUFFER_ALLOCATIONS
-#define recycle(frag) G_STMT_START{ \
-    if (frag->is_foreign) { \
-      { if (frag->destroy) frag->destroy (frag->destroy_data); \
-        g_slice_free(DskBufferFragment, frag); } \
-    else g_free (frag); \
-   }G_STMT_END
+#define recycle(frag) do{ \
+    if (frag->is_foreign && frag->destroy != NULL) \
+      frag->destroy (frag->destroy_data); \
+    dsk_free (frag); \
+   }while(0)
 #else	/* optimized (?) */
 static void
 recycle(DskBufferFragment* frag)
@@ -185,7 +184,7 @@ dsk_buffer_init(DskBuffer *buffer)
 }
 
 #if defined(DSK_DEBUG) || DSK_DEBUG_BUFFER_ALLOCATIONS
-static inline gboolean
+static inline dsk_boolean
 verify_buffer (const DskBuffer *buffer)
 {
   const DskBufferFragment *frag;
@@ -836,8 +835,8 @@ dsk_buffer_drain (DskBuffer *dst,
   CHECK_INTEGRITY (src);
   for (frag = src->first_frag; frag; frag = frag->next)
     dsk_buffer_append (dst,
-                       dsk_buffer_fragment_start (frag),
-                       frag->buf_length);
+                       frag->buf_length,
+                       dsk_buffer_fragment_start (frag));
   dsk_buffer_discard (src, src->size);
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
@@ -901,13 +900,13 @@ dsk_buffer_transfer(DskBuffer *dst,
       unsigned len = frag->buf_length;
       if (len >= max_transfer)
         {
-          dsk_buffer_append (dst, dsk_buffer_fragment_start (frag), max_transfer);
+          dsk_buffer_append (dst, max_transfer, dsk_buffer_fragment_start (frag));
           rv += max_transfer;
           break;
         }
       else
         {
-          dsk_buffer_append (dst, dsk_buffer_fragment_start (frag), len);
+          dsk_buffer_append (dst, len, dsk_buffer_fragment_start (frag));
           rv += len;
           max_transfer -= len;
         }

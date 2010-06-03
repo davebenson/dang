@@ -299,6 +299,7 @@ restart_processing:
                                          "parsing response header: %s",
                                          error->message);
                 do_shutdown (stream);
+                dsk_error_unref (error);
                 return DSK_FALSE;
               }
             if (response->status_code == DSK_HTTP_STATUS_CONTINUE)
@@ -799,6 +800,11 @@ static void dsk_http_client_stream_init (DskHttpClientStream *stream)
 static void dsk_http_client_stream_finalize (DskHttpClientStream *stream)
 {
   do_shutdown (stream);
+  if (stream->latest_error)
+    dsk_error_unref (stream->latest_error);
+  dsk_hook_clear (&stream->error_hook);
+  dsk_buffer_clear (&stream->incoming_data);
+  dsk_buffer_clear (&stream->outgoing_data);
 }
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskHttpClientStream);
