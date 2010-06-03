@@ -27,9 +27,11 @@ struct _DskCmdlineArg
   const char *arg_description;
   DskCmdlineFlags flags;
   void *value_ptr;
+  DskCmdlineCallback callback;
   dsk_boolean (*func)(DskCmdlineArg *arg,
                       const char    *str,
                       DskError     **error);
+
 
   DskCmdlineArg *left, *right, *parent;
   dsk_boolean is_red;
@@ -286,6 +288,32 @@ void dsk_cmdline_add_string  (const char     *option_name,
   arg->flags = flags | DSK_CMDLINE_TAKES_ARGUMENT;
   arg->value_ptr = value_out;
   arg->func = cmdline_handle_string;
+}
+
+static dsk_boolean
+cmdline_handle_callback (DskCmdlineArg *arg,
+                        const char    *str,
+                        DskError     **error)
+{
+  return arg->callback (arg->option_name, str, arg->value_ptr, error);
+}
+
+void dsk_cmdline_add_func    (const char     *option_name,
+                              const char     *description,
+			      const char     *arg_description,
+                              DskCmdlineFlags flags,
+                              DskCmdlineCallback callback,
+                              void              *callback_data)
+{
+  DskCmdlineArg *arg = add_option (option_name);
+  dsk_assert (description != NULL);
+  arg->description = description;
+  arg->arg_description = arg_description;
+  if (arg_description)
+    arg->flags = flags | DSK_CMDLINE_TAKES_ARGUMENT;
+  arg->value_ptr = callback_data;
+  arg->callback = callback;
+  arg->func = cmdline_handle_callback;
 }
 
 void dsk_cmdline_permit_unknown_options (dsk_boolean permit)
