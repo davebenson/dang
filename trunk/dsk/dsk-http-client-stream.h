@@ -107,7 +107,7 @@ struct _DskHttpClientStreamOptions
   4,                    /* max_pipelined_requests */        \
   8192,                 /* max_outgoing_data */             \
   DSK_FALSE,            /* strict_keepalive */              \
-  DSK_TRUE              /* print_warnings */                \
+  DSK_DEBUG             /* print_warnings */                \
 }
 
 DskHttpClientStream *

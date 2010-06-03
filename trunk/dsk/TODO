@@ -6,10 +6,10 @@ x http client stream: content-length POST data, connection-close
 x http client stream: transfer-encoding chunked POST data
 x http client stream: transfer-encoding chunked content data
 x http client stream: keepalive (GET,POST,content-length,chunked)
-_ http client stream: oddballs
+x http client stream: oddballs
   x transfer-encoding chunk extensions
   x transfer-encoding chunk trailer
-  _ multiline header lines (w/ indent)
+  x multiline header lines (w/ indent)
 _ http client stream: error conditions:
   x extra blank space at front of request [ignored blank space]
   x bad response code
@@ -35,7 +35,7 @@ _ converting unixtime <=> DskDate
 x XML Parser: basics
 x XML Parser: big documents
 x XML Parser: error conditions
-_ XML Parser: comments
+x XML Parser: comments
 _ XML Parser: ignore doctype and processing-instructions
 x XML Parser: multiple return paths
 x XML Parser: namespace support
@@ -47,6 +47,15 @@ WARNING CONDITIONS:
 _ high trap counts?
 
 TODO:
+_ remove persistency support from DskClientStream !?!
+_ dsk_buffer_transfer, dsk_buffer_drain: consolidate fragments
+  if they are both small.
+_ figure out a way to tune buffer allocations
+  (perhaps a way to build to write a behavior log?)
+_ Is the post_data hack of dsk_http_server_stream_respond() really ok?
+_ DskOctetFilterZlib...
+  _ prototypes
+  _ implement
 _ Review dsk-dispatch API... has_idle and has_timeout are clearly bogus...
   implement epoll support.
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)

@@ -64,7 +64,7 @@ DskXml *dsk_xml_text_new_len (unsigned len,
 DskXml *dsk_xml_comment_new_len (unsigned len,
                                  const char *text)
 {
-  DskXml *rv = dsk_xml_comment_new_len (len, text);
+  DskXml *rv = dsk_xml_text_new_len (len, text);
   rv->type = DSK_XML_COMMENT;
   return rv;
 }

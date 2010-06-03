@@ -78,9 +78,10 @@ load_valid_xml (const char *str,
               str_at += use;
             }
         }
-      DskXml *xml = dsk_xml_parser_pop (parser, 0);
+      DskXml *xml = dsk_xml_parser_pop (parser, NULL);
       dsk_assert (xml != NULL);
-      dsk_assert (dsk_xml_parser_pop (parser, 0) == NULL);
+      DskXml *second_xml = dsk_xml_parser_pop (parser, NULL);
+      dsk_assert (second_xml == NULL);
       if (start_pattern == patterns)
         rv = xml;
       else
@@ -240,6 +241,86 @@ test_simple_comment (void)
   dsk_xml_parser_config_destroy (config);
 }
 static void
+test_simple_comment_handling (void)
+{
+  char *empty = "*";
+  static const char *xml_texts[] = {
+      /* XXX: there's no way to capture toplevel comments!
+       * this is, however, per spec.  We should have a magic path
+       * that maps to comments */
+      "<!-- this is a comment-->\n<abc a=\"b\">tmp</abc>",
+
+      "<abc a='b'>t<!--this is a comment-->mp</abc>",
+      "<abc a='b'>t<!--comment-->m<!--another comment?-->p</abc>",
+      "<abc a='b'><!--comment-->tmp</abc>",
+      "<abc a='b'>tmp<!--comment--></abc>"
+  };
+
+  DskError *error = NULL;
+  DskXmlParserConfig *config = dsk_xml_parser_config_new (DSK_XML_PARSER_INCLUDE_COMMENTS, 0, NULL,
+                                                          1, &empty,
+                                                          &error);
+  if (config == NULL)
+    dsk_die ("error creating parser-config: %s", error->message);
+  unsigned i;
+  for (i = 0; i < sizeof(xml_texts)/sizeof(xml_texts[0]); i++)
+    {
+      DskXml *xml;
+      xml = load_valid_xml (xml_texts[i], config);
+      dsk_assert (xml->type == DSK_XML_ELEMENT);
+      dsk_assert (strcmp (xml->str, "abc") == 0);
+      dsk_assert (strcmp (xml->attrs[0], "a") == 0);
+      dsk_assert (strcmp (xml->attrs[1], "b") == 0);
+      dsk_assert (xml->attrs[2] == NULL);
+      switch (i)
+        {
+        case 0:
+          dsk_assert (xml->n_children == 1);
+          dsk_assert (xml->children[0]->type == DSK_XML_TEXT);
+          dsk_assert (strcmp (xml->children[0]->str, "tmp") == 0);
+          break;
+        case 1:
+          dsk_assert (xml->n_children == 3);
+          dsk_assert (xml->children[0]->type == DSK_XML_TEXT);
+          dsk_assert (strcmp (xml->children[0]->str, "t") == 0);
+          dsk_assert (xml->children[1]->type == DSK_XML_COMMENT);
+          dsk_assert (strcmp (xml->children[1]->str, "this is a comment") == 0);
+          dsk_assert (xml->children[2]->type == DSK_XML_TEXT);
+          dsk_assert (strcmp (xml->children[2]->str, "mp") == 0);
+          break;
+        case 2:
+          dsk_assert (xml->n_children == 5);
+          dsk_assert (xml->children[0]->type == DSK_XML_TEXT);
+          dsk_assert (strcmp (xml->children[0]->str, "t") == 0);
+          dsk_assert (xml->children[1]->type == DSK_XML_COMMENT);
+          dsk_assert (strcmp (xml->children[1]->str, "comment") == 0);
+          dsk_assert (xml->children[2]->type == DSK_XML_TEXT);
+          dsk_assert (strcmp (xml->children[2]->str, "m") == 0);
+          dsk_assert (xml->children[3]->type == DSK_XML_COMMENT);
+          dsk_assert (strcmp (xml->children[3]->str, "another comment?") == 0);
+          dsk_assert (xml->children[4]->type == DSK_XML_TEXT);
+          dsk_assert (strcmp (xml->children[4]->str, "p") == 0);
+          break;
+        case 3:
+          dsk_assert (xml->n_children == 2);
+          dsk_assert (xml->children[0]->type == DSK_XML_COMMENT);
+          dsk_assert (strcmp (xml->children[0]->str, "comment") == 0);
+          dsk_assert (xml->children[1]->type == DSK_XML_TEXT);
+          dsk_assert (strcmp (xml->children[1]->str, "tmp") == 0);
+          break;
+        case 4:
+          dsk_assert (xml->n_children == 2);
+          dsk_assert (xml->children[0]->type == DSK_XML_TEXT);
+          dsk_assert (strcmp (xml->children[0]->str, "tmp") == 0);
+          dsk_assert (xml->children[1]->type == DSK_XML_COMMENT);
+          dsk_assert (strcmp (xml->children[1]->str, "comment") == 0);
+          break;
+        }
+      dsk_xml_unref (xml);
+    }
+  dsk_xml_parser_config_destroy (config);
+}
+static void
 test_empty_element (void)
 {
   char *empty = "*";
@@ -330,6 +411,7 @@ test_path_handling_0 (void)
   dsk_assert (is_text (xml->children[1]->children[0], "GOO"));
   dsk_xml_unref (xml);
 
+  dsk_xml_parser_free (parser);
   dsk_xml_parser_config_destroy (config);
 }
 static void
@@ -381,6 +463,7 @@ test_path_handling_1 (void)
   dsk_assert (is_text (xml->children[1]->children[0], "GOO"));
   dsk_xml_unref (xml);
 
+  dsk_xml_parser_free (parser);
   dsk_xml_parser_config_destroy (config);
 }
 
@@ -465,6 +548,7 @@ static struct
   { "simple element attribute (1)", test_simple_attrs_1 },
   { "simple tree", test_simple_tree },
   { "simple comment ignoring", test_simple_comment },
+  { "simple comment handling", test_simple_comment_handling },
   { "simple empty element", test_empty_element },
   { "test path handling (0)", test_path_handling_0 },
   { "test path handling (1)", test_path_handling_1 },
