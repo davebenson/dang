@@ -54,6 +54,12 @@ dsk_memory_source_read_buffer (DskOctetSource *source,
     }
   return rv;
 }
+static void
+dsk_memory_source_shutdown (DskOctetSource *source)
+{
+  DskMemorySource *msource = DSK_MEMORY_SOURCE (source);
+  msource->got_shutdown = DSK_TRUE;
+}
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA (DskMemorySource);
 DskMemorySourceClass dsk_memory_source_class =
@@ -65,7 +71,7 @@ DskMemorySourceClass dsk_memory_source_class =
                             dsk_memory_source_finalize),
     dsk_memory_source_read,
     dsk_memory_source_read_buffer,
-    NULL
+    dsk_memory_source_shutdown
   }
 };
 

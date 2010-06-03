@@ -33,8 +33,8 @@ static dsk_boolean ip_address_is_default (DskIpAddress *address)
 dsk_boolean
 dsk_client_stream_new       (DskClientStreamOptions *options,
                              DskClientStream **stream_out,
-                             DskOctetSource  **source_out,
                              DskOctetSink    **sink_out,
+                             DskOctetSource  **source_out,
                              DskError        **error)
 {
   DskClientStream *rv;

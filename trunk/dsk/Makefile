@@ -3,8 +3,10 @@
 BUILT_SOURCES = dsk-ascii-chartable.inc dsk-digit-chartables.inc \
                 dsk-http-ident-chartable.inc dsk-byte-name-table.inc
 TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
-	        tests/test-http-client-stream-0 tests/test-xml-parser-0 \
-		tests/test-http-server-stream-0 
+	        tests/test-http-client-stream-0 \
+		tests/test-http-server-stream-0 \
+		tests/test-http-loopback \
+		tests/test-xml-parser-0
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
 
@@ -17,7 +19,8 @@ programs/%: programs/%.c libdsk.a
 	gcc $(CC_FLAGS) $(LINK_FLAGS) -o $@ $^
 libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socket.o dsk-dispatch.o dsk-hook.o \
 	  dsk-cmdline.o dsk-ip-address.o dsk-dns-client.o dsk-mem-pool.o \
-	  dsk-fd.o dsk-octet-io.o dsk-octet-fd.o dsk-unicode.o dsk-client-stream.o \
+	  dsk-fd.o dsk-octet-io.o dsk-octet-fd.o dsk-octet-pipe.o \
+	  dsk-unicode.o dsk-client-stream.o \
 	  dsk-buffer.o dsk-main.o dsk-octet-connection.o dsk-octet-listener.o \
 	  dsk-octet-listener-socket.o dsk-cleanup.o \
 	  dsk-http-client-stream.o dsk-http-server-stream.o \
