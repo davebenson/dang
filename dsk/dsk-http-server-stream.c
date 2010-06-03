@@ -736,8 +736,6 @@ handle_content_readable (DskOctetSource *content,
       dsk_buffer_append_string (out, hdr_buf);
       dsk_buffer_drain (out, buf);
       dsk_buffer_append (out, 2, "\r\n");
-      if (got_eof)
-        dsk_buffer_append (out, 2, "\r\n");
     }
   else
     {

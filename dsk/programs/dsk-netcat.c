@@ -71,8 +71,8 @@ int main(int argc, char **argv)
       options.path = local_path;
       if (!dsk_client_stream_new (&options,
                                   &client_stream,
-                                  &csource,
                                   &csink,
+                                  &csource,
                                   &error))
         dsk_die ("error creating client-stream: %s", error->message);
 

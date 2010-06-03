@@ -215,6 +215,14 @@ dsk_dispatch_free(DskDispatch *dispatch)
       d->recycled_idles = i->next;
       dsk_free (i);
     }
+  while (d->first_idle)
+    {
+      DskDispatchIdle *i = d->first_idle;
+      d->first_idle = i->next;
+      dsk_free (i);
+    }
+  d->last_idle = NULL;
+
   dsk_free (d->base.notifies_desired);
   dsk_free (d->base.changes);
   dsk_free (d->callbacks);

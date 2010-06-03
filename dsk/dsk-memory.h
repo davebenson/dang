@@ -1,7 +1,7 @@
 
 typedef struct _DskMemorySourceClass DskMemorySourceClass;
-typedef struct _DskMemorySource DskMemorySource;
 typedef struct _DskMemorySinkClass DskMemorySinkClass;
+typedef struct _DskMemorySource DskMemorySource;
 typedef struct _DskMemorySink DskMemorySink;
 
 #define DSK_MEMORY_SOURCE(object) DSK_OBJECT_CAST(DskMemorySource, object, &dsk_memory_source_class)
@@ -22,7 +22,8 @@ struct _DskMemorySource
   DskHook buffer_low;
   unsigned buffer_low_amount;
 
-  dsk_boolean done_adding;
+  unsigned done_adding : 1;
+  unsigned got_shutdown : 1;
 };
 struct _DskMemorySinkClass
 {

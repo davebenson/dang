@@ -99,8 +99,8 @@ struct _DskClientStreamOptions
 
 dsk_boolean      dsk_client_stream_new       (DskClientStreamOptions *options,
                                               DskClientStream **stream_out,
-                                              DskOctetSource  **source_out,
                                               DskOctetSink    **sink_out,
+                                              DskOctetSource  **source_out,
                                               DskError        **error);
 
 /* use -1 to disable these timeouts */

@@ -158,6 +158,10 @@ void                dsk_octet_connection_disconnect (DskOctetConnection *);
    In a connection, it tries to read from a source and write on a sink.
    In a pipe, data written to the sink will appear on a source;
 */
+/* Specify pipe_buffer_size==0 to get the default buffer size */
+void          dsk_octet_pipe_new (unsigned       pipe_buffer_size,
+                                  DskOctetSink **sink_out,
+                                  DskOctetSource **source_out);
 
 /* --- filters --- */
 typedef struct _DskOctetFilterClass DskOctetFilterClass;

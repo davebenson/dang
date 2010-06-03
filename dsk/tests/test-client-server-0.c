@@ -179,8 +179,8 @@ create_client (void)
   options.reconnect_time = 10;
   if (!dsk_client_stream_new (&options,
                               &client_stream,
-                              (DskOctetSource **) &client_source,
                               (DskOctetSink **) &client_sink,
+                              (DskOctetSource **) &client_source,
                               &error))
     dsk_die ("failed creating client-stream: %s", error->message);
 }
