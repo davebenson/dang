@@ -51,6 +51,18 @@ WARNING CONDITIONS:
 _ high trap counts?
 
 TODO:
+filters:
+  _ dsk_hex_encoder_new             
+  _ dsk_hex_decoder_new             
+  _ dsk_url_encoder_new             
+  _ dsk_url_decoder_new
+  _ dsk_quote_printable_new         
+  _ dsk_unquote_printable_new      
+  _ dsk_utf8_to_utf16_converter_new
+  _ dsk_utf16_to_utf8_converter_new
+  _ dsk_byte_doubler_new           
+  _ dsk_byte_undoubler_new         
+  _ dsk_octet_filter_chain_new_take
 _ remove persistency support from DskClientStream !?!
 _ dsk_buffer_transfer, dsk_buffer_drain: consolidate fragments
   if they are both small.
