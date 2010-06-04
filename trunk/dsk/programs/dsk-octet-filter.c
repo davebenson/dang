@@ -106,7 +106,7 @@ int main(int argc, char **argv)
         break;
       for (i = 0; i < n_filters; i++)
         {
-          if (!dsk_octet_filter_process (filters[i], &out, &in, in.size, &error))
+          if (!dsk_octet_filter_process_buffer (filters[i], &out, in.size, &in, DSK_TRUE, &error))
             dsk_die ("error running filter: %s", error->message);
           swap = in;
           in = out;
@@ -134,7 +134,7 @@ int main(int argc, char **argv)
         dsk_die ("error finishing filter: %s", error->message);
       for (j = i + 1; in.size && j < n_filters; j++)
         {
-          if (!dsk_octet_filter_process (filters[j], &out, &in, in.size, &error))
+          if (!dsk_octet_filter_process_buffer (filters[j], &out, in.size, &in, DSK_TRUE, &error))
             dsk_die ("error processing finishing filter: %s", error->message);
           swap = in;
           in = out;

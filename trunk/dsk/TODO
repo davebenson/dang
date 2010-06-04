@@ -57,9 +57,9 @@ _ dsk_buffer_transfer, dsk_buffer_drain: consolidate fragments
 _ figure out a way to tune buffer allocations
   (perhaps a way to build to write a behavior log?)
 _ Is the post_data hack of dsk_http_server_stream_respond() really ok?
-_ DskOctetFilterZlib...
-  _ prototypes
-  _ implement
+x DskOctetFilterZlib...
+  x prototypes
+  x implement
 _ Review dsk-dispatch API... has_idle and has_timeout are clearly bogus...
   implement epoll support.
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)
@@ -84,7 +84,6 @@ _ YAML implementation
   _ parser
   _ printer
 _ checksum implementations
-_ zlib filters
 
 LATER
 _ SSL and HTTPS
