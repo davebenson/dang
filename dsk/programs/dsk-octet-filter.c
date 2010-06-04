@@ -80,16 +80,22 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_c_unquote)
   return DSK_TRUE;
 }
 
-DSK_CMDLINE_CALLBACK_DECLARE(handle_base64)
+DSK_CMDLINE_CALLBACK_DECLARE(handle_base64_encode)
 {
   DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
   add_filter (dsk_base64_encoder_new (DSK_TRUE));
   return DSK_TRUE;
 }
-DSK_CMDLINE_CALLBACK_DECLARE(handle_base64_oneline)
+DSK_CMDLINE_CALLBACK_DECLARE(handle_base64_encode_oneline)
 {
   DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
   add_filter (dsk_base64_encoder_new (DSK_FALSE));
+  return DSK_TRUE;
+}
+DSK_CMDLINE_CALLBACK_DECLARE(handle_base64_decode)
+{
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
+  add_filter (dsk_base64_decoder_new ());
   return DSK_TRUE;
 }
 
@@ -117,10 +123,12 @@ int main(int argc, char **argv)
                         handle_c_quote, NULL);
   dsk_cmdline_add_func ("c-unquote", "do c unquoting", NULL, 0,
                         handle_c_unquote, NULL);
-  dsk_cmdline_add_func ("base64", "do Base-64 Encoding", NULL, 0,
-                        handle_base64, NULL);
-  dsk_cmdline_add_func ("base64-oneline", "do Base-64 Encoding, without line breaks", NULL, 0,
-                        handle_base64_oneline, NULL);
+  dsk_cmdline_add_func ("base64-encode", "do Base-64 Encoding", NULL, 0,
+                        handle_base64_encode, NULL);
+  dsk_cmdline_add_func ("base64-encode-oneline", "do Base-64 Encoding, without line breaks", NULL, 0,
+                        handle_base64_encode_oneline, NULL);
+  dsk_cmdline_add_func ("base64-decode", "do Base-64 Decoding", NULL, 0,
+                        handle_base64_decode, NULL);
   dsk_cmdline_process_args (&argc, &argv);
 
   DskBuffer in = DSK_BUFFER_STATIC_INIT;
