@@ -32,7 +32,7 @@ pump_block (const uint8_t *input,
 {
   output[0] = dsk_base64_value_to_char[input[0] >> 2];
   output[1] = dsk_base64_value_to_char[((input[0]&3) << 4) | (input[1] >> 4)];
-  output[2] = dsk_base64_value_to_char[((input[0]&15) << 2) | (input[2] >> 6)];
+  output[2] = dsk_base64_value_to_char[((input[1]&15) << 2) | (input[2] >> 6)];
   output[3] = dsk_base64_value_to_char[input[2] & 63];
 }
 

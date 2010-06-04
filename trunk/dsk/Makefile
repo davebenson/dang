@@ -34,7 +34,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	  dsk-date.o \
 	  dsk-xml-parser.o dsk-xml.o \
 	  dsk-zlib.o \
-	  dsk-base64.o dsk-base64-encoder.o \
+	  dsk-base64.o dsk-base64-encoder.o dsk-base64-decoder.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \
 	  dsk-print.o
 	ar cru $@ $^
