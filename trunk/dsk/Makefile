@@ -33,7 +33,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	  dsk-date.o \
 	  dsk-xml-parser.o dsk-xml.o \
 	  dsk-zlib.o \
-	  dsk-c-quoted.o \
+	  dsk-c-quoter.o dsk-c-unquoter.o \
 	  dsk-print.o
 	ar cru $@ $^
 
