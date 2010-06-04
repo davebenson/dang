@@ -48,13 +48,18 @@ int      dsk_buffer_read_byte           (DskBuffer    *buffer);
 void     dsk_buffer_append              (DskBuffer    *buffer, 
                                          unsigned      length,
                                          const void   *data);
+DSK_INLINE_FUNC void dsk_buffer_append_small(DskBuffer    *buffer, 
+                                         unsigned      length,
+                                         const void   *data);
 void     dsk_buffer_append_string       (DskBuffer    *buffer, 
                                          const char   *string);
-void     dsk_buffer_append_byte         (DskBuffer    *buffer, 
-                                         uint8_t       character);
+DSK_INLINE_FUNC void dsk_buffer_append_byte(DskBuffer    *buffer, 
+                                         uint8_t       byte);
+void      dsk_buffer_append_byte_f      (DskBuffer    *buffer, 
+                                         uint8_t       byte);
 void     dsk_buffer_append_repeated_byte(DskBuffer    *buffer, 
                                          unsigned      count,
-                                         uint8_t       character);
+                                         uint8_t       byte);
 #define dsk_buffer_append_zeros(buffer, count) \
   dsk_buffer_append_repeated_byte ((buffer), 0, (count))
 
@@ -128,3 +133,42 @@ void dsk_buffer_append_empty_fragment (DskBuffer *buffer);
 
 /* a way to delete the fragment from dsk_buffer_append_empty_fragment() */
 void dsk_buffer_fragment_free (DskBufferFragment *fragment);
+
+
+#if DSK_CAN_INLINE || defined(DSK_IMPLEMENT_INLINES)
+DSK_INLINE_FUNC void dsk_buffer_append_small(DskBuffer    *buffer, 
+                                         unsigned      length,
+                                         const void   *data)
+{
+  DskBufferFragment *f = buffer->last_frag;
+  if (f != NULL
+   && !f->is_foreign
+   && f->buf_start + f->buf_length + length <= f->buf_max_size)
+    {
+      uint8_t *dst = f->buf + (f->buf_start + f->buf_length);
+      const uint8_t *src = data;
+      f->buf_length += length;
+      buffer->size += length;
+      while (length--)
+        *dst++ = *src++;
+    }
+  else
+    dsk_buffer_append (buffer, length, data);
+}
+DSK_INLINE_FUNC void dsk_buffer_append_byte(DskBuffer    *buffer, 
+                                            uint8_t       byte)
+{
+  DskBufferFragment *f = buffer->last_frag;
+  if (f != NULL
+   && !f->is_foreign
+   && f->buf_start + f->buf_length < f->buf_max_size)
+    {
+      f->buf[f->buf_start + f->buf_length] = byte;
+      ++(f->buf_length);
+      buffer->size += 1;
+    }
+  else
+    dsk_buffer_append (buffer, 1, &byte);
+}
+
+#endif

@@ -80,7 +80,7 @@ void _dsk_hook_trap_count_zero (DskHook *);
 void _dsk_hook_add_to_idle_notify_list (DskHook *hook);
 void _dsk_hook_remove_from_idle_notify_list (DskHook *hook);
 
-#if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
+#if DSK_CAN_INLINE || defined(DSK_IMPLEMENT_INLINES)
 DSK_INLINE_FUNC dsk_boolean
 dsk_hook_is_trapped (DskHook *hook)
 {

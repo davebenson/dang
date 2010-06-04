@@ -218,7 +218,7 @@ extern const DskOctetStreamClass dsk_octet_stream_class;
 extern const DskOctetConnectionClass dsk_octet_connection_class;
 extern const DskOctetFilterClass dsk_octet_filter_class;
 
-#if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
+#if DSK_CAN_INLINE || defined(DSK_IMPLEMENT_INLINES)
 DSK_INLINE_FUNC DskIOResult dsk_octet_source_read (void         *octet_source,
                                            unsigned      max_len,
                                            void         *data_out,
