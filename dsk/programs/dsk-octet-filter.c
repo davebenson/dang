@@ -98,6 +98,31 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_base64_decode)
   add_filter (dsk_base64_decoder_new ());
   return DSK_TRUE;
 }
+DSK_CMDLINE_CALLBACK_DECLARE(handle_hex_encode)
+{
+  dsk_boolean newlines = DSK_FALSE, spaces = DSK_FALSE;
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (error);
+  if (arg_value)
+    {
+      const char *at = arg_value;
+      while (*at)
+        {
+          if (strncmp (at, "newlines", 8) == 0) { at += 8; newlines = DSK_TRUE; }
+          else if (strncmp (at, "nonewlines", 10) == 0) { at += 10; newlines = DSK_FALSE; }
+          else if (strncmp (at, "spaces", 6) == 0) { at += 6; spaces = DSK_TRUE; }
+          else if (strncmp (at, "nospaces", 8) == 0) { at += 8; spaces = DSK_FALSE; }
+          else
+            {
+              dsk_set_error (error, "error parsing option '%s' to --hex-encode", at);
+              return DSK_FALSE;
+            }
+          if (*at == ',')
+            at++;
+        }
+    }
+  add_filter (dsk_hex_encoder_new (newlines, spaces));
+  return DSK_TRUE;
+}
 
 int main(int argc, char **argv)
 {
@@ -129,6 +154,9 @@ int main(int argc, char **argv)
                         handle_base64_encode_oneline, NULL);
   dsk_cmdline_add_func ("base64-decode", "do Base-64 Decoding", NULL, 0,
                         handle_base64_decode, NULL);
+  dsk_cmdline_add_func ("hex-encode", "do Hex-64 Encoding (FLAGS may be 'spaces' or 'newlines')",
+                        "FLAGS", DSK_CMDLINE_OPTIONAL,
+                        handle_hex_encode, NULL);
   dsk_cmdline_process_args (&argc, &argv);
 
   DskBuffer in = DSK_BUFFER_STATIC_INIT;

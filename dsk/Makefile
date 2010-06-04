@@ -19,7 +19,8 @@ tests/%: tests/%.c libdsk.a
 	gcc $(CC_FLAGS) $(LINK_FLAGS) -o $@ $^
 programs/%: programs/%.c libdsk.a
 	gcc $(CC_FLAGS) $(LINK_FLAGS) -o $@ $^
-libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socket.o dsk-dispatch.o dsk-hook.o \
+libdsk.a: dsk-inlines.o \
+          dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socket.o dsk-dispatch.o dsk-hook.o \
 	  dsk-cmdline.o dsk-ip-address.o dsk-dns-client.o dsk-mem-pool.o \
 	  dsk-fd.o dsk-octet-io.o dsk-octet-fd.o dsk-octet-pipe.o \
 	  dsk-unicode.o dsk-client-stream.o \
@@ -36,6 +37,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	  dsk-zlib.o \
 	  dsk-base64.o dsk-base64-encoder.o dsk-base64-decoder.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \
+	  dsk-hex-encoder.o \
 	  dsk-print.o
 	ar cru $@ $^
 

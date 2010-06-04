@@ -12,6 +12,7 @@ typedef enum
   DSK_CMDLINE_PRINT_DEFAULT = (1<<2),
   DSK_CMDLINE_TAKES_ARGUMENT = (1<<3),  /* only needed for func-ptr */
   DSK_CMDLINE_REPEATABLE = (1<<4),
+  DSK_CMDLINE_OPTIONAL = (1<<5),        /* only needed for func-ptr */
 
   _DSK_CMDLINE_IS_FOUR_BYTES = (1<<16)
 } DskCmdlineFlags;

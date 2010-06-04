@@ -127,7 +127,7 @@ void _dsk_object_class_first_instance (const DskObjectClass *c);
 /* truly private (use dsk_cleanup() instead) */
 void _dsk_object_cleanup_classes (void);
 
-#if DSK_CAN_INLINE || DSK_IMPLEMENT_INLINES
+#if DSK_CAN_INLINE || defined(DSK_IMPLEMENT_INLINES)
 DSK_INLINE_FUNC  void      *dsk_object_new   (const void *object_class)
 {
   const DskObjectClass *c = object_class;

@@ -141,6 +141,7 @@ void dsk_cmdline_add_int     (const char     *option_name,
   DskCmdlineArg *arg = add_option (option_name);
   dsk_assert (description != NULL);
   dsk_assert (arg_description != NULL);
+  dsk_assert ((flags & DSK_CMDLINE_OPTIONAL) == 0);
   arg->description = description;
   arg->arg_description = arg_description;
   arg->flags = flags | DSK_CMDLINE_TAKES_ARGUMENT;
@@ -178,6 +179,7 @@ void dsk_cmdline_add_uint    (const char     *option_name,
   DskCmdlineArg *arg = add_option (option_name);
   dsk_assert (description != NULL);
   dsk_assert (arg_description != NULL);
+  dsk_assert ((flags & DSK_CMDLINE_OPTIONAL) == 0);
   arg->description = description;
   arg->arg_description = arg_description;
   arg->flags = flags | DSK_CMDLINE_TAKES_ARGUMENT;
@@ -216,6 +218,7 @@ void dsk_cmdline_add_double  (const char     *option_name,
   DskCmdlineArg *arg = add_option (option_name);
   dsk_assert (description != NULL);
   dsk_assert (arg_description != NULL);
+  dsk_assert ((flags & DSK_CMDLINE_OPTIONAL) == 0);
   arg->description = description;
   arg->arg_description = arg_description;
   arg->flags = flags | DSK_CMDLINE_TAKES_ARGUMENT;
@@ -256,6 +259,7 @@ void dsk_cmdline_add_boolean (const char     *option_name,
   dsk_assert (description != NULL);
   arg->description = description;
   arg->arg_description = arg_description;
+  dsk_assert ((flags & DSK_CMDLINE_OPTIONAL) == 0);
   if (arg_description)
     arg->flags = flags | DSK_CMDLINE_TAKES_ARGUMENT;
   else
@@ -283,6 +287,7 @@ void dsk_cmdline_add_string  (const char     *option_name,
   DskCmdlineArg *arg = add_option (option_name);
   dsk_assert (description != NULL);
   dsk_assert (arg_description != NULL);
+  dsk_assert ((flags & DSK_CMDLINE_OPTIONAL) == 0);
   arg->description = description;
   arg->arg_description = arg_description;
   arg->flags = flags | DSK_CMDLINE_TAKES_ARGUMENT;
@@ -369,7 +374,9 @@ print_option (DskCmdlineArg *arg)
   fprintf (stderr, "  ");
   if (arg->option_name)
     {
-      if (arg->arg_description)
+      if ((arg->flags & DSK_CMDLINE_OPTIONAL) != 0 && arg->arg_description != NULL)
+        fprintf (stderr, "--%s[=%s]", arg->option_name, arg->arg_description);
+      else if (arg->arg_description)
         fprintf (stderr, "--%s=%s", arg->option_name, arg->arg_description);
       else
         fprintf (stderr, "--%s", arg->option_name);
@@ -453,7 +460,9 @@ dsk_cmdline_try_process_args (int *argc_inout,
               else
                 {
                   const char *eq = strchr (opt, '=');
-                  if (eq == NULL && (arg->flags & DSK_CMDLINE_TAKES_ARGUMENT))
+                  if (eq == NULL
+                   && (arg->flags & DSK_CMDLINE_TAKES_ARGUMENT)
+                   && (arg->flags & DSK_CMDLINE_OPTIONAL) == 0)
                     {
                       if (i + 1 == *argc_inout)
                         {

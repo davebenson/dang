@@ -314,10 +314,10 @@ dsk_buffer_append_string(DskBuffer  *buffer,
  * Append a byte to a buffer.
  */
 void
-dsk_buffer_append_byte(DskBuffer *buffer,
+dsk_buffer_append_byte_f(DskBuffer *buffer,
 		       uint8_t    byte)
 {
-  dsk_buffer_append (buffer, 1, &byte);
+  dsk_buffer_append_byte (buffer, byte);
 }
 
 /**
