@@ -67,6 +67,12 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_gzip_decompress)
   DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value);
   return handle_generic_decompress (DSK_ZLIB_GZIP, error);
 }
+DSK_CMDLINE_CALLBACK_DECLARE(handle_c_quote)
+{
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
+  add_filter (dsk_c_quoter_new ());
+  return DSK_TRUE;
+}
 
 int main(int argc, char **argv)
 {
@@ -88,6 +94,8 @@ int main(int argc, char **argv)
                         handle_raw_zlib_decompress, NULL);
   dsk_cmdline_add_func ("gzip-decompress", "do raw zlib decompression", NULL, 0,
                         handle_gzip_decompress, NULL);
+  dsk_cmdline_add_func ("c-quote", "do c quoting", NULL, 0,
+                        handle_c_quote, NULL);
   dsk_cmdline_process_args (&argc, &argv);
 
   DskBuffer in = DSK_BUFFER_STATIC_INIT;

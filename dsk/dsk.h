@@ -36,6 +36,7 @@
 #include "dsk-xml-parser.h"
 
 #include "dsk-zlib.h"
+#include "dsk-octet-filter-misc.h"
 
 #include "dsk-unicode.h"
 
