@@ -27,14 +27,13 @@ struct _DskZlibCompressor
 static dsk_boolean
 dsk_zlib_compressor_process(DskOctetFilter *filter,
                             DskBuffer      *out,
-                            DskBuffer      *in,
                             unsigned        in_length,
+                            const uint8_t  *in_data,
                             DskError      **error)
 {
   DskZlibCompressor *compressor = (DskZlibCompressor *) filter;
   DskBufferFragment *prev_last_frag;
   dsk_boolean added_fragment = DSK_FALSE;
-  dsk_assert (in_length <= in->size);
   while (in_length > 0)
     {
       DskBufferFragment *f;
@@ -46,15 +45,10 @@ dsk_zlib_compressor_process(DskOctetFilter *filter,
           dsk_buffer_append_empty_fragment (out);
         }
 
-      uint8_t *in_start;
-      uint8_t *out_start;
-      f = in->first_frag;
-      in_start = f->buf + f->buf_start;
-      compressor->zlib.next_in = in_start;
-      compressor->zlib.avail_in = f->buf_length;
-      if (in_length < f->buf_length)
-        compressor->zlib.avail_in = in_length;
+      compressor->zlib.next_in = (uint8_t*)in_data;
+      compressor->zlib.avail_in = in_length;
 
+      uint8_t *out_start;
       f = out->last_frag;
       out_start = f->buf + f->buf_start + f->buf_length;
       compressor->zlib.next_out = out_start;
@@ -63,10 +57,10 @@ dsk_zlib_compressor_process(DskOctetFilter *filter,
       zrv = deflate (&compressor->zlib, Z_NO_FLUSH);
       if (zrv == Z_OK)
         {
-          unsigned amt_in = compressor->zlib.next_in - in_start;
+          unsigned amt_in = compressor->zlib.next_in - in_data;
           unsigned amt_out = compressor->zlib.next_out - out_start;
-          dsk_buffer_discard (in, amt_in);
           in_length -= amt_in;
+          in_data += amt_in;
           f->buf_length += amt_out;
           out->size += amt_out;
         }
@@ -204,14 +198,13 @@ struct _DskZlibDecompressor
 static dsk_boolean
 dsk_zlib_decompressor_process(DskOctetFilter *filter,
                             DskBuffer      *out,
-                            DskBuffer      *in,
                             unsigned        in_length,
+                            const uint8_t  *in_data,
                             DskError      **error)
 {
   DskZlibDecompressor *decompressor = (DskZlibDecompressor *) filter;
   DskBufferFragment *prev_last_frag;
   dsk_boolean added_fragment = DSK_FALSE;
-  dsk_assert (in_length <= in->size);
   if (decompressor->input_ended)
     {
       if (in_length == 0)
@@ -230,14 +223,9 @@ dsk_zlib_decompressor_process(DskOctetFilter *filter,
           dsk_buffer_append_empty_fragment (out);
         }
 
-      uint8_t *in_start;
       uint8_t *out_start;
-      f = in->first_frag;
-      in_start = f->buf + f->buf_start;
-      decompressor->zlib.next_in = in_start;
-      decompressor->zlib.avail_in = f->buf_length;
-      if (in_length < f->buf_length)
-        decompressor->zlib.avail_in = in_length;
+      decompressor->zlib.next_in = (uint8_t *) in_data;
+      decompressor->zlib.avail_in = in_length;
 
       f = out->last_frag;
       out_start = f->buf + f->buf_start + f->buf_length;
@@ -247,9 +235,9 @@ dsk_zlib_decompressor_process(DskOctetFilter *filter,
       zrv = inflate (&decompressor->zlib, Z_NO_FLUSH);
       if (zrv == Z_OK || zrv == Z_STREAM_END)
         {
-          unsigned amt_in = decompressor->zlib.next_in - in_start;
+          unsigned amt_in = decompressor->zlib.next_in - in_data;
           unsigned amt_out = decompressor->zlib.next_out - out_start;
-          dsk_buffer_discard (in, amt_in);
+          in_data += amt_in;
           in_length -= amt_in;
           f->buf_length += amt_out;
           out->size += amt_out;

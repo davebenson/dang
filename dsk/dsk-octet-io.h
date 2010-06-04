@@ -164,6 +164,7 @@ void          dsk_octet_pipe_new (unsigned       pipe_buffer_size,
                                   DskOctetSource **source_out);
 
 /* --- filters --- */
+/* non-blocking data processing --- */
 typedef struct _DskOctetFilterClass DskOctetFilterClass;
 typedef struct _DskOctetFilter DskOctetFilter;
 struct _DskOctetFilterClass
@@ -171,8 +172,8 @@ struct _DskOctetFilterClass
   DskObjectClass base_class;
   dsk_boolean (*process) (DskOctetFilter *filter,
                           DskBuffer      *out,
-                          DskBuffer      *in,
                           unsigned        in_length,
+                          const uint8_t  *in_data,
                           DskError      **error);
   dsk_boolean (*finish)  (DskOctetFilter *filter,
                           DskBuffer      *out,
@@ -184,8 +185,14 @@ struct _DskOctetFilter
 };
 DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_process (DskOctetFilter *filter,
                                                       DskBuffer      *out,
-                                                      DskBuffer      *in,
                                                       unsigned        in_length,
+                                                      const uint8_t  *in_data,
+                                                      DskError      **error);
+dsk_boolean          dsk_octet_filter_process_buffer (DskOctetFilter *filter,
+                                                      DskBuffer      *out,
+                                                      unsigned        in_len,
+                                                      DskBuffer      *in,
+                                                      dsk_boolean     discard,
                                                       DskError      **error);
 DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_finish  (DskOctetFilter *filter,
                                                       DskBuffer      *out,
@@ -251,12 +258,12 @@ DSK_INLINE_FUNC void dsk_octet_connect       (DskOctetSource *source,
 }
 DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_process (DskOctetFilter *filter,
                                                       DskBuffer      *out,
-                                                      DskBuffer      *in,
                                                       unsigned        in_length,
+                                                      const uint8_t  *in_data,
                                                       DskError      **error)
 {
   DskOctetFilterClass *c = DSK_OCTET_FILTER_GET_CLASS (filter);
-  return c->process (filter, out, in, in_length, error);
+  return c->process (filter, out, in_length, in_data, error);
 }
 
 DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_finish  (DskOctetFilter *filter,
