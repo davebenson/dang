@@ -1,7 +1,8 @@
 # just so :make works in vi
 
 BUILT_SOURCES = dsk-ascii-chartable.inc dsk-digit-chartables.inc \
-                dsk-http-ident-chartable.inc dsk-byte-name-table.inc
+                dsk-http-ident-chartable.inc dsk-byte-name-table.inc \
+		dsk-base64-char-table.inc dsk-base64-value-table.inc 
 TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 	        tests/test-http-client-stream-0 \
 		tests/test-http-server-stream-0 \
@@ -33,6 +34,7 @@ libdsk.a: dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socke
 	  dsk-date.o \
 	  dsk-xml-parser.o dsk-xml.o \
 	  dsk-zlib.o \
+	  dsk-base64.o dsk-base64-encoder.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \
 	  dsk-print.o
 	ar cru $@ $^
@@ -48,6 +50,10 @@ dsk-http-ident-chartable.inc: mk-http-ident-chartable.pl
 	./mk-http-ident-chartable.pl > dsk-http-ident-chartable.inc
 dsk-byte-name-table.inc: mk-byte-name-table.pl
 	./mk-byte-name-table.pl > dsk-byte-name-table.inc
+dsk-base64-char-table.inc: mk-base64-to-char-table.pl
+	./$^ > $@
+dsk-base64-value-table.inc: mk-base64-to-value-table.pl
+	./$^ > $@
 
 
 clean:
