@@ -190,7 +190,11 @@ verify_buffer (const DskBuffer *buffer)
   const DskBufferFragment *frag;
   unsigned total = 0;
   for (frag = buffer->first_frag; frag != NULL; frag = frag->next)
-    total += frag->buf_length;
+    {
+      if (frag->buf_length == 0)
+        return DSK_FALSE;
+      total += frag->buf_length;
+    }
   return total == buffer->size;
 }
 #define CHECK_INTEGRITY(buffer)	dsk_assert (verify_buffer (buffer))

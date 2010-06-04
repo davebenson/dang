@@ -199,6 +199,19 @@ DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_finish  (DskOctetFilter *filter,
                                                       DskError      **error);
 
 
+/* Defining subclasses of DskOctetFilter is easy and fun;
+ */
+
+#define DSK_OCTET_FILTER_SUBCLASS_DEFINE(class_static, ClassName, class_name) \
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(ClassName);                                \
+class_static class_name ## class = {                                          \
+  DSK_OBJECT_CLASS_DEFINE(ClassName, &dsk_octet_filter_class,                 \
+                          class_name ## _init,                                \
+                          class_name ## _finalize),                           \
+  class_name ## _process,                                                     \
+  class_name ## _finish                                                       \
+}
+
 extern const DskOctetSourceClass dsk_octet_source_class;
 extern const DskOctetSinkClass dsk_octet_sink_class;
 extern const DskOctetStreamClass dsk_octet_stream_class;
