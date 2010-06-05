@@ -1237,3 +1237,4198 @@
   "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n<!ENTITY % pe1 '<!ATTLIST root att2 CDATA \"&ge1;\">'>\r\n<!ENTITY ge1 \"attdefaultvalue\" >\r\n%pe1;\r\n\r\n<!--* notation JPGformat not declared *-->\r\n<!ENTITY ge2  SYSTEM \"image.jpg\" NDATA JPGformat>\r\n\r\n]>\r\n<root att2=\"any\" />\r\n<!-- a invalid test case: test P76 VC: Notation Declared -->",
   0, NULL
 },
+{
+  "ibm01n01.xml",
+  96,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE book [\r\n   <!ELEMENT book ANY>\r\n]>\r\n<!-- element is missing -->",
+  0, NULL
+},
+{
+  "ibm01n02.xml",
+  120,
+  "<doc>Wrong ordering between prolog and element!</doc>\r\n<?xml version=\"1.0\"?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc ANY>\r\n]>",
+  0, NULL
+},
+{
+  "ibm01n03.xml",
+  217,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc ANY>\r\n   <!ELEMENT title ANY>\r\n]>\r\n<doc>Wrong combination!</doc>\r\n<?PI after document element?>\r\n<title>Wrong combination!</title>\r\n<?PI after title element?>\r\n",
+  0, NULL
+},
+{
+  "ibm02n01.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x00\r\n in p02: \0 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n02.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x01\r\n in p02: \1 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n03.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x02\r\n in p02: \2 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n04.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x03\r\n in p02: \3 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n05.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x04\r\n in p02: \4 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n06.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x05\r\n in p02: \5 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n07.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x06\r\n in p02: \6 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n08.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x07\r\n in p02: \a -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n09.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x08\r\n in p02: \b -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n10.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x0b\r\n in p02: \v -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n11.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x0c\r\n in p02: \f -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n12.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x0e\r\n in p02: \16 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n13.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x0f\r\n in p02: \17 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n14.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x10\r\n in p02: \20 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n15.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x11\r\n in p02: \21 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n16.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x12\r\n in p02: \22 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n17.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x13\r\n in p02: \23 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n18.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x14\r\n in p02: \24 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n19.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x15\r\n in p02: \25 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n20.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x16\r\n in p02: \26 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n21.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x17\r\n in p02: \27 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n22.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x18\r\n in p02: \30 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n23.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x19\r\n in p02: \31 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n24.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x1a\r\n in p02: \32 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n25.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x1b\r\n in p02: \33 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n26.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x1c\r\n in p02: \34 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n27.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x1d\r\n in p02: \35 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n28.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x1e\r\n in p02: \36 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n29.xml",
+  91,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x1f\r\n in p02: \37 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n30.xml",
+  95,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #xd800\r\n in p02: \355\240\200 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n31.xml",
+  95,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #xdfff\r\n in p02: \355\277\277 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n32.xml",
+  95,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #xfffe\r\n in p02: \357\277\276 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm02n33.xml",
+  95,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #xffff\r\n in p02: \357\277\277 -->\r\n<book/>\r\n",
+  0, NULL
+},
+{
+  "ibm03n01.xml",
+  138,
+  "<!DOCTYPE book [\r\n<!ELEMENT book ANY>\r\n]>\r\n<!-- IllegalChar #x3000\r\n in p03: \343\200\200 -->\r\n<book>Illegal space 3000 in the end tag</book \343\200\200\r\n",
+  0, NULL
+},
+{
+  "ibm04n01.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar! [\r\n   <!ELEMENT IllegalNameChar! EMPTY>\r\n]>\r\n<IllegalNameChar!/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n02.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar( [\r\n   <!ELEMENT IllegalNameChar( EMPTY>\r\n]>\r\n<IllegalNameChar(/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n03.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar) [\r\n   <!ELEMENT IllegalNameChar) EMPTY>\r\n]>\r\n<IllegalNameChar)/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n04.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar+ [\r\n   <!ELEMENT IllegalNameChar+ EMPTY>\r\n]>\r\n<IllegalNameChar+/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n05.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar, [\r\n   <!ELEMENT IllegalNameChar, EMPTY>\r\n]>\r\n<IllegalNameChar,/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n06.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar/ [\r\n   <!ELEMENT IllegalNameChar/ EMPTY>\r\n]>\r\n<IllegalNameChar//>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n07.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar; [\r\n   <!ELEMENT IllegalNameChar; EMPTY>\r\n]>\r\n<IllegalNameChar;/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n08.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar< [\r\n   <!ELEMENT IllegalNameChar< EMPTY>\r\n]>\r\n<IllegalNameChar</>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n09.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar= [\r\n   <!ELEMENT IllegalNameChar= EMPTY>\r\n]>\r\n<IllegalNameChar=/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n10.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar? [\r\n   <!ELEMENT IllegalNameChar? EMPTY>\r\n]>\r\n<IllegalNameChar?/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n11.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar[ [\r\n   <!ELEMENT IllegalNameChar[ EMPTY>\r\n]>\r\n<IllegalNameChar[/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n12.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar\\ [\r\n   <!ELEMENT IllegalNameChar\\ EMPTY>\r\n]>\r\n<IllegalNameChar\\/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n13.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar] [\r\n   <!ELEMENT IllegalNameChar] EMPTY>\r\n]>\r\n<IllegalNameChar]/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n14.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar^ [\r\n   <!ELEMENT IllegalNameChar^ EMPTY>\r\n]>\r\n<IllegalNameChar^/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n15.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar` [\r\n   <!ELEMENT IllegalNameChar` EMPTY>\r\n]>\r\n<IllegalNameChar`/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n16.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar{ [\r\n   <!ELEMENT IllegalNameChar{ EMPTY>\r\n]>\r\n<IllegalNameChar{/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n17.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar| [\r\n   <!ELEMENT IllegalNameChar| EMPTY>\r\n]>\r\n<IllegalNameChar|/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm04n18.xml",
+  95,
+  "<!DOCTYPE IllegalNameChar} [\r\n   <!ELEMENT IllegalNameChar} EMPTY>\r\n]>\r\n<IllegalNameChar}/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm05n01.xml",
+  107,
+  "<!DOCTYPE .A_name_starts_with. [\r\n   <!ELEMENT .A_name_starts_with. EMPTY>\r\n]>\r\n<.A_name_starts_with./>  \r\n",
+  0, NULL
+},
+{
+  "ibm05n02.xml",
+  107,
+  "<!DOCTYPE -A_name_starts_With- [\r\n   <!ELEMENT -A_name_starts_With- EMPTY>\r\n]>\r\n<-A_name_starts_With-/>  \r\n",
+  0, NULL
+},
+{
+  "ibm05n03.xml",
+  122,
+  "<!DOCTYPE 5A_name_starts_with_digit [\r\n   <!ELEMENT 5A_name_starts_with_digit EMPTY>\r\n]>\r\n<5A_name_starts_with_digit/>  \r\n",
+  0, NULL
+},
+{
+  "ibm05n04.xml",
+  128,
+  "<!DOCTYPE illegalChar0f7\303\267\111\156\124\150\145\115\151\144\144\154\145 [\r\n   <!ELEMENT illegalChar0f7\303\267\111\156\124\150\145\115\151\144\144\154\145 EMPTY>\r\n]>\r\n<illegalChar0f7\303\267\111\156\124\150\145\115\151\144\144\154\145\57\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm05n05.xml",
+  98,
+  "<!DOCTYPE illegalNameChar\303\267 [\r\n   <!ELEMENT illegalNameChar\303\267 EMPTY>\r\n]>\r\n<illegalNameChar\303\267\57\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm09n01.xml",
+  223,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n \t<!ENTITY FullName \"Snow%Man\">\r\n]>\r\n\r\n<!-- testing invalid entity value -->\r\n<student>My Name is &FullName;. </student>\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n ",
+  0, NULL
+},
+{
+  "ibm09n02.xml",
+  196,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n \t<!ENTITY FullName \"Snow&Man\">\r\n]>\r\n\r\n<!-- testing invalid entity value -->\r\n<student>My Name is &FullName;. </student>",
+  0, NULL
+},
+{
+  "ibm09n03.xml",
+  196,
+  "<?xml version=\"1.0\"?> \r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ENTITY FullName \"Snow\"Man\"> \r\n]>\r\n\r\n<!-- testing invalid entity value -->\r\n<student>My Name is &FullName;. </student>",
+  0, NULL
+},
+{
+  "ibm09n04.xml",
+  196,
+  "<?xml version=\"1.0\"?> \r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ENTITY FullName \"SnowMan> \r\n]>\r\n\r\n<!-- testing invalid entity value -->\r\n<student>My Name is &FullName;. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm10n01.xml",
+  357,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student\r\n\t\tfirst CDATA #REQUIRED\r\n\t\tmiddle CDATA #IMPLIED\r\n\t\tlast CDATA #IMPLIED > \r\n\t<!ENTITY myfirst \"Snow\">\r\n\t<!ENTITY mymiddle \"I\">\r\n\t<!ENTITY mylast \"Man\">\r\n]>\r\n\r\n<!-- testing invalid attvalue -->\r\n<student first=\"Snow<Man\">My Name is SnowMan. </student>\r\n\r\n\r\n\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm10n02.xml",
+  347,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student\r\n\t\tfirst CDATA #REQUIRED\r\n\t\tmiddle CDATA #IMPLIED\r\n\t\tlast CDATA #IMPLIED > \r\n\t<!ENTITY myfirst \"Snow\">\r\n\t<!ENTITY mymiddle \"I\">\r\n\t<!ENTITY mylast \"Man\">\r\n]>\r\n\r\n<!-- testing invalid attvalue -->\r\n<student first=\"Snow&Man\">My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm10n03.xml",
+  347,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student\r\n\t\tfirst CDATA #REQUIRED\r\n\t\tmiddle CDATA #IMPLIED\r\n\t\tlast CDATA #IMPLIED > \r\n\t<!ENTITY myfirst \"Snow\">\r\n\t<!ENTITY mymiddle \"I\">\r\n\t<!ENTITY mylast \"Man\">\r\n]>\r\n\r\n<!-- testing invalid attvalue -->\r\n<student first=\"Snow\"Man\">My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm10n04.xml",
+  367,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student\r\n\t\tfirst CDATA #REQUIRED\r\n\t\tmiddle CDATA #IMPLIED\r\n\t\tlast CDATA #IMPLIED > \r\n\t<!ENTITY myfirst \"Snow\">\r\n\t<!ENTITY mymiddle \"I\">\r\n\t<!ENTITY mylast \"Man\">\r\n]>\r\n\r\n<!-- testing invalid attvalue with no closing bracket -->\r\n<student first=\"Snow >My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm10n05.xml",
+  347,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student\r\n\t\tfirst CDATA #REQUIRED\r\n\t\tmiddle CDATA #IMPLIED\r\n\t\tlast CDATA #IMPLIED > \r\n\t<!ENTITY myfirst \"SNow\">\r\n\t<!ENTITY mymiddle \"I\">\r\n\t<!ENTITY mylast \"Man\">\r\n]>\r\n\r\n<!-- testing invalid attvalue -->\r\n<student first='Snow<Man'>My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm10n06.xml",
+  347,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student\r\n\t\tfirst CDATA #REQUIRED\r\n\t\tmiddle CDATA #IMPLIED\r\n\t\tlast CDATA #IMPLIED > \r\n\t<!ENTITY myfirst \"Snow\">\r\n\t<!ENTITY mymiddle \"I\">\r\n\t<!ENTITY mylast \"Man\">\r\n]>\r\n\r\n<!-- testing invalid attvalue -->\r\n<student first='Snow&Man'>My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm10n07.xml",
+  347,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student\r\n\t\tfirst CDATA #REQUIRED\r\n\t\tmiddle CDATA #IMPLIED\r\n\t\tlast CDATA #IMPLIED > \r\n\t<!ENTITY myfirst \"Snow\">\r\n\t<!ENTITY mymiddle \"I\">\r\n\t<!ENTITY mylast \"Man\">\r\n]>\r\n\r\n<!-- testing invalid attvalue -->\r\n<student first=\"Snow\"Man\">My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm10n08.xml",
+  372,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student\r\n\t\tfirst CDATA #REQUIRED\r\n\t\tmiddle CDATA #IMPLIED\r\n\t\tlast CDATA #IMPLIED > \r\n\t<!ENTITY myfirst \"Snow\">\r\n\t<!ENTITY mymiddle \"I\">\r\n\t<!ENTITY mylast \"Man\">\r\n]>\r\n\r\n<!-- testing invalid attvalue with no closing single quote -->\r\n<student first='Snow >My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm11n01.xml",
+  207,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student SYSTEM \"student\".dtd\"[\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid system literal  -->\r\n<student>My Name is SnowMan. </student>\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n ",
+  0, NULL
+},
+{
+  "ibm11n02.xml",
+  186,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student SYSTEM 'student'.dtd'[\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid system literal  -->\r\n<student>My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm11n03.xml",
+  209,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student SYSTEM \"student.DTD [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid system literal with no closing bracket  -->\r\n<student>My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm11n04.xml",
+  209,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student SYSTEM 'student.DTD [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid system literal with no closing bracket  -->\r\n<student>My Name is SnowMan. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm12n01.xml",
+  243,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n\t<!ENTITY info PUBLIC \"..\\info.dtd>\r\n]>\r\n\r\n<!-- testing invalid pubid literal with no closing bracket  -->\r\n<student>My Name is &info;. </student>\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n ",
+  0, NULL
+},
+{
+  "ibm12n02.xml",
+  201,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n\t<!ENTITY info PUBLIC '..\\info'.dtd'>\r\n]>\r\n\r\n<!-- testing invalid pubid literal -->\r\n<student>My Name is &info;. </student>\r\n",
+  0, NULL
+},
+{
+  "ibm12n03.xml",
+  222,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n\t<!ENTITY info PUBLIC '..\\info.dtd>\r\n]>\r\n\r\n<!-- testing invalid pubid literal with no closing bracket  -->\r\n<student>My Name is &info;. </student>",
+  0, NULL
+},
+{
+  "ibm13n01.xml",
+  202,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ENTITY info PUBLIC \"This is a {test} \" \"student.dtd\">\r\n]>\r\n\r\n<!-- testing invalid pubid char with {  -->\r\n<student>My Name is &info;. </student>\r\n\r\n\r\n\r\n\r\n ",
+  0, NULL
+},
+{
+  "ibm13n02.xml",
+  191,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ENTITY info PUBLIC \"This is a test~. \" \"student.dtd\">\r\n]>\r\n\r\n<!-- testing invalid pubid char with ~  -->\r\n<student>My Name is &info;. </student>",
+  0, NULL
+},
+{
+  "ibm13n03.xml",
+  206,
+  "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!DOCTYPE student [\n\t<!ENTITY info PUBLIC \"This is a test \303\241 \" \"student.dtd\">\n]>\n\n<!-- testing invalid pubid char with \303\241  -->\n<student>My Name is &info;. </student>\n\n",
+  0, NULL
+},
+{
+  "ibm14n01.xml",
+  255,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student first CDATA #REQUIRED\r\n\t\t\t  last  CDATA #IMPLIED>\r\n]>\r\n\r\n<!-- testing invalid chardata string  -->\r\n<student first=\"Snow\">My name is Snow ]]> Man</student>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm14n02.xml",
+  247,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student first CDATA #REQUIRED\r\n\t\t\t  last  CDATA #IMPLIED>\r\n]>\r\n\r\n<!-- testing invalid chardata string  -->\r\n<student first=\"Snow\">My name is Snow <Man </student>",
+  0, NULL
+},
+{
+  "ibm14n03.xml",
+  248,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)>\r\n\t<!ATTLIST student first CDATA #REQUIRED\r\n\t\t\t  last  CDATA #IMPLIED>\r\n]>\r\n\r\n<!-- testing invalid chardata string  -->\r\n<student first=\"Snow\">My name is Snow&Man </student>\r\n",
+  0, NULL
+},
+{
+  "ibm15n01.xml",
+  182,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid comment  -->\r\n<!------>\r\n<student>My Name is SnowMan. </student>\r\n\r\n\r\n\r\n\r\n\r\n\r\n ",
+  0, NULL
+},
+{
+  "ibm15n02.xml",
+  180,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid comment  -->\r\n<!-- Student's name ->\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm15n03.xml",
+  180,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid comment  -->\r\n<!- student file-1 -->\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm15n04.xml",
+  196,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid comment  -->\r\n<!--student phone number 408-777-8888 \r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm16n01.xml",
+  214,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid PI with illegal sequence  -->\r\n<?MyInstruct This is ?> a test ?>\r\n<student>My Name is SnowMan. </student>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm16n02.xml",
+  181,
+  /* Next line hand-editted to breakup trigraphs */
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n\r\n<!-- testing invalid PI with missing PITarget  -->\r\n<?" "?>\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm16n03.xml",
+  197,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n\r\n<!-- testing invalid PI with wrong closing sequence  -->\r\n<?MyInstruct >\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm16n04.xml",
+  190,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n\r\n<!-- testing invalid PI with missing sequence  -->\r\n<?MyInstruct \r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm17n01.xml",
+  190,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n\r\n<!-- testing invalid PITarget  -->\r\n<?XML This is a test ?>\r\n<student>My Name is SnowMan. </student>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm17n02.xml",
+  182,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid PITarget  -->\r\n<?xML This is a test ?>\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm17n03.xml",
+  182,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid PITarget  -->\r\n<?xml This is a test ?>\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm17n04.xml",
+  182,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid PITarget  -->\r\n<?xmL This is a test ?>\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm18n01.xml",
+  207,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid CDSect with missing CDStart   -->\r\n<student>My Name is SnowMan. This is <normal> text]]></student>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm18n02.xml",
+  205,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid CDSect with missing CDEnd  -->\r\n<student>My Name is SnowMan. <![CDATA[This is <normal> text </student>",
+  0, NULL
+},
+{
+  "ibm19n01.xml",
+  183,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid CDStart -->\r\n<![cdata[This is a test]]>\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm19n02.xml",
+  190,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid CDStart -->\r\n<![[CDATA[This is a test]]>\r\n<student>My Name is SnowMan. </student>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm19n03.xml",
+  183,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid CDStart -->\r\n<?[CDATA[This is a test]]>\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm20n01.xml",
+  226,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid CData with illegal sequence -->\r\n<![CDATA[<testing>This is ]]> a test</testing>]]>\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm21n01.xml",
+  187,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid CDEnd -->\r\n<![[CDATA[This is a test]>\r\n<student>My Name is SnowMan. </student>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm21n02.xml",
+  182,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid CDEnd -->\r\n<![cdata[This is a test]]]>\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm21n03.xml",
+  181,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE student [\r\n\t<!ELEMENT student (#PCDATA)> \r\n]>\r\n\r\n<!-- testing invalid CDEnd -->\r\n<![CDATA[This is a test])>\r\n<student>My Name is SnowMan. </student>",
+  0, NULL
+},
+{
+  "ibm22n01.xml",
+  139,
+  "<!DOCTYPE doc [\r\n<!ELEMENT doc EMPTY>\r\n]>\r\n<?xml version=\"1.0\" encoding=\"ASCII\" ?>\r\n<doc/>\r\n<!-- Wrong ordering between DTD and XMLDecl -->",
+  0, NULL
+},
+{
+  "ibm22n02.xml",
+  139,
+  "<!-- Wrong ordering Misc, DTD and XMLDecl -->\r\n<?xml version=\"1.0\" encoding=\"ASCII\" ?>\r\n<!DOCTYPE doc [\r\n<!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n",
+  0, NULL
+},
+{
+  "ibm22n03.xml",
+  180,
+  "<!-- Wrong ordering patter 4 -->\r\n<!DOCTYPE doc [\r\n<!ELEMENT doc EMPTY>\r\n]>\r\n<!-- Wrong ordering Misc, DTD, Misc, and XMLDecl -->\r\n<?xml version=\"1.0\" encoding=\"ASCII\" ?>\r\n<doc/>\r\n",
+  0, NULL
+},
+{
+  "ibm23n01.xml",
+  135,
+  "<?xml encoding=\"ASCII\" ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Missing required field VersionInfo in XMLDecl -->",
+  0, NULL
+},
+{
+  "ibm23n02.xml",
+  165,
+  "<?xml encoding='ASCII' version='1.0'?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong ordering between VersionInfo and EncodingDecl in XMLDecl -->",
+  0, NULL
+},
+{
+  "ibm23n03.xml",
+  183,
+  "<?xml encoding='ASCII' standalone='yes' version='1.0'?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong ordering EncodingDecl, SDDecl, and VersionInfo in XMLDecl -->",
+  0, NULL
+},
+{
+  "ibm23n04.xml",
+  110,
+  "<?XML version='1.0'?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong keyword in XMLDecl -->",
+  0, NULL
+},
+{
+  "ibm23n05.xml",
+  153,
+  "<?xml version='1.0' encoding='ASCII' standalone='yes' >\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong closing sequence in XMLDecl -->",
+  0, NULL
+},
+{
+  "ibm23n06.xml",
+  154,
+  "<!xml version='1.0' encoding='ASCII' standalone='yes' ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong opening sequence in XMLDecl -->",
+  0, NULL
+},
+{
+  "ibm24n01.xml",
+  117,
+  "<?xml version= ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- VersioNum is missing in VersionInfo -->",
+  0, NULL
+},
+{
+  "ibm24n02.xml",
+  113,
+  "<?xmlversion='1.0' ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- S is missing in VersionInfo -->",
+  0, NULL
+},
+{
+  "ibm24n03.xml",
+  115,
+  "<?xml version'1.0' ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]> \r\n<doc/>\r\n<!-- Eq is missing in VersionInfo -->",
+  0, NULL
+},
+{
+  "ibm24n04.xml",
+  125,
+  "<?xml '1.0'=version ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong ordering VersionNum Eq 'version' -->",
+  0, NULL
+},
+{
+  "ibm24n05.xml",
+  123,
+  "<?xml version'1.0'= ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong ordering version VersionNum Eq -->",
+  0, NULL
+},
+{
+  "ibm24n06.xml",
+  111,
+  "<?xml Version='1.0' ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong key word 'Version' -->",
+  0, NULL
+},
+{
+  "ibm24n07.xml",
+  111,
+  "<?xml versioN='1.0' ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong key word 'versioN' -->",
+  0, NULL
+},
+{
+  "ibm24n08.xml",
+  118,
+  "<?xml version='1.0\" ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Mismatched qotes in VersionInfo -->",
+  0, NULL
+},
+{
+  "ibm24n09.xml",
+  117,
+  "<?xml version='1.0 ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Mismatched qotes in VersionInfo -->",
+  0, NULL
+},
+{
+  "ibm25n01.xml",
+  113,
+  "<?xml version=='1.0' ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong key word \"==\" in Eq -->",
+  0, NULL
+},
+{
+  "ibm25n02.xml",
+  115,
+  "<?xml version eq '1.0' ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- Wrong key word \"eq\" in Eq -->",
+  0, NULL
+},
+{
+  "ibm26n01.xml",
+  124,
+  "<?xml version='_#1.0' ?>\r\n<!DOCTYPE doc [\r\n   <!ELEMENT doc EMPTY>\r\n]>\r\n<doc/>\r\n<!-- illegal character '#' in VersionNum -->",
+  0, NULL
+},
+{
+  "ibm27n01.xml",
+  155,
+  "<?xml version=\"1.0\" ?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal ANY>\r\n]>\r\n<animal>Wrong type of Misc following this element!</animal>\r\n<!ELEMENT cat EMPTY>",
+  0, NULL
+},
+{
+  "ibm28n01.xml",
+  127,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE SYSTEM \"ibm28n01.dtd\">\r\n<!-- Name is missing in doctypedecl --> \r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm28n02.xml",
+  150,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE [\r\n<!ELEMENT animal EMPTY>\r\n] animal>\r\n<!-- Wrong ordering [ ] Name in doctypedecl --> \r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm28n03.xml",
+  217,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE SYSTEM \"ibm28n01.dtd\" animal [\r\n   <!ATTLIST animal color CDATA #REQUIRED>\r\n]>\r\n<!-- Wrong ordering ExternalID Name [ ] in doctypedecl --> \r\n<animal color=\"yellow\"/>\r\n",
+  0, NULL
+},
+{
+  "ibm28n04.xml",
+  380,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE aniaml [\r\n   <!ELEMENT animal ANY>\r\n   <!ENTITY generalE \"leopard\">\r\n   &generalE;\r\n   <!ENTITY % parameterE \"<!ELEMENT leopard EMPTY>\">\r\n   %parameterE;\r\n] animal>\r\n<!-- Wrong componet general entity reference occurs inside the DTD -->\r\n<!-- General entity sould be used in the document content --> \r\n<animal>&generalE</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm28n05.xml",
+  151,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCtYPE animal [\r\n   <!ELEMENT animal EMPTY>\r\n]>\r\n<!-- Wrong keyword DOCTYPE in doctypedecl --> \r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm28n06.xml",
+  152,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal EMPTY>\r\n>\r\n<!-- Bracket mismatch in [ ] in doctypedecl --> \r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm28n07.xml",
+  150,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE animal {\r\n   <!ELEMENT animal EMPTY>\r\n]>\r\n<!-- Wrong bracket in [ ] in doctypedecl --> \r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm28n08.xml",
+  152,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<?DOCTYPE animal [\r\n   <!ELEMENT animal EMPTY>\r\n]>\r\n<!-- Wrong opening sequence in doctypedecl --> \r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm29n01.xml",
+  498,
+  "<!DOCTYPE animal [\r\n   <?xml version=\"1.0\" encoding=\"ASCII\" ?>\r\n   <!-- Illegal markupdecl in DTD --> \r\n   <!ELEMENT animal (cat|tiger|leopard)+>\r\n   <!ELEMENT cat EMPTY>\r\n   <!ELEMENT tiger (#PCDATA)>\r\n   <!ELEMENT leopard ANY>\r\n   <!ELEMENT small EMPTY>\r\n   <!ELEMENT big EMPTY>\r\n   <!ATTLIST tiger color CDATA #REQUIRED>\r\n]>\r\n<animal>\r\n   <cat/>\r\n   <tiger color=\"white\">This is a white tiger in Mirage!!</tiger>\r\n   <cat/>\r\n   <leopard>\r\n      <small/>\r\n      <big/>\r\n   </leopard>\r\n</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm29n02.xml",
+  255,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal ANY>\r\n   <!ENTITY % parameterE \"leopard EMPTY>\">\r\n   <!ELEMENT %parameterE;\r\n]>\r\n<!-- Parameter reference appears inside elementdecl in DTD -->\r\n<animal>Any content</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm29n03.xml",
+  269,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal ANY>\r\n   <!ENTITY % parameterE \"color\">\r\n   <!ATTLIST animal %parameterE; CDATA #IMPLIED>\r\n]>\r\n<!-- Parameter reference appears inside AttlistDecl in DTD -->\r\n<animal>Any content</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm29n04.xml",
+  268,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal ANY>\r\n   <!ENTITY % parameterE \"A leopard\">\r\n   <!ENTITY content \"%parameterE;\">\r\n]>\r\n<!-- Parameter reference appears inside an entity declaration in DTD -->\r\n<animal>&content;</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm29n05.xml",
+  247,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal ANY>\r\n   <!ENTITY % parameterE \"A music file ?>\">\r\n   <?music %parameterE;\r\n]>\r\n<!-- Parameter reference appears inside a PI in DTD -->\r\n<animal>Any content</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm29n06.xml",
+  258,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal ANY>\r\n   <!ENTITY % parameterE \"A music file -->\">\r\n<!-- Parameter reference appears inside a comment in DTD -->\r\n   <!-- This is %parameterE;\r\n]>\r\n<animal>Any content</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm29n07.xml",
+  266,
+  "<?xml version=\"1.0\" encoding='UTF-8'?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal ANY>\r\n   <!ENTITY % parameterE \"cat SYSTEM\">\r\n   <!NOTATION %parameterE; \"cat.txt\">\r\n]>\r\n<!-- Parameter reference appears inside a NotationDecl in DTD -->\r\n<animal>Any content</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm30n01.xml",
+  118,
+  "<!DOCTYPE animal SYSTEM \"ibm30n01.dtd\">\r\n<animal/>\r\n<!-- Wrong ordering extSubsetDecl TextDecl in the external DTD -->",
+  0, NULL
+},
+{
+  "ibm31n01.xml",
+  102,
+  "<!DOCTYPE animal SYSTEM \"ibm31n01.dtd\">\r\n<animal/>\r\n<!-- Illegal extSubsetDecl in the external DTD -->",
+  0, NULL
+},
+{
+  "ibm32n01.xml",
+  135,
+  "<?xml version=\"1.0\"standalone=\"yes\" ?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal EMPTY>\r\n]>\r\n<!-- Missing a S in SDDecl -->\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm32n02.xml",
+  134,
+  "<?xml version=\"1.0\" standalone\"yes\" ?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal EMPTY>\r\n]>\r\n<!-- Missing Eq in SDDecl -->\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm32n03.xml",
+  138,
+  "<?xml version=\"1.0\" Standalone=\"yes\" ?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal EMPTY>\r\n]>\r\n<!-- Wrong keyword in SDDecl -->\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm32n04.xml",
+  138,
+  "<?xml version=\"1.0\" standalone=\"Yes\" ?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal EMPTY>\r\n]>\r\n<!-- Wrong keyword in SDDecl -->\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm32n05.xml",
+  138,
+  "<?xml version=\"1.0\" standalone=\"YES\" ?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal EMPTY>\r\n]>\r\n<!-- Wrong keyword in SDDecl -->\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm32n06.xml",
+  126,
+  "<?xml version=\"1.0\" standalone=\"No\" ?>\r\n<!DOCTYPE animal SYSTEM \"ibm32n06.dtd\">\r\n<!-- Wrong keyword in SDDecl -->\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm32n07.xml",
+  126,
+  "<?xml version=\"1.0\" standalone=\"NO\" ?>\r\n<!DOCTYPE animal SYSTEM \"ibm32n06.dtd\">\r\n<!-- Wrong keyword in SDDecl -->\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm32n08.xml",
+  139,
+  "<?xml version=\"1.0\" standalone\"Yes\"= ?>\r\n<!DOCTYPE animal [\r\n   <!ELEMENT animal EMPTY>\r\n]>\r\n<!-- Wrong ordering in SDDecl -->\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm32n09.xml",
+  423,
+  "<?xml version=\"1.0\" standalone=\"yes\" ?>\r\n<!DOCTYPE animal SYSTEM \"ibm32n09.dtd\" [\r\n   <!ELEMENT animal (#PCDATA)>\r\n]>\r\n<!-- This is test violates WFC: Entity Declared in P68\r\n The standalone document declaration has the value \"yes\", there is an \r\n external markup declaration of an entity (other than amp, lt, gt, apos, quot), and references to this entity appear in the document. \r\n-->\r\n<animal>&animal_content;</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm39n01.xml",
+  97,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n]>\r\n<root>missing end tag\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm39n02.xml",
+  98,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n]>\r\nmissing start tag</root>\r\n",
+  0, NULL
+},
+{
+  "ibm39n03.xml",
+  122,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n]>\r\n<root>\r\n<!--* Missing end tag and no content -->\r\n",
+  0, NULL
+},
+{
+  "ibm39n04.xml",
+  129,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n]>\r\n</root>\r\n<!--* Missing start tag and no content -->\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm39n05.xml",
+  114,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n]>\r\n</root>switched start and end tags<root>\r\n",
+  0, NULL
+},
+{
+  "ibm39n06.xml",
+  108,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n]>\r\n<root></root>content after end tag\r\n",
+  0, NULL
+},
+{
+  "ibm40n01.xml",
+  195,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<attr1=\"any\">missing name in start tag</root>\r\n\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm40n02.xml",
+  200,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<rootattr1=\"any\">missing white space in start tag</root>\r\n",
+  0, NULL
+},
+{
+  "ibm40n03.xml",
+  196,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<attr1=\"any\" root>Wrong ordering in start tag</root>\r\n",
+  0, NULL
+},
+{
+  "ibm40n04.xml",
+  206,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<!root attr1=\"any\">wrong begining sequence in start tag</root>\r\n",
+  0, NULL
+},
+{
+  "ibm40n05.xml",
+  220,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root attr1=\"any1\" attr1=\"any2\">duplicate attr names in start tag</root>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm41n01.xml",
+  189,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root =\"any\">missing name in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n02.xml",
+  191,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root attr1\"any\">missing Eq in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n03.xml",
+  194,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root attr1= >missing AttValue in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n04.xml",
+  195,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root \"any\">missing name and Eq in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n05.xml",
+  199,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root attr1>missing Eq and AttValue in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n06.xml",
+  198,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root = >missing Name and AttValue in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n07.xml",
+  196,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root attr1\"any\"=>wrong ordering in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n08.xml",
+  196,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root \"any\"=attr1>wrong ordering in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n09.xml",
+  196,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root =attr1\"any\">wrong ordering in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n10.xml",
+  270,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n<!ENTITY aExternal SYSTEM \"ibm41n10.ent\">\r\n]>\r\n<root attr1=\"&aExternal;\">direct reference to external entinity in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n11.xml",
+  307,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n<!ENTITY aExternal SYSTEM \"ibm41n11.ent\">\r\n<!ENTITY aIndirect \"&aExternal;\">\r\n]>\r\n<root attr1=\"&aIndirect;\">indirect reference to external entinity in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n12.xml",
+  330,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root attr1=\"&aImage;\">direct reference to external unparsed entinity in Attribute</root>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm41n13.xml",
+  301,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n<!ENTITY withlt \"have <lessthan> inside\">\r\n]>\r\n<root attr1=\"&withlt;\">Direct reference to an entity with &lt; as part of its replacement text in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm41n14.xml",
+  338,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n<!ENTITY withlt \"have <lessthan> inside\">\r\n<!ENTITY aIndirect \"&withlt;\">\r\n]>\r\n<root attr1=\"&aIndirect;\">indirect reference to an entity with &lt; as part of its replacement text in Attribute</root>\r\n",
+  0, NULL
+},
+{
+  "ibm42n01.xml",
+  147,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n]>\r\n<root attr1=\"any\">missing Name in ETag</>\r\n",
+  0, NULL
+},
+{
+  "ibm42n02.xml",
+  163,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n]>\r\n<root attr1=\"any\">Wrong begining sequence in ETag <\\root>\r\n",
+  0, NULL
+},
+{
+  "ibm42n03.xml",
+  162,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n]>\r\n<root attr1=\"any\">Wrong begining sequence in ETag <root>\r\n",
+  0, NULL
+},
+{
+  "ibm42n04.xml",
+  170,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n]>\r\n<root attr1=\"any\">Extra white space before Name in ETag </ root>\r\n",
+  0, NULL
+},
+{
+  "ibm42n05.xml",
+  150,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root ANY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n]>\r\n<root> Attribute in ETag </root attr1=\"any\">\r\n",
+  0, NULL
+},
+{
+  "ibm43n01.xml",
+  204,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY % paaa \"a string\">\r\n]>\r\n<root>\r\n<!NOTATION nota1 SYSTEM \"bogus.not\">\r\n</root>\r\n<!--* NotationDecl in content -->",
+  0, NULL
+},
+{
+  "ibm43n02.xml",
+  188,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY % paaa \"a string\">\r\n]>\r\n<root>\r\n<!ELEMENT ele1 ANY>\r\n</root>\r\n<!--* ElementDecl in content -->\r\n",
+  0, NULL
+},
+{
+  "ibm44n01.xml",
+  202,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n< />\r\n<!--* Missing Name and Attribute EmptyElemTag *-->\r\n",
+  0, NULL
+},
+{
+  "ibm44n02.xml",
+  231,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<attr1=\"any\" root/>\r\n<!--* Swithech positions of Name and Attribute EmptyElemTag *-->\r\n",
+  0, NULL
+},
+{
+  "ibm44n03.xml",
+  224,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root attr1=\"any\"\\>\r\n<!--* Wrong closing sequence in EmptyElemTag *-->\r\n\r\n\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm44n04.xml",
+  232,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root attr1 CDATA #IMPLIED>\r\n<!ATTLIST root attr2 CDATA #IMPLIED>\r\n]>\r\n<root attr1=\"any1\" attr1=\"any2\"/>\r\n<!--* Duplicate Attribute Name in EmptyElemTag *-->\r\n",
+  0, NULL
+},
+{
+  "ibm45n01.xml",
+  163,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Mising Name in elementdecl *-->\r\n<!ELEMENT (#PCDATA)>\r\n]>\r\n<root>Any content</root>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm45n02.xml",
+  170,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Mising white space in elementdecl *-->\r\n<!ELEMENT aEle(#PCDATA)>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm45n03.xml",
+  162,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Mising contentspec in elementdecl *-->\r\n<!ELEMENT root >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm45n04.xml",
+  177,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Mising contentspec and white space in elementdecl *-->\r\n<!ELEMENT root>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm45n05.xml",
+  164,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Mising Name S contentspec in elementdecl *-->\r\n<!ELEMENT >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm45n06.xml",
+  172,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Wrong ordering in elementdecl *-->\r\n<!ELEMENT (#PCDATA) aElement >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm45n07.xml",
+  179,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Wrong begining sequence in elementdecl *-->\r\n<ELEMENT aElement (#PCDATA)>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm45n08.xml",
+  179,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Wrong Keyword: Element in elementdecl *-->\r\n<!Element aElement (#PCDATA)>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm45n09.xml",
+  179,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Wrong keyword: element in elementdecl *-->\r\n<!element aElement (#PCDATA)>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm46n01.xml",
+  175,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Wrong keyword: empty in contentspec *-->\r\n<!ELEMENT aElement empty>\r\n]>\r\n<root>Any content</root>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm46n02.xml",
+  174,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Wrong keyword: Empty in contentspec *-->\r\n<!ELEMENT aElement Empty >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm46n03.xml",
+  169,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Wrong keyword: Any in contentspec *-->\r\n<!ELEMENT aElement Any>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm46n04.xml",
+  170,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Wrong keyword: any in contentspec *-->\r\n<!ELEMENT aElement any >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm46n05.xml",
+  180,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Bogus content type: #CDATA in contentspec *-->\r\n<!ELEMENT aElement #CDATA>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm47n01.xml",
+  165,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Missing choice|seq in children *-->\r\n<!ELEMENT aElement + >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm47n02.xml",
+  165,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Missing choice|seq in children *-->\r\n<!ELEMENT aElement * >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm47n03.xml",
+  165,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* Missing choice|seq in children *-->\r\n<!ELEMENT aElement ? >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm47n04.xml",
+  188,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Wrong ordering in children *-->\r\n<!ELEMENT aElement *(a,a) >\r\n]>\r\n<root>Any content</root>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm47n05.xml",
+  202,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* Wrong ordering in children *-->\r\n<!ELEMENT aElement +(a|a) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm47n06.xml",
+  187,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Wrong keyword: ^  in children *-->\r\n<!ELEMENT aElement (a,a)^ >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm48n01.xml",
+  194,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing seq|choice|Name in cp *-->\r\n<!ELEMENT aElement ((a,a)|+) >\r\n]>\r\n<root>Any content</root>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm48n02.xml",
+  184,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing seq|choice|Name in cp *-->\r\n<!ELEMENT aElement (*) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm48n03.xml",
+  192,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing seq|choice|Name in cp *-->\r\n<!ELEMENT aElement (?|(a,a)|a) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm48n04.xml",
+  182,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* wrong ordering in cp *-->\r\n<!ELEMENT aElement (+(a,a)|a) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm48n05.xml",
+  200,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* wrong ordering in cp *-->\r\n<!ELEMENT aElement (*(a|b),a) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm48n06.xml",
+  181,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* wrong ordering in cp *-->\r\n<!ELEMENT aElement (a, ?a) >\r\n]>\r\n<root>Any content</root>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm48n07.xml",
+  184,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* wrong keyword: ^ in cp *-->\r\n<!ELEMENT aElement ( a^ | a ) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm49n01.xml",
+  176,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* missing cp in choice *-->\r\n<!ELEMENT aElement (|)* >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm49n02.xml",
+  198,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* missing cp in choice *-->\r\n<!ELEMENT aElement (a |b|)* >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm49n03.xml",
+  205,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* wrong separator: !  in choice *-->\r\n<!ELEMENT aElement (a!b)+ >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm49n04.xml",
+  202,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* missing separator in choice *-->\r\n<!ELEMENT aElement (a b) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm49n05.xml",
+  203,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* extra separator in choice *-->\r\n<!ELEMENT aElement (a ||b)* >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm49n06.xml",
+  212,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* missing closing bracket in choice *-->\r\n<!ELEMENT aElement (a |b * >\r\n]>\r\n<root>Any content</root>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm50n01.xml",
+  190,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* missing cp in seq *-->\r\n<!ELEMENT aElement (,) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm50n02.xml",
+  194,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* missing cp in seq *-->\r\n<!ELEMENT aElement (a,a,)+ >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm50n03.xml",
+  200,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* wrong separators in seq *-->\r\n<!ELEMENT aElement (a,a|b) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm50n04.xml",
+  200,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* wrong separator in seq *-->\r\n<!ELEMENT aElement (a . b)* >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm50n05.xml",
+  203,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* extra separator in seq *-->\r\n<!ELEMENT aElement ((a|b),,a)? >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm50n06.xml",
+  207,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* missing separator in seq *-->\r\n<!ELEMENT aElement ((a|b) (b|a)) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm50n07.xml",
+  205,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* wrong closing bracket in seq *-->\r\n<!ELEMENT aElement (a, b]* >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm51n01.xml",
+  213,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* wrong keyword : #pcdata in Mixed  *-->\r\n<!ELEMENT aElement (#pcdata)* >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm51n02.xml",
+  222,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* #PCDATA must be the first in Mixed  *-->\r\n<!ELEMENT aElement ( a | b|#PCDATA)* >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm51n03.xml",
+  205,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* Missing '|' in Mixed  *-->\r\n<!ELEMENT aElement ( #PCDATA a )* >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm51n04.xml",
+  209,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* wrong keyword: #CDATA in Mixed  *-->\r\n<!ELEMENT aElement (#CDATA) >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm51n05.xml",
+  213,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* Missing '* after ')' in Mixed  *-->\r\n<!ELEMENT aElement ( #PCDATA | a ) >\r\n]>\r\n<root>Any content</root>",
+  0, NULL
+},
+{
+  "ibm51n06.xml",
+  217,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* Wrong closing bracket in Mixed  *-->\r\n<!ELEMENT aElement ( #PCDATA | a ]* >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm51n07.xml",
+  213,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!ELEMENT b ANY>\r\n<!--* Missing closing bracket in Mixed  *-->\r\n<!ELEMENT aElement ( #PCDATA *>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm52n01.xml",
+  189,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing Name in AttlistDecl *-->\r\n<!ATTLIST attr1 CDATA #IMPLIED>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm52n02.xml",
+  197,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing white space after 'ATTLIST' *-->\r\n<!ATTLISTa attr1 ID #REQUIRED >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm52n03.xml",
+  223,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Wrong ordering in AttlistDecl *-->\r\n<!ATTLIST attr1 CDATA \"defaultAttValue\" a attr2 CDATA #IMPLIED>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm52n04.xml",
+  203,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Wrong keyword: Attlist in AttlistDecl *-->\r\n<!Attlist a attr1 CDATA #REQUIRED >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm52n05.xml",
+  200,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing closing bracket in AttlistDecl *-->\r\n<!ATTLIST a \r\n<!--* random *-->\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm52n06.xml",
+  202,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Wrong begining sequence in AttlistDecl *-->\r\n<ATTLIST a attr1 CDATA \"default\">\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm53n01.xml",
+  189,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing DefaultDecl in AttDef *-->\r\n<!ATTLIST a attr1 CDATA >\r\n]>\r\n<root>Any content</root>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm53n02.xml",
+  225,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing white space between AttType and DefaultDecl in AttDef *-->\r\n<!ATTLIST a attr1 (abc|def)\"def\">\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm53n03.xml",
+  183,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing AttType in AttDef *-->\r\n<!ATTLIST a attr1 #IMPLIED>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm53n04.xml",
+  219,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing white space between Name and AttType in AttDef *-->\r\n<!ATTLIST a attr1(abc|def) \"abc\" >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm53n05.xml",
+  182,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing Name in AttDef *-->\r\n<!ATTLIST a (abc|def) \"def\" >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm53n06.xml",
+  224,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Missing white space before Name in AttDef *-->\r\n<!ATTLIST a attr1 CDATA \"default\"attr2 ID #required>\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm53n07.xml",
+  189,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* Wrong ordering in AttDef *-->\r\n<!ATTLIST a (abc|def) attr1 \"abc\">\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm53n08.xml",
+  190,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root [\r\n<!ELEMENT root (#PCDATA)>\r\n<!ELEMENT a ANY>\r\n<!--* wrong ordering in AttDef *-->\r\n<!ATTLIST a \"default\" CDATA attr1 >\r\n]>\r\n<root>Any content</root>\r\n",
+  0, NULL
+},
+{
+  "ibm54n01.xml",
+  217,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test for Production 54-->\r\n<!DOCTYPE AttrType\r\n[\r\n<!ELEMENT AttrType ANY>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a att BOGUSATTR #IMPLIED> \r\n]>\r\n<AttrType>\r\nGiving a Bogus attribute. \r\n</AttrType>",
+  0, NULL
+},
+{
+  "ibm54n02.xml",
+  249,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test for Production 54-->\r\n<!DOCTYPE AttrType\r\n[\r\n<!ELEMENT AttrType ANY>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a att PCDATA #IMPLIED> \r\n]>\r\n<AttrType>\r\nGiving a wrong AttType for the attribute. \r\n<a att=\"23\" ></a>\r\n</AttrType>",
+  0, NULL
+},
+{
+  "ibm55n01.xml",
+  248,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test syntax invalid for Production 55-->\r\n<!DOCTYPE AttrType\r\n[\r\n<!ELEMENT AttrType (#PCDATA)>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a att cdata #IMPLIED>  \r\n]>\r\n<AttrType>\r\nGiving a lowercase for CDATA attribute.\r\n</AttrType>",
+  0, NULL
+},
+{
+  "ibm55n02.xml",
+  235,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test invalid syntax for Production 55-->\r\n<!DOCTYPE AttrType\r\n[\r\n<!ELEMENT AttrType (#PCDATA)>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a att #CDATA #IMPLIED> \r\n]>\r\n<AttrType>\r\nGiving a wrong character. \r\n</AttrType>",
+  0, NULL
+},
+{
+  "ibm55n03.xml",
+  251,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test invalid syntax for Production 55-->\r\n<!DOCTYPE AttrType\r\n[\r\n<!ELEMENT AttrType (#PCDATA)>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a att CData #IMPLIED> \r\n]>\r\n<AttrType>\r\n Giving a wrong key word of the StringType.\r\n</AttrType>",
+  0, NULL
+},
+{
+  "ibm56n01.xml",
+  204,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test for Production 56-->\r\n<!DOCTYPE root\r\n[\r\n<!ELEMENT root ANY>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a attr id #REQUIRED>\r\n]>\r\n<root>\r\nInvalid TokenizedType id(lowercase)\r\n</root>",
+  0, NULL
+},
+{
+  "ibm56n02.xml",
+  215,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test for Production 56-->\r\n<!DOCTYPE root\r\n[\r\n<!ELEMENT root ANY>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a attr Idref #REQUIRED>\r\n]>\r\n<root>\r\nInvalid TokenizedType Idref(case sensitive)\r\n</root>",
+  0, NULL
+},
+{
+  "ibm56n03.xml",
+  217,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test for Production 56-->\r\n<!DOCTYPE root\r\n[\r\n<!ELEMENT root ANY>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a attr IdRefs #REQUIRED>\r\n]>\r\n<root>\r\nInvalid TokenizedType IdRefs(case sensitive)\r\n</root>",
+  0, NULL
+},
+{
+  "ibm56n04.xml",
+  217,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test for Production 56-->\r\n<!DOCTYPE root\r\n[\r\n<!ELEMENT root ANY>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a attr EntitY #REQUIRED>\r\n]>\r\n<root>\r\nInvalid TokenizedType EntitY(case sensitive)\r\n</root>",
+  0, NULL
+},
+{
+  "ibm56n05.xml",
+  219,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test for Production 56-->\r\n<!DOCTYPE root\r\n[\r\n<!ELEMENT root ANY>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a attr nmTOKEN #REQUIRED>\r\n]>\r\n<root>\r\nInvalid TokenizedType nmTOKEN(case sensitive)\r\n</root>",
+  0, NULL
+},
+{
+  "ibm56n06.xml",
+  221,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test for Production 56-->\r\n<!DOCTYPE root\r\n[\r\n<!ELEMENT root ANY>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a attr NMtokens #REQUIRED>\r\n]>\r\n<root>\r\nInvalid TokenizedType NMtokens(case sensitive)\r\n</root>",
+  0, NULL
+},
+{
+  "ibm56n07.xml",
+  212,
+  "<?xml  version=\"1.0\"?>\r\n<!-- test for Production 56-->\r\n<!DOCTYPE root\r\n[\r\n<!ELEMENT root ANY>\r\n<!ELEMENT a EMPTY>\r\n<!ATTLIST a attr #ID #REQUIRED>\r\n]>\r\n<root>\r\nInvalid TokenizedType #ID(Wrong Character)\r\n</root>",
+  0, NULL
+},
+{
+  "ibm57n01.xml",
+  224,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 57-->\r\n<!DOCTYPE root\r\n [\r\n <!ELEMENT root EMPTY>\r\n <!ATTLIST root att NMTOKEN (a|b) #IMPLIED>\r\n ]>\r\n <root>\r\nThis test case tests the illegal enumerated types\r\n</root>",
+  0, NULL
+},
+{
+  "ibm58n01.xml",
+  300,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 58-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!NOTATION this SYSTEM \"alpha\">\r\n <!ATTLIST one attr notation (this) #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test with notation (name) \r\nIt is case sensitive.\r\n</test>",
+  0, NULL
+},
+{
+  "ibm58n02.xml",
+  298,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 58-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!NOTATION this SYSTEM \"alpha\">\r\n <!ATTLIST one attr NOTATION this) #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test with  (name) \r\nMissing the open parenthesis\r\n</test>",
+  0, NULL
+},
+{
+  "ibm58n03.xml",
+  298,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 58-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!NOTATION this SYSTEM \"alpha\">\r\n <!ATTLIST one attr NOTATION () #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test with  NOTATION () \r\nMissing the required field\r\n</test>",
+  0, NULL
+},
+{
+  "ibm58n04.xml",
+  306,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 58-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!NOTATION this SYSTEM \"alpha\">\r\n <!ATTLIST one attr NOTATION (this #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test with  NOTATION (Name \r\nMissing the closing brackets\r\n</test>",
+  0, NULL
+},
+{
+  "ibm58n05.xml",
+  294,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 58-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!NOTATION this SYSTEM \"alpha\">\r\n <!ATTLIST one attr (this) NOTATION #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test with (Name) NOTATION  \r\nWrong Ordering\r\n</test>",
+  0, NULL
+},
+{
+  "ibm58n06.xml",
+  392,
+  "<?xml  version=\"1.0\"?>\r\n<!-- Syntax test for Production 58-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ELEMENT two EMPTY>\r\n <!NOTATION this SYSTEM \"alpha\">\r\n <!NOTATION that SYSTEM \"beta\">\r\n <!ATTLIST three attr NOTATION (this,that) #IMPLIED>\r\n ]>\r\n<test>\r\nNegative Test.\r\nThis test tests the presence of a correct seperator. There is a wrong seperator(,)\r\n</test>",
+  0, NULL
+},
+{
+  "ibm58n07.xml",
+  299,
+  "<?xml  version=\"1.0\"?>\r\n<!-- Syntax test for Production 58-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ELEMENT two EMPTY>\r\n <!NOTATION this SYSTEM \"alpha\">\r\n <!ATTLIST three attr NOTATION(this) #IMPLIED>\r\n ]>\r\n<test>\r\nNegative Test.\r\nMissing space after NOTATION\r\n</test>",
+  0, NULL
+},
+{
+  "ibm58n08.xml",
+  309,
+  "<?xml  version=\"1.0\"?>\r\n<!-- Syntax test for Production 58-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ELEMENT two EMPTY>\r\n <!NOTATION this SYSTEM \"alpha\">\r\n <!ATTLIST three attr NOTATION (\"this\") #IMPLIED>\r\n ]>\r\n<test>\r\nNegative Test.\r\nPresence of quotes around the value\r\n</test>",
+  0, NULL
+},
+{
+  "ibm59n01.xml",
+  264,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 59-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ELEMENT enum (#PCDATA)>\r\n <!ATTLIST one attr () #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test\r\nMissing the required field\r\n</test>",
+  0, NULL
+},
+{
+  "ibm59n02.xml",
+  269,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 59-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ELEMENT enum (#PCDATA)>\r\n <!ATTLIST one attr (enum #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test\r\nMissing the closing brackets\r\n</test>",
+  0, NULL
+},
+{
+  "ibm59n03.xml",
+  300,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 59-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ELEMENT two EMPTY>\r\n <!ELEMENT enum (#PCDATA)>\r\n <!ATTLIST one attr (enum,two) #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test\r\nWrong Separator(, instead of |)\r\n</test>",
+  0, NULL
+},
+{
+  "ibm59n04.xml",
+  287,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 59-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ELEMENT enum (#PCDATA)>\r\n <!ATTLIST one attr (\"enum\") #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test\r\nIllegal presence of quotes around the value\r\n</test>",
+  0, NULL
+},
+{
+  "ibm59n05.xml",
+  271,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 59-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ELEMENT enum (#PCDATA)>\r\n <!ATTLIST one attr enum) #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test\r\nMissing the begining bracket  \r\n</test>",
+  0, NULL
+},
+{
+  "ibm59n06.xml",
+  269,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 59-->\r\n<!DOCTYPE test\r\n [\r\n <!ELEMENT test ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ELEMENT enum (#PCDATA)>\r\n <!ATTLIST one attr enum) #IMPLIED>\r\n ]>\r\n <test>\r\nThis is a Negative test\r\nMissing the Opening brackets\r\n</test>",
+  0, NULL
+},
+{
+  "ibm60n01.xml",
+  258,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 60-->\r\n<!DOCTYPE Java \r\n [\r\n <!ELEMENT Java ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ATTLIST one chapter CDATA #required>\r\n ]>\r\n<Java>\r\n<one chapter=\"Introduction\"></one>\r\nNegative Test. Case sensitive.\r\n</Java>",
+  0, NULL
+},
+{
+  "ibm60n02.xml",
+  256,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 60-->\r\n<!DOCTYPE Java \r\n [\r\n <!ELEMENT Java ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ATTLIST one chapter CDATA #Implied>\r\n ]>\r\n<Java>\r\n<one chapter=\"Introduction\"></one>\r\nNegative test. Case Sensitive\r\n</Java>",
+  0, NULL
+},
+{
+  "ibm60n03.xml",
+  258,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 60-->\r\n<!DOCTYPE Java \r\n [\r\n <!ELEMENT Java ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ATTLIST one chapter CDATA !IMPLIED>\r\n ]>\r\n<Java>\r\n<one chapter=\"Introduction\"></one>\r\nNegative Test. Wrong Character.\r\n</Java>",
+  0, NULL
+},
+{
+  "ibm60n04.xml",
+  291,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 60-->\r\n<!DOCTYPE Java \r\n [\r\n <!ELEMENT Java ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ATTLIST one chapter CDATA #FIXED >\r\n ]>\r\n<Java>\r\n<one chapter=\"Introduction\"></one>\r\nNegative test. Missing required field(#FIXED should have a value)\r\n</Java>",
+  0, NULL
+},
+{
+  "ibm60n05.xml",
+  317,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 60-->\r\n<!DOCTYPE Java \r\n [\r\n <!ELEMENT Java ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ATTLIST one chapter CDATA #FIXED\"Introduction\">\r\n ]>\r\n<Java>\r\n<one chapter=\"Introduction\"></one>\r\nNegative test. Missing required field(#FIXED should have a space before value)\r\n</Java>",
+  0, NULL
+},
+{
+  "ibm60n06.xml",
+  269,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 60-->\r\n<!DOCTYPE Java \r\n [\r\n <!ELEMENT Java ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ATTLIST one chapter CDATA \"Introduction\" #FIXED>\r\n ]>\r\n<Java>\r\n<one chapter=\"Introduction\"></one>\r\nNegative test. Wrong Ordering\r\n</Java>",
+  0, NULL
+},
+{
+  "ibm60n07.xml",
+  397,
+  "<?xml  version=\"1.0\"?>\r\n<!-- WFC test for Production 60-->\r\n<!DOCTYPE Java \r\n [\r\n <!ELEMENT Java ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ENTITY avalue \"<Introduction\">\r\n <!ATTLIST one chapter CDATA #REQUIRED>\r\n ]>\r\n<Java>\r\n<one chapter=\"&avalue;\"></one>\r\nNegative test. \r\nThe replacement text of any entity referred to directly or indirectly \r\nin an attribute value contains a less than character\r\n</Java>",
+  0, NULL
+},
+{
+  "ibm60n08.xml",
+  294,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 60-->\r\n<!DOCTYPE Java \r\n [\r\n <!ELEMENT Java ANY>\r\n <!ELEMENT one EMPTY>\r\n <!ATTLIST one chapter CDATA #REQUIRED #IMPLIED>\r\n ]>\r\n<Java>\r\n<one chapter=\"Introduction\"></one>\r\nNegative Test. More than one Default type declarations.\r\n</Java>\r\n",
+  0, NULL
+},
+{
+  "ibm61n01.xml",
+  136,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 61-->\r\n<!DOCTYPE animal SYSTEM \"ibm61n01.dtd\">\r\n<animal>\r\n <tiger/>\r\n</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm62n01.xml",
+  198,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 62-->\r\n<!DOCTYPE animal SYSTEM \"ibm62n01.dtd\">\r\n<animal>\r\n <tiger/>\r\nNegative test. Test includeSect with include(Case sensitive)\r\n</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm62n02.xml",
+  175,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 62-->\r\n<!DOCTYPE animal SYSTEM \"ibm62n02.dtd\">\r\n<animal>\r\n <tiger/>\r\nNegative test.  An extra '[' is used.\r\n</animal>\r\n",
+  0, NULL
+},
+{
+  "ibm62n03.xml",
+  184,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 62-->\r\n<!DOCTYPE animal SYSTEM \"ibm62n03.dtd\">\r\n<animal>\r\n <tiger/>\r\nNegative test.  Wrong character is used is used.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm62n04.xml",
+  187,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 62-->\r\n<!DOCTYPE animal SYSTEM \"ibm62n04.dtd\">\r\n<animal>\r\n <tiger/>\r\nNegative test.  Missing the required field INCLUDE.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm62n05.xml",
+  197,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 62-->\r\n<!DOCTYPE animal SYSTEM \"ibm62n05.dtd\">\r\n<animal>\r\n <tiger/>\r\nNegative test.  Missing the required field '[' after INCLUDE.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm62n06.xml",
+  224,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 62-->\r\n<!DOCTYPE animal SYSTEM \"ibm62n06.dtd\">\r\n<animal>\r\n <tiger/>\r\nNegative test.  Wrong Ordering. External subset declaration prior to the keyword INCLUDE\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm62n07.xml",
+  176,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 62-->\r\n<!DOCTYPE animal SYSTEM \"ibm62n07.dtd\">\r\n<animal>\r\n <tiger/>\r\nNegative test. Missing closing sequence.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm62n08.xml",
+  187,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 62-->\r\n<!DOCTYPE animal SYSTEM \"ibm62n08.dtd\">\r\n<animal>\r\n <tiger/>\r\nNegative test. Missing external subset declaration.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm63n01.xml",
+  299,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 63-->\r\n<!DOCTYPE animal SYSTEM \"ibm63n01.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n<!ELEMENT tiger (#PCDATA)>\r\n<!ATTLIST animal a (tiger) #REQUIRED> \r\n]>\r\n<animal a = \"TIGER1\">\r\nNegative test. Case sensitive(ignore is used instead of IGNORE).\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm63n02.xml",
+  229,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 63-->\r\n<!DOCTYPE animal SYSTEM \"ibm63n02.dtd\"\r\n[\r\n<!ATTLIST attr a (tiger) #REQUIRED> \r\n]>\r\n<animal a = \"TIGER1\">\r\nNegative test. Extra '[' is used before IGNORE.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm63n03.xml",
+  267,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 63-->\r\n<!DOCTYPE animal SYSTEM \"ibm63n03.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n<!ELEMENT tiger (#PCDATA)>\r\n<!ATTLIST animal a (tiger) #REQUIRED> \r\n]>\r\n<animal a = \"TIGER1\">\r\nNegative test.  Wrong character.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm63n04.xml",
+  305,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 63-->\r\n<!DOCTYPE animal SYSTEM \"ibm63n04.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n<!ELEMENT tiger (#PCDATA)>\r\n<!ATTLIST animal a (tiger) #REQUIRED> \r\n]>\r\n<animal a = \"TIGER1\">\r\nNegative test.  Missing required field(The keyword IGNORE is missing).\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm63n05.xml",
+  305,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 63-->\r\n<!DOCTYPE animal SYSTEM \"ibm63n05.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n<!ELEMENT tiger (#PCDATA)>\r\n<!ATTLIST animal a (tiger) #REQUIRED> \r\n]>\r\n<animal a = \"TIGER1\">\r\nNegative test.  Missing required field( '[' is missing after IGNORE ).\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm63n06.xml",
+  252,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 63-->\r\n<!DOCTYPE animal SYSTEM \"ibm63n06.dtd\"\r\n[\r\n<!ATTLIST attr a (tiger) #REQUIRED> \r\n]>\r\n<animal a = \"TIGER1\">\r\nNegative test.  Wrong Ordering. Ignore sect contents preceding IGNORE.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm63n07.xml",
+  276,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 63-->\r\n<!DOCTYPE animal SYSTEM \"ibm63n07.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n<!ELEMENT tiger (#PCDATA)>\r\n<!ATTLIST animal a (tiger) #REQUIRED> \r\n]>\r\n<animal a = \"TIGER1\">\r\nNegative test.  Missing closing sequence.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm64n01.xml",
+  195,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 64-->\r\n<!DOCTYPE animal SYSTEM \"ibm64n01.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n]>\r\n<animal>\r\nNegative Test. Pattern2. Wrong character.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm64n02.xml",
+  204,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 64-->\r\n<!DOCTYPE animal SYSTEM \"ibm64n02.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n]>\r\n<animal>\r\nNegative Test. Pattern3. Missing closing sequence.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm64n03.xml",
+  204,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 64-->\r\n<!DOCTYPE animal SYSTEM \"ibm64n03.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n]>\r\n<animal>\r\nNegative Test. Pattern4. Missing opening sequence.\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm65n01.xml",
+  202,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 65-->\r\n<!DOCTYPE animal SYSTEM \"ibm65n01.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n]>\r\n<animal>\r\nNegative Test. Pattern1.Illegal sequence of ']]'\r\n</animal>",
+  0, NULL
+},
+{
+  "ibm65n02.xml",
+  179,
+  "<?xml  version=\"1.0\"?>\r\n<!-- syntax test for Production 65-->\r\n<!DOCTYPE animal SYSTEM \"ibm65n02.dtd\"\r\n[\r\n<!ELEMENT animal ANY>\r\n]>\r\n<animal>\r\nNegative Test. Pattern2. \r\n</animal>",
+  0, NULL
+},
+{
+  "ibm66n01.xml",
+  143,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"wrong charater reference: &#002f;\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n02.xml",
+  135,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"wrong character reference: &#x003a\"/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n03.xml",
+  140,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"wrong charater reference: &49;\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n04.xml",
+  132,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"wrong charater reference:&#5~0;\"/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n05.xml",
+  144,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"wrong charater reference: &#x002g;\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n06.xml",
+  134,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"wrong charater reference:&#x006G;\"/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n07.xml",
+  144,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"wrong charater reference: &#x0=2f;\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n08.xml",
+  133,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"wrong charater reference:&#56.0;\"/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n09.xml",
+  145,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"wrong charater reference: &#x00/2f;\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n10.xml",
+  133,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"wrong charater reference: &#51);\"/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n11.xml",
+  145,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"wrong charater reference: &#x00 2f;\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm66n12.xml",
+  148,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"wrong replacement charater reference: &#x0000;\" />\r\n",
+  0, NULL
+},
+{
+  "ibm66n13.xml",
+  138,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"wrong replacement charater: &#x001f;\" />\r\n",
+  0, NULL
+},
+{
+  "ibm66n14.xml",
+  139,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"wrong replacement charater : &#xfffe;\" />\r\n",
+  0, NULL
+},
+{
+  "ibm66n15.xml",
+  138,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root EMPTY>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"wrong replacement charater: &#xffff;\" />\r\n",
+  0, NULL
+},
+{
+  "ibm68n01.xml",
+  149,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root>missing entity name &;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm68n02.xml",
+  156,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root att=\"&aaa\">missing semi-colon</root>\r\n",
+  0, NULL
+},
+{
+  "ibm68n03.xml",
+  163,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root>extra space after ampsand & aaa;</root>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm68n04.xml",
+  173,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root att=\"&aAa;\">reference doesn't match delaration</root>\r\n",
+  0, NULL
+},
+{
+  "ibm68n05.xml",
+  126,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root>undefined entitiy &aaa; </root>\r\n",
+  0, NULL
+},
+{
+  "ibm68n06.xml",
+  225,
+  "<?xml version=\"1.0\" standalone=\"yes\"?>\r\n<!DOCTYPE root SYSTEM \"ibm68n06.dtd\"\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n\r\n]>\r\n<root att=\"&aaa;\">entity declared externally but standalone is yes</root>\r\n",
+  0, NULL
+},
+{
+  "ibm68n07.xml",
+  203,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Entity referenced before declared *-->\r\n<!ATTLIST root att1 CDATA \"&aaa;\">\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm68n08.xml",
+  275,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!ENTITY aaa \"aString\">\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root>unparsed entity reference in the wrong place &aImage;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm68n09.xml",
+  194,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* recursive entity reference *-->\r\n<!ENTITY aaa \"&bbb;\">\r\n<!ENTITY bbb \"&aaa;\">\r\n]>\r\n<root>&aaa;</root>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm68n10.xml",
+  274,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* indirect recursive entity reference *-->\r\n<!ENTITY aaa \"&bbb;\">\r\n<!ENTITY bbb \"&ccc;\">\r\n<!ENTITY ccc \"&ddd;\">\r\n<!ENTITY ddd \"&eee;\">\r\n<!ENTITY eee \"&aaa;\">\r\n]>\r\n<root>&aaa;</root>\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm69n01.xml",
+  179,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ENTITY % paaa \"<!ATTLIST root att CDATA #IMPLIED>\">\r\n<!--* incorrect PE reference *-->\r\n%;\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm69n02.xml",
+  200,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ENTITY % paaa \"<!ATTLIST root att CDATA #IMPLIED>\">\r\n<!--* incorrect PE reference without semicolon *-->\r\n%paaa\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm69n03.xml",
+  224,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ENTITY % paaa \"<!ATTLIST root att CDATA #IMPLIED>\">\r\n<!--* incorrect PE reference with a extra white space charater *-->\r\n%paaa ;\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root/>\r\n\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm69n04.xml",
+  214,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ENTITY % paaa \"<!ATTLIST root att CDATA #IMPLIED>\">\r\n<!--* incorrect PE reference with a extra white space char *-->\r\n% paaa;\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm69n05.xml",
+  259,
+  "<?xml version=\"1.0\" standalone=\"yes\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* PE referenced before declared, against WFC: entity declared -->\r\n%paaa;\r\n<!ENTITY % paaa \"<!ATTLIST root att CDATA #IMPLIED>\">\r\n<!ENTITY aaa \"aString\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm69n06.xml",
+  144,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* recursive PE reference -->\r\n<!ENTITY % paaa \"&bbb;\">\r\n<!ENTITY bbb \"%paaa;\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm69n07.xml",
+  224,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!--* indirect recursive PE reference -->\r\n<!ENTITY % paaa \"&bbb;\">\r\n<!ENTITY bbb \"&ccc;\">\r\n<!ENTITY ccc \"&ddd;\">\r\n<!ENTITY ddd \"&eee;\">\r\n<!ENTITY eee \"%paaa;\">\r\n]>\r\n<root/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm71n01.xml",
+  162,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing space  *-->\r\n<!ENTITYaaa \"aString\">\r\n\r\n]>\r\n<root>&aaa;</root>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm71n02.xml",
+  160,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing space  *-->\r\n<!ENTITY aaa\"aString\">\r\n\r\n]>\r\n<root>&aaa;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm71n03.xml",
+  155,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing EntityDef  *-->\r\n<!ENTITY aaa>\r\n\r\n]>\r\n<root>&aaa;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm71n04.xml",
+  156,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing name  *-->\r\n<!ENTITY \"aString\">\r\n\r\n]>\r\n<root>&aaa;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm71n05.xml",
+  160,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* wrong ordering  *-->\r\n<!ENTITY \"aString\" aaa>\r\n]>\r\n<root>&aaa;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm71n06.xml",
+  166,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* ENTITY in lower case  *-->\r\n<!entity aaa \"aString\">\r\n]>\r\n<root>&aaa;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm71n07.xml",
+  170,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing closing bracket  *-->\r\n<!ENTITY aaa \"aString\"\r\n\r\n]>\r\n<root>&aaa;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm71n08.xml",
+  171,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* exclamation mark missing  *-->\r\n<ENTITY aaa \"aString\">\r\n\r\n]>\r\n<root>&aaa;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm72n01.xml",
+  178,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing space  *-->\r\n<!ENTITY% paaa \"<!-- comments -->\">\r\n%paaa;\r\n]>\r\n<root/>\r\n\r\n\r\n\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm72n02.xml",
+  163,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing name  *-->\r\n<!ENTITY % \"<!-- comments -->\">\r\n%paaa;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm72n03.xml",
+  168,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing space  *-->\r\n<!ENTITY % paaa\"<!-- comments -->\">\r\n%paaa;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm72n04.xml",
+  149,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing PEDef  *-->\r\n<!ENTITY % paaa>\r\n%paaa;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm72n05.xml",
+  167,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* wrong order  *-->\r\n<!ENTITY % \"<!-- comments -->\" paaa>\r\n%paaa;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm72n06.xml",
+  168,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* wrong order  *-->\r\n<!ENTITY \"<!-- comments -->\" % paaa >\r\n%paaa;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm72n07.xml",
+  169,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* wrong keyword  *-->\r\n<!entity % paaa \"<!-- comments -->\">\r\n%paaa;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm72n08.xml",
+  178,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing closing bracket  *-->\r\n<!ENTITY % paaa \"<!-- comments -->\"\r\n%paaa;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm72n09.xml",
+  202,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* wrong closing sequence: extra exclamation mark *-->\r\n<!ENTITY% paaa \"<!-- comments -->\" !>\r\n%paaa;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm73n01.xml",
+  239,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!--* wrong order: NDataDecl ExternalID  *-->\r\n<!ENTITY aImage NDATA JPGformat SYSTEM \"image.jpg\" >\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm74n01.xml",
+  240,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!--* wrong PEDef: NDataDecl ExternalID  *-->\r\n<!ENTITY % pImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n01.xml",
+  168,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* wrong keyword: system  *-->\r\n<!ENTITY pImage system \"image.jpg\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n02.xml",
+  196,
+  "<?xml version=\"1.0\"?>\r\n<!--* wrong keyword: public  *-->\r\n<!DOCTYPE root \r\n    public \"-//W3C//DTD//EN\" \"empty.dtd\"\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n03.xml",
+  196,
+  "<?xml version=\"1.0\"?>\r\n<!--* wrong keyword: Public  *-->\r\n<!DOCTYPE root \r\n    Public \"-//W3C//DTD//EN\" \"empty.dtd\"\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n04.xml",
+  185,
+  "<?xml version=\"1.0\"?>\r\n<!--* wrong order *-->\r\n<!DOCTYPE root \r\n    \"-//W3C//DTD//EN\" \"empty.dtd\" PUBLIC\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n05.xml",
+  158,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing space *-->\r\n<!ENTITY pImage SYSTEM\"image.jpg\">\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n06.xml",
+  157,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* missing SystemLiterral *-->\r\n<!ENTITY pImage SYSTEM >\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n07.xml",
+  187,
+  "<?xml version=\"1.0\"?>\r\n<!--* missing space  *-->\r\n<!DOCTYPE root \r\n    PUBLIC \"-//W3C//DTD//EN\"\"empty.dtd\"\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n08.xml",
+  191,
+  "<?xml version=\"1.0\"?>\r\n<!--* missing keyword: PUBLIC  *-->\r\n<!DOCTYPE root \r\n    \"-//W3C//DTD//EN\" \"empty.dtd\"\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n09.xml",
+  187,
+  "<?xml version=\"1.0\"?>\r\n<!--* missing space  *-->\r\n<!DOCTYPE root \r\n    PUBLIC\"-//W3C//DTD//EN\" \"empty.dtd\"\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n10.xml",
+  179,
+  "<?xml version=\"1.0\"?>\r\n<!--* missing PubidLiteral  *-->\r\n<!DOCTYPE root \r\n    PUBLIC \".\\empty.dtd\"\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n11.xml",
+  184,
+  "<?xml version=\"1.0\"?>\r\n<!--* missing System Literal *-->\r\n<!DOCTYPE root \r\n    public \"-//W3C//DTD//EN\"\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n12.xml",
+  157,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* wrong order *-->\r\n<!ENTITY pImage \"image.jpg\" SYSTEM>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm75n13.xml",
+  185,
+  "<?xml version=\"1.0\"?>\r\n<!--* wrong order *-->\r\n<!DOCTYPE root \r\n    \"-//W3C//DTD//EN\" PUBLIC \"empty.dtd\"\r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm76n01.xml",
+  260,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!--* wrong keyword in NdataDecl: ndata *-->\r\n<!ENTITY aImage SYSTEM \"image.jpg\" ndata JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm76n02.xml",
+  260,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!--* wrong keyword in NdataDecl: NData *-->\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NData JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm76n03.xml",
+  252,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!--* missing space in NdataDecl *-->\r\n<!ENTITY aImage SYSTEM \"image.jpg\"NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm76n04.xml",
+  257,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!--* missing keyword in NdataDecl : NDATA *-->\r\n<!ENTITY aImage SYSTEM \"image.jpg\" JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm76n05.xml",
+  248,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!--* Missing Name field in NdataDecl *-->\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm76n06.xml",
+  252,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!--* missing space in NdataDecl *-->\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATAJPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm76n07.xml",
+  251,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\">\r\n<!--* wrong order in NdataDecl *-->\r\n<!ENTITY aImage SYSTEM \"image.jpg\" JPGformat NDATA>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm77n01.xml",
+  194,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* error in external entity  *-->\r\n<!ENTITY aExternal SYSTEM \"ibm77n01.ent\">\r\n]>\r\n<root>&aExternal;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm77n02.xml",
+  194,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* error in external entity  *-->\r\n<!ENTITY aExternal SYSTEM \"ibm77n02.ent\">\r\n]>\r\n<root>&aExternal;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm77n03.xml",
+  192,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* error in external entity  *-->\r\n<!ENTITY % pExternal SYSTEM \"ibm77n03.ent\">\r\n%pExternal;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm77n04.xml",
+  192,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* error in external entity  *-->\r\n<!ENTITY % pExternal SYSTEM \"ibm77n04.ent\">\r\n%pExternal;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm78n01.xml",
+  200,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* error in external entity  *-->\r\n<!ENTITY aExternal SYSTEM \"ibm78n01.ent\">\r\n]>\r\n<root>&aExternal;</root>\r\n\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm78n02.xml",
+  194,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* error in external entity  *-->\r\n<!ENTITY aExternal SYSTEM \"ibm78n02.ent\">\r\n]>\r\n<root>&aExternal;</root>\r\n",
+  0, NULL
+},
+{
+  "ibm79n01.xml",
+  192,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* error in external entity  *-->\r\n<!ENTITY % pExternal SYSTEM \"ibm79n01.ent\">\r\n%pExternal;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm79n02.xml",
+  192,
+  "<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* error in external entity  *-->\r\n<!ENTITY % pExternal SYSTEM \"ibm79n02.ent\">\r\n%pExternal;\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm80n01.xml",
+  189,
+  "<?xml version=\"1.0\"encoding=\"UTF-8\"?>\r\n<!--* missing white space in above EncodingDecl *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm80n02.xml",
+  181,
+  "<?xml version=\"1.0\" encoding \"UTF-8\"?>\r\n<!--* missing Eq in above EncodingDecl *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm80n03.xml",
+  180,
+  "<?xml version=\"1.0\" encoding= ?>\r\n<!--* missing EncName in above EncodingDecl *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm80n04.xml",
+  185,
+  "<?xml version=\"1.0\" \"UTF-8\"encoding=?>\r\n<!--* wrong ordering in above EncodingDecl *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm80n05.xml",
+  185,
+  "<?xml version=\"1.0\" \"UTF-8\"=encoding?>\r\n<!--* wrong ordering in above EncodingDecl *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm80n06.xml",
+  193,
+  "<?xml version=\"1.0\" Encoding=\"UTF-8\"?>\r\n<!--* Wrong keyword Encoding in above EncodingDecl *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm81n01.xml",
+  192,
+  "<?xml version=\"1.0\" encoding=\"_UTF-8\"?>\r\n<!--* Illegal inital Charater in above EncName *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm81n02.xml",
+  190,
+  "<?xml version=\"1.0\" encoding=\"-UTF-8\"?>\r\n<!--* Illegal inital Charater in above EncName *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm81n03.xml",
+  190,
+  "<?xml version=\"1.0\" encoding=\".UTF-8\"?>\r\n<!--* Illegal inital Charater in above EncName *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm81n04.xml",
+  190,
+  "<?xml version=\"1.0\" encoding=\"8-UTF\"?>\r\n<!--* Illegal initial Charater in above EncName *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm81n05.xml",
+  182,
+  "<?xml version=\"1.0\" encoding=\"UTF~8\"?>\r\n<!--* Illegal Charater in above EncName *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm81n06.xml",
+  182,
+  "<?xml version=\"1.0\" encoding=\"UTF#8\"?>\r\n<!--* Illegal Charater in above EncName *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm81n07.xml",
+  181,
+  "<?xml version=\"1.0\" encoding=\"UTF:8\"?>\r\n<!--* IllegalCharater in above EncName *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm81n08.xml",
+  182,
+  "<?xml version=\"1.0\" encoding=\"UTF/8\"?>\r\n<!--* Illegal Charater in above EncName *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm81n09.xml",
+  182,
+  "<?xml version=\"1.0\" encoding=\"UTF;8\"?>\r\n<!--* Illegal Charater in above EncName *-->\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm82n01.xml",
+  260,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Missing whitespace in NotationDecl *-->\r\n<!NOTATIONJPGformat SYSTEM \"JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm82n02.xml",
+  258,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Missing Name in NotationDecl *-->\r\n<!NOTATION PUBLIC \"-//JPG//DTD//JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm82n03.xml",
+  255,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Missing ExternalID or PublicID in NotationDecl *-->\r\n<!NOTATION JPGformat >\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm82n04.xml",
+  258,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Wrong ordering in NotationDecl *-->\r\n<!NOTATION SYSTEM \"JPGFormat\" JPGformat >\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm82n05.xml",
+  266,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Wrong keyword: notation in NotationDecl *-->\r\n<!notation JPGformat SYSTEM \"JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm82n06.xml",
+  278,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Missing closing bracket in NotationDecl *-->\r\n<!NOTATION JPGformat PUBLIC \"-//JPG//DTD//JPGFormat\"\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm82n07.xml",
+  295,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Wrong beginning sequence in NotationDecl *-->\r\n<NOTATION JPGformat PUBLIC \"-//JPG//DTD//JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm82n08.xml",
+  266,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Wrong Closing sequence in NotationDecl *-->\r\n<!NOTATION JPGformat SYSTEM \"JPGFormat\"!>\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm83n01.xml",
+  267,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Wrong keyword in PublicID *-->\r\n<!NOTATION JPGformat public \"-//JPG//DTD//JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n\r\n",
+  0, NULL
+},
+{
+  "ibm83n02.xml",
+  275,
+  "r<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Wrong keyword : Public in PublicID *-->\r\n<!NOTATION JPGformat Public \"-//JPG//DTD//JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm83n03.xml",
+  260,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Missing keyword in PublicID *-->\r\n<!NOTATION JPGformat \"-//JPG//DTD//JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm83n04.xml",
+  270,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Missing White space in PublicID *-->\r\n<!NOTATION JPGformat PUBLIC\"-//JPG//DTD//JPGFormat\">\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm83n05.xml",
+  248,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Missing PubidLiteral in PublicID *-->\r\n<!NOTATION JPGformat PUBLIC >\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm83n06.xml",
+  266,
+  "<?xml version=\"1.0\"?>\r\n<!DOCTYPE root \r\n[\r\n<!ELEMENT root (#PCDATA)>\r\n<!ATTLIST root att CDATA #IMPLIED>\r\n<!--* Wrong ordering in PublicID *-->\r\n<!NOTATION JPGformat \"-//JPG//DTD//JPGFormat\" PUBLIC>\r\n<!ENTITY aImage SYSTEM \"image.jpg\" NDATA JPGformat>\r\n]>\r\n<root/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n01.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\303\227 an illegal char #x0d7\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n02.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\303\267 an illegal char #x0f7\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n03.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\304\262 an illegal char #x132\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n04.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\304\263 an illegal char #x133\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n05.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\304\277 an illegal char #x13f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n06.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\305\200 an illegal char #x140\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n07.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\305\211 an illegal char #x149\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n08.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\305\277 an illegal char #x17f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n09.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\307\204 an illegal char #x1c4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n10.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\307\214 an illegal char #x1cc\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n11.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\307\261 an illegal char #x1f1\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n12.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\307\263 an illegal char #x1f3\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n13.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\307\266 an illegal char #x1f6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n14.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\307\271 an illegal char #x1f9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n15.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\307\271 an illegal char #x1f9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n16.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\310\260 an illegal char #x230\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n17.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\312\257 an illegal char #x2af\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n18.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\313\217 an illegal char #x2cf\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n19.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\316\207 an illegal char #x387\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n20.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\316\213 an illegal char #x38b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n21.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\316\242 an illegal char #x3a2\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n22.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\317\217 an illegal char #x3cf\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n23.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\317\227 an illegal char #x3d7\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n24.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\317\235 an illegal char #x3dd\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n25.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\317\241 an illegal char #x3e1\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n26.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\317\264 an illegal char #x3f4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n27.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\320\215 an illegal char #x40d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n28.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\321\220 an illegal char #x450\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n29.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\321\235 an illegal char #x45d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n30.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\322\202 an illegal char #x482\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n31.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\323\205 an illegal char #x4c5\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n32.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\323\206 an illegal char #x4c6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n33.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\323\211 an illegal char #x4c9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n34.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\323\254 an illegal char #x4ec\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n35.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\323\255 an illegal char #x4ed\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n36.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\323\266 an illegal char #x4f6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n37.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\323\272 an illegal char #x4fa\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n38.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\325\227 an illegal char #x557\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n39.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\325\230 an illegal char #x558\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n40.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\326\207 an illegal char #x587\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n41.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\327\253 an illegal char #x5eb\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n42.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\327\263 an illegal char #x5f3\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n43.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\330\240 an illegal char #x620\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n44.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\330\273 an illegal char #x63b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n45.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\331\213 an illegal char #x64b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n46.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\332\270 an illegal char #x6b8\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n47.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\332\277 an illegal char #x6bf\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n48.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\333\217 an illegal char #x6cf\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n49.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\333\224 an illegal char #x6d4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n50.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\333\226 an illegal char #x6d6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n51.xml",
+  103,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\333\247 an illegal char #x6e7\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n52.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\244\272 an illegal char #x093a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n53.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\244\276 an illegal char #x093e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n54.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\245\242 an illegal char #x0962\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n55.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\246\215 an illegal char #x098d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n56.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\246\221 an illegal char #x0991\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n57.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\246\222 an illegal char #x0992\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n58.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\246\251 an illegal char #x09a9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n59.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\246\261 an illegal char #x09b1\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n60.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\246\265 an illegal char #x09b5\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n61.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\246\272 an illegal char #x09ba\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n62.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\247\236 an illegal char #x09de\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n63.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\247\242 an illegal char #x09e2\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n64.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\247\262 an illegal char #x09f2\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n65.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\250\213 an illegal char #x0a0b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n66.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\250\221 an illegal char #x0a11\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n67.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\250\251 an illegal char #x0a29\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n68.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\250\261 an illegal char #x0a31\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n69.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\250\264 an illegal char #x0a34\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n70.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\250\267 an illegal char #x0a37\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n71.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\250\272 an illegal char #x0a3a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n72.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\251\235 an illegal char #x0a5d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n73.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\251\260 an illegal char #x0a70\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n74.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\251\265 an illegal char #x0a75\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n75.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\252\204 an illegal char #x0a84\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n76.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\252\274 an illegal char #x0abc\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n77.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\252\222 an illegal char #x0a92\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n78.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\252\251 an illegal char #x0aa9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n79.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\252\261 an illegal char #x0ab1\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n80.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\252\264 an illegal char #x0ab4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n81.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\252\272 an illegal char #x0aba\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n82.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\254\204 an illegal char #x0b04\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n83.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\254\215 an illegal char #x0b0d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n84.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\254\221 an illegal char #x0b11\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n85.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\254\251 an illegal char #x0b29\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n86.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\254\261 an illegal char #x0b31\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n87.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\254\264 an illegal char #x0b34\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n88.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\254\272 an illegal char #x0b3a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n89.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\254\276 an illegal char #x0b3e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n90.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\255\236 an illegal char #x0b5e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n91.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\255\242 an illegal char #x0b62\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n92.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\213 an illegal char #x0b8b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n93.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\221 an illegal char #x0b91\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n94.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\230 an illegal char #x0b98\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n95.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\233 an illegal char #x0b9b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n96.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\235 an illegal char #x0b9d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n97.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\240 an illegal char #x0ba0\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n98.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\247 an illegal char #x0ba7\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n99.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\253 an illegal char #x0bab\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n100.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\266 an illegal char #x0bb6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n101.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\256\272 an illegal char #x0bba\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n102.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\260\215 an illegal char #x0c0d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n103.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\260\221 an illegal char #x0c11\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n104.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\260\251 an illegal char #x0c29\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n105.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\260\264 an illegal char #x0c34\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n106.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\261\237 an illegal char #x0c5f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n107.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\261\242 an illegal char #x0c62\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n108.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\262\215 an illegal char #x0c8d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n109.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\262\221 an illegal char #x0c91\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n110.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\262\251 an illegal char #x0ca9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n111.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\262\264 an illegal char #x0cb4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n112.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\262\272 an illegal char #x0cba\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n113.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\263\237 an illegal char #x0cdf\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n114.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\263\242 an illegal char #x0ce2\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n115.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\264\215 an illegal char #x0d0d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n116.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\264\221 an illegal char #x0d11\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n117.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\264\251 an illegal char #x0d29\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n118.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\264\272 an illegal char #x0d3a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n119.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\265\242 an illegal char #x0d62\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n120.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\270\257 an illegal char #x0e2f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n121.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\270\261 an illegal char #x0e31\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n122.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\270\264 an illegal char #x0e34\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n123.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\271\206 an illegal char #x0e46\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n124.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\203 an illegal char #x0e83\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n125.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\205 an illegal char #x0e85\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n126.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\211 an illegal char #x0e89\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n127.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\213 an illegal char #x0e8b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n128.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\216 an illegal char #x0e8e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n129.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\230 an illegal char #x0e98\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n130.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\240 an illegal char #x0ea0\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n131.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\244 an illegal char #x0ea4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n132.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\246 an illegal char #x0ea6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n133.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\250 an illegal char #x0ea8\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n134.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\254 an illegal char #x0eac\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n135.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\257 an illegal char #x0eaf\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n136.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\261 an illegal char #x0eb1\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n137.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\264 an illegal char #x0eb4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n138.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\272\276 an illegal char #x0ebe\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n139.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\273\205 an illegal char #x0ec5\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n140.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\275\210 an illegal char #x0f48\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n141.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\340\275\252 an illegal char #x0f6a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n142.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\203\206 an illegal char #x10c6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n143.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\203\267 an illegal char #x10f7\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n144.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\204\201 an illegal char #x1101\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n145.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\204\204 an illegal char #x1104\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n146.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\204\210 an illegal char #x1108\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n147.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\204\212 an illegal char #x110a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n148.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\204\215 an illegal char #x110d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n149.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\204\273 an illegal char #x113b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n150.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\204\277 an illegal char #x113f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n151.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\201 an illegal char #x1141\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n152.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\215 an illegal char #x114d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n153.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\217 an illegal char #x114f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n154.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\221 an illegal char #x1151\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n155.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\226 an illegal char #x1156\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n156.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\232 an illegal char #x115a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n157.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\242 an illegal char #x1162\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n158.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\244 an illegal char #x1164\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n159.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\246 an illegal char #x1166\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n160.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\253 an illegal char #x116b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n161.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\257 an illegal char #x116f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n162.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\205\264 an illegal char #x1174\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n163.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\206\237 an illegal char #x119f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n164.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\206\254 an illegal char #x11ac\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n165.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\206\266 an illegal char #x11b6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n166.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\206\271 an illegal char #x11b9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n167.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\206\273 an illegal char #x11bb\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n168.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\207\203 an illegal char #x11c3\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n169.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\207\261 an illegal char #x11f1\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n170.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\207\272 an illegal char #x11fa\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n171.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\272\234 an illegal char #x1e9c\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n172.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\273\272 an illegal char #x1efa\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n173.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\274\226 an illegal char #x1f16\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n174.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\274\236 an illegal char #x1f1e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n175.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\275\206 an illegal char #x1f46\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n176.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\275\217 an illegal char #x1f4f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n177.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\275\230 an illegal char #x1f58\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n178.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\275\232 an illegal char #x1f5a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n179.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\275\234 an illegal char #x1f5c\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n180.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\275\236 an illegal char #x1f5e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n181.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\275\276 an illegal char #x1f7e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n182.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\276\265 an illegal char #x1fb5\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n183.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\276\275 an illegal char #x1fbd\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n184.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\276\277 an illegal char #x1fbf\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n185.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\277\205 an illegal char #x1fc5\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n186.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\277\215 an illegal char #x1fcd\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n187.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\277\225 an illegal char #x1fd5\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n188.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\277\234 an illegal char #x1fdc\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n189.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\277\255 an illegal char #x1fed\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n190.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\277\265 an illegal char #x1ff5\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n191.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\341\277\275 an illegal char #x1ffd\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n192.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\342\204\247 an illegal char #x2127\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n193.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\342\204\257 an illegal char #x212f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n194.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\342\206\203 an illegal char #x2183\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n195.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\343\202\225 an illegal char #x3095\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n196.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\343\203\273 an illegal char #x30fb\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n197.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\343\204\255 an illegal char #x312d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm85n198.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\355\236\244 an illegal char #xd7a4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm86n01.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\344\263\277 an illegal char #x4cff\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm86n02.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\351\276\246 an illegal char #x9fa6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm86n03.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\343\200\210 an illegal char #x3008\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm86n04.xml",
+  105,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?\343\200\252 an illegal char #x302a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n01.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\313\277 an illegal char #x2ff\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n02.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\315\206 an illegal char #x346\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n03.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\315\242 an illegal char #x362\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n04.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\322\207 an illegal char #x487\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n05.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\326\242 an illegal char #x5a2\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n06.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\326\272 an illegal char #x5ba\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n07.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\326\276 an illegal char #x5be\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n08.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\327\200 an illegal char #x5c0\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n09.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\327\203 an illegal char #x5c3\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n10.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\331\223 an illegal char #x653\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n11.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\332\270 an illegal char #x6b8\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n12.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\332\271 an illegal char #x6b9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n13.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\333\251 an illegal char #x6e9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n14.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\333\256 an illegal char #x6ee\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n15.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\244\204 an illegal char #x0904\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n16.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\244\273 an illegal char #x093b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n17.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\245\216 an illegal char #x094e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n18.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\245\225 an illegal char #x0955\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n19.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\245\244 an illegal char #x0964\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n20.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\246\204 an illegal char #x0984\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n21.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\247\205 an illegal char #x09c5\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n22.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\247\211 an illegal char #x09c9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n23.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\247\216 an illegal char #x09ce\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n24.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\247\230 an illegal char #x09d8\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n25.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\247\244 an illegal char #x09e4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n26.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\250\203 an illegal char #x0a03\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n27.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\250\275 an illegal char #x0a3d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n28.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\251\206 an illegal char #x0a46\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n29.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\251\211 an illegal char #x0a49\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n30.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\251\216 an illegal char #x0a4e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n31.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\252\200 an illegal char #x0a80\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n32.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\252\204 an illegal char #x0a84\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n33.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\252\273 an illegal char #x0abb\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n34.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\253\206 an illegal char #x0ac6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n35.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\253\212 an illegal char #x0aca\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n36.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\253\216 an illegal char #x0ace\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n37.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\254\204 an illegal char #x0b04\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n38.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\254\273 an illegal char #x0b3b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n39.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\255\204 an illegal char #x0b44\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n40.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\255\212 an illegal char #x0b4a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n41.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\255\216 an illegal char #x0b4e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n42.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\255\230 an illegal char #x0b58\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n43.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\256\204 an illegal char #x0b84\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n44.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\257\203 an illegal char #x0bc3\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n45.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\257\211 an illegal char #x0bc9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n46.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\257\226 an illegal char #x0bd6\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n47.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\260\215 an illegal char #x0c0d\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n48.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\261\205 an illegal char #x0c45\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n49.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\261\211 an illegal char #x0c49\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n50.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\261\224 an illegal char #x0c54\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n51.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\262\201 an illegal char #x0c81\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n52.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\262\204 an illegal char #x0c84\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n53.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\263\205 an illegal char #x0cc5\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n54.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\263\211 an illegal char #x0cc9\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n55.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\263\224 an illegal char #x0cd4\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n56.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\263\227 an illegal char #x0cd7\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n57.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\264\204 an illegal char #x0d04\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n58.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\265\205 an illegal char #x0d45\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n59.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\265\211 an illegal char #x0d49\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n60.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\265\216 an illegal char #x0d4e\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n61.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\265\230 an illegal char #x0d58\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n62.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\270\277 an illegal char #x0e3f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n63.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\270\273 an illegal char #x0e3b\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm87n64.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\271\217 an illegal char #x0e4f\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm88n01.xml",
+  100,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_) an illegal char #x29 in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm88n02.xml",
+  100,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_; an illegal char #x3b in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm88n03.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\331\252 an illegal char #x66a\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm88n04.xml",
+  104,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\333\272 an illegal char #x6fa\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm88n05.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\245\260 an illegal char #x0970\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm88n06.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\247\262 an illegal char #x09f2\r\n in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm89n01.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\302\266 an illegal extender #x0b6 in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm89n02.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\302\270 an illegal extender #x0b8 in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm89n03.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\313\222 an illegal extender #x2d2 in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm89n04.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\317\276 an illegal extender #x3fe in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm89n05.xml",
+  106,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\331\237 an illegal extender #x65f in PITarget ?>\r\n]>\r\n<animal/>\r\n",
+  0, NULL
+},
+{
+  "ibm89n06.xml",
+  131,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\340\273\207 an illegal extender #x0ec7 in PITarget ?>\r\n]>\r\n<animal/>\r\n<IllegalExtender\340\273\207\57\r\n",
+  0, NULL
+},
+{
+  "ibm89n07.xml",
+  131,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\343\200\206 an illegal extender #x3006 in PITarget ?>\r\n]>\r\n<animal/>\r\n<IllegalExtender\343\200\206\57\r\n",
+  0, NULL
+},
+{
+  "ibm89n08.xml",
+  131,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\343\200\260 an illegal extender #x3030 in PITarget ?>\r\n]>\r\n<animal/>\r\n<IllegalExtender\343\200\260\57\r\n",
+  0, NULL
+},
+{
+  "ibm89n09.xml",
+  131,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\343\200\266 an illegal extender #x3036 in PITarget ?>\r\n]>\r\n<animal/>\r\n<IllegalExtender\343\200\266\57\r\n",
+  0, NULL
+},
+{
+  "ibm89n10.xml",
+  131,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\343\202\234 an illegal extender #x309c in PITarget ?>\r\n]>\r\n<animal/>\r\n<IllegalExtender\343\202\234\57\r\n",
+  0, NULL
+},
+{
+  "ibm89n11.xml",
+  131,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\343\202\237 an illegal extender #x309f in PITarget ?>\r\n]>\r\n<animal/>\r\n<IllegalExtender\343\202\237\57\r\n",
+  0, NULL
+},
+{
+  "ibm89n12.xml",
+  131,
+  "<!DOCTYPE animal [\r\n<!ELEMENT animal ANY>\r\n<?_\343\203\277 an illegal extender #x30ff in PITarget ?>\r\n]>\r\n<animal/>\r\n<IllegalExtender\343\203\277\57\r\n",
+  0, NULL
+},

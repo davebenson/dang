@@ -920,8 +920,8 @@ int main(int argc, char **argv)
 {
   unsigned i;
 
-  dsk_cmdline_init ("test HTTP server stream",
-                    "Test the low-level HTTP server interface",
+  dsk_cmdline_init ("test HTTP client stream",
+                    "Test the low-level HTTP client interface",
                     NULL, 0);
   dsk_cmdline_add_boolean ("verbose", "extra logging", NULL, 0,
                            &cmdline_verbose);
