@@ -3,6 +3,8 @@
 #include "../dsk.h"
 
 static dsk_boolean print_errors = DSK_FALSE;
+static dsk_boolean verbose = DSK_FALSE;
+
 
 static dsk_boolean
 xml_equal (DskXml *a, DskXml *b)
@@ -50,12 +52,18 @@ int main(int argc, char **argv)
   DskXmlParser *parser;
   unsigned i;
   char *star = "*";
+  unsigned n_correct_valid = 0;
+  unsigned n_correct_invalid = 0;
+  unsigned n_failed_valid = 0;
+  unsigned n_failed_invalid = 0;
 
   dsk_cmdline_init ("standard xml conformance test",
                     "Run some standard conformance test on our XML parser",
                     NULL, 0);
   dsk_cmdline_add_boolean ("print-error", "print error messages for bad-response tests", NULL, 0,
                            &print_errors);
+  dsk_cmdline_add_boolean ("verbose", "print all test statuses", NULL, 0,
+                           &verbose);
   dsk_cmdline_process_args (&argc, &argv);
 
 
@@ -67,7 +75,8 @@ int main(int argc, char **argv)
     {
       DskXml *xml = NULL, *oxml = NULL;
       DskError *error = NULL, *oerror = NULL;
-      fprintf (stderr, "%s... ", tests[i].name);
+      if (verbose)
+        fprintf (stderr, "%s... ", tests[i].name);
       parser = dsk_xml_parser_new (config, tests[i].name);
       if (dsk_xml_parser_feed (parser, tests[i].in_length, tests[i].in, &error))
         xml = dsk_xml_parser_pop (parser, NULL);
@@ -92,30 +101,54 @@ int main(int argc, char **argv)
       if (xml == NULL && tests[i].out != NULL)
         {
           if (oxml == NULL)
-            fprintf (stderr, "FAILED [unable to parse original xml or simplified xml]\n");
+            {
+              if (verbose)
+                fprintf (stderr, "FAILED  [unable to parse any xml]\n");
+            }
           else
-            fprintf (stderr, "FAILED [unable to parse original xml but parsed simplied xml]\n");
+            {
+              if (verbose)
+                fprintf (stderr, "FAILED  [unable to parse original xml]\n");
+            }
+          n_failed_valid++;
         }
       else if (xml != NULL && oxml != NULL)
         {
           /* equal? */
           if (xml_equal (xml, oxml))
-            fprintf (stderr, "PASS\n");
+            {
+              if (verbose) fprintf (stderr, "PASS\n");
+              n_correct_valid++;
+            }
           else
-            fprintf (stderr, "FAILED [xml mismatch]\n");
+            {
+              if (verbose) fprintf (stderr, "FAILED  [xml mismatch]\n");
+              n_failed_valid++;
+            }
         }
       else if (xml != NULL && tests[i].out == NULL)
         {
-          fprintf (stderr, "TOO LAX [accepted invalid xml]\n");
+          if (verbose) fprintf (stderr, "TOO LAX [accepted invalid xml]\n");
+          n_failed_invalid++;
         }
       else if (xml == NULL && tests[i].out == NULL)
         {
-          fprintf (stderr, "PASS [rejected invalid xml]\n");
+          if (verbose) fprintf (stderr, "PASS    [rejected invalid xml]\n");
+          n_correct_invalid++;
         }
       else if (xml != NULL && tests[i].out != NULL && oxml == NULL)
         {
-          fprintf (stderr, "FAILED [parsing simplified xml]\n");
+          if (verbose) fprintf (stderr, "FAILED  [parsing simplified xml]\n");
+          n_failed_valid++;
         }
     }
+
+  fprintf (stderr, "Correctly handled valid documents: %u\n"
+                   "Rejected invalid documents: %u\n\n"
+                   "Incorrectly handled valid documents: %u\n"
+                   "Invalid documents accepted: %u\n",
+                   n_correct_valid, n_correct_invalid,
+                   n_failed_valid, n_failed_invalid);
+
   return 0;
 }
