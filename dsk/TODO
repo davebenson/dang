@@ -53,7 +53,7 @@ _ high trap counts?
 TODO:
 filters:
   _ dsk_hex_encoder_new             
-  _ dsk_hex_decoder_new             
+  x dsk_hex_decoder_new             
   _ dsk_url_encoder_new             
   _ dsk_url_decoder_new
   _ dsk_quote_printable_new         

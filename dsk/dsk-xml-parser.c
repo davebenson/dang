@@ -1615,6 +1615,7 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
               return DSK_FALSE;
             CONSUME_CHAR_AND_SWITCH_STATE (LEX_DEFAULT);
           case '/':
+            APPEND_BYTE (0);
             CONSUME_CHAR_AND_SWITCH_STATE (LEX_OPEN_CLOSE);
           case '=':
             goto disallowed_char;
