@@ -27,6 +27,13 @@ dsk_xml_parser_config_new (DskXmlParserFlags flags,
 			   unsigned          n_xmlpaths,
 			   char            **xmlpaths,
                            DskError        **error);
+
+/* IGNORE_NS will be supplied automatically to parsers 
+   created in this way. */
+DskXmlParserConfig *
+dsk_xml_parser_config_new_simple (DskXmlParserFlags flags,
+                                  const char       *path);
+
 void
 dsk_xml_parser_config_destroy (DskXmlParserConfig *config);
 
@@ -34,7 +41,7 @@ dsk_xml_parser_config_destroy (DskXmlParserConfig *config);
 DskXmlParser *dsk_xml_parser_new (DskXmlParserConfig *config,
                                   const char         *display_filename);
 DskXml       *dsk_xml_parser_pop (DskXmlParser       *parser,
-                                  unsigned           *xpath_index_out);
+                                  unsigned           *xmlpath_index_out);
 dsk_boolean   dsk_xml_parser_feed(DskXmlParser       *parser,
                                   unsigned            len,
                                   const char         *data,
