@@ -7,7 +7,8 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 	        tests/test-http-client-stream-0 \
 		tests/test-http-server-stream-0 \
 		tests/test-http-loopback \
-		tests/test-xml-parser-0
+		tests/test-xml-parser-0 \
+		tests/test-xml-validation-suite
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
            programs/dsk-octet-filter
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
@@ -37,7 +38,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-zlib.o \
 	  dsk-base64.o dsk-base64-encoder.o dsk-base64-decoder.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \
-	  dsk-hex-encoder.o \
+	  dsk-hex-encoder.o dsk-hex-decoder.o \
 	  dsk-print.o
 	ar cru $@ $^
 

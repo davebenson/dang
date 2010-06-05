@@ -123,6 +123,12 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_hex_encode)
   add_filter (dsk_hex_encoder_new (newlines, spaces));
   return DSK_TRUE;
 }
+DSK_CMDLINE_CALLBACK_DECLARE(handle_hex_decode)
+{
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
+  add_filter (dsk_hex_decoder_new ());
+  return DSK_TRUE;
+}
 
 int main(int argc, char **argv)
 {
@@ -157,6 +163,8 @@ int main(int argc, char **argv)
   dsk_cmdline_add_func ("hex-encode", "do Hex-64 Encoding (FLAGS may be 'spaces' or 'newlines')",
                         "FLAGS", DSK_CMDLINE_OPTIONAL,
                         handle_hex_encode, NULL);
+  dsk_cmdline_add_func ("hex-decode", "do Hex Decoding", NULL, 0,
+                        handle_hex_decode, NULL);
   dsk_cmdline_process_args (&argc, &argv);
 
   DskBuffer in = DSK_BUFFER_STATIC_INIT;
