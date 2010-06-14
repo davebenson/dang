@@ -41,6 +41,13 @@ DskXml *dsk_xml_text_new_len (unsigned len,
 DskXml *dsk_xml_comment_new_len (unsigned len,
                                  const char *text);
 
+
+/* --- xml lookup functions --- */
+const char *dsk_xml_find_attr (const DskXml *xml,
+                               const char   *name);
+
+char *dsk_xml_get_all_text (const DskXml *xml);
+
 /* FOR INTERNAL USE ONLY: create an xml node from a packed set of
    attributes, and a set of children, which we will take ownership of.
    We will do text-node compacting.

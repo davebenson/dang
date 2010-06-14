@@ -17,6 +17,58 @@ add_filter (DskOctetFilter *filter)
 }
 
 static dsk_boolean
+parse_comma_sep (const char *flag_str,
+                 uint8_t    *flags_out,
+                 DskError  **error,
+                 const char *name1,
+                 ...)
+{
+  const char *names[256];
+  const char *name = name1;
+  unsigned n_flags = 0;
+  va_list args;
+  va_start (args, name1);
+  do
+    {
+      flags_out[n_flags] = 0;
+      names[n_flags++] = name;
+      name = va_arg (args, const char *);
+    }
+  while (name != NULL);
+  va_end (args);
+  
+  while (*flag_str)
+    {
+      const char *start = flag_str;
+      const char *end;
+      while (dsk_ascii_isspace (*start))
+        start++;
+      while (!dsk_ascii_isspace (*end) && *end != ',')
+        end++;
+      if (start < end)
+        {
+          unsigned i;
+          for (i = 0; i < n_flags; i++)
+            if (strncmp (start, names[i], end-start) == 0
+                && names[i][end-start] == 0)
+              break;
+          if (i == n_flags)
+            {
+              dsk_set_error (error, "bad flag '%.*s'", (int)(end-start), start);
+              return DSK_FALSE;
+            }
+          flags_out[i] = 1;
+        }
+      while (dsk_ascii_isspace (*end))
+        end++;
+      if (*end == ',')
+        end++;
+      flag_str = end;
+    }
+  return DSK_TRUE;
+}
+
+static dsk_boolean
 handle_generic_compress (DskZlibMode mode, const char *arg_value, DskError **error)
 {
   int level = atoi (arg_value);
@@ -69,14 +121,45 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_gzip_decompress)
 }
 DSK_CMDLINE_CALLBACK_DECLARE(handle_c_quote)
 {
-  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
-  add_filter (dsk_c_quoter_new ());
+  dsk_boolean add_quotes = DSK_TRUE, protect_trigraphs = DSK_FALSE;
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (error);
+  if (arg_value)
+    {
+      uint8_t flags[4];
+      if (!parse_comma_sep (arg_value, flags, error,
+                            "quotes", "noquotes",
+                            "trigraphs", "notrigraphs", NULL))
+        return DSK_FALSE;
+      if (flags[0])
+        add_quotes = DSK_TRUE;
+      else if (flags[1])
+        add_quotes = DSK_FALSE;
+      if (flags[2])
+        protect_trigraphs = DSK_TRUE;
+      else if (flags[3])
+        protect_trigraphs = DSK_FALSE;
+    }
+
+  add_filter (dsk_c_quoter_new (add_quotes, protect_trigraphs));
   return DSK_TRUE;
 }
 DSK_CMDLINE_CALLBACK_DECLARE(handle_c_unquote)
 {
-  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
-  add_filter (dsk_c_unquoter_new ());
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (error);
+  dsk_boolean remove_quotes = DSK_TRUE;
+  if (arg_value)
+    {
+      uint8_t flags[2];
+      if (!parse_comma_sep (arg_value, flags, error,
+                            "quotes", "noquotes", NULL))
+        return DSK_FALSE;
+      if (flags[0])
+        remove_quotes = DSK_TRUE;
+      else if (flags[1])
+        remove_quotes = DSK_FALSE;
+    }
+
+  add_filter (dsk_c_unquoter_new (remove_quotes));
   return DSK_TRUE;
 }
 
@@ -100,25 +183,24 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_base64_decode)
 }
 DSK_CMDLINE_CALLBACK_DECLARE(handle_hex_encode)
 {
+
   dsk_boolean newlines = DSK_FALSE, spaces = DSK_FALSE;
   DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (error);
   if (arg_value)
     {
-      const char *at = arg_value;
-      while (*at)
-        {
-          if (strncmp (at, "newlines", 8) == 0) { at += 8; newlines = DSK_TRUE; }
-          else if (strncmp (at, "nonewlines", 10) == 0) { at += 10; newlines = DSK_FALSE; }
-          else if (strncmp (at, "spaces", 6) == 0) { at += 6; spaces = DSK_TRUE; }
-          else if (strncmp (at, "nospaces", 8) == 0) { at += 8; spaces = DSK_FALSE; }
-          else
-            {
-              dsk_set_error (error, "error parsing option '%s' to --hex-encode", at);
-              return DSK_FALSE;
-            }
-          if (*at == ',')
-            at++;
-        }
+      uint8_t flags[4];
+      if (!parse_comma_sep (arg_value, flags, error,
+                            "newlines", "nonewlines",
+                            "spaces", "nospaces", NULL))
+        return DSK_FALSE;
+      if (flags[0])
+        newlines = DSK_TRUE;
+      else if (flags[1])
+        newlines = DSK_FALSE;
+      if (flags[2])
+        spaces = DSK_TRUE;
+      else if (flags[3])
+        spaces = DSK_FALSE;
     }
   add_filter (dsk_hex_encoder_new (newlines, spaces));
   return DSK_TRUE;

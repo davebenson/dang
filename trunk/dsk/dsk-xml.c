@@ -166,3 +166,39 @@ void _dsk_xml_set_position (DskXml *xml,
   filename->ref_count++;
   xml->line_no = line_no;
 }
+
+const char *dsk_xml_find_attr (const DskXml *xml,
+                               const char *name)
+{
+  unsigned i;
+  if (xml->type == DSK_XML_ELEMENT)
+    for (i = 0; xml->attrs[2*i] != NULL; i++)
+      if (strcmp (xml->attrs[2*i], name) == 0)
+        return xml->attrs[2*i+1];
+  return NULL;
+}
+
+static void
+get_all_text_to_buffer (const DskXml *xml,
+                        DskBuffer *out)
+{
+  if (xml->type == DSK_XML_TEXT)
+    dsk_buffer_append_string (out, xml->str);
+  else if (xml->type == DSK_XML_ELEMENT)
+    {
+      unsigned i;
+      for (i = 0; i < xml->n_children; i++)
+        get_all_text_to_buffer (xml->children[i], out);
+    }
+}
+
+char *dsk_xml_get_all_text (const DskXml *xml)
+{
+  DskBuffer buffer = DSK_BUFFER_STATIC_INIT;
+  char *rv;
+  get_all_text_to_buffer (xml, &buffer);
+  rv = dsk_malloc (buffer.size + 1);
+  rv[buffer.size] = 0;
+  dsk_buffer_read (&buffer, buffer.size, rv);
+  return rv;
+}

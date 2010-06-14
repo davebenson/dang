@@ -179,6 +179,36 @@ test_simple_attrs_1 (void)
   dsk_xml_parser_config_destroy (config);
 }
 static void
+test_simple_attrs_2 (void)
+{
+  char *empty = "*";
+  static const char *xml_texts[] = {"<abc a=\"b\" cc='d  d'>tmp</abc>",
+                                    "<abc a='b' cc=\"d  d\">tmp</abc>"};
+
+  DskError *error = NULL;
+  DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
+                                                          1, &empty,
+                                                          &error);
+  if (config == NULL)
+    dsk_die ("error creating parser-config: %s", error->message);
+  unsigned i;
+  for (i = 0; i < 2; i++)
+    {
+      DskXml *xml;
+      xml = load_valid_xml (xml_texts[i], config);
+      dsk_assert (is_element (xml, "abc"));
+      dsk_assert (strcmp (xml->attrs[0], "a") == 0);
+      dsk_assert (strcmp (xml->attrs[1], "b") == 0);
+      dsk_assert (strcmp (xml->attrs[2], "cc") == 0);
+      dsk_assert (strcmp (xml->attrs[3], "d  d") == 0);
+      dsk_assert (xml->attrs[4] == NULL);
+      dsk_assert (xml->n_children == 1);
+      dsk_assert (is_text (xml->children[0], "tmp"));
+      dsk_xml_unref (xml);
+    }
+  dsk_xml_parser_config_destroy (config);
+}
+static void
 test_simple_tree (void)
 {
   char *empty = "*";
@@ -350,6 +380,42 @@ test_empty_element (void)
     }
   dsk_xml_parser_config_destroy (config);
 }
+
+static void
+test_standard_char_entities (void)
+{
+  char *empty = "*";
+  DskError *error = NULL;
+  DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
+                                                          1, &empty,
+                                                          &error);
+  if (config == NULL)
+    dsk_die ("error creating parser-config: %s", error->message);
+  static struct {
+    const char *xml_str;
+    const char *center_str;
+  } xml_char_tests[] = {
+    { "<abc>&lt;</abc>", "<" },
+    { "<abc>&gt;</abc>", ">" },
+    { "<abc>&apos;</abc>", "'" },
+    { "<abc>&quot;</abc>", "\"" },
+    { "<abc>&lt;hi&gt;</abc>", "<hi>" },
+    { "<abc>what&apos;s up?</abc>", "what's up?" },
+  };
+  unsigned i;
+  for (i = 0; i < DSK_N_ELEMENTS (xml_char_tests); i++)
+    {
+      DskXml *xml = load_valid_xml (xml_char_tests[i].xml_str, config);
+      dsk_assert (xml->type == DSK_XML_ELEMENT);
+      dsk_assert (strcmp (xml->str, "abc") == 0);
+      dsk_assert (xml->n_children == 1);
+      dsk_assert (xml->children[0]->type == DSK_XML_TEXT);
+      dsk_assert (strcmp (xml->children[0]->str, xml_char_tests[i].center_str) == 0);
+      dsk_xml_unref (xml);
+    }
+  dsk_xml_parser_config_destroy (config);
+}
+
 static void
 feed_string (DskXmlParser *parser, const char *str)
 {
@@ -537,6 +603,7 @@ static void test_ns_simple_1 (void)
   dsk_xml_parser_config_destroy (config);
 }
 
+
 static struct 
 {
   const char *name;
@@ -546,10 +613,12 @@ static struct
   { "simple element", test_simple_0 },
   { "simple element attribute (0)", test_simple_attrs_0 },
   { "simple element attribute (1)", test_simple_attrs_1 },
+  { "simple element attribute (2)", test_simple_attrs_2 },
   { "simple tree", test_simple_tree },
   { "simple comment ignoring", test_simple_comment },
   { "simple comment handling", test_simple_comment_handling },
   { "simple empty element", test_empty_element },
+  { "test standard character entities", test_standard_char_entities },
   { "test path handling (0)", test_path_handling_0 },
   { "test path handling (1)", test_path_handling_1 },
   { "simple namespace handling (0)", test_ns_simple_0 },

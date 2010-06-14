@@ -48,43 +48,20 @@ void dsk_print_pop  (DskPrint *context);
 void dsk_print                     (DskPrint    *context,
                                     const char  *template_string);
 
-typedef enum
-{
-  /* This is quoted in the same manner that strings are in C.
-     we quote the following:   \a \b \f \n \r \t \v
-     all other nonprintables and non-ansi (ie above 127)
-     are escaped as octal.  If the octal escaping is followed by a digit,
-     use three octal numbers; if followed by a non-digit, use as
-     few charcters as the character core permits. */
-  DSK_PRINT_STRING_C_QUOTED,
 
-  /* Use hex characters to encode the data */
-  DSK_PRINT_STRING_HEX,
-
-  /* Use hex characters, each byte boundary separated by spaces,
-     to encode the data */
-  DSK_PRINT_STRING_HEX_PAIRS,
-
-  /* Dump the binary with non-printables transformed to question-marks */
-  DSK_PRINT_STRING_MYSTERIOUSLY,
-
-  /* Just dump the binary - may cause UTF-8 problems. */
-  DSK_PRINT_STRING_RAW
-
-} DskPrintStringQuoting;
-
-/* Making a context of variables that can be popped in one quick go */
-void dsk_print_set_quoted_string   (DskPrint    *context,
+/* Making a context of variables that can be popped in one quick go;
+   these take ownership of the filter */
+void dsk_print_set_filtered_string   (DskPrint    *context,
                                     const char  *variable_name,
 			            const char  *raw_string,
-                                    DskPrintStringQuoting quoting_method);
-void dsk_print_set_quoted_binary   (DskPrint    *context,
+                                    DskOctetFilter *filter);
+void dsk_print_set_filtered_binary   (DskPrint    *context,
                                     const char  *variable_name,
                                     size_t       raw_string_length,
 			            const char  *raw_string,
-                                    DskPrintStringQuoting quoting_method);
-void dsk_print_set_quoted_buffer   (DskPrint    *context,
+                                    DskOctetFilter *filter);
+void dsk_print_set_filtered_buffer   (DskPrint    *context,
                                     const char  *variable_name,
 			            const DskBuffer *buffer,
-                                    DskPrintStringQuoting quoting_method);
+                                    DskOctetFilter *filter);
 

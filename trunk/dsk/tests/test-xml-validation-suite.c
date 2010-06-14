@@ -41,10 +41,11 @@ typedef struct
   const char *in;
   unsigned out_length;
   const char *out;
+  const char *description;
   } Test;
 
 static Test tests[] = {
-#include "xml-validation-suite--ibm.inc"
+#include "xml-validation-suite.inc"
 };
 
 int main(int argc, char **argv)
@@ -56,6 +57,7 @@ int main(int argc, char **argv)
   unsigned n_correct_invalid = 0;
   unsigned n_failed_valid = 0;
   unsigned n_failed_invalid = 0;
+  dsk_boolean print_failure_descriptions = DSK_FALSE;
 
   dsk_cmdline_init ("standard xml conformance test",
                     "Run some standard conformance test on our XML parser",
@@ -64,6 +66,8 @@ int main(int argc, char **argv)
                            &print_errors);
   dsk_cmdline_add_boolean ("verbose", "print all test statuses", NULL, 0,
                            &verbose);
+  dsk_cmdline_add_boolean ("desc", "print description of failed tests", NULL, 0,
+                           &print_failure_descriptions);
   dsk_cmdline_process_args (&argc, &argv);
 
 
@@ -110,6 +114,8 @@ int main(int argc, char **argv)
               if (verbose)
                 fprintf (stderr, "FAILED  [unable to parse original xml]\n");
             }
+          if (print_failure_descriptions)
+            fprintf (stderr, "   >> %s\n", tests[i].description);
           n_failed_valid++;
         }
       else if (xml != NULL && oxml != NULL)
@@ -117,28 +123,39 @@ int main(int argc, char **argv)
           /* equal? */
           if (xml_equal (xml, oxml))
             {
-              if (verbose) fprintf (stderr, "PASS\n");
+              if (verbose)
+                fprintf (stderr, "PASS\n");
               n_correct_valid++;
             }
           else
             {
-              if (verbose) fprintf (stderr, "FAILED  [xml mismatch]\n");
+              if (verbose)
+                fprintf (stderr, "FAILED  [xml mismatch]\n");
+              if (print_failure_descriptions)
+                fprintf (stderr, "   >> %s\n", tests[i].description);
               n_failed_valid++;
             }
         }
       else if (xml != NULL && tests[i].out == NULL)
         {
-          if (verbose) fprintf (stderr, "TOO LAX [accepted invalid xml]\n");
+          if (verbose)
+            fprintf (stderr, "TOO LAX [accepted invalid xml]\n");
+          if (print_failure_descriptions)
+            fprintf (stderr, "   >> %s\n", tests[i].description);
           n_failed_invalid++;
         }
       else if (xml == NULL && tests[i].out == NULL)
         {
-          if (verbose) fprintf (stderr, "PASS    [rejected invalid xml]\n");
+          if (verbose)
+            fprintf (stderr, "PASS    [rejected invalid xml]\n");
           n_correct_invalid++;
         }
       else if (xml != NULL && tests[i].out != NULL && oxml == NULL)
         {
-          if (verbose) fprintf (stderr, "FAILED  [parsing simplified xml]\n");
+          if (verbose)
+            fprintf (stderr, "FAILED  [parsing simplified xml]\n");
+          if (print_failure_descriptions)
+            fprintf (stderr, "   >> %s\n", tests[i].description);
           n_failed_valid++;
         }
     }

@@ -78,6 +78,7 @@ char *dsk_stpcpy (char *dst, const char *src);
 #define dsk_goto_if_fail(condition, blurb, label) do{}while(0)
 #define dsk_return_if_fail(condition, blurb) do{}while(0)
 #define dsk_return_val_if_fail(condition, blurb, value) do{}while(0)
+#define dsk_warn_if_reached(blurb)
 #define dsk_return_if_reached(blurb)     return
 #define dsk_return_val_if_reached(blurb, value)     return (value)
 

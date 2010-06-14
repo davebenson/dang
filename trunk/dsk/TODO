@@ -52,7 +52,7 @@ _ high trap counts?
 
 TODO:
 filters:
-  _ dsk_hex_encoder_new             
+  x dsk_hex_encoder_new             
   x dsk_hex_decoder_new             
   _ dsk_url_encoder_new             
   _ dsk_url_decoder_new
@@ -62,18 +62,23 @@ filters:
   _ dsk_utf16_to_utf8_converter_new
   _ dsk_byte_doubler_new           
   _ dsk_byte_undoubler_new         
-  _ dsk_octet_filter_chain_new_take
+  _ dsk_octet_filter_chain_new_take [steal from programs/dsk-octet-filter.c]
 _ remove persistency support from DskClientStream !?!
 _ dsk_buffer_transfer, dsk_buffer_drain: consolidate fragments
   if they are both small.
 _ figure out a way to tune buffer allocations
   (perhaps a way to build to write a behavior log?)
 _ Is the post_data hack of dsk_http_server_stream_respond() really ok?
-x DskOctetFilterZlib...
-  x prototypes
-  x implement
 _ Review dsk-dispatch API... has_idle and has_timeout are clearly bogus...
   implement epoll support.
+_ HTTP Header Work:
+  _ "no_cache" response:
+    HTTP/1.1:
+      Cache-Control: no-store, no-cache, must-revalidate
+      Cache-Control: post-check=0, pre-check=0
+    HTTP/1.0:
+      Pragma: no-cache
+
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)
 _ HTTP Client Stream
   _ content-encoding gzip
@@ -89,6 +94,7 @@ _ XML implementation
   _ parser: suppress whitespace
   _ parser: UTF-16
   _ printer / pretty-printer
+  _ entity / dtd parser / handler
 _ JSON implementation
   _ parser
   _ printer
