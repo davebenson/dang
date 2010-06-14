@@ -78,8 +78,8 @@ lex_state_description (LexState state)
     case LEX_OPEN_IN_ATTR_VALUE_SQ:
     case LEX_OPEN_IN_ATTR_VALUE_DQ:
     case LEX_OPEN_IN_ATTR_VALUE_SQ_ENTITY_REF:
-    case LEX_OPEN_IN_ATTR_VALUE_DQ_ENTITY_REF: return "in attributes";
-    case LEX_LT_SLASH:                          return "aftert '</'";
+    case LEX_OPEN_IN_ATTR_VALUE_DQ_ENTITY_REF:  return "in attributes";
+    case LEX_LT_SLASH:                          return "after '</'";
     case LEX_CLOSE_ELEMENT_NAME:                return "in element-name of close tag";
     case LEX_AFTER_CLOSE_ELEMENT_NAME:          return "after element-name of close tag";
     case LEX_OPEN_CLOSE:                        return "got a slash after an open tag";
@@ -458,7 +458,18 @@ dump_parse_state_recursive (ParseState *state,
     }
 }
 #endif
-
+DskXmlParserConfig *
+dsk_xml_parser_config_new_simple (DskXmlParserFlags flags,
+                                  const char       *path)
+{
+  DskXmlParserConfig *cfg;
+  cfg = dsk_xml_parser_config_new (flags | DSK_XML_PARSER_IGNORE_NS,
+                                   0, NULL,
+                                   1, (char **) (&path),
+                                   NULL);
+  dsk_assert (cfg);
+  return cfg;
+}
 DskXmlParserConfig *
 dsk_xml_parser_config_new (DskXmlParserFlags flags,
 			   unsigned          n_ns,
@@ -624,7 +635,9 @@ handle_char_entity (DskXmlParser *parser,
   switch (parser->entity_buf_len)
     {
     case 0: case 1:
-      dsk_set_error (error, "character entity too short (%u bytes)", parser->entity_buf_len);
+      dsk_set_error (error, "character entity too short (%u bytes) (%s, line %u)", parser->entity_buf_len,
+                 parser->filename ? parser->filename->filename : "string",
+                 parser->line_no);
       return DSK_FALSE;
     case 2:
       switch (b[0])
@@ -700,7 +713,8 @@ handle_char_entity (DskXmlParser *parser,
 
 static dsk_boolean is_valid_ascii_char (unsigned c, dsk_boolean strict)
 {
-  DSK_UNUSED (strict);
+  if (c == 32 && !strict)
+    return DSK_TRUE;
   return c > 32;
 }
 static dsk_boolean is_valid_unichar2 (unsigned c, dsk_boolean strict)
@@ -743,8 +757,8 @@ static dsk_boolean utf_validate_open_element (DskXmlParser *parser,
             {
               attrs_out[attr_index++] = at + 1;
 
-              /* event elements are all strict */
-              is_strict = (attr_index & 1) ^ 1;
+              /* even elements are all strict */
+              is_strict = (attr_index & 1);
             }
           else
             {
@@ -802,14 +816,14 @@ static dsk_boolean utf_validate_open_element (DskXmlParser *parser,
 
 bad_utf8:
   /* TODO: this doesn't count whitespace added between the attributes!!!!!! */
-  dsk_set_error (error, "bad UTF-8 at %s, line %u, in open-tag",
+  dsk_set_error (error, "bad UTF-8 at %s, line %u, in open tag",
                  parser->filename ? parser->filename->filename : "string",
                  parser->start_line + line_offset);
   return DSK_FALSE;
 
 bad_character:
   /* TODO: this doesn't count whitespace added between the attributes!!!!!! */
-  dsk_set_error (error, "bad character %s at %s, line %u, in open-tag",
+  dsk_set_error (error, "bad character %s at %s, line %u, in open tag",
                  dsk_ascii_byte_name (*at),
                  parser->filename ? parser->filename->filename : "string",
                  parser->start_line + line_offset);
@@ -990,7 +1004,7 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
   unsigned n_attrs = parser->n_attrs;
   /* there's 2*n_attrs strings for the attributes
      and 1 additional sentinel marking the end of the array */
-  char **attrs = alloca (sizeof (char*) * n_attrs * 2 + 1);
+  char **attrs = alloca (sizeof (char*) * (n_attrs * 2 + 1));
   NsAbbrevMap *defined_list = NULL;      /* namespace defs in this element */
 
   /* perform UTF-8 and character validation;
@@ -1228,7 +1242,7 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
   st->state = new_state;
   st->defined_list = defined_list;
   st->n_children = 0;
-  st->needed = (st-1)->needed || new_state->n_ret != 0;
+  st->needed = (st-1)->needed || (new_state != NULL && new_state->n_ret != 0);
   st->condense_text = 0;
 
   /* clear buffer */
@@ -1549,11 +1563,13 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
     label__LEX_DEFAULT_ENTITY_REF:
       {
         const char *semicolon = memchr (data, ';', len);
+        unsigned app_len;
         unsigned new_elen;
         if (semicolon == NULL)
-          new_elen = parser->entity_buf_len + len;
+          app_len = len;
         else
-          new_elen = parser->entity_buf_len + (semicolon - data);
+          app_len = semicolon - data;
+        new_elen = parser->entity_buf_len + app_len;
         CHECK_ENTITY_TOO_LONG(new_elen);
         if (IS_SUPPRESSED)
           {
@@ -1565,13 +1581,10 @@ dsk_xml_parser_feed(DskXmlParser       *parser,
           }
         else
           {
+            memcpy (parser->entity_buf + parser->entity_buf_len, data, app_len);
+            parser->entity_buf_len = new_elen;
             if (semicolon == NULL)
-              {
-                memcpy (parser->entity_buf + parser->entity_buf_len, data, len);
-                parser->entity_buf_len += len;
-                return DSK_TRUE;
-              }
-            memcpy (parser->entity_buf + parser->entity_buf_len, data, semicolon - data);
+              return DSK_TRUE;
             if (!handle_char_entity (parser, error))
               return DSK_FALSE;
           }

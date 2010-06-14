@@ -129,6 +129,28 @@ void dsk_print_set_string_length   (DskPrint    *context,
   add_var_def (context, vd);
 }
 
+void dsk_print_set_dsk_buffer      (DskPrint    *context,
+                                    const char  *variable_name,
+                                    const DskBuffer *buffer)
+{
+  unsigned key_len = strlen (variable_name);
+  VarDef *vd = dsk_malloc (sizeof (VarDef) + key_len + 1 + buffer->size + 1);
+  dsk_buffer_peek (buffer, buffer->size, vd + 1);
+  ((char*)(vd+1))[buffer->size] = 0;
+  vd->key = strcpy ((char*)(vd+1) + buffer->size + 1, variable_name);
+  vd->value_length = buffer->size;
+  add_var_def (context, vd);
+}
+
+void dsk_print_set_uint (DskPrint *context,
+                         const char *variable_name,
+                         unsigned value)
+{
+  char buf[32];
+  snprintf (buf, sizeof (buf), "%u", value);
+  dsk_print_set_string (context, variable_name, buf);
+}
+
 void dsk_print_push (DskPrint *context)
 {
   StackNode *new_node = dsk_malloc (sizeof (StackNode));
@@ -182,14 +204,15 @@ handle_template_expression (DskPrint *context,
       start = expr + 2;
       while (dsk_ascii_isspace (*start))
         start++;
-      if (!dsk_ascii_isalnum (*start))
+#define ascii_is_ident(c)    (dsk_ascii_isalnum(c) || (c)=='_')
+      if (!ascii_is_ident (*start))
         {
           dsk_set_error (error, "unexpected character %s after '${' in dsk_print",
                          dsk_ascii_byte_name (*start));
           return DSK_FALSE;
         }
       len = 1;
-      while (dsk_ascii_isalnum (start[len]))
+      while (ascii_is_ident (start[len]))
         len++;
       end = start + len;
       while (dsk_ascii_isspace (*end))
@@ -204,11 +227,11 @@ handle_template_expression (DskPrint *context,
         }
       *expr_len_out = (end + 1) - expr;
     }
-  else if (dsk_ascii_isalnum (expr[1]))
+  else if (ascii_is_ident (expr[1]))
     {
       len = 1;
       start = expr + 1;
-      while (dsk_ascii_isalnum (start[len]))
+      while (ascii_is_ident (start[len]))
         len++;
       *expr_len_out = len + 1;
     }
@@ -304,192 +327,52 @@ dsk_print (DskPrint *context,
 }
 
 /* --- quoting support --- */
-void dsk_print_set_quoted_buffer   (DskPrint    *context,
+void dsk_print_set_filtered_buffer   (DskPrint    *context,
                                     const char  *variable_name,
 			            const DskBuffer *buffer,
-                                    DskPrintStringQuoting quoting_method)
+                                    DskOctetFilter *filter)
 {
-  char init_slab[1024];
-  if (buffer->size == 0)
+  DskBuffer output = DSK_BUFFER_STATIC_INIT;
+  const DskBufferFragment *in = buffer->first_frag;
+  DskError *error = NULL;
+  while (in)
     {
-      dsk_print_set_string (context, variable_name, "");
-      return;
+      if (!dsk_octet_filter_process (filter, &output, in->buf_length,
+                                     in->buf + in->buf_start, &error))
+        goto failed;
+      in = in->next;
     }
-  switch (quoting_method)
-    {
-    case DSK_PRINT_STRING_C_QUOTED:
-      {
-        DskBufferFragment *frag = buffer->first_frag;
-        const uint8_t *frag_at = frag->buf + frag->buf_start;
-        const uint8_t *frag_end = frag_at + frag->buf_length;
-        uint8_t at = *frag_at++;
-        char *slab = init_slab;
-        unsigned slab_alloced = sizeof (init_slab);
-        unsigned slab_len = 0;
-        while (frag != NULL)
-          {
-            uint8_t next;
-            if (frag_at == frag_end)
-              {
-                frag = frag->next;
-                if (frag == NULL)
-                  next = 0;
-                else
-                  {
-                    frag_at = frag->buf + frag->buf_start;
-                    frag_end = frag_at + frag->buf_length;
-                    next = *frag_at++;
-                  }
-              }
-            else
-              next = *frag_at++;
-            if (slab_len + 5 > slab_alloced)
-              {
-                if (slab == init_slab)
-                  {
-                    slab = dsk_malloc (slab_alloced * 2);
-                    memcpy (slab, init_slab, slab_len);
-                  }
-                else
-                  slab = dsk_realloc (slab, slab_alloced * 2);
-                slab_alloced *= 2;
-              }
-#define APP(c) slab[slab_len++] = (c)
-            switch (at)
-              {
-              case '\a': APP('\\'); APP('a'); break;
-              case '\b': APP('\\'); APP('b'); break;
-              case '\f': APP('\\'); APP('f'); break;
-              case '\n': APP('\\'); APP('n'); break;
-              case '\r': APP('\\'); APP('r'); break;
-              case '\t': APP('\\'); APP('t'); break;
-              case '\v': APP('\\'); APP('v'); break;
-              case '\\': APP('\\'); APP('\\'); break;
-              case '"':  APP('\\'); APP('"'); break;
-              default:
-                if (' ' <= at && at <= 126)
-                  APP(at);
-                else
-                  {
-                    if (dsk_ascii_isdigit (next) || at >= 64)
-                      {
-                        /* three digit codes */
-                        APP('\\');
-                        APP('0' + at/64);
-                        APP('0' + (at/8)%8);
-                        APP('0' + at%8);
-                      }
-                    else if (at >= 8)
-                      {
-                        /* two digit codes */
-                        APP('\\');
-                        APP('0' + at/8);
-                        APP('0' + at%8);
-                      }
-                    else
-                      {
-                        /* one digit code */
-                        APP('\\');
-                        APP('0' + at);
-                      }
-                  }
-              }
-            at = next;
-          }
-        dsk_print_set_string_length (context, variable_name, slab_len, slab);
-        if (slab != init_slab)
-          dsk_free (slab);
-      }
-      break;
-    case DSK_PRINT_STRING_HEX:
-      {
-        unsigned space = buffer->size * 2 + 1;
-        DskBufferFragment *frag = buffer->first_frag;
-        char *str = space <= sizeof (init_slab) ? init_slab : dsk_malloc (space);
-        char *out = str;
-        while (frag)
-          {
-            unsigned len = frag->buf_length;
-            uint8_t *at = frag->buf + frag->buf_start;
-            while (len--)
-              {
-                *out++ = dsk_ascii_hex_digits[*at / 16];
-                *out++ = dsk_ascii_hex_digits[*at % 16];
-              }
-            frag = frag->next;
-          }
-        *out = 0;
-        dsk_print_set_string_length (context, variable_name, out - str, str);
-        if (str != init_slab)
-          dsk_free (str);
-      }
-      break;
-    case DSK_PRINT_STRING_HEX_PAIRS:
-      {
-        unsigned space = buffer->size * 3;
-        DskBufferFragment *frag = buffer->first_frag;
-        char *str = space <= sizeof (init_slab) ? init_slab : dsk_malloc (space);
-        char *out = str;
-        while (frag)
-          {
-            unsigned len = frag->buf_length;
-            uint8_t *at = frag->buf + frag->buf_start;
-            while (len--)
-              {
-                *out++ = dsk_ascii_hex_digits[*at / 16];
-                *out++ = dsk_ascii_hex_digits[*at % 16];
-                *out++ = ' ';
-              }
-            frag = frag->next;
-          }
-        out--;  /* cut off terminal space (note: assumed non-empty string;
-                 see above) */
-        dsk_print_set_string_length (context, variable_name, out - str, str);
-        if (str != init_slab)
-          dsk_free (str);
-      }
-      break;
-    case DSK_PRINT_STRING_RAW:
-      {
-        unsigned space = buffer->size;
-        char *str = space <= sizeof (init_slab) ? init_slab : dsk_malloc (space);
-        dsk_buffer_peek (buffer, space, str);
-        dsk_print_set_string_length (context, variable_name, space, str);
-        if (str != init_slab)
-          dsk_free (str);
-      }
-      break;
-    case DSK_PRINT_STRING_MYSTERIOUSLY:
-      {
-        unsigned space = buffer->size;
-        char *str = space <= sizeof (init_slab) ? init_slab : dsk_malloc (space);
-        unsigned i;
-        dsk_buffer_peek (buffer, space, str);
-        for (i = 0; i < space; i++)
-          if (str[i] < ' ' || ((uint8_t)str[i] >= 127))
-            str[i] = '?';
-        dsk_print_set_string_length (context, variable_name, space, str);
-        if (str != init_slab)
-          dsk_free (str);
-      }
-      break;
-    }
+  if (!dsk_octet_filter_finish (filter, &output, &error))
+    goto failed;
+
+  dsk_print_set_dsk_buffer (context, variable_name, &output);
+  dsk_buffer_clear (&output);
+  dsk_object_unref (filter);
+  return;
+
+failed:
+  dsk_warning ("error filtering data in dsk_print_set_filtered: %s (variable name=%s)",
+               error->message,
+               variable_name);
+  dsk_buffer_clear (&output);
+  dsk_object_unref (filter);
+  return;
 }
-void dsk_print_set_quoted_string   (DskPrint    *context,
+void dsk_print_set_filtered_string   (DskPrint    *context,
                                     const char  *variable_name,
 			            const char  *raw_string,
-                                    DskPrintStringQuoting quoting_method)
+                                    DskOctetFilter *filter)
 {
-  dsk_print_set_quoted_binary (context, variable_name,
+  dsk_print_set_filtered_binary (context, variable_name,
                                strlen (raw_string), raw_string,
-                               quoting_method);
+                               filter);
 }
 
-void dsk_print_set_quoted_binary   (DskPrint    *context,
+void dsk_print_set_filtered_binary   (DskPrint    *context,
                                     const char  *variable_name,
                                     size_t       raw_string_length,
 			            const char  *raw_string,
-                                    DskPrintStringQuoting quoting_method)
+                                    DskOctetFilter *filter)
 {
   DskBuffer buf;
   DskBufferFragment frag;
@@ -499,7 +382,7 @@ void dsk_print_set_quoted_binary   (DskPrint    *context,
   frag.next = NULL;
   buf.first_frag = buf.last_frag = &frag;
   buf.size = frag.buf_length;
-  dsk_print_set_quoted_buffer (context, variable_name, &buf, quoting_method);
+  dsk_print_set_filtered_buffer (context, variable_name, &buf, filter);
 }
 
 
@@ -510,6 +393,8 @@ append_to_file_pointer (unsigned   length,
                         DskError **error)
 {
   /* TODO: use fwrite_unlocked where available */
+  if (length == 0)
+    return DSK_TRUE;
   if (fwrite (data, length, 1, append_data) != 1)
     {
       dsk_set_error (error, "error writing to file-pointer");

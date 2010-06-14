@@ -13,6 +13,15 @@ PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
            programs/dsk-octet-filter
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
 
+EXTRA_PROGRAMS = programs/make-validation-test-data
+extra: $(EXTRA_PROGRAMS)
+
+full: all extra
+
+# For minimum size:
+#CC_FLAGS =  -W -Wall -g -Os -DDSK_DEBUG=0 -DDSK_DISABLE_ASSERTIONS=1
+
+# For standard initial size:
 CC_FLAGS =  -W -Wall -g -O0 -DDSK_DEBUG=1
 LINK_FLAGS = -g -lz
 
@@ -38,7 +47,8 @@ libdsk.a: dsk-inlines.o \
 	  dsk-zlib.o \
 	  dsk-base64.o dsk-base64-encoder.o dsk-base64-decoder.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \
-	  dsk-hex-encoder.o dsk-hex-decoder.o \
+	  dsk-octet-filter-chain.o dsk-octet-filter-identity.o \
+	  dsk-hex-encoder.o dsk-hex-decoder.o dsk-whitespace-trimmer.o \
 	  dsk-print.o
 	ar cru $@ $^
 

@@ -14,6 +14,8 @@ struct _DskOctetFilterCUnquoter
   DskOctetFilter base_instance;
   uint8_t partial_octal;
   uint8_t state;
+  uint8_t remove_initial_quote : 1;
+  uint8_t remove_quotes : 1;
 };
 typedef enum
 {
@@ -54,6 +56,22 @@ dsk_octet_filter_c_unquoter_process (DskOctetFilter *filter,
   DskOctetFilterCUnquoter *cunquoter = (DskOctetFilterCUnquoter *) filter;
   if (in_length == 0)
     return DSK_TRUE;
+  if (cunquoter->remove_initial_quote)
+    {
+      if (*in_data == '"')
+        {
+          in_data++;
+          in_length--;
+          if (in_length == 0)
+            return DSK_TRUE;
+        }
+      else
+        {
+          dsk_set_error (error, "expected '\"' start of string");
+          cunquoter->remove_initial_quote = 0;
+          return DSK_FALSE;
+        }
+    }
   switch (cunquoter->state)
     {
     case STATE_DEFAULT:
@@ -100,7 +118,7 @@ dsk_octet_filter_c_unquoter_process (DskOctetFilter *filter,
         WRITE_CASE ('r', '\r');
         WRITE_CASE ('t', '\t');
         WRITE_CASE ('v', '\v');
-        case '\'': case '"': case '\\':
+        case '\'': case '"': case '\\': case '?':
           dsk_buffer_append_byte (out, *in_data);
           in_data++;
           in_length--;
@@ -202,7 +220,10 @@ dsk_octet_filter_c_unquoter_finish  (DskOctetFilter *filter,
 DSK_OCTET_FILTER_SUBCLASS_DEFINE(static, DskOctetFilterCUnquoter, dsk_octet_filter_c_unquoter);
 
 DskOctetFilter *
-dsk_c_unquoter_new (void)
+dsk_c_unquoter_new (dsk_boolean remove_quotes)
 {
-  return dsk_object_new (&dsk_octet_filter_c_unquoter_class);
+  DskOctetFilterCUnquoter *cu = dsk_object_new (&dsk_octet_filter_c_unquoter_class);
+  if (remove_quotes)
+    cu->remove_quotes = cu->remove_initial_quote = 1;
+  return DSK_OCTET_FILTER (cu);
 }
