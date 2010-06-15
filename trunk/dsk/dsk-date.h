@@ -1,4 +1,12 @@
 
+/* A Gregorian Date class.
+ *
+ * Wikipedia has a list of other calendar systems, which is neat:
+ *      http://en.wikipedia.org/wiki/List_of_calendars
+ * However, none of these is used in any protocols,
+ * so we do not implement them at all.
+ */
+
 
 typedef struct _DskDate DskDate;
 struct _DskDate
@@ -44,7 +52,10 @@ void        dsk_unixtime_to_date (dsk_time_t unixtime,
                                   DskDate *date_out);
 
 /* we recognise: UT, UTC, GMT; EST EDT CST CDT MST MDT PST PDT [A-Z]
-   and the numeric formats: +#### and -#### */
+   and the numeric formats: +#### and -#### and +##:## and -##:##
+
+   The return value is the number of minutes you must add to the time
+   to get the time in Greenwich.  */
 dsk_boolean dsk_date_parse_timezone (const char *at,
                                      char **end,
 				     int *zone_offset_out);

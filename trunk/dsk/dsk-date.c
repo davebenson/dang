@@ -459,7 +459,7 @@ dsk_boolean dsk_date_parse_timezone (const char *at,
   if (dsk_ascii_isalpha (*at) && !dsk_ascii_isalpha (at[1]))
     {
       /* one-letter timezone */
-      if (*at == 'Z')
+      if (*at == 'z' || *at == 'Z')
         *zone_offset_out = 0;
       else
         return DSK_FALSE;
@@ -589,6 +589,8 @@ dsk_boolean dsk_date_parse_timezone (const char *at,
                          + dsk_ascii_digit_value (at[4+has_colon]);
         if (at[0] == '-')
           *zone_offset_out = -*zone_offset_out;
+        if (end)
+          *end = (char*)at + (5+has_colon);
         return DSK_TRUE;
       }
     default:

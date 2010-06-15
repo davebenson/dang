@@ -34,63 +34,6 @@ struct _DskHttpClientStream
   unsigned print_warnings : 1;
 };
 
-/* internals */
-typedef enum
-{
-  DSK_HTTP_CLIENT_STREAM_READ_NEED_HEADER,
-  DSK_HTTP_CLIENT_STREAM_READ_IN_BODY,
-  DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF,
-  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER,
-  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER_EXTENSION,
-  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK,
-  DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNK,
-  DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNKED, /* after final chunk */
-  DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_TRAILER,
-  //DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_FINAL_NEWLINE,
-  DSK_HTTP_CLIENT_STREAM_READ_DONE
-} DskHttpClientStreamReadState;
-typedef enum
-{
-  DSK_HTTP_CLIENT_STREAM_WRITE_INIT,
-  DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT,         /* in post/put data */
-  DSK_HTTP_CLIENT_STREAM_WRITE_DONE
-} DskHttpClientStreamWriteState;
-
-struct _DskHttpClientStreamTransfer
-{
-  DskHttpClientStream *owner;
-  DskHttpRequest *request;
-  DskOctetSource *post_data;
-  DskHttpResponse *response;
-  DskMemorySource *content;      
-  DskHttpClientStreamTransfer *next;
-  DskHttpClientStreamFuncs *funcs;
-  void *user_data;
-  DskHttpClientStreamReadState read_state;
-  dsk_boolean failed;
-  /* branch of union depends on 'read_state' */
-  union {
-    /* number of bytes we've already checked for end of header. */
-    struct { unsigned checked; } need_header;
-
-    /* number of bytes remaining in content-length */
-    struct { uint64_t remaining; } in_body;
-
-    /* number of bytes remaining in current chunk */
-    /* same structure for in_xfer_chunk_header */
-    struct { uint64_t remaining; } in_xfer_chunk;
-
-    struct { unsigned checked; } in_xfer_chunk_trailer;
-    /* no data for DONE */
-  } read_info;
-
-  DskHttpClientStreamWriteState write_state;
-  union {
-    struct { DskHookTrap *post_data_trap; uint64_t bytes; } in_content;
-  } write_info;
-
-};
-
 typedef struct _DskHttpClientStreamOptions DskHttpClientStreamOptions;
 struct _DskHttpClientStreamOptions
 {
@@ -148,4 +91,64 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
 				DskOctetSource           *post_data,
 				DskHttpClientStreamFuncs *funcs,
 				void                     *user_data);
+
+/* internals */
+typedef enum
+{
+  DSK_HTTP_CLIENT_STREAM_READ_NEED_HEADER,
+  DSK_HTTP_CLIENT_STREAM_READ_IN_BODY,
+  DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF,
+  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER,
+  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNKED_HEADER_EXTENSION,
+  DSK_HTTP_CLIENT_STREAM_READ_IN_XFER_CHUNK,
+  DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNK,
+  DSK_HTTP_CLIENT_STREAM_READ_AFTER_XFER_CHUNKED, /* after final chunk */
+  DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_TRAILER,
+  //DSK_HTTP_CLIENT_STREAM_READ_XFER_CHUNK_FINAL_NEWLINE,
+  DSK_HTTP_CLIENT_STREAM_READ_DONE
+} DskHttpClientStreamReadState;
+typedef enum
+{
+  DSK_HTTP_CLIENT_STREAM_WRITE_INIT,
+  DSK_HTTP_CLIENT_STREAM_WRITE_CONTENT,         /* in post/put data */
+  DSK_HTTP_CLIENT_STREAM_WRITE_DONE
+} DskHttpClientStreamWriteState;
+
+struct _DskHttpClientStreamTransfer
+{
+  /*< public >*/
+  DskHttpClientStream *owner;
+  DskHttpRequest *request;
+  DskOctetSource *post_data;
+  DskHttpResponse *response;
+  DskMemorySource *content;      
+  DskHttpClientStreamTransfer *next;
+  DskHttpClientStreamFuncs *funcs;
+  void *user_data;
+  dsk_boolean failed;
+
+  /*< private >*/
+  DskHttpClientStreamReadState read_state;
+  /* branch of union depends on 'read_state' */
+  union {
+    /* number of bytes we've already checked for end of header. */
+    struct { unsigned checked; } need_header;
+
+    /* number of bytes remaining in content-length */
+    struct { uint64_t remaining; } in_body;
+
+    /* number of bytes remaining in current chunk */
+    /* same structure for in_xfer_chunk_header */
+    struct { uint64_t remaining; } in_xfer_chunk;
+
+    struct { unsigned checked; } in_xfer_chunk_trailer;
+    /* no data for DONE */
+  } read_info;
+
+  DskHttpClientStreamWriteState write_state;
+  union {
+    struct { DskHookTrap *post_data_trap; uint64_t bytes; } in_content;
+  } write_info;
+
+};
 
