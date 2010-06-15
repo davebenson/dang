@@ -124,6 +124,29 @@ parse_generic (const char *format,
           at += 2;
           format += 2;
           break;
+        case 'D':
+          if (dsk_ascii_isspace (at[0]) && dsk_ascii_isdigit (at[1]))
+            {
+              out->day = (at[1] - '0');
+              at += 2;
+            }
+          else if (dsk_ascii_isdigit (at[0]) && dsk_ascii_isdigit (at[1]))
+            {
+              out->day = (at[0] - '0') * 10 + (at[1] - '0');
+              at += 2;
+            }
+          else if (dsk_ascii_isdigit (at[0]))
+            {
+              out->day = (at[0] - '0');
+              at += 1;
+            }
+          else
+            {
+              dsk_set_error (error, "expected day-of-month");
+              return DSK_FALSE;
+            }
+          format += 2;
+          break;
         case 'b':
           /* accept 3-letter month abbrev */
           if (!dsk_ascii_isalpha (at[0])
@@ -244,7 +267,7 @@ dsk_boolean dsk_date_parse   (const char *str,
   if (n_alpha == 3 && str[3] == ',')
     {
       /* RFC 822/1123 */
-      return parse_generic ("%A , %d %b %Y %H:%M:%S %Z", str, end, out, error);
+      return parse_generic ("%A , %D %b %Y %H:%M:%S %Z", str, end, out, error);
     }
   else if (n_alpha == 3 && str[3] == ' ')
     {
@@ -265,7 +288,7 @@ dsk_boolean dsk_date_parse   (const char *str,
     {
       /* ISO 8601 */
       /* example: "2009-02-12 T 14:32:61.1+01:00" (see RFC 3339) */
-      return parse_generic ("%Y-%m-%d T %H:%M:%S%Z", str, end, out, error);
+      return parse_generic ("%Y-%m-%D T %H:%M:%S%Z", str, end, out, error);
     }
   else
     {
@@ -550,18 +573,24 @@ dsk_boolean dsk_date_parse_timezone (const char *at,
 
     case '+':
     case '-':
-      if (!dsk_ascii_isdigit (at[1])
-       || !dsk_ascii_isdigit (at[2])
-       || !dsk_ascii_isdigit (at[3])
-       || !dsk_ascii_isdigit (at[4]))
-        return DSK_FALSE;
-      *zone_offset_out = dsk_ascii_digit_value (at[1]) * 600
-                       + dsk_ascii_digit_value (at[2]) * 60
-                       + dsk_ascii_digit_value (at[3]) * 10
-                       + dsk_ascii_digit_value (at[4]);
-      if (at[0] == '-')
-        *zone_offset_out = -*zone_offset_out;
-      return DSK_TRUE;
+      {
+        unsigned has_colon = 0;
+        if (!dsk_ascii_isdigit (at[1])
+         || !dsk_ascii_isdigit (at[2]))
+          return DSK_FALSE;
+        if (at[3] == ':')
+          has_colon = 1;
+        if (!dsk_ascii_isdigit (at[3+has_colon])
+         || !dsk_ascii_isdigit (at[4+has_colon]))
+          return DSK_FALSE;
+        *zone_offset_out = dsk_ascii_digit_value (at[1]) * 600
+                         + dsk_ascii_digit_value (at[2]) * 60
+                         + dsk_ascii_digit_value (at[3+has_colon]) * 10
+                         + dsk_ascii_digit_value (at[4+has_colon]);
+        if (at[0] == '-')
+          *zone_offset_out = -*zone_offset_out;
+        return DSK_TRUE;
+      }
     default:
       return DSK_FALSE;
     }
