@@ -7,6 +7,7 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 	        tests/test-http-client-stream-0 \
 		tests/test-http-server-stream-0 \
 		tests/test-http-loopback \
+		tests/test-date-0 \
 		tests/test-xml-parser-0 \
 		tests/test-xml-validation-suite
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
