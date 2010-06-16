@@ -50,6 +50,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \
 	  dsk-octet-filter-chain.o dsk-octet-filter-identity.o \
 	  dsk-hex-encoder.o dsk-hex-decoder.o dsk-whitespace-trimmer.o \
+	  dsk-url-encoder.o dsk-url-decoder.o \
 	  dsk-print.o
 	ar cru $@ $^
 
