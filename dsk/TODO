@@ -34,8 +34,8 @@ _ tie http-server and client together with pipes
   _ simple POST / close connection
   _ import 'test_keepalive' (from tests/test-http-client-stream-0)
 x date parsing (each of the three formats)
-_ date printing RFC-822
-_ converting unixtime <=> DskDate 
+x date printing RFC-822
+x converting unixtime <=> DskDate 
 x XML Parser: basics
 x XML Parser: big documents
 x XML Parser: error conditions
@@ -58,7 +58,6 @@ filters:
   _ dsk_url_encoder_new             
   _ dsk_url_decoder_new
   _ dsk_xml_encoder_new             
-  _ dsk_xml_decoder_new
   _ dsk_quote_printable_new         
   _ dsk_unquote_printable_new      
   _ dsk_utf8_to_utf16_converter_new
@@ -74,6 +73,9 @@ _ figure out a way to tune buffer allocations
 _ Is the post_data hack of dsk_http_server_stream_respond() really ok?
 _ Review dsk-dispatch API... has_idle and has_timeout are clearly bogus...
   implement epoll support.
+_ Date:
+  _ dsk_date_print_rfc850()
+  _ dsk_date_print_iso8601()
 _ HTTP Header Work:
   _ "no_cache" response:
     HTTP/1.1:
