@@ -33,9 +33,9 @@ dsk_boolean dsk_date_parse   (const char *str,
 #define DSK_DATE_MAX_LENGTH 64
 void        dsk_date_print_rfc822 (DskDate *date,
                                    char    *buf);
-void        dsk_date_print_rfc850 (DskDate *date,
+void        dsk_date_print_rfc850 (DskDate *date, /* unimplemented */
                                    char    *buf);
-void        dsk_date_print_iso8601 (DskDate *date,
+void        dsk_date_print_iso8601 (DskDate *date, /* unimplemented */
                                    char    *buf);
 
 /* 'unixtime' here is seconds since epoch.

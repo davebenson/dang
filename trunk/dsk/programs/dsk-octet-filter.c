@@ -215,8 +215,7 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_hex_decode)
 int main(int argc, char **argv)
 {
   DskError *error = NULL;
-  DskBuffer swap;
-  unsigned i, j;
+  DskOctetFilter *filter;
   dsk_cmdline_init ("run various filters",
                     "Run a chain of DskOctetFilters, mostly useful for testing.\n",
                     NULL, 0);
@@ -252,6 +251,7 @@ int main(int argc, char **argv)
   DskBuffer in = DSK_BUFFER_STATIC_INIT;
   DskBuffer out = DSK_BUFFER_STATIC_INIT;
 
+  filter = dsk_octet_filter_chain_new_take (n_filters, filters);
   for (;;)
     {
       int rv = dsk_buffer_readv (&in, 0);
@@ -263,17 +263,11 @@ int main(int argc, char **argv)
         }
       if (rv == 0)
         break;
-      for (i = 0; i < n_filters; i++)
+      if (!dsk_octet_filter_process_buffer (filter, &out, in.size, &in, DSK_TRUE, &error))
+        dsk_die ("error running filter: %s", error->message);
+      while (out.size)
         {
-          if (!dsk_octet_filter_process_buffer (filters[i], &out, in.size, &in, DSK_TRUE, &error))
-            dsk_die ("error running filter: %s", error->message);
-          swap = in;
-          in = out;
-          out = swap;
-        }
-      while (in.size)
-        {
-          int rv = dsk_buffer_writev (&in, 1);
+          int rv = dsk_buffer_writev (&out, 1);
           if (rv < 0)
             {
               if (errno == EAGAIN || errno == EINTR)
@@ -287,34 +281,22 @@ int main(int argc, char **argv)
     }
 
   /* finish the filters */
-  for (i = 0; i < n_filters; i++)
+  if (!dsk_octet_filter_finish (filter, &in, &error))
+    dsk_die ("error finishing filter: %s", error->message);
+  while (in.size != 0)
     {
-      if (!dsk_octet_filter_finish (filters[i], &in, &error))
-        dsk_die ("error finishing filter: %s", error->message);
-      for (j = i + 1; in.size && j < n_filters; j++)
+      int rv = dsk_buffer_writev (&in, 1);
+      if (rv < 0)
         {
-          if (!dsk_octet_filter_process_buffer (filters[j], &out, in.size, &in, DSK_TRUE, &error))
-            dsk_die ("error processing finishing filter: %s", error->message);
-          swap = in;
-          in = out;
-          out = swap;
-        }
-      while (in.size != 0)
-        {
-          int rv = dsk_buffer_writev (&in, 1);
-          if (rv < 0)
-            {
-              if (errno == EAGAIN || errno == EINTR)
-                continue;
-              dsk_die ("error writing to standard-output: %s",
-                       strerror (errno));
-            }
+          if (errno == EAGAIN || errno == EINTR)
+            continue;
+          dsk_die ("error writing to standard-output: %s",
+                   strerror (errno));
         }
     }
   dsk_assert (in.size == 0);
   dsk_assert (out.size == 0);
-  for (i = 0; i < n_filters; i++)
-    dsk_object_unref (filters[i]);
+  dsk_object_unref (filter);
   dsk_cleanup ();
   return 0;
 }

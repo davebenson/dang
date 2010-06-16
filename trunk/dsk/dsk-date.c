@@ -413,13 +413,13 @@ void        dsk_unixtime_to_date (int64_t  unixtime,
       if (delta >= 366)
         {
           first_is_leap = DSK_FALSE;
-          year -= 1 + (delta-366)/365;
+          year += 1 + (delta-366)/365;
           delta = (delta - 1) % 365;
         }
     }
   else
     {
-      year -= delta / 365;
+      year += delta / 365;
       delta %= 365;
     }
 
