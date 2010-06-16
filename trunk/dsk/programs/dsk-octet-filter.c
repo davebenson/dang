@@ -212,6 +212,20 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_hex_decode)
   return DSK_TRUE;
 }
 
+DSK_CMDLINE_CALLBACK_DECLARE(handle_url_encode)
+{
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
+  add_filter (dsk_url_encoder_new ());
+  return DSK_TRUE;
+}
+
+DSK_CMDLINE_CALLBACK_DECLARE(handle_url_decode)
+{
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
+  add_filter (dsk_url_decoder_new ());
+  return DSK_TRUE;
+}
+
 int main(int argc, char **argv)
 {
   DskError *error = NULL;
@@ -223,13 +237,13 @@ int main(int argc, char **argv)
                         handle_zlib_compress, NULL);
   dsk_cmdline_add_func ("raw-zlib-compress", "do raw zlib compression", "LEVEL", 0,
                         handle_raw_zlib_compress, NULL);
-  dsk_cmdline_add_func ("gzip-compress", "do raw zlib compression", "LEVEL", 0,
+  dsk_cmdline_add_func ("gzip-compress", "do gzip compression", "LEVEL", 0,
                         handle_gzip_compress, NULL);
   dsk_cmdline_add_func ("zlib-decompress", "do zlib decompression", NULL, 0,
                         handle_zlib_decompress, NULL);
   dsk_cmdline_add_func ("raw-zlib-decompress", "do raw zlib decompression", NULL, 0,
                         handle_raw_zlib_decompress, NULL);
-  dsk_cmdline_add_func ("gzip-decompress", "do raw zlib decompression", NULL, 0,
+  dsk_cmdline_add_func ("gzip-decompress", "do gzip decompression", NULL, 0,
                         handle_gzip_decompress, NULL);
   dsk_cmdline_add_func ("c-quote", "do c quoting", NULL, 0,
                         handle_c_quote, NULL);
@@ -246,6 +260,10 @@ int main(int argc, char **argv)
                         handle_hex_encode, NULL);
   dsk_cmdline_add_func ("hex-decode", "do Hex Decoding", NULL, 0,
                         handle_hex_decode, NULL);
+  dsk_cmdline_add_func ("url-encode", "do URL Encoding", NULL, 0,
+                        handle_url_encode, NULL);
+  dsk_cmdline_add_func ("url-decode", "do URL Decoding", NULL, 0,
+                        handle_url_decode, NULL);
   dsk_cmdline_process_args (&argc, &argv);
 
   DskBuffer in = DSK_BUFFER_STATIC_INIT;

@@ -55,8 +55,8 @@ TODO:
 filters:
   x dsk_hex_encoder_new             
   x dsk_hex_decoder_new             
-  _ dsk_url_encoder_new             
-  _ dsk_url_decoder_new
+  x dsk_url_encoder_new             
+  x dsk_url_decoder_new
   _ dsk_xml_encoder_new             
   _ dsk_quote_printable_new         
   _ dsk_unquote_printable_new      
@@ -64,7 +64,7 @@ filters:
   _ dsk_utf16_to_utf8_converter_new
   _ dsk_byte_doubler_new           
   _ dsk_byte_undoubler_new         
-  _ dsk_octet_filter_chain_new_take [steal from programs/dsk-octet-filter.c]
+  x dsk_octet_filter_chain_new_take [steal from programs/dsk-octet-filter.c]
 _ remove persistency support from DskClientStream !?!
 _ dsk_buffer_transfer, dsk_buffer_drain: consolidate fragments
   if they are both small.
