@@ -23,6 +23,12 @@ void              dsk_main_remove_timer    (DskDispatchTimer   *timer);
 DskDispatchIdle  *dsk_main_add_idle        (DskIdleFunc         func,
                                             void               *func_data);
 void              dsk_main_remove_idle     (DskDispatchIdle    *idle);
+DskDispatchSignal*dsk_main_add_signal      (int                 signal_number,
+                                            DskSignalHandler    func,
+                                            void               *func_data);
+void              dsk_main_remove_signal   (DskDispatchSignal  *signal);
+
+#define dsk_main_run_once()  dsk_dispatch_run(dsk_dispatch_default())
 
 
 /* program termination (terminate when ref-count gets to 0);

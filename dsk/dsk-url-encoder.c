@@ -21,6 +21,8 @@ dsk_url_encoder_process    (DskOctetFilter *filter,
                             const uint8_t  *in_data,
                             DskError      **error)
 {
+  DSK_UNUSED (filter);
+  DSK_UNUSED (error);
   while (in_length > 0)
     {
       unsigned unquoted_len = 0;

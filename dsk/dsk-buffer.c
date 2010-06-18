@@ -246,9 +246,9 @@ dsk_buffer_append(DskBuffer    *buffer,
 }
 
 void
-dsk_buffer_append_repeated_char (DskBuffer    *buffer, 
+dsk_buffer_append_repeated_byte (DskBuffer    *buffer, 
                                  size_t        count,
-                                 char          character)
+                                 uint8_t       byte)
 {
   CHECK_INTEGRITY (buffer);
   buffer->size += count;
@@ -272,7 +272,7 @@ dsk_buffer_append_repeated_char (DskBuffer    *buffer,
 	}
       if (avail > count)
 	avail = count;
-      memset (dsk_buffer_fragment_end (buffer->last_frag), character, avail);
+      memset (dsk_buffer_fragment_end (buffer->last_frag), byte, avail);
       count -= avail;
       buffer->last_frag->buf_length += avail;
     }

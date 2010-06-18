@@ -16,8 +16,8 @@ DskOctetFilter *dsk_unquote_printable_new          (void);
 DskOctetFilter *dsk_utf8_to_utf16_converter_new    (dsk_boolean big_endian);
 DskOctetFilter *dsk_utf16_to_utf8_converter_new    (dsk_boolean initially_big_endian,
                                                     dsk_boolean require_endian_marker);
-DskOctetFilter *dsk_byte_doubler_new               (char c);
-DskOctetFilter *dsk_byte_undoubler_new             (char c,
+DskOctetFilter *dsk_byte_doubler_new               (uint8_t c);
+DskOctetFilter *dsk_byte_undoubler_new             (uint8_t c,
                                                     dsk_boolean ignore_errors);
 
 

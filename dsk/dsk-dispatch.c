@@ -27,6 +27,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <signal.h>
+#include <unistd.h>             /* for pipe(), needed for signal handling */
 #include "dsk-common.h"
 #include "dsk-fd.h"
 #include "dsk-dispatch.h"
@@ -85,6 +86,9 @@ struct _RealDispatch
   DskDispatchTimer *timer_tree;
   DskDispatchTimer *recycled_timeouts;
 
+  DskDispatchSignal *signal_tree;
+  int signal_pipe_fds[2];
+
   DskDispatchIdle *first_idle, *last_idle;
   DskDispatchIdle *recycled_idles;
 };
@@ -116,6 +120,24 @@ struct _DskDispatchIdle
   DskIdleFunc func;
   void *func_data;
 };
+
+struct _DskDispatchSignal
+{
+  RealDispatch *dispatch;
+  int signal;
+  unsigned is_notifying : 1;
+  unsigned destroyed_while_notifying : 1;
+  unsigned is_red : 1;
+  DskSignalHandler func;
+  void *func_data;
+
+  DskDispatchSignal *left, *right, *parent;
+};
+
+/* only one dispatch may assume responsibility for signal-handling */
+static DskDispatch *global_signal_dispatch;
+static int          global_signal_dispatch_fd;
+
 /* Define the tree of timers, as per gskrbtreemacros.h */
 #define TIMERS_COMPARE(a,b, rv) \
   if (a->timeout_secs < b->timeout_secs) rv = -1; \
@@ -151,6 +173,17 @@ struct _DskDispatchIdle
 #define GET_IDLE_LIST(d) \
   DskDispatchIdle *, d->first_idle, d->last_idle, prev, next
 
+/* signals */
+#define COMPARE_SIGNO_TO_SIGNAL(a,b, rv) \
+  rv = a < b->signal ? -1 : a > b->signal ? 1 : 0;
+#define COMPARE_SIGNALS(a,b, rv) \
+  COMPARE_SIGNO_TO_SIGNAL(a->signal, b, rv)
+#define GET_SIGNAL_TREE(d) \
+  (d)->signal_tree, DskDispatchSignal *, \
+  GSK_STD_GET_IS_RED, GSK_STD_SET_IS_RED, \
+  parent, left, right, \
+  COMPARE_SIGNALS
+
 /* Create or destroy a Dispatch */
 DskDispatch *dsk_dispatch_new (void)
 {
@@ -177,6 +210,9 @@ DskDispatch *dsk_dispatch_new (void)
 
   /* need to handle SIGPIPE more gracefully than default */
   signal (SIGPIPE, SIG_IGN);
+
+  rv->signal_tree = NULL;
+  rv->signal_pipe_fds[0] = rv->signal_pipe_fds[1] = -1;
 
   gettimeofday (&tv, NULL);
   rv->base.last_dispatch_secs = tv.tv_sec;
@@ -856,6 +892,162 @@ dsk_dispatch_remove_idle (DskDispatchIdle *idle)
       d->recycled_idles = idle;
     }
 }
+
+static void
+generic_signal_handler (int sig)
+{
+  uint8_t b = sig;
+  int rv;
+  dsk_assert (sig < 256);
+retry_write:
+  rv = write (global_signal_dispatch_fd, &b, 1);
+  if (rv < 0)
+    {
+      if (errno == EINTR)
+        goto retry_write;
+      if (errno == EAGAIN)
+        {
+          /* TODO: we should do a second strategy here */
+        }
+      else
+        {
+          /* should be give a warning or something?
+             i have no idea what error we might get */
+        }
+    }
+}
+
+static void
+handle_signal_pipe_fd_readable  (DskFileDescriptor   fd,
+                                 unsigned       events,
+                                 void          *callback_data)
+{
+  RealDispatch *d = callback_data;
+  uint8_t buf[1024];
+  uint8_t emitted[32];
+  int bytes_read;
+  DSK_UNUSED (events);
+retry_read:
+  bytes_read = read (fd, buf, sizeof (buf));
+  if (bytes_read < 0)
+    {
+      if (errno == EINTR)
+        goto retry_read;
+      if (errno == EAGAIN)
+        return;
+      dsk_warning ("error reading from signal-pipe: %s", strerror (errno));
+    }
+  else
+    {
+      unsigned i;
+      memset (emitted, 0, 32);
+      for (i = 0; i < (unsigned)bytes_read; i++)
+        {
+          DskDispatchSignal *handler;
+          /* Guard against repeated emissions of the same signal
+             (which is usually a waste of time since signal-handlers
+             must guard against dropped repeated sgnals anyway) */
+          if (emitted[buf[i]>>3] & (1 << (buf[i] & 7)))
+            continue;
+          emitted[buf[i]>>3] |= (1 << (buf[i] & 7));
+
+          GSK_RBTREE_LOOKUP_COMPARATOR (GET_SIGNAL_TREE (d),
+                                        buf[i], COMPARE_SIGNO_TO_SIGNAL,
+                                        handler);
+          if (handler != NULL)
+            {
+              handler->is_notifying = 1;
+              handler->func (handler->func_data);
+              handler->is_notifying = 0;
+              if (handler->destroyed_while_notifying)
+                dsk_free (handler);
+            }
+        }
+    }
+}
+
+DskDispatchSignal *
+dsk_dispatch_add_signal    (DskDispatch     *dispatch,
+                            int              signal_number,
+                            DskSignalHandler func,
+                            void            *func_data)
+{
+  DskDispatchSignal *rv;
+  DskDispatchSignal *conflict;
+  RealDispatch *d = (RealDispatch *) dispatch;
+  struct sigaction action, oaction;
+
+  /* we restrict signals so they fit in a byte,
+     since we communicate the signal-number
+     across a stream and we don't want them to get broken up. */
+  dsk_return_val_if_fail (signal_number < 256,
+                          "currently, only signals <256 can be trapped",
+                          NULL);
+  if (global_signal_dispatch == NULL)
+    {
+      global_signal_dispatch = dispatch;
+retry_pipe:
+      if (pipe (d->signal_pipe_fds) < 0)
+        {
+          if (errno == EINTR)
+            goto retry_pipe;
+          dsk_die ("error creating pipe for synchronous signal handling");
+        }
+      dsk_fd_set_nonblocking (d->signal_pipe_fds[0]);
+      dsk_fd_set_nonblocking (d->signal_pipe_fds[1]);
+      global_signal_dispatch_fd = d->signal_pipe_fds[1];
+      dsk_dispatch_watch_fd (dispatch, d->signal_pipe_fds[0], DSK_EVENT_READABLE,
+                             handle_signal_pipe_fd_readable, d);
+    }
+  else if (global_signal_dispatch != dispatch)
+    {
+      dsk_die ("only one dispatcher may be used to handle signals");
+    }
+  GSK_RBTREE_LOOKUP_COMPARATOR (GET_SIGNAL_TREE (d),
+                                signal_number, COMPARE_SIGNO_TO_SIGNAL,
+                                rv);
+  dsk_return_val_if_fail (rv == NULL, "signal already trapped", NULL);
+  memset (&action, 0, sizeof (action));
+  action.sa_handler = generic_signal_handler;
+  action.sa_flags = SA_NOCLDSTOP;
+retry_sigaction:
+  if (sigaction (signal_number, &action, &oaction) != 0)
+    {
+      if (errno == EINTR)
+        goto retry_sigaction;
+      dsk_warning ("error running sigaction (signal %u): %s",
+                   signal_number, strerror (errno));
+      return NULL;
+    }
+
+  rv = dsk_malloc (sizeof (DskDispatchSignal));
+  rv->dispatch = d;
+  rv->is_notifying = rv->destroyed_while_notifying = 0;
+  rv->signal = signal_number;
+  rv->func = func;
+  rv->func_data = func_data;
+  GSK_RBTREE_INSERT (GET_SIGNAL_TREE (d), rv, conflict);
+  dsk_assert (conflict == NULL);
+
+  return rv;
+}
+void  dsk_dispatch_remove_signal (DskDispatchSignal *sig)
+{
+  RealDispatch *d = sig->dispatch;
+  dsk_assert (!sig->destroyed_while_notifying);
+
+  /* untrap signal handler */
+  signal (sig->signal, SIG_DFL);
+
+  /* remove signal handler from tree */
+  GSK_RBTREE_REMOVE (GET_SIGNAL_TREE (d), sig);
+
+  if (sig->is_notifying)
+    sig->destroyed_while_notifying = 1;
+  else
+    dsk_free (sig);
+}
+
 void
 dsk_dispatch_destroy_default (void)
 {

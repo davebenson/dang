@@ -64,6 +64,19 @@ void              dsk_main_remove_idle     (DskDispatchIdle    *idle)
 {
   dsk_dispatch_remove_idle (idle);
 }
+DskDispatchSignal*dsk_main_add_signal      (int                 signal_number,
+                                            DskSignalHandler    func,
+                                            void               *func_data)
+{
+  return dsk_dispatch_add_signal (dsk_dispatch_default (),
+                                  signal_number, func, func_data);
+}
+  
+void              dsk_main_remove_signal   (DskDispatchSignal  *signal)
+{
+  dsk_dispatch_remove_signal (signal);
+}
+
 
 
 /* program termination (terminate when ref-count gets to 0);
@@ -92,8 +105,9 @@ void              dsk_main_remove_ref      (void)
 int
 dsk_main_run             (void)
 {
+  DskDispatch *d = dsk_dispatch_default ();
   while (main_exit_status < 0)
-    dsk_main_run_once ();
+    dsk_dispatch_run (d);
   return main_exit_status;
 }
 

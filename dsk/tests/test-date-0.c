@@ -234,7 +234,7 @@ test_printing (void)
   DskDate date = { 2006, 12, 22, 15, 39, 59, 0 };
   char buf[DSK_DATE_MAX_LENGTH];
   dsk_date_print_rfc822 (&date, buf);
-  dsk_assert (strcmp (buf, "Fri, 22 Dec 2006 15:39:59 +0000") == 0);
+  dsk_assert (strcmp (buf, "Fri, 22 Dec 2006 15:39:59 GMT") == 0);
 #if 0
   dsk_date_print_rfc850 (&date, buf);
   dsk_assert (strcmp (buf, "Friday, 22-Dec-2006 15:39:59 +0000") == 0);
