@@ -81,7 +81,8 @@ typedef struct {
 typedef void (*DskChildHandler) (DskDispatchChildInfo  *info,
                                  void                  *func_data);
 DskDispatchChild *
-      dsk_dispatch_add_child    (int                process_id,
+      dsk_dispatch_add_child    (DskDispatch       *dispatch,
+                                 int                process_id,
                                  DskChildHandler    func,
                                  void              *func_data);
 void  dsk_dispatch_remove_child (DskDispatchChild  *handler);

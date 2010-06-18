@@ -1,5 +1,8 @@
+#include <unistd.h>
 #include <stdio.h>
 #include <signal.h>
+#include <sys/time.h>
+#include <sys/stat.h>
 #include "../dsk.h"
 
 static dsk_boolean cmdline_verbose = DSK_FALSE;
@@ -26,6 +29,105 @@ test_signal_handling (void)
     dsk_main_run_once ();
   dsk_main_remove_signal (sig);
 }
+static void
+handle_child_exit (DskDispatchChildInfo *info, void *func_data)
+{
+  dsk_assert (!info->killed);
+  *(int*)func_data = info->value;
+}
+static void
+test_child_exit (void)
+{
+  int pid;
+  int exit_status = -1;
+retry_fork:
+  pid = fork ();
+  if (pid < 0)
+    {
+      sleep(1);
+      goto retry_fork;
+    }
+  if (pid == 0)
+    _exit(16);
+  dsk_main_add_child (pid, handle_child_exit, &exit_status);
+  while (exit_status == -1)
+    dsk_main_run_once ();
+  dsk_assert (exit_status == 16);
+}
+static void
+test_child_exit2 (void)
+{
+  int pid;
+  int exit_status = -1;
+retry_fork:
+  pid = fork ();
+  if (pid < 0)
+    {
+      sleep(1);
+      goto retry_fork;
+    }
+  if (pid == 0)
+    {
+      struct timeval tv = { 0, 100*1000 };
+      select (0, NULL, NULL, NULL, &tv);
+      _exit(16);
+    }
+  dsk_main_add_child (pid, handle_child_exit, &exit_status);
+  while (exit_status == -1)
+    dsk_main_run_once ();
+  dsk_assert (exit_status == 16);
+}
+static void
+handle_child_killed (DskDispatchChildInfo *info, void *func_data)
+{
+  dsk_assert (info->killed);
+  *(int*)func_data = info->value;
+}
+static void
+test_child_killed (void)
+{
+  int pid;
+  int sig = -1;
+retry_fork:
+  pid = fork ();
+  if (pid < 0)
+    {
+      sleep(1);
+      goto retry_fork;
+    }
+  if (pid == 0)
+    {
+      raise (SIGTERM);
+    }
+  dsk_main_add_child (pid, handle_child_killed, &sig);
+  while (sig == -1)
+    dsk_main_run_once ();
+  dsk_assert (sig == SIGTERM);
+}
+
+static void
+test_child_killed2 (void)
+{
+  int pid;
+  int sig = -1;
+retry_fork:
+  pid = fork ();
+  if (pid < 0)
+    {
+      sleep(1);
+      goto retry_fork;
+    }
+  if (pid == 0)
+    {
+      struct timeval tv = { 0, 100*1000 };
+      select (0, NULL, NULL, NULL, &tv);
+      raise (SIGTERM);
+    }
+  dsk_main_add_child (pid, handle_child_killed, &sig);
+  while (sig == -1)
+    dsk_main_run_once ();
+  dsk_assert (sig == SIGTERM);
+}
 
 static struct 
 {
@@ -34,6 +136,10 @@ static struct
 } tests[] =
 {
   { "signal handling", test_signal_handling },
+  { "test child immediate exit", test_child_exit },
+  { "test child exit", test_child_exit2 },
+  { "test child immediate kill", test_child_killed },
+  { "test child killed", test_child_killed2 },
 };
 int main(int argc, char **argv)
 {
