@@ -226,6 +226,98 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_url_decode)
   return DSK_TRUE;
 }
 
+static dsk_boolean
+parse_byte_spec (const char *spec, uint8_t *out, DskError **error)
+{
+  if (spec[0] == 0)
+    {
+      *out = 0;
+      return DSK_TRUE;
+    }
+  else if (spec[1] == 0)
+    {
+      *out = *spec;
+      return DSK_TRUE;
+    }
+  else if (spec[0] == 'h' && spec[1] == 'e' && spec[2] == 'x' && spec[3] == ':')
+    {
+      if (!dsk_ascii_isxdigit (spec[4]) || !dsk_ascii_isxdigit (spec[5]) || spec[6] != 0)
+        {
+          dsk_set_error (error, "'hex:' must be followed by 2 hex digits");
+          return DSK_FALSE;
+        }
+      *out = (dsk_ascii_xdigit_value (spec[4]) << 4)
+           | dsk_ascii_xdigit_value (spec[5]);
+      return DSK_TRUE;
+    }
+  else if (spec[0] == '\\')
+    {
+      /* fire up c-unquoter */
+      DskBuffer buf = DSK_BUFFER_STATIC_INIT;
+      DskOctetFilter *f = dsk_c_unquoter_new (DSK_FALSE);
+      if (!dsk_octet_filter_process (f, &buf, strlen (spec), (uint8_t*)spec, error)
+       || !dsk_octet_filter_finish (f, &buf, error))
+        {
+          dsk_object_unref (f);
+          dsk_buffer_clear (&buf);
+          return DSK_FALSE;
+        }
+      dsk_object_unref (f);
+      if (buf.size != 1)
+        {
+          dsk_set_error (error, "trailing garbage after \\ sequence for byte-spec");
+          return DSK_FALSE;
+        }
+      dsk_buffer_read (&buf, 1, out);
+      return DSK_TRUE;
+    }
+  else
+    {
+      dsk_set_error (error, "unrecognized byte-spec");
+      return DSK_FALSE;
+    }
+}
+
+DSK_CMDLINE_CALLBACK_DECLARE(handle_byte_doubler)
+{
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data);
+  uint8_t byte;
+
+  /* parse byte */
+  if (!parse_byte_spec (arg_value, &byte, error))
+    return DSK_FALSE;
+  add_filter (dsk_byte_doubler_new (byte));
+  return DSK_TRUE;
+}
+DSK_CMDLINE_CALLBACK_DECLARE(handle_byte_undoubler)
+{
+  unsigned len = strlen (arg_value);
+  dsk_boolean ignore_errors;
+  uint8_t byte;
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data);
+  if (len > 1 && arg_value[len-1] == '!')
+    {
+      char *av = dsk_malloc (len);
+      memcpy (av, arg_value, len-1);
+      av[len-1] = 0;
+      if (!parse_byte_spec (av, &byte, error))
+        {
+          dsk_free (av);
+          return DSK_FALSE;
+        }
+      dsk_free (av);
+      ignore_errors = DSK_TRUE;
+    }
+  else
+    {
+      if (!parse_byte_spec (arg_value, &byte, error))
+        return DSK_FALSE;
+      ignore_errors = DSK_FALSE;
+    }
+  add_filter (dsk_byte_undoubler_new (byte, ignore_errors));
+  return DSK_TRUE;
+}
+
 int main(int argc, char **argv)
 {
   DskError *error = NULL;
@@ -264,6 +356,10 @@ int main(int argc, char **argv)
                         handle_url_encode, NULL);
   dsk_cmdline_add_func ("url-decode", "do URL Decoding", NULL, 0,
                         handle_url_decode, NULL);
+  dsk_cmdline_add_func ("byte-doubler", "double a certain byte", "BYTE_SPEC", 0,
+                        handle_byte_doubler, NULL);
+  dsk_cmdline_add_func ("byte-undoubler", "undouble a certain byte ('!' means ignore errors)", "BYTE_SPEC[!]", 0,
+                        handle_byte_undoubler, NULL);
   dsk_cmdline_process_args (&argc, &argv);
 
   DskBuffer in = DSK_BUFFER_STATIC_INIT;

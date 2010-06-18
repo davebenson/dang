@@ -4,6 +4,7 @@ BUILT_SOURCES = dsk-ascii-chartable.inc dsk-digit-chartables.inc \
                 dsk-http-ident-chartable.inc dsk-byte-name-table.inc \
 		dsk-base64-char-table.inc dsk-base64-value-table.inc 
 TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
+		tests/test-dispatch \
 	        tests/test-http-client-stream-0 \
 		tests/test-http-server-stream-0 \
 		tests/test-http-loopback \
@@ -51,6 +52,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-octet-filter-chain.o dsk-octet-filter-identity.o \
 	  dsk-hex-encoder.o dsk-hex-decoder.o dsk-whitespace-trimmer.o \
 	  dsk-url-encoder.o dsk-url-decoder.o \
+	  dsk-byte-doubler.o dsk-byte-undoubler.o \
 	  dsk-print.o
 	ar cru $@ $^
 

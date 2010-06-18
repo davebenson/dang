@@ -62,8 +62,8 @@ filters:
   _ dsk_unquote_printable_new      
   _ dsk_utf8_to_utf16_converter_new
   _ dsk_utf16_to_utf8_converter_new
-  _ dsk_byte_doubler_new           
-  _ dsk_byte_undoubler_new         
+  x dsk_byte_doubler_new           
+  x dsk_byte_undoubler_new         
   x dsk_octet_filter_chain_new_take [steal from programs/dsk-octet-filter.c]
 _ remove persistency support from DskClientStream !?!
 _ dsk_buffer_transfer, dsk_buffer_drain: consolidate fragments
@@ -87,8 +87,25 @@ _ HTTP Header Work:
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)
 _ HTTP Client Stream
   _ content-encoding gzip
+    _ POST data, pre-gzipped, with size
+    _ POST data, pre-gzipped, with chunked
+    _ POST data, streaming, with chunked
+    _ POST data, data in slab with size
+      (gzip and provide content-length=compressed-size)
+    _ body, with size
+    _ body, streaming
+    _ body, without auto-decompression
+
 _ HTTP Server Stream implementation
   _ content-encoding gzip
+    _ POST data, with size
+    _ POST data, with chunked
+    _ POST data, without auto-decompression
+    _ body, pre-gzipped, with size
+    _ body, pre-gzipped, with chunked
+    _ body, streaming, with chunked
+    _ body, data in slab with size
+      (gzip and provide content-length=compressed-size)
 _ HTTP Server implementation
 _ MIME Multipart Impl
 _ XML implementation

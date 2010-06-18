@@ -646,6 +646,7 @@ dsk_date_get_day_of_week (DskDate *date)
   return (day + 4) % 7;
 }
 
+/* Sun, 06 Nov 1994 08:49:37 GMT */
 void        dsk_date_print_rfc822 (DskDate *date,
                                    char    *buf)
 {
@@ -654,8 +655,27 @@ void        dsk_date_print_rfc822 (DskDate *date,
   memcpy (buf, days_of_week + dsk_date_get_day_of_week (date)*3, 3);
   buf[3] = ',';
   buf[4] = ' ';
-  memcpy (buf + 5, months + (date->month-1) * 3, 3);
-  buf[8] = ' ';
-  snprintf (buf, 15, "%02u:%02u:%02u ", date->hour, date->minute, date->second);
-  strcpy (buf + 24, "GMT");
+  buf[5] = '0' + date->day / 10;
+  buf[6] = '0' + date->day % 10;
+  buf[7] = ' ';
+  memcpy (buf + 8, months + (date->month-1) * 3, 3);
+  buf[11] = ' ';
+  buf[12] = '0' + date->year / 1000;
+  buf[13] = '0' + date->year / 100 % 10;
+  buf[14] = '0' + date->year / 10 % 10;
+  buf[15] = '0' + date->year % 10;
+  buf[16] = ' ';
+  buf[17] = '0' + date->hour / 10;
+  buf[18] = '0' + date->hour % 10;
+  buf[19] = ':';
+  buf[20] = '0' + date->minute / 10;
+  buf[21] = '0' + date->minute % 10;
+  buf[22] = ':';
+  buf[23] = '0' + date->second / 10;
+  buf[24] = '0' + date->second % 10;
+  buf[25] = ' ';
+  buf[26] = 'G';
+  buf[27] = 'M';
+  buf[28] = 'T';
+  buf[29] = '\0';
 }

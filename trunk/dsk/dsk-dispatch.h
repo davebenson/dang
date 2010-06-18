@@ -4,6 +4,8 @@
 typedef struct _DskDispatch DskDispatch;
 typedef struct _DskDispatchTimer DskDispatchTimer;
 typedef struct _DskDispatchIdle DskDispatchIdle;
+typedef struct _DskDispatchSignal DskDispatchSignal;
+typedef struct _DskDispatchChild DskDispatchChild;
 
 typedef enum
 {
@@ -61,6 +63,29 @@ DskDispatchIdle *
                                     void               *func_data);
 void  dsk_dispatch_remove_idle (DskDispatchIdle *);
 
+/* Signal handling */
+typedef void (*DskSignalHandler) (void *func_data);
+DskDispatchSignal *
+      dsk_dispatch_add_signal    (DskDispatch     *dispatch,
+                                  int              signal_number,
+                                  DskSignalHandler func,
+                                  void            *func_data);
+void  dsk_dispatch_remove_signal (DskDispatchSignal *signal);
+
+/* Process termination */
+typedef struct {
+  int process_id;
+  dsk_boolean killed;           /* killed by signal */
+  int value;                    /* exit status or signal number */
+} DskDispatchChildInfo;
+typedef void (*DskChildHandler) (DskDispatchChildInfo  *info,
+                                 void                  *func_data);
+DskDispatchChild *
+      dsk_dispatch_add_child    (int                process_id,
+                                 DskChildHandler    func,
+                                 void              *func_data);
+void  dsk_dispatch_remove_child (DskDispatchChild  *handler);
+
 /* --- API for use in standalone application --- */
 /* Where you are happy just to run poll(2). */
 
@@ -70,7 +95,6 @@ void  dsk_dispatch_remove_idle (DskDispatchIdle *);
  */
 void  dsk_dispatch_run      (DskDispatch *dispatch);
 
-#define dsk_main_run_once()  dsk_dispatch_run(dsk_dispatch_default())
 
 
 /* --- API for those who want to embed a dispatch into their own main-loop --- */
