@@ -27,6 +27,10 @@ DskDispatchSignal*dsk_main_add_signal      (int                 signal_number,
                                             DskSignalHandler    func,
                                             void               *func_data);
 void              dsk_main_remove_signal   (DskDispatchSignal  *signal);
+DskDispatchChild *dsk_main_add_child       (int                process_id,
+                                            DskChildHandler    func,
+                                            void              *func_data);
+void              dsk_main_remove_child    (DskDispatchChild  *handler);
 
 #define dsk_main_run_once()  dsk_dispatch_run(dsk_dispatch_default())
 

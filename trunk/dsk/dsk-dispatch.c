@@ -12,6 +12,8 @@
 #include <assert.h>
 #include <alloca.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
@@ -89,6 +91,10 @@ struct _RealDispatch
   DskDispatchSignal *signal_tree;
   int signal_pipe_fds[2];
 
+  DskDispatchChild *child_tree;
+  DskDispatchSignal *child_sig_handler;
+  DskDispatchIdle *idle_child_handler;
+
   DskDispatchIdle *first_idle, *last_idle;
   DskDispatchIdle *recycled_idles;
 };
@@ -132,6 +138,18 @@ struct _DskDispatchSignal
   void *func_data;
 
   DskDispatchSignal *left, *right, *parent;
+};
+
+struct _DskDispatchChild
+{
+  RealDispatch *dispatch;
+  int process_id;
+  unsigned is_notifying : 1;
+  unsigned is_red : 1;
+  DskChildHandler func;
+  void *func_data;
+
+  DskDispatchChild *left, *right, *parent;
 };
 
 /* only one dispatch may assume responsibility for signal-handling */
@@ -184,6 +202,17 @@ static int          global_signal_dispatch_fd;
   parent, left, right, \
   COMPARE_SIGNALS
 
+/* children */
+#define COMPARE_PID_TO_CHILD(a,b, rv) \
+  rv = a < b->process_id ? -1 : a > b->process_id ? 1 : 0;
+#define COMPARE_PROCESSES(a,b, rv) \
+  COMPARE_PID_TO_CHILD(a->process_id, b, rv)
+#define GET_CHILD_TREE(d) \
+  (d)->child_tree, DskDispatchChild *, \
+  GSK_STD_GET_IS_RED, GSK_STD_SET_IS_RED, \
+  parent, left, right, \
+  COMPARE_PROCESSES
+
 /* Create or destroy a Dispatch */
 DskDispatch *dsk_dispatch_new (void)
 {
@@ -213,6 +242,10 @@ DskDispatch *dsk_dispatch_new (void)
 
   rv->signal_tree = NULL;
   rv->signal_pipe_fds[0] = rv->signal_pipe_fds[1] = -1;
+
+  rv->child_tree = NULL;
+  rv->child_sig_handler = NULL;
+  rv->idle_child_handler = NULL;
 
   gettimeofday (&tv, NULL);
   rv->base.last_dispatch_secs = tv.tv_sec;
@@ -1047,6 +1080,92 @@ void  dsk_dispatch_remove_signal (DskDispatchSignal *sig)
   else
     dsk_free (sig);
 }
+
+static void
+do_waitpid_repeatedly (void *data)
+{
+  RealDispatch *d = data;
+  pid_t pid;
+  int status;
+  while ((pid=waitpid (-1, &status, WNOHANG)) != -1)
+    {
+      DskDispatchChild *child;
+      if (pid == 0)
+        break;
+      GSK_RBTREE_LOOKUP_COMPARATOR (GET_CHILD_TREE (d),
+                                    pid, COMPARE_PID_TO_CHILD,
+                                    child);
+      if (child != NULL)
+        {
+          DskDispatchChildInfo child_info;
+          GSK_RBTREE_REMOVE (GET_CHILD_TREE (d), child);
+          child_info.process_id = pid;
+          if (WIFSIGNALED (status))
+            {
+              child_info.killed = DSK_TRUE;
+              child_info.value = WTERMSIG (status);
+            }
+          else
+            {
+              child_info.killed = DSK_FALSE;
+              child_info.value = WEXITSTATUS (status);
+            }
+          child->is_notifying = DSK_TRUE;
+          child->func (&child_info, child->func_data);
+          dsk_free (child);
+        }
+    }
+}
+static void
+do_waitpid_repeatedly_idle (void *data)
+{
+  RealDispatch *d = data;
+  d->idle_child_handler = NULL;
+  do_waitpid_repeatedly (d);
+}
+
+DskDispatchChild *
+dsk_dispatch_add_child    (DskDispatch       *dispatch,
+                           int                process_id,
+                           DskChildHandler    func,
+                           void              *func_data)
+{
+  RealDispatch *d = (RealDispatch *) dispatch;
+  DskDispatchChild *conflict;
+  if (d->child_sig_handler == NULL)
+    d->child_sig_handler = dsk_dispatch_add_signal (dispatch,
+                                                    SIGCHLD,
+                                                    do_waitpid_repeatedly,
+                                                    d);
+  if (d->idle_child_handler == NULL)
+    d->idle_child_handler = dsk_dispatch_add_idle (dispatch,
+                                                   do_waitpid_repeatedly_idle,
+                                                   d);
+  
+
+  /* add child to child tree */
+  DskDispatchChild *child;
+  child = dsk_malloc (sizeof (DskDispatchChild));
+  child->dispatch = d;
+  child->process_id = process_id;
+  child->func = func;
+  child->func_data = func_data;
+  child->is_notifying = DSK_FALSE;
+  GSK_RBTREE_INSERT (GET_CHILD_TREE (d), child, conflict);
+  dsk_return_val_if_fail (conflict == NULL, "process-id trapped twice", NULL);
+  return child;
+}
+
+void
+dsk_dispatch_remove_child (DskDispatchChild  *handler)
+{
+  RealDispatch *d = handler->dispatch;
+  if (handler->is_notifying)
+    return;
+  GSK_RBTREE_REMOVE (GET_CHILD_TREE (d), handler);
+  dsk_free (handler);
+}
+
 
 void
 dsk_dispatch_destroy_default (void)

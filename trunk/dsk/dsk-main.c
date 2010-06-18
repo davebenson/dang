@@ -77,6 +77,19 @@ void              dsk_main_remove_signal   (DskDispatchSignal  *signal)
   dsk_dispatch_remove_signal (signal);
 }
 
+DskDispatchChild *dsk_main_add_child       (int                 process_id,
+                                            DskChildHandler     func,
+                                            void               *func_data)
+{
+  return dsk_dispatch_add_child (dsk_dispatch_default (),
+                                 process_id, func, func_data);
+}
+  
+void              dsk_main_remove_child   (DskDispatchChild *child)
+{
+  dsk_dispatch_remove_child (child);
+}
+
 
 
 /* program termination (terminate when ref-count gets to 0);
