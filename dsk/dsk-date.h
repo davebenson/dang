@@ -60,7 +60,7 @@ dsk_boolean dsk_date_parse_timezone (const char *at,
                                      char **end,
 				     int *zone_offset_out);
 
-unsigned dsk_date_get_days_since_epoch (DskDate *);
+int dsk_date_get_days_since_epoch (DskDate *);
 
 #if 0
 /* UNIMPLEMENTED:  this is the API to deal with localtime

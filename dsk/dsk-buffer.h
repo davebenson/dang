@@ -58,7 +58,7 @@ DSK_INLINE_FUNC void dsk_buffer_append_byte(DskBuffer    *buffer,
 void      dsk_buffer_append_byte_f      (DskBuffer    *buffer, 
                                          uint8_t       byte);
 void     dsk_buffer_append_repeated_byte(DskBuffer    *buffer, 
-                                         unsigned      count,
+                                         size_t        count,
                                          uint8_t       byte);
 #define dsk_buffer_append_zeros(buffer, count) \
   dsk_buffer_append_repeated_byte ((buffer), 0, (count))

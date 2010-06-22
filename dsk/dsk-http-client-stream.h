@@ -43,6 +43,7 @@ struct _DskHttpClientStreamOptions
   unsigned max_outgoing_data;
   dsk_boolean strict_keepalive;
   dsk_boolean print_warnings;
+  dsk_boolean transparent_decompression;
 };
 
 #define DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT              \
@@ -51,7 +52,8 @@ struct _DskHttpClientStreamOptions
   4,                    /* max_pipelined_requests */        \
   8192,                 /* max_outgoing_data */             \
   DSK_FALSE,            /* strict_keepalive */              \
-  DSK_DEBUG             /* print_warnings */                \
+  DSK_DEBUG,            /* print_warnings */                \
+  DSK_TRUE,             /* transparent_decompression */     \
 }
 
 DskHttpClientStream *
@@ -130,6 +132,7 @@ struct _DskHttpClientStreamTransfer
 
   /* for transparent handling of content-encoding gzip */
   DskOctetFilter *content_decoder;
+  DskOctetFilter *post_data_encoder;
 
   /*< private >*/
   DskHttpClientStreamReadState read_state;
