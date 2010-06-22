@@ -18,6 +18,15 @@ _ http client stream: error conditions:
   _ random data tests
   _ transport errors reading/writing
   _ post-data stream read errors
+_ http client gzip content-encoding:
+  _ POST data, pre-gzipped, with size
+  _ POST data, pre-gzipped, with chunked
+  _ POST data, streaming, with chunked
+  _ POST data, data in slab with size
+    (gzip and provide content-length=compressed-size)
+  _ body, with size
+  _ body, streaming
+  _ body, without auto-decompression
 _ http server stream: content-length POST data
 _ http server stream: transfer-encoding-chunked POST data
 x http server stream: transfer-encoding-chunked content
@@ -47,11 +56,28 @@ _ XML Parser: parse errors
 _ XML Parser: strip whitespace (not implemented yet) 
 x XML Parser: search for existing conformance test
 _ XML Parser: XML conformance test: suck up entities included
+_ octet-filter test harness [feed data is several ways]
+  _ c-quote test
+  _ hex test
+  _ base64 test
+  _ url-encode test
+  _ byte doubler test
 
 WARNING CONDITIONS:
 _ high trap counts?
 
 TODO:
+_ HTTP Client implementation (search for TODO in dsk-http-client.h)
+_ HTTP Client Stream
+  _ content-encoding gzip
+    x message body
+    _ POST data
+      _ make dsk_http_client_stream_request_new take a
+	DskHttpClientStreamRequestOptions
+      _ add force_post_data_gzip to Options; if given a static buffer,
+        compress at request time; if given a stream, make a post-data-encoder.
+	content-length must be handled carefullly.
+
 filters:
   x dsk_hex_encoder_new             
   x dsk_hex_decoder_new             
@@ -83,18 +109,6 @@ _ HTTP Header Work:
       Cache-Control: post-check=0, pre-check=0
     HTTP/1.0:
       Pragma: no-cache
-
-_ HTTP Client implementation (search for TODO in dsk-http-client.h)
-_ HTTP Client Stream
-  _ content-encoding gzip
-    _ POST data, pre-gzipped, with size
-    _ POST data, pre-gzipped, with chunked
-    _ POST data, streaming, with chunked
-    _ POST data, data in slab with size
-      (gzip and provide content-length=compressed-size)
-    _ body, with size
-    _ body, streaming
-    _ body, without auto-decompression
 
 _ HTTP Server Stream implementation
   _ content-encoding gzip

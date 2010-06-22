@@ -349,6 +349,15 @@ void        dsk_unixtime_to_date (int64_t  unixtime,
   unsigned year;
   int64_t delta;
 
+  /* --- figure out the year --- */
+  /* This is actually the hard part, b/c of leap years being so random.
+     The invariant is this:  start_day(year) + delta == days_since_epoch
+     where start_day(year) returns the days since epoch of Jan 1 of the given year.
+
+     The goal is to reduce delta to less than one year --
+     at that point, we know the year
+     and the day within the year (ie delta). */
+
   /* which 400 year period are we in? (period ending Jan 1 2000 is 0, we
    are in period '1', etc)  the time at period = 1 was 946684800 (in 2000),
    the period is 86400*(365*400 + 97) */
@@ -371,6 +380,9 @@ void        dsk_unixtime_to_date (int64_t  unixtime,
       year = 2000;
       delta = days_since_epoch - JAN1_2000;
     }
+
+  /* note: now delta < 400 years */
+
   /* the first hundred year period is 100*365+25 days;
      the next three are 100*365+24 days */
   dsk_boolean first_is_leap = DSK_FALSE;
@@ -394,6 +406,8 @@ void        dsk_unixtime_to_date (int64_t  unixtime,
       delta -= 300*365+73;
     }
 
+  /* note: now delta < 100 years */
+
   /* offset into 4 year period */
   if (!first_is_leap)
     {
@@ -406,6 +420,8 @@ void        dsk_unixtime_to_date (int64_t  unixtime,
     }
   year += (delta / (365*4+1)) * 4;
   delta %= (365*4+1);
+
+  /* note: now delta < 4 years */
 
   /* offset into 1 year period */
   if (first_is_leap)
@@ -423,7 +439,8 @@ void        dsk_unixtime_to_date (int64_t  unixtime,
       delta %= 365;
     }
 
-  /* ok, so now, we have the year */
+  /* Ok, so now, we have the year!
+   * Figure the month, use fairly gruesomely hardcoded stuff! */
   date->year = year;
   if (delta < 31) { date->month = 1; }
   else if (delta < 31+28+first_is_leap) { date->month = 2; delta -= 31; }
@@ -442,6 +459,9 @@ void        dsk_unixtime_to_date (int64_t  unixtime,
       else if (delta < 334) { date->month = 11; delta -= 304; }
       else { date->month = 12; delta -= 334; }
     }
+
+  /* note: now delta is less than a month */
+
   date->day = delta + 1;
   date->hour = secs_since_midnight / 3600;
   date->minute = secs_since_midnight / 60 % 60;
@@ -597,8 +617,8 @@ dsk_boolean dsk_date_parse_timezone (const char *at,
       return DSK_FALSE;
     }
 }
-static dsk_boolean
-is_leap_year (unsigned year)
+dsk_boolean
+dsk_date_is_leap_year (unsigned year)
 {
   return (year % 4 == 0)
      && ((year % 100 != 0) || (year % 400 == 0));
@@ -606,13 +626,13 @@ is_leap_year (unsigned year)
 
 unsigned    dsk_date_get_day_of_year (DskDate *date)
 {
-  dsk_boolean is_after_leap = date->month >= 3 && is_leap_year (date->year);
+  dsk_boolean is_after_leap = date->month >= 3 && dsk_date_is_leap_year (date->year);
   dsk_assert (1 <= date->month && date->month <= 12);
   return month_starts_in_days[date->month-1] + date->day - 1
        + (is_after_leap ? 1 : 0);
 }
 
-unsigned    dsk_date_get_days_since_epoch (DskDate *date)
+int    dsk_date_get_days_since_epoch (DskDate *date)
 {
   unsigned year = date->year;
   /* we need to find the number of leap years between 1970
@@ -626,9 +646,10 @@ unsigned    dsk_date_get_days_since_epoch (DskDate *date)
    * There is a leap year every 4 years, except every 100 years,
    * except every 400 years.  see "Gregorian calendar" on wikipedia.
    */
-  unsigned n_leaps = ((ly_year / 4) - (EPOCH_YEAR / 4))
-                   - ((ly_year / 100) - (EPOCH_YEAR / 100))
-                   + ((ly_year / 400) - (EPOCH_YEAR / 400));
+  /* XXX: does not handle dates before epoch correctly! */
+  int n_leaps = ((ly_year / 4) - (EPOCH_YEAR / 4))
+              - ((ly_year / 100) - (EPOCH_YEAR / 100))
+              + ((ly_year / 400) - (EPOCH_YEAR / 400));
 
   return (year - EPOCH_YEAR) * 365
        + n_leaps

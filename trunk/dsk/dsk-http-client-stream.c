@@ -612,31 +612,37 @@ handle_post_data_readable (DskOctetSource *source,
                            DskHttpClientStreamTransfer *xfer)
 {
   DskBuffer buffer = DSK_BUFFER_STATIC_INIT;
+  DskBuffer compressed_buffer = DSK_BUFFER_STATIC_INIT;
+  DskBuffer *buf = &buffer;
   DskError *error = NULL;
   DskHttpClientStream *stream = xfer->owner;
+  if (xfer->post_data_encoder != NULL)
+    buf = &compressed_buffer;
   switch (dsk_octet_source_read_buffer (source, &buffer, &error))
     {
     case DSK_IO_RESULT_SUCCESS:
       if (buffer.size == 0)
         return DSK_TRUE;
-#if  0 /* POST data content compession goes here */
-      if (xfer->post_data_filter)
+      if (xfer->post_data_encoder != NULL)
         {
-          ...
+          DskError *error = NULL;
+          if (!dsk_octet_filter_process_buffer (xfer->post_data_encoder,
+                                                &compressed_buffer,
+                                                buffer.size, &buffer,
+                                                DSK_TRUE, &error))
+            dsk_die ("error compressing: %s", error->message);
+          if (compressed_buffer.size == 0)
+            return DSK_TRUE;
         }
-      else
-#endif
+      if (xfer->request->transfer_encoding_chunked)
         {
-          if (xfer->request->transfer_encoding_chunked)
-            {
-              char chunked_header[MAX_CHUNK_HEADER_SIZE];
-              unsigned len = get_chunked_header (buffer.size, chunked_header);
-              dsk_buffer_append (&stream->outgoing_data, len, chunked_header);
-            }
-          dsk_buffer_drain (&stream->outgoing_data, &buffer);
-          if (xfer->request->transfer_encoding_chunked)
-            dsk_buffer_append (&stream->outgoing_data, 2, "\r\n");
+          char chunked_header[MAX_CHUNK_HEADER_SIZE];
+          unsigned len = get_chunked_header (buf->size, chunked_header);
+          dsk_buffer_append (&stream->outgoing_data, len, chunked_header);
         }
+      dsk_buffer_drain (&stream->outgoing_data, buf);
+      if (xfer->request->transfer_encoding_chunked)
+        dsk_buffer_append (&stream->outgoing_data, 2, "\r\n");
 
 #if 0 /* DEBUG: Dump buffer */
       dsk_print_push (NULL);
@@ -903,6 +909,7 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
   xfer->response = NULL;
   xfer->content = NULL;
   xfer->content_decoder = NULL;
+  xfer->post_data_encoder = NULL;
   xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_NEED_HEADER;
   xfer->read_info.need_header.checked = 0;
   xfer->write_state = DSK_HTTP_CLIENT_STREAM_WRITE_INIT;
