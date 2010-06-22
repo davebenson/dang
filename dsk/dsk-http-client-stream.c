@@ -68,6 +68,8 @@ free_transfer (DskHttpClientStreamTransfer *xfer)
       dsk_octet_source_shutdown (xfer->post_data);
       dsk_object_unref (xfer->post_data);
     }
+  if (xfer->content_decoder)
+    dsk_object_unref (xfer->content_decoder);
   dsk_free (xfer);
 }
 
@@ -79,12 +81,21 @@ transfer_done (DskHttpClientStreamTransfer *xfer)
   GSK_QUEUE_DEQUEUE (GET_STREAM_XFER_QUEUE (xfer->owner), tmp);
   dsk_assert (tmp == xfer);
 
-#if 0           /* content gzip support here */
-  if (xfer->content_filter)
+  if (xfer->content_decoder != NULL)
     {
-      ...
+      DskError *error = NULL;
+      if (!dsk_octet_filter_finish (xfer->content_decoder,
+                                    &xfer->content->buffer,
+                                    &error))
+        {
+          client_stream_set_error (xfer->owner, xfer,
+                                   "http-client: error decompressing content: %s",
+                                   error->message);
+          dsk_error_unref (error);
+          return;
+        }
+      dsk_memory_source_added_data (xfer->content);
     }
-#endif
 
   /* EOF for content */
   if (xfer->content)
@@ -99,6 +110,8 @@ transfer_done (DskHttpClientStreamTransfer *xfer)
     dsk_object_unref (xfer->content);
   dsk_object_unref (xfer->request);
   dsk_object_unref (xfer->response);
+  if (xfer->content_decoder)
+    dsk_object_unref (xfer->content_decoder);
   dsk_free (xfer);
 }
 
@@ -194,10 +207,25 @@ transfer_content (DskHttpClientStreamTransfer *xfer,
                   unsigned                     amount)
 {
   /* TODO: handle compressing */
-
-  dsk_buffer_transfer (&xfer->content->buffer,
-                       &xfer->owner->incoming_data,
-                       amount);
+  if (xfer->content_decoder != NULL)
+    {
+      DskError *error = NULL;
+      if (!dsk_octet_filter_process_buffer (xfer->content_decoder,
+                                            &xfer->content->buffer,
+                                            amount, &xfer->owner->incoming_data,
+                                            DSK_TRUE, &error))
+        {
+          client_stream_set_error (xfer->owner, xfer,
+                                   "http-client: error decompressing content: %s",
+                                   error->message);
+          dsk_error_unref (error);
+          return;
+        }
+    }
+  else
+    dsk_buffer_transfer (&xfer->content->buffer,
+                         &xfer->owner->incoming_data,
+                         amount);
   dsk_memory_source_added_data (xfer->content);
 }
 
@@ -347,6 +375,9 @@ restart_processing:
                       }
                     xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF;
                   }
+                if (stream->transparent_decompression
+                 && xfer->response->content_encoding_gzip)
+                  xfer->content_decoder = dsk_zlib_decompressor_new (DSK_ZLIB_GZIP);
               }
             else
               {
@@ -871,6 +902,7 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
   xfer->user_data = user_data;
   xfer->response = NULL;
   xfer->content = NULL;
+  xfer->content_decoder = NULL;
   xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_NEED_HEADER;
   xfer->read_info.need_header.checked = 0;
   xfer->write_state = DSK_HTTP_CLIENT_STREAM_WRITE_INIT;

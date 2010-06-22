@@ -32,6 +32,7 @@ struct _DskHttpClientStream
 
   unsigned strict_keepalive : 1;
   unsigned print_warnings : 1;
+  unsigned transparent_decompression : 1;
 };
 
 typedef struct _DskHttpClientStreamOptions DskHttpClientStreamOptions;
@@ -126,6 +127,9 @@ struct _DskHttpClientStreamTransfer
   DskHttpClientStreamFuncs *funcs;
   void *user_data;
   dsk_boolean failed;
+
+  /* for transparent handling of content-encoding gzip */
+  DskOctetFilter *content_decoder;
 
   /*< private >*/
   DskHttpClientStreamReadState read_state;
