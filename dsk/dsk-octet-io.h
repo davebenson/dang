@@ -199,6 +199,13 @@ DSK_INLINE_FUNC dsk_boolean dsk_octet_filter_finish  (DskOctetFilter *filter,
                                                       DskError      **error);
 
 
+
+/* Filtering sources or sinks */
+DskOctetSource *dsk_octet_filter_source (DskOctetSource *source,
+                                         DskOctetFilter *filter);
+DskOctetSink   *dsk_octet_filter_sink   (DskOctetSource *sink,
+                                         DskOctetFilter *filter);
+
 /* Defining subclasses of DskOctetFilter is easy and fun;
  */
 

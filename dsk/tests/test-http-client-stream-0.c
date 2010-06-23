@@ -133,6 +133,7 @@ test_simple (dsk_boolean byte_by_byte)
       DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
       RequestData request_data = REQUEST_DATA_DEFAULT;
       DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
+      DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
       DskHttpRequest *request;
       DskHttpClientStreamTransfer *xfer;
       DskHttpClientStreamFuncs request_funcs_0;
@@ -150,9 +151,12 @@ test_simple (dsk_boolean byte_by_byte)
                                            &options);
       req_options.host = "localhost";
       req_options.full_path = "/hello.txt";
-      request = dsk_http_request_new (&req_options, &error);
-      xfer = dsk_http_client_stream_request (stream, request, NULL, 
-                                             &request_funcs_0, &request_data);
+      cr_options.request_options = &req_options;
+      cr_options.funcs = &request_funcs_0;
+      cr_options.user_data = &request_data;
+      xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
+      if (xfer == NULL)
+        dsk_die ("dsk_http_client_stream_request failed: %s", error->message);
 
       /* read data from sink */
       while (!is_http_request_complete (&request_data.sink->buffer, NULL))
@@ -214,7 +218,6 @@ test_transfer_encoding_chunked (void)
       DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
       RequestData request_data = REQUEST_DATA_DEFAULT;
       DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
-      DskHttpRequest *request;
       DskHttpClientStreamTransfer *xfer;
       DskHttpClientStreamFuncs request_funcs_0;
       DskError *error = NULL;
@@ -265,15 +268,17 @@ test_transfer_encoding_chunked (void)
                                            &options);
       req_options.host = "localhost";
       req_options.full_path = "/hello.txt";
+      DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
+      cr_options.request_options = &req_options;
+      cr_options.funcs = &request_funcs_0;
+      cr_options.user_data = &request_data;
 
       /* write response */
       unsigned pass;
       for (pass = 0; pass < 2; pass++)
         {
           fprintf (stderr, ".");
-          request = dsk_http_request_new (&req_options, &error);
-          xfer = dsk_http_client_stream_request (stream, request, NULL, 
-                                                 &request_funcs_0, &request_data);
+          xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
 
           /* read data from sink */
           while (!is_http_request_complete (&request_data.sink->buffer, NULL))
@@ -325,7 +330,6 @@ test_transfer_encoding_chunked (void)
           dsk_object_unref (request_data.response_header);
           request_data.response_header = NULL;
           dsk_buffer_clear (&request_data.sink->buffer);
-          dsk_object_unref (request);
         }
       dsk_object_unref (stream);
       request_data_clear (&request_data);
@@ -339,7 +343,7 @@ test_simple_post (void)
   DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
   RequestData request_data = REQUEST_DATA_DEFAULT;
   DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
-  DskHttpRequest *request;
+  DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
   DskHttpClientStreamTransfer *xfer;
   DskHttpClientStreamFuncs request_funcs_0;
   DskError *error = NULL;
@@ -358,15 +362,19 @@ test_simple_post (void)
   req_options.host = "localhost";
   req_options.full_path = "/hello.txt";
   req_options.content_length = strlen (post_data_str);
-  request = dsk_http_request_new (&req_options, &error);
   DskMemorySource *post_data;
   post_data = dsk_memory_source_new ();
   dsk_buffer_append_string (&post_data->buffer, post_data_str);
   dsk_memory_source_done_adding (post_data);
-  xfer = dsk_http_client_stream_request (stream, request, DSK_OCTET_SOURCE (post_data),
-                                         &request_funcs_0, &request_data);
+  cr_options.request_options = &req_options;
+  cr_options.funcs = &request_funcs_0;
+  cr_options.user_data = &request_data;
+  cr_options.post_data = DSK_OCTET_SOURCE (post_data);
+  cr_options.post_data_len = req_options.content_length;
+  xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
+  if (xfer == NULL)
+    dsk_die ("error creating request: %s", error->message);
   dsk_object_unref (post_data);
-  dsk_object_unref (request);
 
   /* read data from sink; pluck off POST Data */
   unsigned len;
@@ -458,8 +466,8 @@ test_transfer_encoding_chunked_post (void)
     {
       DskHttpClientStream *stream;
       DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
+      DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
       DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
-      DskHttpRequest *request;
       DskHttpClientStreamTransfer *xfer;
       DskHttpClientStreamFuncs request_funcs_0;
       DskError *error = NULL;
@@ -479,7 +487,6 @@ test_transfer_encoding_chunked_post (void)
       req_options.verb = DSK_HTTP_VERB_POST;
       req_options.host = "localhost";
       req_options.full_path = "/hello.txt";
-      request = dsk_http_request_new (&req_options, &error);
       DskMemorySource *post_data;
       post_data = dsk_memory_source_new ();
       fprintf (stderr, ".");
@@ -489,8 +496,11 @@ test_transfer_encoding_chunked_post (void)
           dsk_memory_source_added_data (post_data);
           dsk_memory_source_done_adding (post_data);
         }
-      xfer = dsk_http_client_stream_request (stream, request, DSK_OCTET_SOURCE (post_data),
-                                             &request_funcs_0, &request_data);
+      cr_options.request_options = &req_options;
+      cr_options.post_data = DSK_OCTET_SOURCE (post_data);
+      cr_options.funcs = &request_funcs_0;
+      cr_options.user_data = &request_data;
+      xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
       if (iter == 0)
         dsk_object_unref (post_data);
       else if (iter == 1)
@@ -582,7 +592,6 @@ test_transfer_encoding_chunked_post (void)
         dsk_assert (memcmp (buf, "hi mom\n", 7) == 0);
       }
 
-      dsk_object_unref (request);
       dsk_object_unref (stream);
       request_data_clear (&request_data);
     }
@@ -660,24 +669,23 @@ test_keepalive_full (dsk_boolean add_postcontent_newlines)
             case 'Q':
               {
                 DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
-                DskHttpRequest *request;
+                DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
                 DskHttpClientStreamTransfer *xfer;
                 req_options.verb = DSK_HTTP_VERB_GET;
                 req_options.host = "localhost";
                 req_options.full_path = "/hello.txt";
-                request = dsk_http_request_new (&req_options, &error);
-                dsk_assert (request != NULL);
-                xfer = dsk_http_client_stream_request (stream, request,
-                                                       NULL,
-                                                &request_funcs_0, rd);
-                dsk_object_unref (request);
+                cr_options.request_options = &req_options;
+                cr_options.funcs = &request_funcs_0;
+                cr_options.user_data = rd;
+                xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
+                dsk_assert (xfer != NULL);
                 (void) xfer;            /* hmm */
               }
               break;
             case 'P':
               {
                 DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
-                DskHttpRequest *request;
+                DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
                 DskHttpClientStreamTransfer *xfer;
                 const char *pd_str = "this is post data\n";
                 DskMemorySource *post_data;
@@ -685,40 +693,39 @@ test_keepalive_full (dsk_boolean add_postcontent_newlines)
                 req_options.host = "localhost";
                 req_options.full_path = "/hello.txt";
                 req_options.content_length = strlen (pd_str);
-                request = dsk_http_request_new (&req_options, &error);
-                dsk_assert (request != NULL);
+                cr_options.request_options = &req_options;
+                cr_options.funcs = &request_funcs_0;
+                cr_options.user_data = rd;
                 post_data = dsk_memory_source_new ();
+                cr_options.post_data = DSK_OCTET_SOURCE (post_data);
                 dsk_buffer_append_string (&post_data->buffer, pd_str);
-                xfer = dsk_http_client_stream_request (stream, request,
-                                                       DSK_OCTET_SOURCE (post_data),
-                                                       &request_funcs_0, rd);
+                xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
+                dsk_assert (xfer != NULL);
                 dsk_memory_source_added_data (post_data);
                 dsk_memory_source_done_adding (post_data);
-                (void) xfer;            /* hmm */
-                dsk_object_unref (request);
                 dsk_object_unref (post_data);
               }
               break;
             case 'T':
               {
                 DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
-                DskHttpRequest *request;
+                DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
                 DskHttpClientStreamTransfer *xfer;
                 const char *pd_str = "this is post data\n";
                 DskMemorySource *post_data;
                 req_options.verb = DSK_HTTP_VERB_POST;
                 req_options.host = "localhost";
                 req_options.full_path = "/hello.txt";
-                request = dsk_http_request_new (&req_options, &error);
-                dsk_assert (request != NULL);
+                cr_options.request_options = &req_options;
+                cr_options.funcs = &request_funcs_0;
+                cr_options.post_data = DSK_OCTET_SOURCE (post_data);
+                cr_options.user_data = rd;
                 post_data = dsk_memory_source_new ();
                 dsk_buffer_append_string (&post_data->buffer, pd_str);
-                xfer = dsk_http_client_stream_request (stream, request,
-                                                       DSK_OCTET_SOURCE (post_data),
-                                                       &request_funcs_0, rd);
+                xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
+                dsk_assert (xfer != NULL);
                 dsk_memory_source_added_data (post_data);
                 dsk_memory_source_done_adding (post_data);
-                (void) xfer;            /* hmm */
               }
               break;
 
@@ -819,9 +826,9 @@ test_bad_response (const char *response)
 {
   DskHttpClientStream *stream;
   DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
+  DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
   RequestData request_data = REQUEST_DATA_DEFAULT;
   DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
-  DskHttpRequest *request;
   DskHttpClientStreamFuncs request_funcs_0;
   DskError *error = NULL;
   memset (&request_funcs_0, 0, sizeof (request_funcs_0));
@@ -837,11 +844,10 @@ test_bad_response (const char *response)
                                        DSK_OCTET_SOURCE (request_data.source),
                                        &options);
   req_options.full_path = "/hello.txt";
-  request = dsk_http_request_new (&req_options, &error);
-  dsk_assert (request != NULL);
-  dsk_http_client_stream_request (stream, request,
-                                  NULL,
-                                  &request_funcs_0, &request_data);
+  cr_options.request_options = &req_options;
+  cr_options.user_data = &request_data;
+  cr_options.funcs = &request_funcs_0;
+  dsk_http_client_stream_request (stream, &cr_options, NULL);
   dsk_buffer_append_string (&request_data.source->buffer, response);
   dsk_memory_source_added_data (request_data.source);
   dsk_memory_source_done_adding (request_data.source);
@@ -851,7 +857,6 @@ test_bad_response (const char *response)
   error = dsk_error_ref (request_data.error);
   request_data_clear (&request_data);
   dsk_object_unref (stream);
-  dsk_object_unref (request);
   return error;
 }
 

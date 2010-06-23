@@ -957,12 +957,15 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
       if (request == NULL)
         return NULL;
     }
+  DskOctetSource *post_data;
   if (options->post_data != NULL)
     {
       if (options->gzip_compress_post_data)
         {
           /* create filtered source */
-          ...
+          DskOctetFilter *filter = dsk_zlib_compressor_new (DSK_ZLIB_GZIP, options->gzip_compression_level);
+          post_data = dsk_octet_filter_source (options->post_data, filter);
+          dsk_object_unref (filter);
         }
       else
         {
@@ -971,16 +974,15 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
     }
   else if (options->post_data_len >= 0)
     {
+      DskMemorySource *source = dsk_memory_source_new ();
       if (options->gzip_compress_post_data)
-        {
-          /* use compressed_data */
-          ...
-        }
+        /* use compressed_data */
+        dsk_buffer_drain (&source->buffer, &compressed_data);
       else
-        {
-          /* create stream (?) */
-          ...
-        }
+        /* create stream (?) */
+        dsk_buffer_append (&source->buffer, options->post_data_len, options->post_data_slab);
+      dsk_memory_source_added_data (source);
+      post_data = DSK_OCTET_SOURCE (source);
     }
   else
     post_data = NULL;
@@ -993,8 +995,8 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
   xfer->owner = stream;
   xfer->request = request;
   xfer->post_data = post_data;
-  xfer->funcs = funcs;
-  xfer->user_data = user_data;
+  xfer->funcs = options->funcs;
+  xfer->user_data = options->user_data;
   xfer->response = NULL;
   xfer->content = NULL;
   xfer->content_decoder = NULL;
