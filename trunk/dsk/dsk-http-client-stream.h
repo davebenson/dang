@@ -113,6 +113,20 @@ struct _DskHttpClientStreamRequestOptions
 
 };
 
+#define DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT \
+{                                                      \
+  NULL,                /* request_options */           \
+  NULL,                /* request */                   \
+  NULL,                /* post_data */                 \
+  -1LL,                /* post_data_len */             \
+  NULL,                /* post_data_slab */            \
+  3,                   /* gzip_compression_level */    \
+  DSK_FALSE,           /* gzip_compress_post_data */   \
+  DSK_FALSE,           /* post_data_is_gzipped */      \
+  NULL,                /* funcs */                     \
+  NULL                 /* user_data */                 \
+}
+
 /* note that 'funcs' must exist for the duration of the request.
  * usually this is done by having a static DskHttpClientStreamFuncs.
  * You could also free 'funcs' in the 'destroy' method.
@@ -183,6 +197,5 @@ struct _DskHttpClientStreamTransfer
   union {
     struct { DskHookTrap *post_data_trap; uint64_t bytes; } in_content;
   } write_info;
-
 };
 

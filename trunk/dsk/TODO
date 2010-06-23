@@ -18,6 +18,10 @@ _ http client stream: error conditions:
   _ random data tests
   _ transport errors reading/writing
   _ post-data stream read errors
+_ http client: request instead of request_options testing
+  _ modify http-client test to be two-pass
+  _ test error conditions
+  _ check we don't use assert inappropriately
 _ http client gzip content-encoding:
   _ POST data, pre-gzipped, with size
   _ POST data, pre-gzipped, with chunked
