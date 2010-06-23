@@ -251,6 +251,8 @@ struct _DskHttpRequestOptions
 
   /* --- content-length --- */
   int64_t content_length;
+  dsk_boolean content_encoding_gzip;
+  dsk_boolean transfer_encoding_chunked;
 
   /* --- date --- */
   dsk_boolean has_date;
@@ -286,6 +288,8 @@ DskHttpRequest *dsk_http_request_new (DskHttpRequestOptions *options,
   NULL,                         /* content_sub_type */          \
   NULL,                         /* content_charset */           \
   -1LL,                         /* content_length */            \
+  DSK_FALSE,                    /* content_encoding_gzip */     \
+  DSK_FALSE,                    /* transfer_encoding_chunked */ \
   DSK_FALSE, 0LL,               /* has_date, date */            \
   NULL,                         /* referrer */                  \
   NULL,                         /* user_agent */                \

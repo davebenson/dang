@@ -891,24 +891,46 @@ dsk_http_client_stream_new     (DskOctetSink        *sink,
 
 DskHttpClientStreamTransfer *
 dsk_http_client_stream_request (DskHttpClientStream      *stream,
-                                DskHttpClientStreamRequestOptions *options)
+                                DskHttpClientStreamRequestOptions *options,
+                                DskError          **error)
 {
   DskHttpClientStreamTransfer *xfer;
+  DskHttpRequest *request;
+  unsigned compressed_len;
+  uint8_t compressed_data;
+  if (options->post_data_len >= 0
+   && options->gzip_compress_post_data)
+    {
+      /* compress post-data immediately */
+      ...
+    }
   if (options->request != NULL)
     {
-      request = dsk_object_ref (options->request);
-
+      /* --- verify existing header is valid --- */
       if (options->post_data_len >= 0)
         {
-          ...
+          if (options->post_data_is_gzipped || !options->gzip_compress_post_data)
+            {
+              if (options->post_data_is_gzipped)
+                dsk_assert (options->request->content_encoding_gzip);
+              dsk_assert (options->request->transfer_encoding_chunked
+                       || options->request->content_length == options->post_data_len);
+            }
+          else
+            {
+              dsk_assert (options->request->transfer_encoding_chunked);
+            }
         }
       else if (options->post_data)
         {
-          ..
+          dsk_assert (options->request->content_length != -1LL
+                  ||  options->request->transfer_encoding_chunked);
         }
+      request = dsk_object_ref (options->request);
     }
   else
     {
+      /* --- construct request header --- */
       DskHttpRequestOptions ropts = *options->request_options;
 
       if (options->gzip_compress_post_data || options->post_data_is_gzipped)
@@ -916,9 +938,7 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
       if (options->post_data_len >= 0)
         {
           if (options->gzip_compress_post_data)
-            {
-              ...
-            }
+            ropts.content_length = compressed_len;
           else
             ropts.content_length = options->post_data_len;
         }
@@ -926,17 +946,19 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
         {
           options->transfer_encoding_chunked = 1;
         }
-      request = dsk_http_request_new (&ropts, &error);
+      request = dsk_http_request_new (&ropts, error);
       if (request == NULL)
-        {
-          ...
-        }
+        return NULL;
     }
   if (options->post_data != NULL)
     {
       ...
+      if (options->gzip_compress_post_data)
+        {
+          ...
+        }
     }
-  if (options->gzip_compress_post_data)
+  else if (options->post_data_len >= 0)
     {
       ...
     }
