@@ -896,13 +896,20 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
 {
   DskHttpClientStreamTransfer *xfer;
   DskHttpRequest *request;
-  unsigned compressed_len;
-  uint8_t compressed_data;
+  DskBuffer compressed_data = DSK_BUFFER_STATIC_INIT;
   if (options->post_data_len >= 0
+   && (options->post_data_len == 0 || options->post_data_slab != NULL)
    && options->gzip_compress_post_data)
     {
       /* compress post-data immediately */
-      ...
+      DskOctetFilter *filter = dsk_zlib_compressor_new (DSK_ZLIB_GZIP, options->gzip_compression_level);
+      if (!dsk_octet_filter_process (filter, &compressed_data,
+                                     options->post_data_len, options->post_data_slab, error)
+       || !dsk_octet_filter_finish (filter, &compressed_data, error))
+        {
+          dsk_object_unref (filter);
+          return NULL;
+        }
     }
   if (options->request != NULL)
     {
@@ -938,13 +945,13 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
       if (options->post_data_len >= 0)
         {
           if (options->gzip_compress_post_data)
-            ropts.content_length = compressed_len;
+            ropts.content_length = compressed_data.size;
           else
             ropts.content_length = options->post_data_len;
         }
       else
         {
-          options->transfer_encoding_chunked = 1;
+          ropts.transfer_encoding_chunked = 1;
         }
       request = dsk_http_request_new (&ropts, error);
       if (request == NULL)
@@ -952,16 +959,31 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
     }
   if (options->post_data != NULL)
     {
-      ...
       if (options->gzip_compress_post_data)
         {
+          /* create filtered source */
           ...
+        }
+      else
+        {
+          post_data = dsk_object_ref (options->post_data);
         }
     }
   else if (options->post_data_len >= 0)
     {
-      ...
+      if (options->gzip_compress_post_data)
+        {
+          /* use compressed_data */
+          ...
+        }
+      else
+        {
+          /* create stream (?) */
+          ...
+        }
     }
+  else
+    post_data = NULL;
 
   xfer = dsk_malloc (sizeof (DskHttpClientStreamTransfer));
   GSK_QUEUE_ENQUEUE (GET_STREAM_XFER_QUEUE (stream), xfer);
@@ -970,7 +992,7 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
   stream->n_pending_outgoing_requests++;
   xfer->owner = stream;
   xfer->request = request;
-  xfer->post_data = post_data ? dsk_object_ref (post_data) : NULL;
+  xfer->post_data = post_data;
   xfer->funcs = funcs;
   xfer->user_data = user_data;
   xfer->response = NULL;
