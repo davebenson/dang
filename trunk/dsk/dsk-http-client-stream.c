@@ -891,18 +891,63 @@ dsk_http_client_stream_new     (DskOctetSink        *sink,
 
 DskHttpClientStreamTransfer *
 dsk_http_client_stream_request (DskHttpClientStream      *stream,
-                                DskHttpRequest           *request,
-				DskOctetSource           *post_data,
-				DskHttpClientStreamFuncs *funcs,
-				void                     *user_data)
+                                DskHttpClientStreamRequestOptions *options)
 {
-  DskHttpClientStreamTransfer *xfer = dsk_malloc (sizeof (DskHttpClientStreamTransfer));
+  DskHttpClientStreamTransfer *xfer;
+  if (options->request != NULL)
+    {
+      request = dsk_object_ref (options->request);
+
+      if (options->post_data_len >= 0)
+        {
+          ...
+        }
+      else if (options->post_data)
+        {
+          ..
+        }
+    }
+  else
+    {
+      DskHttpRequestOptions ropts = *options->request_options;
+
+      if (options->gzip_compress_post_data || options->post_data_is_gzipped)
+        ropts.content_encoding_gzip = 1;
+      if (options->post_data_len >= 0)
+        {
+          if (options->gzip_compress_post_data)
+            {
+              ...
+            }
+          else
+            ropts.content_length = options->post_data_len;
+        }
+      else
+        {
+          options->transfer_encoding_chunked = 1;
+        }
+      request = dsk_http_request_new (&ropts, &error);
+      if (request == NULL)
+        {
+          ...
+        }
+    }
+  if (options->post_data != NULL)
+    {
+      ...
+    }
+  if (options->gzip_compress_post_data)
+    {
+      ...
+    }
+
+  xfer = dsk_malloc (sizeof (DskHttpClientStreamTransfer));
   GSK_QUEUE_ENQUEUE (GET_STREAM_XFER_QUEUE (stream), xfer);
   if (stream->outgoing_data_transfer == NULL)
     stream->outgoing_data_transfer = xfer;
   stream->n_pending_outgoing_requests++;
   xfer->owner = stream;
-  xfer->request = dsk_object_ref (request);
+  xfer->request = request;
   xfer->post_data = post_data ? dsk_object_ref (post_data) : NULL;
   xfer->funcs = funcs;
   xfer->user_data = user_data;
