@@ -100,6 +100,7 @@ struct _DskHttpClientStreamRequestOptions
   DskOctetSource *post_data;
   int64_t post_data_len;
   const uint8_t *post_data_slab;
+  int gzip_compression_level;
 
   /* content-encoding gzip for the post-data */
   dsk_boolean gzip_compress_post_data;          /* gzip post-data internally */
