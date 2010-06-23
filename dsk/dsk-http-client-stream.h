@@ -2,6 +2,7 @@ typedef struct _DskHttpClientStreamClass DskHttpClientStreamClass;
 typedef struct _DskHttpClientStream DskHttpClientStream;
 typedef struct _DskHttpClientStreamFuncs DskHttpClientStreamFuncs;
 typedef struct _DskHttpClientStreamTransfer DskHttpClientStreamTransfer;
+typedef struct _DskHttpClientStreamRequestOptions DskHttpClientStreamRequestOptions;
 
 struct _DskHttpClientStreamClass
 {
@@ -84,16 +85,32 @@ struct _DskHttpClientStreamFuncs
   void (*destroy)                 (DskHttpClientStreamTransfer *transfer);
 };
 
+struct _DskHttpClientStreamRequestOptions
+{
+  /* only one of these should be set */
+  DskHttpRequestOptions *request_options;
+  DskHttpRequest *request;
+
+  /* typically only for POST, PUT, etc */
+  DskOctetSource *post_data;
+
+  /* alternate way to declare post-data */
+  unsigned post_data_len;
+  const uint8_t *post_data_slab;
+
+  /* functions and user-data */
+  DskHttpClientStreamFuncs *funcs;
+  void *user_data;
+
+};
+
 /* note that 'funcs' must exist for the duration of the request.
  * usually this is done by having a static DskHttpClientStreamFuncs.
  * You could also free 'funcs' in the 'destroy' method.
  */
 DskHttpClientStreamTransfer *
 dsk_http_client_stream_request (DskHttpClientStream      *stream,
-                                DskHttpRequest           *request,
-				DskOctetSource           *post_data,
-				DskHttpClientStreamFuncs *funcs,
-				void                     *user_data);
+                                DskHttpClientStreamRequestOptions *options);
 
 /* internals */
 typedef enum
