@@ -91,16 +91,24 @@ struct _DskHttpClientStreamRequestOptions
   DskHttpRequestOptions *request_options;
   DskHttpRequest *request;
 
-  /* typically only for POST, PUT, etc */
+  /* typically only for POST, PUT, etc.
+   * post_data_len may be combined with post_data or post_data_slab.
+   * if post_data_len > 0, either post_data or post_data_slab is non-null.
+   * if post_data_len == -1 and post_Data is non-null,
+   * then we use transfer-encoding chunked.
+   */
   DskOctetSource *post_data;
-
-  /* alternate way to declare post-data */
-  unsigned post_data_len;
+  int64_t post_data_len;
   const uint8_t *post_data_slab;
+
+  /* content-encoding gzip for the post-data */
+  dsk_boolean gzip_compress_post_data;          /* gzip post-data internally */
+  dsk_boolean post_data_is_gzipped;             /* assume post-data is already gzipped */
 
   /* functions and user-data */
   DskHttpClientStreamFuncs *funcs;
   void *user_data;
+
 
 };
 
@@ -110,7 +118,8 @@ struct _DskHttpClientStreamRequestOptions
  */
 DskHttpClientStreamTransfer *
 dsk_http_client_stream_request (DskHttpClientStream      *stream,
-                                DskHttpClientStreamRequestOptions *options);
+                                DskHttpClientStreamRequestOptions *options,
+                                DskError                **error);
 
 /* internals */
 typedef enum

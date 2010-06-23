@@ -237,7 +237,9 @@ dsk_http_request_new (DskHttpRequestOptions *options,
       if (options->parsed_connection_close)
         request->connection_close = 1;
     }
-  else if (has_request_body (options->verb))
+  else if (options->content_length >= 0 
+        || options->transfer_encoding_chunked
+        || has_request_body (options->verb))
     {
       if (options->content_length >= 0)
         request->content_length = options->content_length;
