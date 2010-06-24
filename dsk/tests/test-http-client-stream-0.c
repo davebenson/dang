@@ -134,7 +134,6 @@ test_simple (dsk_boolean byte_by_byte)
       RequestData request_data = REQUEST_DATA_DEFAULT;
       DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
       DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
-      DskHttpRequest *request;
       DskHttpClientStreamTransfer *xfer;
       DskHttpClientStreamFuncs request_funcs_0;
       DskError *error = NULL;
@@ -200,7 +199,6 @@ test_simple (dsk_boolean byte_by_byte)
       }
 
       dsk_object_unref (stream);
-      dsk_object_unref (request);
       request_data_clear (&request_data);
     }
 }

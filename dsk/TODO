@@ -76,7 +76,7 @@ _ HTTP Client Stream
   _ content-encoding gzip
     x message body
     _ POST data
-      _ make dsk_http_client_stream_request_new take a
+      x make dsk_http_client_stream_request_new take a
 	DskHttpClientStreamRequestOptions
       _ add force_post_data_gzip to Options; if given a static buffer,
         compress at request time; if given a stream, make a post-data-encoder.

@@ -72,7 +72,7 @@ test_simple_connection_close (void)
   DskHttpClientStreamTransfer *client_xfer;
   DskHttpServerStreamTransfer *server_xfer;
   DskHttpRequestOptions request_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
-  DskHttpRequest *request;
+  DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
   DskError *error = NULL;
   dsk_octet_pipe_new (0, &sink1, &source1);
   dsk_octet_pipe_new (0, &sink2, &source2);
@@ -87,10 +87,10 @@ test_simple_connection_close (void)
   dsk_object_unref (source2);
   request_options.full_path = "/";
   request_options.host = "localhost";
-  request = dsk_http_request_new (&request_options, NULL);
-  client_xfer = dsk_http_client_stream_request (client, request, NULL,
-                                                &client_request_funcs,
-                                                &client_request_data);
+  cr_options.request_options = &request_options;
+  cr_options.funcs = &client_request_funcs;
+  cr_options.user_data = &client_request_data;
+  client_xfer = dsk_http_client_stream_request (client, &cr_options, &error);
   /* ALTERNATE: wait for request_available hook */
   while ((server_xfer=dsk_http_server_stream_get_request (server)) == NULL)
     dsk_main_run_once ();
@@ -111,7 +111,6 @@ test_simple_connection_close (void)
   /* cleanup */
   dsk_object_unref (client);
   dsk_object_unref (server);
-  dsk_object_unref (request);
   client_request_data_clear (&client_request_data);
 }
 
