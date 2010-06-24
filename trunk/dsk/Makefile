@@ -37,7 +37,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-fd.o dsk-octet-io.o dsk-octet-fd.o dsk-octet-pipe.o \
 	  dsk-unicode.o dsk-client-stream.o \
 	  dsk-buffer.o dsk-main.o dsk-octet-connection.o dsk-octet-listener.o \
-	  dsk-octet-filter.o \
+	  dsk-octet-filter.o dsk-octet-filter-source.o \
 	  dsk-octet-listener-socket.o dsk-cleanup.o \
 	  dsk-http-client-stream.o dsk-http-server-stream.o \
 	  dsk-memory-source.o dsk-memory-sink.o \
