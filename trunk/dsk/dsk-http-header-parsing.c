@@ -263,6 +263,25 @@ ascii_caseless_equals (const char *a,
     }
 }
 
+/* TODO: implement a real parser */
+static dsk_boolean
+handle_content_encoding (const char  *value,
+                         dsk_boolean *is_gzip_out,
+                         DskError   **error)
+{
+  if (ascii_caseless_equals (value, "gzip"))
+    *is_gzip_out = DSK_TRUE;
+  else if (ascii_caseless_equals (value, "identity")
+      ||   ascii_caseless_equals (value, "none"))
+    *is_gzip_out = DSK_FALSE;
+  else
+    {
+      dsk_set_error (error, "unhandled content-encoding '%s'", value);
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
 static dsk_boolean
 handle_content_length (const char *value,
                        int64_t    *len_out,
@@ -504,6 +523,17 @@ parse_http_version (char **at_inout,
                   }                                              \
               }                                                  \
             break;
+#define HANDLE_CONTENT_ENCODING_CASE                             \
+          case UNSIGNED_FROM_4_BYTES('c', 'o', 16, 'g'):         \
+            if (ascii_caseless_equals (name, "content-encoding"))\
+              {                                                  \
+                if (!handle_content_encoding (value,             \
+                                            &options.content_encoding_gzip, \
+                                            error))              \
+                  goto FAIL;                                     \
+                continue;                                        \
+              }                                                  \
+            break;
 #define HANDLE_CONTENT_LENGTH_CASE                               \
           case UNSIGNED_FROM_4_BYTES('c', 'o', 14, 'h'):         \
             if (ascii_caseless_equals (name, "content-length"))  \
@@ -715,9 +745,10 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
       switch (v)
         {
           HANDLE_CONNECTION_CASE        /* Connection header */
+          HANDLE_CONTENT_ENCODING_CASE  /* Content-Encoding header */
           HANDLE_CONTENT_LENGTH_CASE    /* Content-Length header */
-          HANDLE_CONTENT_TYPE_CASE              /* Content-Type header */
-          HANDLE_DATE_CASE                      /* Date header */
+          HANDLE_CONTENT_TYPE_CASE      /* Content-Type header */
+          HANDLE_DATE_CASE              /* Date header */
           case UNSIGNED_FROM_4_BYTES('h', 'o', 4, 't'):
             if (ascii_caseless_equals (name, "host"))
               {
@@ -826,8 +857,9 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
       switch (v)
         {
           HANDLE_CONNECTION_CASE                /* Connection header */
-          HANDLE_CONTENT_TYPE_CASE              /* Content-Type header */
+          HANDLE_CONTENT_ENCODING_CASE          /* Content-Encoding header */
           HANDLE_CONTENT_LENGTH_CASE            /* Content-Length header */
+          HANDLE_CONTENT_TYPE_CASE              /* Content-Type header */
           HANDLE_DATE_CASE                      /* Date header */
           HANDLE_TRANSFER_ENCODING_HEADER       /* Transfer-Encoding header */
           case UNSIGNED_FROM_4_BYTES('s', 'e', 6, 'r'):

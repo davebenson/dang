@@ -247,11 +247,13 @@ dsk_http_request_new (DskHttpRequestOptions *options,
         request->transfer_encoding_chunked = 1;
       else
         {
+          /// not really true, although it's certainly unconventional
           dsk_set_error (error, "POST/PUT data must use Transfer-Encoding: chunked (requires HTTP/1.1) or Content-length");
           dsk_object_unref (request);
           return NULL;
         }
     }
+  request->content_encoding_gzip = options->content_encoding_gzip ? 1 : 0;
 
   unsigned unparsed_headers_start;
   unparsed_headers_start
@@ -385,7 +387,7 @@ dsk_http_response_new (DskHttpResponseOptions *options,
     }
 
 
-  /* TODO: gzip encoding? */
+  response->content_encoding_gzip = options->content_encoding_gzip ? 1 : 0;
 
   unsigned unparsed_headers_start;
   unparsed_headers_start
