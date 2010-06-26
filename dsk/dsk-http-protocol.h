@@ -319,6 +319,9 @@ struct _DskHttpResponseOptions
   /* --- content-length --- */
   int64_t content_length;
 
+  /* --- content-encoding --- */
+  dsk_boolean content_encoding_gzip;
+
   /* --- date --- */
   dsk_boolean has_date;
   dsk_time_t date;
@@ -352,10 +355,11 @@ struct _DskHttpResponseOptions
   NULL,                         /* content_sub_type */          \
   NULL,                         /* content_charset */           \
   -1LL,                         /* content_length */            \
+  DSK_FALSE,                    /* content_encoding_gzip */     \
   DSK_FALSE,                    /* has_date */                  \
   0LL,                          /* date */                      \
-  DSK_FALSE,                    /* has_expires */                  \
-  0LL,                          /* expires */                      \
+  DSK_FALSE,                    /* has_expires */               \
+  0LL,                          /* expires */                   \
   NULL,                         /* server */                    \
   NULL,                         /* location */                  \
   0, NULL,                      /* n_unparsed_headers, unparsed_headers  */\
