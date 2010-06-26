@@ -33,7 +33,6 @@ struct _DskHttpClientStream
 
   unsigned strict_keepalive : 1;
   unsigned print_warnings : 1;
-  unsigned transparent_decompression : 1;
 };
 
 typedef struct _DskHttpClientStreamOptions DskHttpClientStreamOptions;
@@ -44,7 +43,6 @@ struct _DskHttpClientStreamOptions
   unsigned max_outgoing_data;
   dsk_boolean strict_keepalive;
   dsk_boolean print_warnings;
-  dsk_boolean transparent_decompression;
 };
 
 #define DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT              \
@@ -53,8 +51,7 @@ struct _DskHttpClientStreamOptions
   4,                    /* max_pipelined_requests */        \
   8192,                 /* max_outgoing_data */             \
   DSK_FALSE,            /* strict_keepalive */              \
-  DSK_DEBUG,            /* print_warnings */                \
-  DSK_TRUE,             /* transparent_decompression */     \
+  DSK_DEBUG             /* print_warnings */                \
 }
 
 DskHttpClientStream *
@@ -106,6 +103,15 @@ struct _DskHttpClientStreamRequestOptions
   dsk_boolean gzip_compress_post_data;          /* gzip post-data internally */
   dsk_boolean post_data_is_gzipped;             /* assume post-data is already gzipped */
 
+  /* Content-encoding gzip for the content-body is
+     governed by 'uncompress_content':
+     - If true, then Content-Encoding: gzip will be handled automatically.
+     - If false, then you must expect gzipped data, or, from within
+       funcs->handle_response, the request can call
+       dsk_http_client_stream_transfer_add_content_filter()
+   */
+  dsk_boolean uncompress_content;       
+
   /* functions and user-data */
   DskHttpClientStreamFuncs *funcs;
   void *user_data;
@@ -123,6 +129,7 @@ struct _DskHttpClientStreamRequestOptions
   3,                   /* gzip_compression_level */    \
   DSK_FALSE,           /* gzip_compress_post_data */   \
   DSK_FALSE,           /* post_data_is_gzipped */      \
+  DSK_TRUE,            /* uncompress_content */        \
   NULL,                /* funcs */                     \
   NULL                 /* user_data */                 \
 }
@@ -169,7 +176,8 @@ struct _DskHttpClientStreamTransfer
   DskHttpClientStreamTransfer *next;
   DskHttpClientStreamFuncs *funcs;
   void *user_data;
-  dsk_boolean failed;
+  unsigned failed : 1;
+  unsigned uncompress_content : 1;
 
   /* for transparent handling of content-encoding gzip */
   DskOctetFilter *content_decoder;

@@ -375,7 +375,7 @@ restart_processing:
                       }
                     xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_IN_BODY_EOF;
                   }
-                if (stream->transparent_decompression
+                if (xfer->uncompress_content
                  && xfer->response->content_encoding_gzip)
                   xfer->content_decoder = dsk_zlib_decompressor_new (DSK_ZLIB_GZIP);
               }
@@ -1004,6 +1004,8 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
   xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_NEED_HEADER;
   xfer->read_info.need_header.checked = 0;
   xfer->write_state = DSK_HTTP_CLIENT_STREAM_WRITE_INIT;
+  xfer->failed = 0;
+  xfer->uncompress_content = options->uncompress_content;
   maybe_add_write_hook (stream);
   return xfer;
 }
