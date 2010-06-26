@@ -73,13 +73,14 @@ _ high trap counts?
 
 TODO:
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)
-_ HTTP Client Stream
-  _ content-encoding gzip
+
+x HTTP Client Stream        KEEP UNTIL DONE TESTING
+  x content-encoding gzip
     x message body
-    _ POST data
+    x POST data
       x make dsk_http_client_stream_request_new take a
 	DskHttpClientStreamRequestOptions
-      _ add force_post_data_gzip to Options; if given a static buffer,
+      x add force_post_data_gzip to Options; if given a static buffer,
         compress at request time; if given a stream, make a post-data-encoder.
 	content-length must be handled carefullly.
 
@@ -142,13 +143,13 @@ _ XML implementation
 _ JSON implementation
   _ parser
   _ printer
-_ YAML implementation
-  _ parser
-  _ printer
 _ checksum implementations
 
 LATER
 _ SSL and HTTPS
+_ YAML implementation
+  _ parser
+  _ printer
 
 DOCUMENTATION
 *everything needs docs, but just remind ourselves of subtle stuff*
