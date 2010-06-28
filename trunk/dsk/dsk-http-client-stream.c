@@ -378,7 +378,6 @@ restart_processing:
                 if (xfer->uncompress_content
                  && xfer->response->content_encoding_gzip)
                   {
-                    dsk_warning ("enabling gzip decompression");
                     xfer->content_decoder = dsk_zlib_decompressor_new (DSK_ZLIB_GZIP);
                   }
               }

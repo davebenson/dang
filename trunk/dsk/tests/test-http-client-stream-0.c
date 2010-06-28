@@ -912,7 +912,7 @@ test_gzip_download (void)
       "Content-Length: 27\r\n"
       "Connection: close\r\n"
       "\r\n"
-      "\36\213\b\0\0\0\0\0\0\3\313\310T\310\315\317\345\2\0]\363Nq\a\0\0\0";
+      "\37\213\b\0\0\0\0\0\0\3\313\310T\310\315\317\345\2\0]\363Nq\a\0\0\0";
 
   static const char response1[] =
       "HTTP/1.1 200 OK\n"
