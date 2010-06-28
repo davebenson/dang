@@ -28,8 +28,8 @@ _ http client gzip content-encoding:
   _ POST data, streaming, with chunked
   _ POST data, data in slab with size
     (gzip and provide content-length=compressed-size)
-  _ body, with size
-  _ body, streaming
+  x body, with size
+  x body, streaming
   _ body, without auto-decompression
 _ http server stream: content-length POST data
 _ http server stream: transfer-encoding-chunked POST data
