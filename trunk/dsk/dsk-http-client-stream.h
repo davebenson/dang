@@ -181,7 +181,6 @@ struct _DskHttpClientStreamTransfer
 
   /* for transparent handling of content-encoding gzip */
   DskOctetFilter *content_decoder;
-  DskOctetFilter *post_data_encoder;
 
   /*< private >*/
   DskHttpClientStreamReadState read_state;
