@@ -95,7 +95,7 @@ struct _DskHttpClientStreamRequestOptions
    * then we use transfer-encoding chunked.
    */
   DskOctetSource *post_data;
-  int64_t post_data_len;
+  int64_t post_data_length;
   const uint8_t *post_data_slab;
   int gzip_compression_level;
 

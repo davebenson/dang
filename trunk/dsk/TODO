@@ -21,10 +21,10 @@ _ http client stream: error conditions:
 _ http client: request instead of request_options testing
   _ modify http-client test to be two-pass
   _ test error conditions
-  _ check we don't use assert inappropriately
+  _ audit that we don't use assert inappropriately
 _ http client gzip content-encoding:
-  _ POST data, pre-gzipped, with size
-  _ POST data, pre-gzipped, with chunked
+  x POST data, pre-gzipped, with size
+  _ POST data, pre-gzipped, with chunked [valgrind "with size" case first]
   _ POST data, streaming, with chunked
   _ POST data, data in slab with size
     (gzip and provide content-length=compressed-size)
