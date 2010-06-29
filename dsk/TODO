@@ -24,7 +24,7 @@ _ http client: request instead of request_options testing
   _ audit that we don't use assert inappropriately
 _ http client gzip content-encoding:
   x POST data, pre-gzipped, with size
-  _ POST data, pre-gzipped, with chunked [valgrind "with size" case first]
+  x POST data, pre-gzipped, with chunked
   _ POST data, streaming, with chunked
   _ POST data, data in slab with size
     (gzip and provide content-length=compressed-size)

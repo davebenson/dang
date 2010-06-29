@@ -1168,6 +1168,141 @@ test_pre_gzipped_post_data_0 (void)
   request_data_clear (&request_data);
 }
 
+static void
+test_pre_gzipped_post_data_1 (void)
+{
+  DskHttpClientStream *stream;
+  DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
+  RequestData request_data = REQUEST_DATA_DEFAULT;
+  DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
+  DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
+  DskHttpClientStreamTransfer *xfer;
+  DskHttpClientStreamFuncs request_funcs_0;
+  DskError *error = NULL;
+  unsigned gzipped_post_len = sizeof (this_is_post_data__gzipped) - 1;
+  char buf[64];
+  int index;
+
+  fprintf (stderr, ".");
+  memset (&request_funcs_0, 0, sizeof (request_funcs_0));
+  request_funcs_0.handle_response = request_data__handle_response;
+  request_funcs_0.handle_content_complete = request_data__handle_content_complete;
+  request_funcs_0.destroy = request_data__destroy;
+  request_data.source = dsk_memory_source_new ();
+  request_data.sink = dsk_memory_sink_new ();
+  request_data.sink->max_buffer_size = 100000000;
+  stream = dsk_http_client_stream_new (DSK_OCTET_SINK (request_data.sink),
+                                       DSK_OCTET_SOURCE (request_data.source),
+                                       &options);
+  req_options.host = "localhost";
+  req_options.full_path = "/hello.txt";
+  req_options.verb = DSK_HTTP_VERB_POST;
+  cr_options.request_options = &req_options;
+  cr_options.funcs = &request_funcs_0;
+  cr_options.user_data = &request_data;
+  DskMemorySource *post_data;
+  post_data = dsk_memory_source_new ();
+  cr_options.post_data = DSK_OCTET_SOURCE (post_data);
+  cr_options.post_data_is_gzipped = DSK_TRUE;
+  xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
+  if (xfer == NULL)
+    dsk_die ("dsk_http_client_stream_request failed: %s", error->message);
+
+  /* read data from sink */
+  unsigned req_hdr_len;
+  while (!is_http_request_complete (&request_data.sink->buffer, &req_hdr_len))
+    dsk_main_run_once ();
+
+  /* verify header is ok */
+  {
+    char *hdr = dsk_malloc (req_hdr_len+1);
+    dsk_buffer_read (&request_data.sink->buffer, req_hdr_len, hdr);
+    hdr[req_hdr_len] = 0;
+    dsk_assert (strstr (hdr, "Transfer-Encoding: chunked") != NULL);
+    dsk_assert (strstr (hdr, "Content-Encoding: gzip") != NULL);
+    dsk_free (hdr);
+  }
+
+  unsigned n_written, n_read;
+  for (n_written = 0; n_written < gzipped_post_len; n_written++)
+    {
+      dsk_buffer_append_byte (&post_data->buffer,
+                              this_is_post_data__gzipped[n_written]);
+      dsk_memory_source_added_data (post_data);
+      while (post_data->buffer.size)
+        dsk_main_run_once ();
+    }
+  dsk_memory_source_done_adding (post_data);
+  dsk_object_unref (post_data);
+
+  /* handle eof marker?? */
+  dsk_main_run_once ();
+
+  /* read/verify POST data */
+  for (n_read = 0; n_read < gzipped_post_len; n_read++)
+    {
+      /* read chunk header */
+      index = dsk_buffer_index_of (&request_data.sink->buffer, '\n');
+      dsk_assert (index >= 0);
+      dsk_assert (index < (int)sizeof (buf));
+      dsk_buffer_read (&request_data.sink->buffer, index + 1, buf);
+      buf[index] = 0;
+      dsk_assert (buf[0] == '1');
+      dsk_assert (buf[1] == 0 || buf[1] == '\r');
+
+      /* read chunk data */
+      dsk_assert (request_data.sink->buffer.size != 0);
+      dsk_assert ((uint8_t)dsk_buffer_read_byte (&request_data.sink->buffer)
+               == (uint8_t)this_is_post_data__gzipped[n_read]);
+      index = dsk_buffer_index_of (&request_data.sink->buffer, '\n');
+      dsk_assert (index >= 0);
+      dsk_assert (index <= 2);
+      dsk_buffer_discard (&request_data.sink->buffer, index + 1);
+    }
+  /* read chunked-data end */
+  index = dsk_buffer_index_of (&request_data.sink->buffer, '\n');
+  dsk_assert (index >= 0);
+  dsk_assert (index < (int)sizeof (buf));
+  dsk_buffer_read (&request_data.sink->buffer, index + 1, buf);
+  buf[index] = 0;
+  dsk_assert (buf[0] == '0');
+  dsk_assert (buf[1] == 0 || buf[1] == '\r');
+  index = dsk_buffer_index_of (&request_data.sink->buffer, '\n');
+  dsk_assert (index >= 0);
+  dsk_buffer_discard (&request_data.sink->buffer, index+1);
+
+  /* buffer should now be empty */
+  dsk_assert (request_data.sink->buffer.size == 0);
+
+  /* write response */
+  dsk_buffer_append_string (&request_data.source->buffer,
+                            "HTTP/1.1 200 Success\r\n"
+                            "Content-Length: 7\r\n"
+                            "Connection: close\r\n"
+                            "\r\n"
+                            "hi mom\n");
+  dsk_memory_source_added_data (request_data.source);
+
+  while (request_data.response_header == NULL)
+    dsk_main_run_once ();
+  dsk_assert (request_data.response_header->http_major_version == 1);
+  dsk_assert (request_data.response_header->http_minor_version == 1);
+  dsk_assert (!request_data.response_header->transfer_encoding_chunked);
+  dsk_assert (request_data.response_header->connection_close);
+  while (!request_data.content_complete)
+    dsk_main_run_once ();
+
+  dsk_assert (request_data.content.size == 7);
+  {
+    char buf[7];
+    dsk_buffer_peek (&request_data.content, 7, buf);
+    dsk_assert (memcmp (buf, "hi mom\n", 7) == 0);
+  }
+
+  dsk_object_unref (stream);
+  request_data_clear (&request_data);
+}
+
 
 static struct 
 {
@@ -1185,6 +1320,7 @@ static struct
   { "bad responses", test_bad_responses },
   { "gzip uncompression", test_gzip_download },
   { "pre-gzipped POST data (slab)", test_pre_gzipped_post_data_0 },
+  { "pre-gzipped POST data (chunked)", test_pre_gzipped_post_data_1 },
 };
 
 int main(int argc, char **argv)

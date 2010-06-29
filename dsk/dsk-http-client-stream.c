@@ -108,6 +108,11 @@ transfer_done (DskHttpClientStreamTransfer *xfer)
 
   if (xfer->content)
     dsk_object_unref (xfer->content);
+  if (xfer->post_data)
+    {
+      dsk_octet_source_shutdown (xfer->post_data);
+      dsk_object_unref (xfer->post_data);
+    }
   dsk_object_unref (xfer->request);
   dsk_object_unref (xfer->response);
   if (xfer->content_decoder)
@@ -614,28 +619,14 @@ handle_post_data_readable (DskOctetSource *source,
                            DskHttpClientStreamTransfer *xfer)
 {
   DskBuffer buffer = DSK_BUFFER_STATIC_INIT;
-  DskBuffer compressed_buffer = DSK_BUFFER_STATIC_INIT;
   DskBuffer *buf = &buffer;
   DskError *error = NULL;
   DskHttpClientStream *stream = xfer->owner;
-  if (xfer->post_data_encoder != NULL)
-    buf = &compressed_buffer;
   switch (dsk_octet_source_read_buffer (source, &buffer, &error))
     {
     case DSK_IO_RESULT_SUCCESS:
       if (buffer.size == 0)
         return DSK_TRUE;
-      if (xfer->post_data_encoder != NULL)
-        {
-          DskError *error = NULL;
-          if (!dsk_octet_filter_process_buffer (xfer->post_data_encoder,
-                                                &compressed_buffer,
-                                                buffer.size, &buffer,
-                                                DSK_TRUE, &error))
-            dsk_die ("error compressing: %s", error->message);
-          if (compressed_buffer.size == 0)
-            return DSK_TRUE;
-        }
       if (xfer->request->transfer_encoding_chunked)
         {
           char chunked_header[MAX_CHUNK_HEADER_SIZE];
@@ -978,12 +969,17 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
     {
       DskMemorySource *source = dsk_memory_source_new ();
       if (options->gzip_compress_post_data)
-        /* use compressed_data */
-        dsk_buffer_drain (&source->buffer, &compressed_data);
+        {
+          /* use compressed_data */
+          dsk_buffer_drain (&source->buffer, &compressed_data);
+        }
       else
-        /* create stream (?) */
-        dsk_buffer_append (&source->buffer, options->post_data_length, options->post_data_slab);
+        {
+          /* create stream (?) */
+          dsk_buffer_append (&source->buffer, options->post_data_length, options->post_data_slab);
+        }
       dsk_memory_source_added_data (source);
+      dsk_memory_source_done_adding (source);
       post_data = DSK_OCTET_SOURCE (source);
     }
   else
@@ -1002,7 +998,6 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
   xfer->response = NULL;
   xfer->content = NULL;
   xfer->content_decoder = NULL;
-  xfer->post_data_encoder = NULL;
   xfer->read_state = DSK_HTTP_CLIENT_STREAM_READ_NEED_HEADER;
   xfer->read_info.need_header.checked = 0;
   xfer->write_state = DSK_HTTP_CLIENT_STREAM_WRITE_INIT;
