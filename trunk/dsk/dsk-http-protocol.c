@@ -191,6 +191,7 @@ dsk_http_request_new (DskHttpRequestOptions *options,
   StrFixup fixups[MAX_STR_FIXUPS];
   DskHttpRequest *request = dsk_object_new (&dsk_http_request_class);
 
+  request->verb = options->verb;
 
   /* ---- Pass 1:  compute memory needed ---- */
   /* We try to store as much information as we can

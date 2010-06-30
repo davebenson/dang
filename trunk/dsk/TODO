@@ -60,7 +60,7 @@ _ XML Parser: parse errors
 _ XML Parser: strip whitespace (not implemented yet) 
 x XML Parser: search for existing conformance test
 _ XML Parser: XML conformance test: suck up entities included
-_ octet-filter test harness [feed data is several ways]
+_ octet-filter test harness [feed data in several ways]
   _ c-quote test
   _ hex test
   _ base64 test

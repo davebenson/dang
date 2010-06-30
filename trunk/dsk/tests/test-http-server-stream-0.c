@@ -433,6 +433,196 @@ test_response_keepalive (void)
         }
 }
 
+static void
+test_simple_post (void)
+{
+  static const char *headers[] =
+    {
+      "POST / HTTP/1.1\r\n"
+      "Host: localhost\r\n"
+      "Connection: close\r\n"
+      "Content-Length: 7\r\n"
+      "\r\n"
+      "hi mom\n"
+      ,
+      "POST / HTTP/1.0\r\n"
+      "Host: localhost\r\n"
+      "Content-Length: 7\r\n"
+      "\r\n"
+      "hi mom\n"
+      ,
+      "POST / HTTP/1.0\r\n"
+      "Host: localhost\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "7\r\nhi mom\n0\r\n\r\n"
+      ,
+      "POST / HTTP/1.0\r\n"
+      "Host: localhost\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\r\n"
+      "1\r\nh\r\n"
+      "1\r\ni\r\n"
+      "1\r\n \r\n"
+      "1\r\nm\r\n"
+      "1\r\no\r\n"
+      "1\r\nm\r\n"
+      "1\r\n\n\r\n"
+      "0\r\n\r\n"
+    };
+  static const char *header_blurbs[] = { "1.1/close", "1.0/default" };
+  static const char *iter_blurbs[] = { "byte-by-byte", "one-chunk" };
+  unsigned header_i, iter;
+
+  for (header_i = 0; header_i < DSK_N_ELEMENTS (headers); header_i++)
+    for (iter = 0; iter < 2; iter++)
+      {
+        const char *hdr = headers[header_i];
+        unsigned hdr_len = strlen (hdr);
+        DskError *error = NULL;
+        DskMemorySource *csource = dsk_memory_source_new ();
+        DskMemorySink *csink = dsk_memory_sink_new ();
+        DskHttpServerStream *stream;
+        DskHttpServerStreamOptions server_opts 
+          = DSK_HTTP_SERVER_STREAM_OPTIONS_DEFAULT;
+        DskHttpResponseOptions resp_opts
+          = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
+        DskHttpServerStreamResponseOptions stream_resp_opts
+          = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
+        csink->max_buffer_size = 128*1024;
+        if (cmdline_verbose)
+          dsk_warning ("request style: %s; writing data mode: %s",
+                       header_blurbs[header_i], iter_blurbs[iter]);
+        else
+          fprintf (stderr, ".");
+        stream = dsk_http_server_stream_new (DSK_OCTET_SINK (csink),
+                                             DSK_OCTET_SOURCE (csource),
+                                             &server_opts);
+        if (iter == 0)
+          {
+            /* Feed data to server in one bite */
+            dsk_buffer_append (&csource->buffer, hdr_len, hdr);
+            dsk_memory_source_added_data (csource);
+            //dsk_memory_source_done_adding (csource);
+          }
+        else
+          {
+            /* Feed data to server byte-by-byte */
+            unsigned rem = hdr_len;
+            const char *at = hdr;
+            while (rem--)
+              {
+                dsk_buffer_append_byte (&csource->buffer, *at++);
+                dsk_memory_source_added_data (csource);
+                while (csource->buffer.size > 0)
+                  dsk_main_run_once ();
+              }
+            //dsk_memory_source_done_adding (csource);
+          }
+        /* wait til we receive the request */
+        dsk_boolean got_notify;
+        got_notify = DSK_FALSE;
+        dsk_hook_trap (&stream->request_available,
+                       set_boolean_true,
+                       &got_notify,
+                       NULL);
+        while (!got_notify)
+          dsk_main_run_once ();
+        DskHttpServerStreamTransfer *xfer;
+        xfer = dsk_http_server_stream_get_request (stream);
+        dsk_assert (xfer != NULL);
+        dsk_assert (dsk_http_server_stream_get_request (stream) == NULL);
+
+        switch (header_i)
+          {
+          case 0:
+            dsk_assert (xfer->request->verb == DSK_HTTP_VERB_POST);
+            dsk_assert (xfer->request->connection_close);
+            dsk_assert (xfer->request->http_major_version == 1);
+            dsk_assert (xfer->request->http_minor_version == 1);
+            dsk_assert (!xfer->request->transfer_encoding_chunked);
+            dsk_assert (xfer->request->content_length == 7);
+            break;
+          case 1:
+            dsk_assert (xfer->request->verb == DSK_HTTP_VERB_POST);
+            dsk_assert (xfer->request->http_major_version == 1);
+            dsk_assert (xfer->request->http_minor_version == 0);
+            dsk_assert (!xfer->request->transfer_encoding_chunked);
+            dsk_assert (xfer->request->content_length == 7);
+            break;
+          }
+
+        DskOctetSource *post_data;
+        post_data = dsk_object_ref (xfer->post_data);
+        dsk_boolean done = DSK_FALSE;
+        DskBuffer buffer = DSK_BUFFER_STATIC_INIT;
+        while (!done)
+          {
+            switch (dsk_octet_source_read_buffer (post_data, &buffer, &error))
+              {
+              case DSK_IO_RESULT_SUCCESS:
+                break;
+              case DSK_IO_RESULT_AGAIN:
+                dsk_main_run_once ();
+                break;
+              case DSK_IO_RESULT_ERROR:
+                dsk_die ("error reading post-data: %s", error->message);
+              case DSK_IO_RESULT_EOF:
+                done = DSK_TRUE;
+                break;
+              }
+          }
+        dsk_assert (buffer.size == 7);
+        {
+          char buf[7];
+          dsk_buffer_read (&buffer, 7, buf);
+          dsk_assert (memcmp (buf, "hi mom\n", 7) == 0);
+        }
+
+        /* send a response */
+        stream_resp_opts.header_options = &resp_opts;
+        stream_resp_opts.content_length = 7;
+        stream_resp_opts.content_data = (const uint8_t *) "yo mom\n";
+        if (!dsk_http_server_stream_respond (xfer, &stream_resp_opts, &error))
+          dsk_die ("error responding to request: %s", error->message);
+
+        /* read until EOF from sink */
+        while (!csink->got_shutdown)
+          dsk_main_run_once ();
+
+        /* analyse response (header+body) */
+        char *line;
+        line = dsk_buffer_read_line (&csink->buffer);
+        dsk_assert (line != NULL);
+        dsk_assert (strncmp (line, "HTTP/1.", 7) == 0);
+        dsk_assert (line[7] == '0' || line[7] == '1');
+        dsk_assert (line[8] == ' ');
+        dsk_assert (strncmp (line+9, "200", 3) == 0);
+        dsk_assert (line[12] == 0 || dsk_ascii_isspace (line[12]));
+        dsk_free (line);
+        while ((line=dsk_buffer_read_line (&csink->buffer)) != NULL)
+          {
+            if (line[0] == '\r' || line[0] == 0)
+              {
+                dsk_free (line);
+                break;
+              }
+            /* TODO: process header line? */
+            dsk_free (line);
+          }
+        dsk_assert (line != NULL);
+        line = dsk_buffer_read_line (&csink->buffer);
+        dsk_assert (strcmp (line, "yo mom") == 0);
+        dsk_free (line);
+        dsk_assert (csink->buffer.size == 0);
+
+        /* cleanup */
+        dsk_object_unref (csource);
+        dsk_object_unref (csink);
+        dsk_object_unref (stream);
+      }
+}
+
 static struct 
 {
   const char *name;
@@ -441,7 +631,7 @@ static struct
 {
   { "simple connection-close", test_simple },
   { "simple response keepalive", test_response_keepalive },
-  //{ "simple POST", test_simple_post },
+  { "simple POST", test_simple_post },
   //{ "transfer-encoding chunked content", test_transfer_encoding_chunked },
   //{ "transfer-encoding chunked POST", test_transfer_encoding_chunked_post },
   //{ "content-encoding gzip", test_content_encoding_gzip },
