@@ -601,8 +601,8 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
     {
     case 'h': case 'H':
       if ((pi.slab[1] == 'e' || pi.slab[1] == 'E')
-       || (pi.slab[2] == 'a' || pi.slab[2] == 'A')
-       || (pi.slab[3] == 'd' || pi.slab[3] == 'D'))
+       && (pi.slab[2] == 'a' || pi.slab[2] == 'A')
+       && (pi.slab[3] == 'd' || pi.slab[3] == 'D'))
         {
           options.verb = DSK_HTTP_VERB_HEAD;
           at = pi.slab + 4;
@@ -611,7 +611,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
       goto handle_unknown_verb;
     case 'g': case 'G':
       if ((pi.slab[1] == 'e' || pi.slab[1] == 'E')
-       || (pi.slab[2] == 't' || pi.slab[2] == 'T'))
+       && (pi.slab[2] == 't' || pi.slab[2] == 'T'))
         {
           options.verb = DSK_HTTP_VERB_GET;
           at = pi.slab + 3;
@@ -620,15 +620,15 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
       goto handle_unknown_verb;
     case 'p': case 'P':
       if ((pi.slab[1] == 'o' || pi.slab[1] == 'O')
-       || (pi.slab[2] == 's' || pi.slab[2] == 'S')
-       || (pi.slab[3] == 't' || pi.slab[3] == 'T'))
+       && (pi.slab[2] == 's' || pi.slab[2] == 'S')
+       && (pi.slab[3] == 't' || pi.slab[3] == 'T'))
         {
           options.verb = DSK_HTTP_VERB_POST;
           at = pi.slab + 4;
           break;
         }
       if ((pi.slab[1] == 'u' || pi.slab[1] == 'U')
-       || (pi.slab[2] == 't' || pi.slab[2] == 'T'))
+       && (pi.slab[2] == 't' || pi.slab[2] == 'T'))
         {
           options.verb = DSK_HTTP_VERB_PUT;
           at = pi.slab + 3;
@@ -637,11 +637,11 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
       goto handle_unknown_verb;
     case 'c': case 'C':
       if ((pi.slab[1] == 'o' || pi.slab[1] == 'O')
-       || (pi.slab[2] == 'n' || pi.slab[2] == 'N')
-       || (pi.slab[3] == 'n' || pi.slab[3] == 'N')
-       || (pi.slab[4] == 'e' || pi.slab[4] == 'E')
-       || (pi.slab[5] == 'c' || pi.slab[5] == 'C')
-       || (pi.slab[6] == 't' || pi.slab[6] == 'T'))
+       && (pi.slab[2] == 'n' || pi.slab[2] == 'N')
+       && (pi.slab[3] == 'n' || pi.slab[3] == 'N')
+       && (pi.slab[4] == 'e' || pi.slab[4] == 'E')
+       && (pi.slab[5] == 'c' || pi.slab[5] == 'C')
+       && (pi.slab[6] == 't' || pi.slab[6] == 'T'))
         {
           options.verb = DSK_HTTP_VERB_CONNECT;
           at = pi.slab + 7;
@@ -650,10 +650,10 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
       goto handle_unknown_verb;
     case 'd': case 'D':
       if ((pi.slab[1] == 'e' || pi.slab[1] == 'E')
-       || (pi.slab[2] == 'l' || pi.slab[2] == 'L')
-       || (pi.slab[3] == 'e' || pi.slab[3] == 'E')
-       || (pi.slab[4] == 't' || pi.slab[4] == 'T')
-       || (pi.slab[5] == 'e' || pi.slab[5] == 'E'))
+       && (pi.slab[2] == 'l' || pi.slab[2] == 'L')
+       && (pi.slab[3] == 'e' || pi.slab[3] == 'E')
+       && (pi.slab[4] == 't' || pi.slab[4] == 'T')
+       && (pi.slab[5] == 'e' || pi.slab[5] == 'E'))
         {
           options.verb = DSK_HTTP_VERB_DELETE;
           at = pi.slab + 6;
@@ -662,11 +662,11 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
       goto handle_unknown_verb;
     case 'o': case 'O':
       if ((pi.slab[1] == 'p' || pi.slab[1] == 'P')
-       || (pi.slab[2] == 't' || pi.slab[2] == 'T')
-       || (pi.slab[3] == 'i' || pi.slab[3] == 'I')
-       || (pi.slab[4] == 'o' || pi.slab[4] == 'O')
-       || (pi.slab[5] == 'n' || pi.slab[5] == 'N')
-       || (pi.slab[6] == 's' || pi.slab[6] == 'S'))
+       && (pi.slab[2] == 't' || pi.slab[2] == 'T')
+       && (pi.slab[3] == 'i' || pi.slab[3] == 'I')
+       && (pi.slab[4] == 'o' || pi.slab[4] == 'O')
+       && (pi.slab[5] == 'n' || pi.slab[5] == 'N')
+       && (pi.slab[6] == 's' || pi.slab[6] == 'S'))
         {
           options.verb = DSK_HTTP_VERB_OPTIONS;
           at = pi.slab + 7;

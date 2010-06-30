@@ -138,6 +138,8 @@ done_reading_post_data (DskHttpServerStream *ss)
   if (xfer->request->connection_close)
     ss->no_more_transfers = DSK_TRUE;
 
+  if (xfer->post_data != NULL)
+    dsk_memory_source_done_adding (xfer->post_data);
   xfer->read_state = DSK_HTTP_SERVER_STREAM_READ_DONE;
   if (xfer->funcs != NULL && xfer->funcs->post_data_complete != NULL)
     xfer->funcs->post_data_complete (xfer);
