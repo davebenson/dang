@@ -31,9 +31,11 @@ _ http client gzip content-encoding:
   x body, with size
   x body, streaming
   _ body, without auto-decompression
-_ http server stream: content-length POST data
-_ http server stream: transfer-encoding-chunked POST data
+x http server stream: content-length POST data
+x http server stream: transfer-encoding-chunked POST data
 x http server stream: transfer-encoding-chunked content
+_ http server stream: transfer-encoding-chunked trailer
+_ http server stream: transfer-encoding-chunked extensions
 _ http server stream: pipelining
 _ http server stream: error conditions:
   _ extra blank space at front of request
@@ -143,6 +145,7 @@ _ XML implementation
 _ JSON implementation
   _ parser
   _ printer
+_ dsk_octet_filter_sink()
 _ checksum implementations
 
 LATER
