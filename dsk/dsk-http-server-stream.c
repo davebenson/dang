@@ -13,6 +13,9 @@
    or if not provided for any other verb. */
 #define DEBUG_ODD_VERB_USE              1
 
+/* print message on error */
+#define DEBUG_PRINT_ERRORS              1
+
 static void
 handle_post_data_finalize (void *data)
 {
@@ -124,6 +127,9 @@ server_set_error (DskHttpServerStream *server,
   va_list args;
   va_start (args, format);
   e = dsk_error_new_valist (format, args);
+#if DEBUG_PRINT_ERRORS
+  dsk_warning ("server_set_error: %s", e->message);
+#endif
   va_end (args);
   do_shutdown (server, e);
   dsk_error_unref (e);
@@ -283,6 +289,8 @@ restart_processing:
             if (has_content)
               {
                 xfer->post_data = dsk_memory_source_new ();
+                if (ss->wait_for_content_complete)
+                  xfer->post_data->buffer_low_amount = ss->max_post_data_size;
                 dsk_object_trap_finalize (DSK_OBJECT (xfer->post_data),
                                           handle_post_data_finalize,
                                           xfer);
