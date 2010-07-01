@@ -479,7 +479,7 @@ test_pipelining (void)
               /* Feed data to server in one bite */
               dsk_buffer_append (&csource->buffer, hdr_len, hdr);
               dsk_memory_source_added_data (csource);
-              dsk_memory_source_done_adding (csource);
+              //dsk_memory_source_done_adding (csource);
             }
           else
             {
@@ -493,7 +493,7 @@ test_pipelining (void)
                   while (csource->buffer.size > 0)
                     dsk_main_run_once ();
                 }
-              dsk_memory_source_done_adding (csource);
+              //dsk_memory_source_done_adding (csource);
             }
           /* wait til we receive the request */
           dsk_boolean got_notify;
@@ -510,7 +510,6 @@ test_pipelining (void)
             {
               xfer = dsk_http_server_stream_get_request (stream);
               dsk_assert (xfer != NULL);
-              dsk_assert (dsk_http_server_stream_get_request (stream) == NULL);
 
               switch (header_i)
                 {
@@ -574,6 +573,7 @@ test_pipelining (void)
                 }
               dsk_assert (content_source == NULL);
             }
+          dsk_assert (dsk_http_server_stream_get_request (stream) == NULL);
 
           /* read until EOF from sink */
           while (!csink->got_shutdown)
