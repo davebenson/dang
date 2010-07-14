@@ -610,7 +610,32 @@ test_pipelining (void)
               dsk_assert (line != NULL);
               if (chunked)
                 {
-                  ...
+                  DskBuffer tmp = DSK_BUFFER_STATIC_INIT;
+                  char buf[7];
+                  for (;;)
+                    {
+                      line = dsk_buffer_read_line (&csink->buffer);
+                      unsigned len = strtoul (line, NULL, 16);
+                      dsk_free (line);
+                      if (len == 0)
+                        {
+                          /* trailer */
+                          line = dsk_buffer_read_line (&csink->buffer);
+                          dsk_assert (line != NULL);
+                          dsk_free (line);
+                          break;
+                        }
+                      else
+                        {
+                          dsk_buffer_transfer (&tmp, &csink->buffer, len);
+                          line = dsk_buffer_read_line (&csink->buffer);
+                          dsk_assert (line != NULL);
+                          dsk_free (line);
+                        }
+                    }
+                  dsk_assert (tmp.size == 7);
+                  dsk_buffer_read (&tmp, 7, buf);
+                  dsk_assert (memcmp (buf, "hi mom\n", 7) == 0);
                 }
               else
                 {
