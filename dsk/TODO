@@ -36,7 +36,7 @@ x http server stream: transfer-encoding-chunked POST data
 x http server stream: transfer-encoding-chunked content
 _ http server stream: transfer-encoding-chunked trailer
 _ http server stream: transfer-encoding-chunked extensions
-_ http server stream: pipelining
+x http server stream: pipelining
 _ http server stream: error conditions:
   _ extra blank space at front of request
   _ bad transfer-encoding chunked format
