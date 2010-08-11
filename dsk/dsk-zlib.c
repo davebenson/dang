@@ -68,6 +68,7 @@ dsk_zlib_compressor_process(DskOctetFilter *filter,
         {
           dsk_set_error (error, "error compressing: %s",
                          compressor->zlib.msg);
+          dsk_buffer_maybe_remove_empty_fragment (out);
           return DSK_FALSE;
         }
     }
@@ -124,6 +125,7 @@ dsk_zlib_compressor_finish (DskOctetFilter *filter,
         {
           dsk_set_error (error, "error finishing compression: %s",
                          compressor->zlib.msg);
+          dsk_buffer_maybe_remove_empty_fragment (out);
           return DSK_FALSE;
         }
     }
@@ -247,6 +249,7 @@ dsk_zlib_decompressor_process(DskOctetFilter *filter,
               if (in_length > 0)
                 {
                   dsk_set_error (error, "garbage after compressed data");
+                  dsk_buffer_maybe_remove_empty_fragment (out);
                   return DSK_FALSE;
                 }
             }
@@ -255,6 +258,7 @@ dsk_zlib_decompressor_process(DskOctetFilter *filter,
         {
           dsk_set_error (error, "error decompressing: %s [%d]",
                          decompressor->zlib.msg, zrv);
+          dsk_buffer_maybe_remove_empty_fragment (out);
           return DSK_FALSE;
         }
     }
@@ -313,6 +317,7 @@ dsk_zlib_decompressor_finish (DskOctetFilter *filter,
         {
           dsk_set_error (error, "error finishing decompression: %s [%d]",
                          decompressor->zlib.msg, zrv);
+          dsk_buffer_maybe_remove_empty_fragment (out);
           return DSK_FALSE;
         }
     }

@@ -14,10 +14,11 @@ _ http client stream: error conditions:
   x extra blank space at front of request [ignored blank space]
   x bad response code
   x bad transfer-encoding chunked format
-  _ bad gzip data
+  x bad gzip data
   _ random data tests
   _ transport errors reading/writing
   _ post-data stream read errors
+  _ more responses than requests
 _ http client: request instead of request_options testing
   _ modify http-client test to be two-pass
   _ test error conditions
