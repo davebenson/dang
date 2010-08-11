@@ -131,6 +131,8 @@ dsk_boolean dsk_buffer_fragment_advance (DskBufferFragment **frag_inout,
    not actually add data to the buffer */
 void dsk_buffer_append_empty_fragment (DskBuffer *buffer);
 
+void dsk_buffer_maybe_remove_empty_fragment (DskBuffer *buffer);
+
 /* a way to delete the fragment from dsk_buffer_append_empty_fragment() */
 void dsk_buffer_fragment_free (DskBufferFragment *fragment);
 

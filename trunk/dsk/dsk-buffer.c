@@ -1511,6 +1511,19 @@ dsk_buffer_append_empty_fragment (DskBuffer *buffer)
   buffer->last_frag = frag;
 }
 
+void dsk_buffer_maybe_remove_empty_fragment (DskBuffer *buffer)
+{
+  if (buffer->last_frag->buf_length == 0)
+    {
+      DskBufferFragment **p = &(buffer->first_frag);
+      while (*p != buffer->last_frag)
+        p = &((*p)->next);
+      *p = NULL;
+      dsk_buffer_fragment_free (buffer->last_frag);
+      buffer->last_frag = NULL;
+    }
+}
+
 void
 dsk_buffer_fragment_free (DskBufferFragment *frag)
 {

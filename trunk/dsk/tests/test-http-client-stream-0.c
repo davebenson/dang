@@ -1303,6 +1303,174 @@ test_pre_gzipped_post_data_1 (void)
   request_data_clear (&request_data);
 }
 
+static void
+test_bad_gzip (void)
+{
+  dsk_boolean byte_by_byte;
+  static const char response0[] =
+      "HTTP/1.1 200 OK\r\n"
+      "Date: Mon, 17 May 2010 22:50:08 GMT\r\n"
+      "Content-Type: text/plain\r\n"
+      "Content-Encoding: gzip\r\n"
+      "Content-Length: 27\r\n"
+      "Connection: close\r\n"
+      "\r\n"
+      "\32\213\b\0\0\1\0\0\0\3\313\310T\311\315\317\345\2\0]\363Nq\a\0\0\0";
+
+  static const char response1[] =
+      "HTTP/1.1 200 OK\n"
+      "Date: Mon, 17 May 2010 22:50:08 GMT\n"
+      "Content-Type: text/plain\n"
+      "Content-Length: 27\n"
+      "Content-Encoding: gzip\r\n"
+      "Connection: close\n"
+      "\n"
+      "\32\213\b\0\0\2\0\0\0\3\313\310T\311\315\317\345\2\0]\363Nq\a\0\0\0";
+  static const char response2[] =
+      "HTTP/1.1 200 OK\n"
+      "Date: Mon, 17 May 2010 22:50:08 GMT\n"
+      "Content-Type: text/plain\n"
+      "Content-Encoding: gzip\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\n"
+      "1b\r\n"
+       "\31\213\b\0\0\0\0\0\0\4\313\310T\310\315\317\345\2\0]\363Nq\a\0\0\0\r\n"
+      "0\r\n\r\n";
+  static const char response3[] =
+      "HTTP/1.1 200 OK\n"
+      "Date: Mon, 17 May 2010 22:50:08 GMT\n"
+      "Content-Type: text/plain\n"
+      "Content-Encoding: gzip\r\n"
+      "Transfer-Encoding: chunked\r\n"
+      "\n"
+      "1\r\n\32\r\n"
+      "1\r\n\213\r\n"
+      "1\r\n\b\r\n"
+      "1\r\n\0\r\n"
+      "1\r\n\0\r\n"
+      "1\r\n\0\r\n"
+      "1\r\n\0\r\n"
+      "1\r\n\1\r\n"
+      "1\r\n\0\r\n"
+      "1\r\n\3\r\n"
+      "1\r\n\314\r\n"
+      "1\r\n\310\r\n"
+      "1\r\nT\r\n"
+      "1\r\n\310\r\n"
+      "1\r\n\315\r\n"
+      "1\r\n\317\r\n"
+      "1\r\n\345\r\n"
+      "1\r\n\2\r\n"
+      "1\r\n\0\r\n"
+      "1\r\n]\r\n"
+      "1\r\n\363\r\n"
+      "1\r\nN\r\n"
+      "1\r\nq\r\n"
+      "1\r\n\a\r\n"
+      "1\r\n\0\r\n"
+      "1\r\n\0\r\n"
+      "1\r\n\0\r\n"
+      "0\r\n\r\n";
+
+  static struct {
+    unsigned length;
+    const char *data;
+    /* the sizeof(static_arr) includes the terminal NUL, so subtract 1 */
+#define MK_ENTRY(static_arr) { sizeof(static_arr)-1, static_arr }
+  } response_content_versions[] = {
+    MK_ENTRY(response0),
+    MK_ENTRY(response1),
+    MK_ENTRY(response2),
+    MK_ENTRY(response3)
+  };
+#undef MK_ENTRY
+  for (byte_by_byte = 0; byte_by_byte <= 1; byte_by_byte++)
+    {
+      unsigned iter;
+
+      for (iter = 0; iter < DSK_N_ELEMENTS (response_content_versions); iter++)
+        {
+          DskHttpClientStream *stream;
+          DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
+          RequestData request_data = REQUEST_DATA_DEFAULT;
+          DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
+          DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
+          DskHttpClientStreamTransfer *xfer;
+          DskHttpClientStreamFuncs request_funcs_0;
+          DskError *error = NULL;
+          fprintf (stderr, ".");
+          memset (&request_funcs_0, 0, sizeof (request_funcs_0));
+          request_funcs_0.handle_response = request_data__handle_response;
+          request_funcs_0.handle_content_complete = request_data__handle_content_complete;
+          request_funcs_0.handle_error = request_data__handle_error;
+          request_funcs_0.destroy = request_data__destroy;
+          request_data.source = dsk_memory_source_new ();
+          request_data.sink = dsk_memory_sink_new ();
+          request_data.sink->max_buffer_size = 100000000;
+          options.print_warnings = DSK_FALSE;
+          stream = dsk_http_client_stream_new (DSK_OCTET_SINK (request_data.sink),
+                                               DSK_OCTET_SOURCE (request_data.source),
+                                               &options);
+          req_options.host = "localhost";
+          req_options.full_path = "/hello.txt";
+          cr_options.request_options = &req_options;
+          cr_options.funcs = &request_funcs_0;
+          cr_options.user_data = &request_data;
+          xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
+          if (xfer == NULL)
+            dsk_die ("dsk_http_client_stream_request failed: %s", error->message);
+
+          /* read data from sink */
+          while (!is_http_request_complete (&request_data.sink->buffer, NULL))
+            dsk_main_run_once ();
+
+          const char *content = response_content_versions[iter].data;
+          unsigned len = response_content_versions[iter].length;
+
+          /* write response */
+          if (byte_by_byte)
+            {
+              const char *at = content;
+              unsigned rem = len;
+              while (rem > 0 && request_data.error == NULL)
+                {
+                  dsk_buffer_append_byte (&request_data.source->buffer, *at++);
+                  dsk_memory_source_added_data (request_data.source);
+                  while (request_data.source->buffer.size
+                      && request_data.error == NULL)
+                    dsk_main_run_once ();
+                  rem--;
+                }
+            }
+          else
+            {
+              dsk_buffer_append (&request_data.source->buffer, len, content);
+              dsk_memory_source_added_data (request_data.source);
+            }
+
+          while (request_data.response_header == NULL)
+            dsk_main_run_once ();
+          dsk_assert (request_data.response_header->http_major_version == 1);
+          dsk_assert (request_data.response_header->http_minor_version == 1);
+          if (iter < 2)
+            {
+              dsk_assert (!request_data.response_header->transfer_encoding_chunked);
+              dsk_assert (request_data.response_header->connection_close);
+            }
+          else
+            {
+              dsk_assert (request_data.response_header->transfer_encoding_chunked);
+              dsk_assert (!request_data.response_header->connection_close);
+            }
+          while (request_data.error == NULL)
+            dsk_main_run_once ();
+
+          dsk_object_unref (stream);
+          request_data_clear (&request_data);
+        }
+    }
+}
+
 
 static struct 
 {
@@ -1321,6 +1489,7 @@ static struct
   { "gzip uncompression", test_gzip_download },
   { "pre-gzipped POST data (slab)", test_pre_gzipped_post_data_0 },
   { "pre-gzipped POST data (chunked)", test_pre_gzipped_post_data_1 },
+  { "bad gzipped data", test_bad_gzip },
 };
 
 int main(int argc, char **argv)
