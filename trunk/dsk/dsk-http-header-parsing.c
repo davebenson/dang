@@ -147,7 +147,11 @@ parse_info_init (ParseInfo *pi,
   /* gather key/value pairs, lowercasing keys */
   at = pi->slab;
   at = strchr (at, '\n');    /* skip initial line (not key-value format) */
-  dsk_assert (at != NULL);
+  if (at == NULL)
+    {
+      dsk_set_error (error, "NUL in header");
+      goto FAIL;
+    }
   if (at > pi->slab && *(at-1) == '\r')
     *(at-1) = 0;
   else

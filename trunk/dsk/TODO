@@ -15,7 +15,7 @@ _ http client stream: error conditions:
   x bad response code
   x bad transfer-encoding chunked format
   x bad gzip data
-  _ random data tests
+  x random data tests
   _ transport errors reading/writing
   _ post-data stream read errors
   _ more responses than requests

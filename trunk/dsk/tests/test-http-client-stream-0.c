@@ -1471,6 +1471,62 @@ test_bad_gzip (void)
     }
 }
 
+static void
+test_random_response (void)
+{
+  unsigned iter;
+  unsigned r = 5003;
+  for (iter = 0; iter < 6400; iter++)
+    {
+      DskHttpClientStream *stream;
+      DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
+      RequestData request_data = REQUEST_DATA_DEFAULT;
+      DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
+      DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
+      unsigned i;
+      DskHttpClientStreamTransfer *xfer;
+      DskHttpClientStreamFuncs request_funcs_0;
+      DskError *error = NULL;
+      char rstr[1000];
+      if (iter % 100 == 0)
+        fprintf (stderr, ".");
+      memset (&request_funcs_0, 0, sizeof (request_funcs_0));
+      request_funcs_0.handle_response = request_data__handle_response;
+      request_funcs_0.handle_content_complete = request_data__handle_content_complete;
+      request_funcs_0.handle_error = request_data__handle_error;
+      request_funcs_0.destroy = request_data__destroy;
+      request_data.source = dsk_memory_source_new ();
+      request_data.sink = dsk_memory_sink_new ();
+      request_data.sink->max_buffer_size = 100000000;
+      options.print_warnings = DSK_FALSE;
+      stream = dsk_http_client_stream_new (DSK_OCTET_SINK (request_data.sink),
+                                           DSK_OCTET_SOURCE (request_data.source),
+                                           &options);
+      req_options.host = "localhost";
+      req_options.full_path = "/hello.txt";
+      cr_options.request_options = &req_options;
+      cr_options.funcs = &request_funcs_0;
+      cr_options.user_data = &request_data;
+      xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
+
+      while (!is_http_request_complete (&request_data.sink->buffer, NULL))
+        dsk_main_run_once ();
+
+      for (i = 0; i < sizeof(rstr); i++)
+        {
+          rstr[i] = r % 100252051;
+          r *= 33;
+          r += 8;
+        }
+      dsk_buffer_append (&request_data.source->buffer, sizeof (rstr), rstr);
+      dsk_buffer_append_string (&request_data.source->buffer, "\r\n\r\n");
+      dsk_memory_source_added_data (request_data.source);
+      while (request_data.error == NULL)
+        dsk_main_run_once ();
+      dsk_object_unref (stream);
+      request_data_clear (&request_data);
+    }
+}
 
 static struct 
 {
@@ -1490,6 +1546,7 @@ static struct
   { "pre-gzipped POST data (slab)", test_pre_gzipped_post_data_0 },
   { "pre-gzipped POST data (chunked)", test_pre_gzipped_post_data_1 },
   { "bad gzipped data", test_bad_gzip },
+  { "random-data response test", test_random_response },
 };
 
 int main(int argc, char **argv)
