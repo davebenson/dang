@@ -22,6 +22,8 @@ struct _DskMemorySource
   DskHook buffer_low;
   unsigned buffer_low_amount;
 
+  DskError *error;
+
   unsigned done_adding : 1;
   unsigned got_shutdown : 1;
 };
@@ -44,6 +46,12 @@ struct _DskMemorySink
 /* used to pump data into the DskMemorySource */
 void dsk_memory_source_done_adding (DskMemorySource *source);
 void dsk_memory_source_added_data  (DskMemorySource *source);
+void dsk_memory_source_add_error   (DskMemorySource *source,
+                                    DskError        *error);
+void dsk_memory_source_take_error  (DskMemorySource *source,
+                                    DskError        *error);
+#define dsk_memory_source_add_error(msource, error) \
+  dsk_memory_source_take_error ((msource), dsk_error_ref (error))
 
 void dsk_memory_sink_drained (DskMemorySink *sink);
 
