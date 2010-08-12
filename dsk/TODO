@@ -15,6 +15,8 @@ _ http client stream: error conditions:
   x bad response code
   x bad transfer-encoding chunked format
   x bad gzip data
+    _ content-stream should have a way to enqueue an error
+      (needs to be in DskMemorySource)
   x random data tests
   _ transport errors reading/writing
   _ post-data stream read errors

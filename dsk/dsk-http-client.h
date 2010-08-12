@@ -62,7 +62,7 @@ struct _DskHttpClientRequestOptions
   /* TODO: POST-data CGI variables? */
   /* TODO: GET CGI variables? */
 
-  /* May we attempt to pipeline this request? (default: yes) */
+  /* May we attempt to pipeline this request? (default: yes for GET/HEAD) */
   unsigned pipeline_head : 1;
   unsigned pipeline_get : 1;
   unsigned pipeline_post : 1;
