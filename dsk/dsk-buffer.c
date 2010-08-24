@@ -1032,6 +1032,7 @@ void     dsk_buffer_vprintf             (DskBuffer    *buffer,
 					 const char   *format,
 					 va_list       args)
 {
+  XXX: use va_copy
   size_t size = g_printf_string_upper_bound (format, args);
   if (size < 1024)
     {
