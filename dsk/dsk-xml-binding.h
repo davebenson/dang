@@ -55,7 +55,8 @@ struct _DskXmlBindingNamespace
 
 DskXmlBinding *dsk_xml_binding_new (void);
 void           dsk_xml_binding_add_searchpath (DskXmlBinding *binding,
-                                               const char    *path);
+                                               const char    *path,
+                                               const char    *ns_separator);
 DskXmlBindingNamespace*
                dsk_xml_binding_get_ns         (DskXmlBinding *binding,
                                                const char    *name,
