@@ -128,7 +128,6 @@ void dsk_print_set_string_length   (DskPrint    *context,
   vd->value_length = value_len;
   add_var_def (context, vd);
 }
-
 void dsk_print_set_dsk_buffer      (DskPrint    *context,
                                     const char  *variable_name,
                                     const DskBuffer *buffer)
@@ -140,6 +139,15 @@ void dsk_print_set_dsk_buffer      (DskPrint    *context,
   vd->key = strcpy ((char*)(vd+1) + buffer->size + 1, variable_name);
   vd->value_length = buffer->size;
   add_var_def (context, vd);
+}
+
+void dsk_print_set_int             (DskPrint    *context,
+                                    const char  *variable_name,
+                                    int          value)
+{
+  char buf[32];
+  snprintf (buf, sizeof (buf), "%d", value);
+  dsk_print_set_string (context, variable_name, buf);
 }
 
 void dsk_print_set_uint (DskPrint *context,
@@ -324,6 +332,65 @@ dsk_print (DskPrint *context,
       dsk_warning ("error in dsk_print: %s", error->message);
       dsk_error_unref (error);
     }
+}
+
+static dsk_boolean append_to_buffer (unsigned   length,
+                                     const uint8_t *data,
+                                     void      *append_data,
+                                     DskError **error)
+{
+  DSK_UNUSED (error);
+  dsk_buffer_append (append_data, length, data);
+  return DSK_TRUE;
+}
+
+void
+dsk_print_set_template_string (DskPrint *context,
+                               const char *variable_name,
+                               const char *template_string)
+{
+  DskBuffer buffer = DSK_BUFFER_STATIC_INIT;
+  DskError *error = NULL;
+
+  /* save append/append_func */
+  DskPrintAppendFunc old_append = context->append;
+  void *old_append_data = context->append_data;
+
+  context->append = append_to_buffer;
+  context->append_data = &buffer;
+
+  if (!print__internal (context, template_string, &error))
+    {
+      dsk_warning ("error in dsk_print: %s", error->message);
+      dsk_error_unref (error);
+    }
+
+  context->append = old_append;
+  context->append_data = old_append_data;
+
+  dsk_print_set_buffer (context, variable_name, &buffer);
+  dsk_buffer_clear (&buffer);
+}
+
+DskPrint *dsk_print_new_buffer    (DskBuffer *buffer)
+{
+  return dsk_print_new (append_to_buffer, buffer, NULL);
+}
+
+void dsk_print_set_buffer          (DskPrint    *context,
+                                    const char  *variable_name,
+                                    DskBuffer   *buffer)
+{
+  unsigned key_len = strlen (variable_name);
+  unsigned value_len = buffer->size;
+  VarDef *vd = dsk_malloc (sizeof (VarDef) + key_len + 1 + value_len + 1);
+  char *value = (char*) (vd + 1);
+  dsk_buffer_peek (buffer, value_len, value);
+  value[value_len] = 0;
+  vd->key = value + value_len + 1;
+  strcpy ((char*) vd->key, variable_name);
+  vd->value_length = value_len;
+  add_var_def (context, vd);
 }
 
 /* --- quoting support --- */

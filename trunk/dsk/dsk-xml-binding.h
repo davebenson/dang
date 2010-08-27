@@ -5,6 +5,7 @@ typedef struct _DskXmlBindingStructMember DskXmlBindingStructMember;
 typedef struct _DskXmlBindingTypeStruct DskXmlBindingTypeStruct;
 typedef struct _DskXmlBindingUnionCase DskXmlBindingUnionCase;
 typedef struct _DskXmlBindingTypeUnion DskXmlBindingTypeUnion;
+typedef struct _DskXmlBindingNamespace DskXmlBindingNamespace;
 
 typedef enum
 {
@@ -17,12 +18,14 @@ typedef enum
 
 struct _DskXmlBindingType
 {
-  dsk_boolean is_fundamental;
-  dsk_boolean is_static;
-  dsk_boolean is_struct;
+  unsigned is_fundamental : 1;
+  unsigned is_static : 1;
+  unsigned is_struct : 1;
+  unsigned is_union : 1;
 
   unsigned sizeof_type;
   unsigned alignof_type;
+  DskXmlBindingNamespace *ns;
   char *name;
 
   /* virtual functions */
@@ -38,18 +41,12 @@ struct _DskXmlBindingType
 };
 
 
-struct _DskXmlBindingNamespaceEntry
-{
-  char *name;
-  DskXmlBindingNamespace *ns;
-  DskXmlBindingType *type;
-};
 struct _DskXmlBindingNamespace
 {
   dsk_boolean is_static;
   char *name;
-  unsigned n_entries;
-  DskXmlBindingNamespaceEntry *entries;
+  unsigned n_types;
+  DskXmlBindingType **types;
 };
 
 
@@ -61,6 +58,9 @@ DskXmlBindingNamespace*
                dsk_xml_binding_get_ns         (DskXmlBinding *binding,
                                                const char    *name,
                                                DskError     **error);
+DskXmlBindingNamespace*
+               dsk_xml_binding_try_ns         (DskXmlBinding *binding,
+                                               const char    *name);
 
 struct _DskXmlBindingStructMember
 {

@@ -1,3 +1,6 @@
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "../dsk.h"
 
 static const char description[] =
@@ -10,16 +13,344 @@ static DskXmlBinding *binding;
 
 static DSK_CMDLINE_CALLBACK_DECLARE (handle_searchpath)
 {
+  DSK_UNUSED (arg_name);
+  DSK_UNUSED (error);
   dsk_xml_binding_add_searchpath (binding,
                                   arg_value,
                                   (const char *) callback_data);
   return DSK_TRUE;
 }
 
+static int pstrcmp (const void *a, const void *b)
+{
+  const char *A = * (char **) a;
+  const char *B = * (char **) b;
+  return strcmp (A, B);
+}
+
+static void set_string_ns (DskPrint *ctx,
+                           const char *var,
+                           const char *name,
+                           dsk_boolean uc_first,
+                           dsk_boolean uc_nonfirst)
+{
+  char *str = dsk_malloc (strlen (name) * 2 + 1);
+  char *at = str;
+  const char *in = name;
+  dsk_boolean next_is_first = DSK_TRUE;
+  while (*in)
+    {
+      if (*in == '.')
+        {
+          *at++ = '_';
+          *at++ = '_';
+          in++;
+          next_is_first = DSK_TRUE;
+        }
+      else if (*in == '_' || *in == '-')
+        {
+          next_is_first = DSK_TRUE;
+          in++;
+        }
+      else
+        {
+          if (( next_is_first && uc_first)
+           || (!next_is_first && uc_nonfirst))
+            *at++ = dsk_ascii_toupper (*in);
+          else
+            *at++ = dsk_ascii_tolower (*in);
+          in++;
+          next_is_first = DSK_FALSE;
+        }
+    }
+  *at = 0;
+  dsk_print_set_string (ctx, var, str);
+  dsk_free (str);
+}
+
+static void
+set_ctypename (DskPrint *ctx,
+               const char *name,
+               DskXmlBindingType *type)
+{
+  if (type->ns == NULL)
+    dsk_print_set_string (ctx, name, type->name);
+  else
+    {
+      unsigned max_size = 2 * strlen (type->ns->name)  /* max possible expansion == a.b.c. -> A__B__C__ */
+                        + 2                     /* __ */
+                        + strlen (type->name)   /* (no transformation on type-name itself) */
+                        + 1;                    /* nul-terminate */
+      char *str = dsk_malloc (max_size);
+      char *at = str;
+      const char *in = type->ns->name;
+      dsk_boolean next_is_upper = DSK_TRUE;
+      while (*in)
+        {
+          if (*in == '.')
+            {
+              *at++ = '_';
+              *at++ = '_';
+              in++;
+              next_is_upper = DSK_TRUE;
+            }
+          else if (*in == '_' || *in == '-')
+            {
+              next_is_upper = DSK_TRUE;
+              in++;
+            }
+          else
+            {
+              if (next_is_upper)
+                *at++ = dsk_ascii_toupper (*in);
+              else
+                *at++ = dsk_ascii_tolower (*in);
+              in++;
+              next_is_upper = DSK_FALSE;
+            }
+        }
+      *at++ = '_';
+      *at++ = '_';
+      strcpy (at, name);
+      dsk_print_set_string (ctx, name, str);
+      dsk_free (str);
+    }
+}
+
+
+static void
+render_member (DskPrint *ctx, DskXmlBindingStructMember *member)
+{
+  set_ctypename (ctx, "member_type", member->type);
+  dsk_print_set_string (ctx, "member_name", member->name);
+  if (member->quantity == DSK_XML_BINDING_REQUIRED)
+    dsk_print_set_string (ctx, "maybe_star", "");
+  else
+    dsk_print_set_string (ctx, "maybe_star", "*");
+  if (member->quantity == DSK_XML_BINDING_REQUIRED_REPEATED
+   || member->quantity == DSK_XML_BINDING_REPEATED)
+    dsk_print (ctx, "${indent}unsigned n_$member_name;");
+  dsk_print (ctx, "${indent}$member_type $maybe_star$member_name;");
+}
+
+static void
+set_struct_uppercase (DskPrint *ctx, const char *var, const char *value)
+{
+  const char *in = value;
+  char *str = dsk_malloc (strlen (value) * 2 + 1);
+  char *out = str;
+  while (*in)
+    {
+      if (in != value && dsk_ascii_isupper (*in))
+        *out++ = '_';
+      *out++ = dsk_ascii_toupper (*in);
+      in++;
+    }
+  *out = 0;
+  dsk_print_set_string (ctx, var, str);
+  dsk_free (str);
+}
+static void
+set_struct_lowercase (DskPrint *ctx, const char *var, const char *value)
+{
+  const char *in = value;
+  char *str = dsk_malloc (strlen (value) * 2 + 1);
+  char *out = str;
+  while (*in)
+    {
+      if (in != value && dsk_ascii_isupper (*in))
+        *out++ = '_';
+      *out++ = dsk_ascii_tolower (*in);
+      in++;
+    }
+  *out = 0;
+  dsk_print_set_string (ctx, var, str);
+  dsk_free (str);
+}
+
+static void
+render_h_file (DskXmlBindingNamespace *ns, const char *output_basename)
+{
+  DskPrint *ctx;
+  char *name = dsk_malloc (strlen (output_basename) + 10);
+  FILE *fp;
+  unsigned i, j, k;
+  unsigned n_labels = 0;
+  char **labels;
+  strcpy (name, output_basename);
+  strcat (name, ".h");
+  fp = fopen (name, "w");
+  if (fp == NULL)
+    dsk_die ("error creating %s: %s", name, strerror (errno));
+
+  ctx = dsk_print_new_fp_fclose (fp);
+
+  /* convert ns->name into camel-case, lowercase and uppercase strings */
+  dsk_print_set_string (ctx, "namespace_name", ns->name);
+  set_string_ns (ctx, "namespace_func_prefix", ns->name, 0, 0);
+  set_string_ns (ctx, "namespace_type_prefix", ns->name, 1, 0);
+  set_string_ns (ctx, "namespace_enum_prefix", ns->name, 1, 1);
+
+  /* gather all enums / unions in this namespace; emit #define's */
+  for (i = 0; i < ns->n_types; i++)
+    if (ns->types[i]->is_union)
+      n_labels += ((DskXmlBindingTypeUnion*)ns->types[i])->n_cases;
+  labels = dsk_malloc (sizeof (char *) * n_labels);
+  k = 0;
+  for (i = 0; i < ns->n_types; i++)
+    if (ns->types[i]->is_union)
+      {
+        DskXmlBindingTypeUnion *t = ((DskXmlBindingTypeUnion*)ns->types[i]);
+        for (j = 0; j < t->n_cases; j++)
+          labels[k] = t->cases[j].name;
+      }
+  dsk_assert (k == n_labels);
+
+  /* uniquify all labels */
+  qsort (labels, k, sizeof (char*), pstrcmp);
+  if (n_labels > 0)
+    {
+      unsigned o = 0;
+      for (i = 1; i < n_labels; i++)
+        if (strcmp (labels[o], labels[i]) != 0)
+          labels[++o] = labels[i];
+      n_labels = o + 1;
+    }
+
+  for (i = 0; i < n_labels; i++)
+    {
+      dsk_print_push (ctx);
+      set_struct_uppercase (ctx, "label", labels[i]);
+      dsk_print_set_int (ctx, "value", i);
+      dsk_print (ctx, "#define ${namespace_enum_prefix}__ENUM_VALUE__$label   $value");
+      dsk_print_pop (ctx);
+    }
+
+  /* render typedefs for structures and unions */
+  for (i = 0; i < ns->n_types; i++)
+    if (ns->types[i]->is_struct
+     || ns->types[i]->is_union)
+      {
+        dsk_print_push (ctx);
+        dsk_print_set_string (ctx, "typename", ns->types[i]->name);
+        //set_struct_lowercase (ctx, "typename_func_prefix", ns->entries[i].name);
+        //set_struct_uppercase (ctx, "typename_func_prefix", ns->entries[i].name);
+        dsk_print_set_template_string (ctx,
+                                       "fulltypename",
+                                       "${namespace_type_prefix}__$typename");
+        dsk_print (ctx, "typedef struct _$fulltypename $fulltypename;");
+        dsk_print_pop (ctx);
+      }
+
+  /* render c-enums for unions/enums */
+  for (i = 0; i < ns->n_types; i++)
+    if (ns->types[i]->is_union)
+      {
+        DskXmlBindingTypeUnion *t = ((DskXmlBindingTypeUnion*)ns->types[i]);
+        dsk_print (ctx, "typedef enum\n{");
+        for (j = 0; j < t->n_cases; j++)
+          {
+            dsk_print_push (ctx);
+            set_struct_uppercase (ctx, "uc_typename", t->cases[j].name);
+            dsk_print_set_template_string (ctx, "elabel",
+                         "${namespace_enum_prefix}__${uc_typename}__$label");
+            dsk_print_set_template_string (ctx, "evalue",
+                         "${namespace_enum_prefix}__ENUM_VALUE__$label");
+            dsk_print (ctx, "  $elabel = $evalue,");
+            dsk_print_pop (ctx);
+          }
+        dsk_print (ctx, "} ${namespace_type_prefix}__${name}_Type;");
+      }
+
+  /* render struct's and union's */
+  for (i = 0; i < ns->n_types; i++)
+    if (ns->types[i]->is_struct)
+      {
+        DskXmlBindingType *type = ns->types[i];
+        DskXmlBindingTypeStruct *s = (DskXmlBindingTypeStruct *) type;
+        dsk_print_push (ctx);
+        set_ctypename (ctx, "fulltypename", type);
+        dsk_print (ctx, "struct _$fulltypename\n{");
+        for (j = 0; j < s->n_members; j++)
+          {
+            dsk_print_push (ctx);
+            dsk_print_set_string (ctx, "indent", "  ");
+            render_member (ctx, s->members + j);
+            dsk_print_pop (ctx);
+          }
+        dsk_print_pop (ctx);
+        dsk_print (ctx, "};");
+      }
+    else if (ns->types[i]->is_union)
+      {
+        DskXmlBindingType *type = ns->types[i];
+        DskXmlBindingTypeUnion *u = (DskXmlBindingTypeUnion *) type;
+        dsk_print_push (ctx);
+        set_ctypename (ctx, "fulltypename", type);
+        dsk_print (ctx, "struct _$fulltypename\n"
+                        "{\n"
+                        "  ${fulltypename}_Type type;"
+                        "  union {");
+        for (j = 0; j < u->n_cases; j++)
+          {
+            DskXmlBindingType *ct = u->cases[j].type;
+            dsk_print_push (ctx);
+            dsk_print_set_string (ctx, "case_name", u->cases[j].name);
+            if (u->cases[j].elide_struct_outer_tag)
+              {
+                DskXmlBindingTypeStruct *cs = (DskXmlBindingTypeStruct*) ct;
+                dsk_assert (ct->is_struct);
+                dsk_print (ctx, "    struct {");
+                for (k = 0; k < cs->n_members; k++)
+                  {
+                    dsk_print_push (ctx);
+                    dsk_print_set_string (ctx, "indent", "      ");
+                    render_member (ctx, cs->members + k);
+                    dsk_print_pop (ctx);
+                  }
+                dsk_print (ctx, "    } $case_name;");
+              }
+            else if (ct != NULL)
+              {
+                set_ctypename (ctx, "case_type", ct);
+                dsk_print (ctx, "    $case_type $case_name;");
+              }
+          }
+        dsk_print_pop (ctx);
+        dsk_print (ctx, "};");
+      }
+
+  /* render descriptor declarations */
+  for (i = 0; i < ns->n_types; i++)
+    if (ns->types[i]->is_struct
+     && ns->types[i]->is_union)
+      {
+        dsk_print_push (ctx);
+        set_struct_lowercase (ctx, "label", ns->types[i]->name);
+        if (ns->types[i]->is_struct)
+          dsk_print_set_string (ctx, "desc_type", "DskXmlBindingTypeStruct");
+        else
+          dsk_print_set_string (ctx, "desc_type", "DskXmlBindingTypeUnion");
+        dsk_print_set_template_string (ctx, "func_prefix",
+                                       "${namespace_func_prefix}__${label}");
+
+        dsk_print (ctx, "extern const $desc_type ${func_prefix}__descriptor;");
+        dsk_print_pop (ctx);
+      }
+
+  /* render namespace object */
+  dsk_print (ctx, "extern const DskXmlBindingNamespace ${namespace_func_prefix}__descriptor;");
+
+  dsk_print_free (ctx);
+}
+
 int main(int argc, char **argv)
 {
   char *output_basename;
-  char *input_filename = "-";
+  char *namespace_name;
+  DskXmlBindingNamespace *ns;
+  DskError *error = NULL;
+
   dsk_cmdline_init ("Make XML C-Bindings", description, NULL, 0);
   dsk_cmdline_add_string ("output-basename",
                           "Directory and basename for output files",
@@ -30,7 +361,7 @@ int main(int argc, char **argv)
                           "Namespace to generate prototypes/descriptors for",
                           "NS",
                           DSK_CMDLINE_MANDATORY,
-                          &input_filename);
+                          &namespace_name);
   dsk_cmdline_add_func ("search-tree",
                         "Filesystem tree to search for format files",
                         "PATH",
@@ -44,6 +375,11 @@ int main(int argc, char **argv)
 
   binding = dsk_xml_binding_new ();
   dsk_cmdline_process_args (&argc, &argv);
+
+  ns = dsk_xml_binding_get_ns (binding, namespace_name, &error);
+  if (ns == NULL)
+    dsk_die ("getting namespace '%s': %s", namespace_name, error->message);
+  render_h_file (ns, output_basename);
 
   return 0;
 }
