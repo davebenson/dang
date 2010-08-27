@@ -12,7 +12,7 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-xml-parser-0 \
 		tests/test-xml-validation-suite
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
-           programs/dsk-octet-filter
+           programs/dsk-octet-filter programs/dsk-make-xml-binding
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
 
 EXTRA_PROGRAMS = programs/make-validation-test-data
@@ -46,6 +46,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-http-header-printing.o \
 	  dsk-date.o \
 	  dsk-xml-parser.o dsk-xml.o \
+	  dsk-xml-binding.o \
 	  dsk-zlib.o \
 	  dsk-base64.o dsk-base64-encoder.o dsk-base64-decoder.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \

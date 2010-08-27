@@ -23,6 +23,9 @@ DskPrint *dsk_print_new_fp (void *file_pointer);
 DskPrint *dsk_print_new_fp_fclose (void *file_pointer);
 DskPrint *dsk_print_new_fp_pclose (void *file_pointer);
 
+/* buffer support */
+DskPrint *dsk_print_new_buffer    (DskBuffer *buffer);
+
 /* Setting variables for interpolation */
 void dsk_print_set_string          (DskPrint    *context,
                                     const char  *variable_name,
@@ -42,6 +45,9 @@ void dsk_print_set_uint64          (DskPrint    *context,
 void dsk_print_set_template_string (DskPrint    *context,
                                     const char  *variable_name,
 			            const char  *template_string);
+void dsk_print_set_buffer          (DskPrint    *context,
+                                    const char  *variable_name,
+                                    DskBuffer   *buffer);
 void dsk_print_push (DskPrint *context);
 void dsk_print_pop  (DskPrint *context);
 

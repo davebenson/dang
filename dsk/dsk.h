@@ -34,6 +34,7 @@
 
 #include "dsk-xml.h"
 #include "dsk-xml-parser.h"
+#include "dsk-xml-binding.h"
 
 #include "dsk-zlib.h"
 #include "dsk-octet-filter-misc.h"
