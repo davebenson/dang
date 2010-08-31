@@ -16,7 +16,8 @@
    file -> namespace_decl use_statements type_decls
  */
 
-#include "dsk-xml-binding.h"
+#include "dsk.h"
+#include "dsk-xml-binding-internals.h"
 
 typedef enum
 {
@@ -233,7 +234,7 @@ done:
 }
 
 
-dsk_boolean
+static DskXmlBindingNamespace *
 parse_file (ParseContext *context,
             DskError  **error)
 {
@@ -458,3 +459,6 @@ error_cleanup:
   dsk_free (use_statements);
   return DSK_FALSE;
 }
+
+DskXmlBindingNamespace *
+_dsk_xml_binding_parse_ns_str (binding, path, contents, error))
