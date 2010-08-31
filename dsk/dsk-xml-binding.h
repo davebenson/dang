@@ -34,7 +34,7 @@ struct _DskXmlBindingType
 		       void              *out,
 		       DskError         **error);
   DskXml   *  (*to_xml)(DskXmlBindingType *type,
-                        const char        *data,
+                        const void        *data,
 		        DskError         **error);
   void        (*clear) (DskXmlBindingType *type,
 		        void              *out);

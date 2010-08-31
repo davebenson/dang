@@ -174,7 +174,7 @@ xml_binding_parse__int(DskXmlBindingType *type,
 
 static DskXml   *
 xml_binding_to_xml__int(DskXmlBindingType *type,
-                        const char        *data,
+                        const void        *data,
 		        DskError         **error)
 {
   char buf[64];
@@ -219,7 +219,7 @@ xml_binding_parse__uint(DskXmlBindingType *type,
 
 static DskXml   *
 xml_binding_to_xml__uint(DskXmlBindingType *type,
-                         const char        *data,
+                         const void        *data,
 		         DskError         **error)
 {
   char buf[64];
@@ -245,6 +245,34 @@ DskXmlBindingType dsk_xml_binding_type_uint =
   NULL         /* no clear */
 };
 
+static dsk_boolean
+xml_binding_parse__float(DskXmlBindingType *type,
+                        DskXml            *to_parse,
+		        void              *out,
+		        DskError         **error)
+{
+  char *end;
+  CHECK_IS_TEXT ();
+  * (float *) out = strtod (to_parse->str, &end);
+  if (end == to_parse->str || *end != 0)
+    {
+      dsk_set_error (error, "error parsing float from XML node");
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
+static DskXml   *
+xml_binding_to_xml__float(DskXmlBindingType *type,
+                          const void        *data,
+		          DskError         **error)
+{
+  char buf[64];
+  DSK_UNUSED (type); DSK_UNUSED (error);
+  snprintf (buf, sizeof (buf), "%.6f", * (float *) data);
+  return dsk_xml_text_new (buf);
+}
+
 DskXmlBindingType dsk_xml_binding_type_float = 
 {
   DSK_TRUE,    /* is_fundamental */
@@ -262,6 +290,34 @@ DskXmlBindingType dsk_xml_binding_type_float =
   NULL         /* no clear */
 };
 
+static dsk_boolean
+xml_binding_parse__double(DskXmlBindingType *type,
+                        DskXml            *to_parse,
+		        void              *out,
+		        DskError         **error)
+{
+  char *end;
+  CHECK_IS_TEXT ();
+  * (double *) out = strtod (to_parse->str, &end);
+  if (end == to_parse->str || *end != 0)
+    {
+      dsk_set_error (error, "error parsing double from XML node");
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
+static DskXml   *
+xml_binding_to_xml__double(DskXmlBindingType *type,
+                          const void        *data,
+		          DskError         **error)
+{
+  char buf[64];
+  DSK_UNUSED (type); DSK_UNUSED (error);
+  snprintf (buf, sizeof (buf), "%.16f", * (double *) data);
+  return dsk_xml_text_new (buf);
+}
+
 DskXmlBindingType dsk_xml_binding_type_double = 
 {
   DSK_TRUE,    /* is_fundamental */
@@ -278,6 +334,34 @@ DskXmlBindingType dsk_xml_binding_type_double =
   xml_binding_to_xml__double,
   NULL         /* no clear */
 };
+
+static dsk_boolean
+xml_binding_parse__string(DskXmlBindingType *type,
+                          DskXml            *to_parse,
+		          void              *out,
+		          DskError         **error)
+{
+  CHECK_IS_TEXT ();
+  * (char **) out = dsk_strdup (to_parse->str);
+  return DSK_TRUE;
+}
+
+static DskXml   *
+xml_binding_to_xml__string(DskXmlBindingType *type,
+                           const void        *data,
+		           DskError         **error)
+{
+  const char *str = * (char **) data;
+  DSK_UNUSED (type); DSK_UNUSED (error);
+  return dsk_xml_text_new (str ? str : "");
+}
+static void
+clear__string(DskXmlBindingType *type,
+              void              *data)
+{
+  DSK_UNUSED (type);
+  dsk_free (* (char **) data);
+}
 
 DskXmlBindingType dsk_xml_binding_type_string = 
 {
@@ -301,12 +385,82 @@ DskXmlBindingType dsk_xml_binding_type_string =
 dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
 		                          DskXml            *to_parse,
 		                          void              *out,
-		                          DskError         **error);
+		                          DskError         **error)
+{
+  DskXmlBindingTypeStruct *s = (DskXmlBindingTypeStruct *) type;
+  if (to_parse->type != DSK_XML_ELEMENT)
+    {
+      dsk_set_error (error, "cannot parse structure from string");
+      return DSK_FALSE;
+    }
+  counts = alloca (s->n_members * sizeof (unsigned));
+  for (i = 0; i < s->n_members; i++)
+    counts[i] = 0;
+  member_index = alloca (to_parse->n_children * sizeof (unsigned));
+  for (i = 0; i < to_parse->n_children; i++)
+    if (to_parse->children[i]->type == DSK_XML_ELEMENT)
+      {
+        ...
+        member_index[i] = mem_no;
+        counts[mem_no] += 1;
+      }
+  for (i = 0; i < s->n_members; i++)
+    switch (s->members[i].quantity)
+      {
+      case DSK_XML_BINDING_REQUIRED:
+        if (counts[i] != 1)
+          {
+            ...
+          }
+        break;
+      case DSK_XML_BINDING_OPTIONAL,
+        if (counts[i] > 1)
+          {
+            ...
+          }
+        DSK_STRUCT_MEMBER (unsigned, out,
+                           s->members[i].quantifier_offset) = counts[i];
+        break;
+      case DSK_XML_BINDING_REQUIRED_REPEATED:
+        if (counts[i] == 0)
+          {
+            ...
+          }
+        /* Fall-through */
+      case DSK_XML_BINDING_REPEATED:
+        DSK_STRUCT_MEMBER (unsigned, out,
+                           s->members[i].quantifier_offset) = 0;
+        DSK_STRUCT_MEMBER (void *, out, s->members[i].offset)
+          = dsk_malloc (s->members[i].sizeof_instance * counts[i]);
+        break;
+      }
+  for (i = 0; i < to_parse->n_children; i++)
+    if (to_parse->children[i]->type == DSK_XML_ELEMENT)
+      {
+        ...
+      }
+  return DSK_TRUE;
+}
+
 DskXml  *   dsk_xml_binding_struct_to_xml(DskXmlBindingType *type,
 		                          const char        *data,
-		                          DskError         **error);
+		                          DskError         **error)
+{
+  ...
+}
+
 void        dsk_xml_binding_struct_clear (DskXmlBindingType *type,
-		                          void              *out);
+		                          void              *out)
+{
+  DskXmlBindingTypeStruct *s = (DskXmlBindingTypeStruct *) type;
+  unsigned i;
+  for (i = 0; i < s->n_members; i++)
+    switch (s->members[i].quantity)
+      {
+        ...
+      }
+}
+
 
 
 
@@ -314,9 +468,21 @@ void        dsk_xml_binding_struct_clear (DskXmlBindingType *type,
 dsk_boolean dsk_xml_binding_union_parse  (DskXmlBindingType *type,
 		                          DskXml            *to_parse,
 		                          void              *out,
-		                          DskError         **error);
+		                          DskError         **error)
+{
+  ...
+}
+
 DskXml  *   dsk_xml_binding_union_to_xml (DskXmlBindingType *type,
 		                          const char        *data,
-		                          DskError         **error);
+		                          DskError         **error)
+{
+  ...
+}
+
 void        dsk_xml_binding_union_clear  (DskXmlBindingType *type,
-		                          void              *out);
+		                          void              *out)
+{
+  ...
+}
+
