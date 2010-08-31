@@ -47,6 +47,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-date.o \
 	  dsk-xml-parser.o dsk-xml.o \
 	  dsk-xml-binding.o \
+	  dsk-xml-binding-parser.o \
 	  dsk-zlib.o \
 	  dsk-base64.o dsk-base64-encoder.o dsk-base64-decoder.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \
