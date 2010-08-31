@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "dsk.h"
 #include "dsk-xml-binding-internals.h"
 #include "../gskrbtreemacros.h"
@@ -176,7 +177,10 @@ xml_binding_to_xml__int(DskXmlBindingType *type,
                         const char        *data,
 		        DskError         **error)
 {
-  ...
+  char buf[64];
+  DSK_UNUSED (type); DSK_UNUSED (error);
+  snprintf (buf, sizeof (buf), "%d", * (int *) data);
+  return dsk_xml_text_new (buf);
 }
 
 DskXmlBindingType dsk_xml_binding_type_int =
@@ -195,6 +199,34 @@ DskXmlBindingType dsk_xml_binding_type_int =
   xml_binding_to_xml__int,
   NULL         /* no clear */
 };
+
+static dsk_boolean
+xml_binding_parse__uint(DskXmlBindingType *type,
+                        DskXml            *to_parse,
+		        void              *out,
+		        DskError         **error)
+{
+  char *end;
+  CHECK_IS_TEXT ();
+  * (int *) out = strtoul (to_parse->str, &end, 10);
+  if (end == to_parse->str || *end != 0)
+    {
+      dsk_set_error (error, "error parsing uint from XML node");
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
+static DskXml   *
+xml_binding_to_xml__uint(DskXmlBindingType *type,
+                         const char        *data,
+		         DskError         **error)
+{
+  char buf[64];
+  DSK_UNUSED (type); DSK_UNUSED (error);
+  snprintf (buf, sizeof (buf), "%u", * (unsigned int *) data);
+  return dsk_xml_text_new (buf);
+}
 
 DskXmlBindingType dsk_xml_binding_type_uint = 
 {
@@ -215,17 +247,53 @@ DskXmlBindingType dsk_xml_binding_type_uint =
 
 DskXmlBindingType dsk_xml_binding_type_float = 
 {
-  ...
+  DSK_TRUE,    /* is_fundamental */
+  DSK_TRUE,    /* is_static */
+  DSK_FALSE,   /* is_struct */
+  DSK_FALSE,   /* is_union */
+
+  sizeof (float),
+  DSK_ALIGNOF_FLOAT,
+
+  NULL,        /* no namespace */
+  "float",      /* name */
+  xml_binding_parse__float,
+  xml_binding_to_xml__float,
+  NULL         /* no clear */
 };
 
 DskXmlBindingType dsk_xml_binding_type_double = 
 {
-  ...
+  DSK_TRUE,    /* is_fundamental */
+  DSK_TRUE,    /* is_static */
+  DSK_FALSE,   /* is_struct */
+  DSK_FALSE,   /* is_union */
+
+  sizeof (double),
+  DSK_ALIGNOF_DOUBLE,
+
+  NULL,        /* no namespace */
+  "double",    /* name */
+  xml_binding_parse__double,
+  xml_binding_to_xml__double,
+  NULL         /* no clear */
 };
 
 DskXmlBindingType dsk_xml_binding_type_string = 
 {
-  ...
+  DSK_TRUE,    /* is_fundamental */
+  DSK_TRUE,    /* is_static */
+  DSK_FALSE,   /* is_struct */
+  DSK_FALSE,   /* is_union */
+
+  sizeof (char *),
+  DSK_ALIGNOF_POINTER,
+
+  NULL,        /* no namespace */
+  "string",    /* name */
+  xml_binding_parse__string,
+  xml_binding_to_xml__string,
+  clear__string
 };
 
 
