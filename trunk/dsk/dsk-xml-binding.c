@@ -403,7 +403,13 @@ dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
   for (i = 0; i < to_parse->n_children; i++)
     if (to_parse->children[i]->type == DSK_XML_ELEMENT)
       {
-        ...
+        const char *mem_name = to_parse->children[i]->str;
+        int mem_no = dsk_xml_binding_type_struct_lookup_member (s, mem_name);
+        if (mem_no < 0)
+          {
+            dsk_set_error (error, "no member %s found", mem_name);
+            return DSK_FALSE;
+          }
         member_index[i] = mem_no;
         counts[mem_no] += 1;
       }
@@ -411,15 +417,25 @@ dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
     switch (s->members[i].quantity)
       {
       case DSK_XML_BINDING_REQUIRED:
-        if (counts[i] != 1)
+        if (counts[i] == 0)
           {
-            ...
+            dsk_set_error (error, "required member %s not found",
+                           s->members[i].name);
+            return DSK_FALSE;
+          }
+        else if (counts[i] > 1)
+          {
+            dsk_set_error (error, "required member %s specified more than once",
+                           s->members[i].name);
+            return DSK_FALSE;
           }
         break;
       case DSK_XML_BINDING_OPTIONAL:
         if (counts[i] > 1)
           {
-            ...
+            dsk_set_error (error, "optional member %s specified more than once",
+                           s->members[i].name);
+            return DSK_FALSE;
           }
         DSK_STRUCT_MEMBER (unsigned, out,
                            s->members[i].quantifier_offset) = counts[i];
@@ -427,7 +443,9 @@ dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
       case DSK_XML_BINDING_REQUIRED_REPEATED:
         if (counts[i] == 0)
           {
-            ...
+            dsk_set_error (error, "repeated required member %s not found",
+                           s->members[i].name);
+            return DSK_FALSE;
           }
         /* Fall-through */
       case DSK_XML_BINDING_REPEATED:
