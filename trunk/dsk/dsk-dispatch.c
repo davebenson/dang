@@ -466,10 +466,10 @@ deallocate_notify_desired_index (RealDispatch *d,
 /* Registering file-descriptors to watch. */
 void
 dsk_dispatch_watch_fd (DskDispatch *dispatch,
-                              int                 fd,
-                              unsigned            events,
-                              DskFDFunc           callback,
-                              void               *callback_data)
+                       int          fd,
+                       unsigned     events,
+                       DskFDFunc    callback,
+                       void        *callback_data)
 {
   RealDispatch *d = (RealDispatch *) dispatch;
   unsigned f = fd;              /* avoid tiring compiler warnings: "comparison of signed versus unsigned" */
