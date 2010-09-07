@@ -75,7 +75,15 @@ struct _DskXmlBindingTypeStruct
   DskXmlBindingType base_type;
   unsigned n_members;
   DskXmlBindingStructMember *members;
+  unsigned *members_sorted_by_name;
 };
+DskXmlBindingTypeStruct *dsk_xml_binding_struct_new (DskXmlBindingNamespace *ns,
+                                                 const char        *struct_name,
+                                                 unsigned           n_members,
+                                   const DskXmlBindingStructMember *members);
+
+int dsk_xml_binding_type_struct_lookup_member (DskXmlBindingTypeStruct *type,
+                                               const char              *name);
 
 struct _DskXmlBindingUnionCase
 {

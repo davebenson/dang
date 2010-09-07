@@ -388,6 +388,9 @@ dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
 		                          DskError         **error)
 {
   DskXmlBindingTypeStruct *s = (DskXmlBindingTypeStruct *) type;
+  unsigned *counts;
+  unsigned *member_index;
+  unsigned i;
   if (to_parse->type != DSK_XML_ELEMENT)
     {
       dsk_set_error (error, "cannot parse structure from string");
@@ -413,7 +416,7 @@ dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
             ...
           }
         break;
-      case DSK_XML_BINDING_OPTIONAL,
+      case DSK_XML_BINDING_OPTIONAL:
         if (counts[i] > 1)
           {
             ...
@@ -461,8 +464,38 @@ void        dsk_xml_binding_struct_clear (DskXmlBindingType *type,
       }
 }
 
+DskXmlBindingTypeStruct *
+dsk_xml_binding_struct_new (DskXmlBindingNamespace *ns,
+                            const char        *struct_name,
+                            unsigned           n_members,
+                            const DskXmlBindingStructMember *members)
+{
+  DskXmlBindingTypeStruct *rv;
+  unsigned tail_space = n_members * sizeof (DskXmlBindingStructMember);
+  unsigned i;
+  for (i = 0; i < n_members; i++)
+    tail_space += strlen (members[i].name) + 1;
+  rv = dsk_malloc (sizeof (DskXmlBindingTypeStruct) + tail_space);
+  rv->base.is_fundamental = 0;
+  rv->base.is_static = 0;
+  rv->base.is_struct = 1;
+  rv->base.is_union = 0;
+  rv->base.sizeof_type = ???;
+  rv->base.alignof_type = ???;
+  rv->base.ns = ???;
+  rv->base.name = ???;
+  rv->base.parse = dsk_xml_binding_struct_parse;
+  rv->base.to_xml = dsk_xml_binding_struct_to_xml;
+  rv->base.clear = dsk_xml_binding_struct_clear;
 
-
+  rv->n_members = n_members;
+  rv->members = (DskXmlBindingStructMember*)(rv + 1);
+  str_at = (char*)(rv->members + n_members);
+  for (i = 0; i < n_members; i++)
+    {
+      ...
+    }
+}
 
 /* unions */
 dsk_boolean dsk_xml_binding_union_parse  (DskXmlBindingType *type,
