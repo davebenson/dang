@@ -23,8 +23,8 @@ struct _DskXmlBindingType
   unsigned is_struct : 1;
   unsigned is_union : 1;
 
-  unsigned sizeof_type;
-  unsigned alignof_type;
+  unsigned sizeof_instance;
+  unsigned alignof_instance;
   DskXmlBindingNamespace *ns;
   char *name;
 
@@ -76,6 +76,7 @@ struct _DskXmlBindingTypeStruct
   unsigned n_members;
   DskXmlBindingStructMember *members;
   unsigned *members_sorted_by_name;
+  unsigned sizeof_struct;
 };
 DskXmlBindingTypeStruct *dsk_xml_binding_struct_new (DskXmlBindingNamespace *ns,
                                                  const char        *struct_name,

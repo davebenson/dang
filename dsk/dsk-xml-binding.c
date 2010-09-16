@@ -4,6 +4,10 @@
 #include "dsk.h"
 #include "dsk-xml-binding-internals.h"
 #include "../gskrbtreemacros.h"
+#define DSK_STRUCT_MEMBER_P(struct_p, struct_offset)   \
+    ((void*) ((char*) (struct_p) + (long) (struct_offset)))
+#define DSK_STRUCT_MEMBER(member_type, struct_p, struct_offset)   \
+    (*(member_type*) DSK_STRUCT_MEMBER_P ((struct_p), (struct_offset)))
 
 typedef struct _NamespaceNode NamespaceNode;
 struct _NamespaceNode
@@ -379,7 +383,52 @@ DskXmlBindingType dsk_xml_binding_type_string =
   xml_binding_to_xml__string,
   clear__string
 };
+static dsk_boolean xml_is_whitespace (DskXml *xml)
+{
+  if (xml->type == DSK_XML_ELEMENT)
+    return DSK_FALSE;
+  const char *at;
+  at = xml->str;
+  while (*at)
+    {
+      if (!dsk_ascii_isspace (*at))
+        return DSK_FALSE;
+      at++;
+    }
+  return DSK_TRUE;
+}
 
+static dsk_boolean
+is_value_bearing_node (DskXml *child, DskError **error)
+{
+  unsigned i;
+  unsigned n_nonws = 0;
+  dsk_assert (child->type == DSK_XML_ELEMENT);
+  if (child->n_children <= 1)
+    return DSK_TRUE;
+  for (i = 0; i < child->n_children; i++)
+    if (!xml_is_whitespace (child->children[i]))
+      n_nonws++;
+  if (n_nonws > 1)
+    {
+      dsk_set_error (error, "<%s> contains multiple values", child->str);
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+static DskXml *
+get_value_from_value_bearing_node (DskXml *child)
+{
+  if (child->n_children == 0)
+    return dsk_xml_empty_text;
+  else if (child->n_children == 1)
+    return child->children[0];
+  else
+    for (i = 0; i < child->n_children; i++)
+      if (!xml_is_whitespace (child->children[i]))
+        return child->children[i];
+  return NULL;  /* can't happen since is_value_bearing_node() returned TRUE */
+}
 
 /* structures */
 dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
@@ -412,6 +461,9 @@ dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
           }
         member_index[i] = mem_no;
         counts[mem_no] += 1;
+
+        if (!is_value_bearing_node (to_parse->children[i], error))
+          return DSK_FALSE;
       }
   for (i = 0; i < s->n_members; i++)
     switch (s->members[i].quantity)
@@ -447,20 +499,92 @@ dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
                            s->members[i].name);
             return DSK_FALSE;
           }
-        /* Fall-through */
+        break;
       case DSK_XML_BINDING_REPEATED:
-        DSK_STRUCT_MEMBER (unsigned, out,
-                           s->members[i].quantifier_offset) = 0;
-        DSK_STRUCT_MEMBER (void *, out, s->members[i].offset)
-          = dsk_malloc (s->members[i].sizeof_instance * counts[i]);
         break;
       }
+  out = dsk_malloc (type->sizeof_instance);
+  for (i = 0; i < s->n_members; i++)
+    switch (s->members[i].quantity)
+      {
+      case DSK_XML_BINDING_REQUIRED:
+        break;
+      case DSK_XML_BINDING_OPTIONAL:
+        DSK_STRUCT_MEMBER (unsigned, out,
+                           s->members[i].quantifier_offset) = counts[i];
+        break;
+      case DSK_XML_BINDING_REQUIRED_REPEATED:
+      case DSK_XML_BINDING_REPEATED:
+        DSK_STRUCT_MEMBER (void *, out, s->members[i].offset)
+          = dsk_malloc (s->members[i].type->sizeof_instance * counts[i]);
+        break;
+      }
+  strct = dsk_malloc0 (s->sizeof_struct);
   for (i = 0; i < to_parse->n_children; i++)
     if (to_parse->children[i]->type == DSK_XML_ELEMENT)
       {
-        ...
+        unsigned index = member_index[i];
+        DskXmlBindingStructMember *member = s->members + index;
+        DskXml *value_xml = get_value_from_value_bearing_node (to_parse->children[i]);
+        switch (member->quantity)
+          {
+          case DSK_XML_BINDING_REQUIRED:
+          case DSK_XML_BINDING_OPTIONAL:
+            if (!member->type->parse (member->type, value_xml,
+                                      DSK_STRUCT_MEMBER_P (strct, member->offset),
+                                      error))
+              {
+                ...
+                goto error_cleanup;
+              }
+            break;
+          case DSK_XML_BINDING_REPEATED:
+          case DSK_XML_BINDING_REQUIRED_REPEATED:
+            {
+              unsigned *p_idx = DSK_STRUCT_MEMBER_P (strct, member->quantifier_offset);
+              unsigned idx = *p_idx;
+              char *slab = DSK_STRUCT_MEMBER (void *, strct, member->offset);
+              if (!member->type->parse (member->type, value_xml,
+                                        slab + member->type->sizeof_struct * idx,
+                                        error))
+                {
+                  ...
+                  goto error_cleanup;
+                }
+              *p_idx += 1;
+            }
+            break;
+          }
       }
+  * (void **) out = strct;
   return DSK_TRUE;
+
+cleanup:
+  {
+    unsigned j, k;
+    for (j = 0; j < i; j++)
+      if (to_parse->children[j]->type == DSK_XML_ELEMENT
+       && (s->members[member_index[j]].quantity == DSK_XML_BINDING_REQUIRED
+        || s->members[member_index[j]].quantity == DSK_XML_BINDING_OPTIONAL))
+        {
+          DskXmlBindingType *mtype = s->members[member_index[j]].type;
+          if (mtype->clear != NULL)
+            mtype->clear (mtype, DSK_STRUCT_MEMBER_P (strct, s->members[member_index[j]].offset));
+        }
+    for (j = 0; j < s->n_members; j++)
+      if (s->members[j] == DSK_XML_BINDING_REPEATED
+       || s->members[j] == DSK_XML_BINDING_REQUIRED_REPEATED)
+        {
+          unsigned count = DSK_STRUCT_MEMBER (unsigned, strct, s->members[j].quantifier_offset);
+          char *slab = DSK_STRUCT_MEMBER (char *, strct, s->members[j].offset);
+          DskXmlBindingType *mtype = s->members[j].type;
+          if (mtype->clear != NULL)
+            for (k = 0; k < count; k++)
+              mtype->clear (mtype, slab + mtype->sizeof_instance * k);
+          dsk_free (slab);
+        }
+  }
+  return DSK_FALSE;
 }
 
 DskXml  *   dsk_xml_binding_struct_to_xml(DskXmlBindingType *type,
