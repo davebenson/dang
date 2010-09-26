@@ -86,20 +86,27 @@ DskXmlBindingTypeStruct *dsk_xml_binding_struct_new (DskXmlBindingNamespace *ns,
 int dsk_xml_binding_type_struct_lookup_member (DskXmlBindingTypeStruct *type,
                                                const char              *name);
 
+typedef unsigned int DskXmlBindingTypeUnionTag;
 struct _DskXmlBindingUnionCase
 {
   char *name;
+  DskXmlBindingTypeUnionTag tag;
   dsk_boolean elide_struct_outer_tag;
   DskXmlBindingType *type;
 };
 struct _DskXmlBindingTypeUnion
 {
   DskXmlBindingType base_type;
+  unsigned sizeof_union;
   unsigned variant_offset;
   unsigned n_cases;
   DskXmlBindingUnionCase *cases;
 };
 
+int dsk_xml_binding_type_union_lookup_case (DskXmlBindingTypeUnion *type,
+                                            const char              *name);
+int dsk_xml_binding_type_union_lookup_case_by_tag (DskXmlBindingTypeUnion *type,
+                                            DskXmlBindingTypeUnionTag tag);
 
 /* --- fundamental types --- */
 extern DskXmlBindingType dsk_xml_binding_type_int;
@@ -114,7 +121,7 @@ dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
 		                          void              *out,
 		                          DskError         **error);
 DskXml  *   dsk_xml_binding_struct_to_xml(DskXmlBindingType *type,
-		                          const char        *data,
+		                          const void        *data,
 		                          DskError         **error);
 void        dsk_xml_binding_struct_clear (DskXmlBindingType *type,
 		                          void              *out);
@@ -123,7 +130,7 @@ dsk_boolean dsk_xml_binding_union_parse  (DskXmlBindingType *type,
 		                          void              *out,
 		                          DskError         **error);
 DskXml  *   dsk_xml_binding_union_to_xml (DskXmlBindingType *type,
-		                          const char        *data,
+		                          const void        *data,
 		                          DskError         **error);
 void        dsk_xml_binding_union_clear  (DskXmlBindingType *type,
 		                          void              *out);

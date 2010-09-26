@@ -36,7 +36,20 @@ DskXml *dsk_xml_text_new_len (unsigned len,
                               const char *data);
 DskXml *dsk_xml_text_new     (const char *str);
 
+DskXml *dsk_xml_new_take_1   (const char *name,
+                              DskXml     *child);
 
+/* Create an empty xml node */
+DskXml *dsk_xml_new_empty    (const char *name);
+
+/* NOTE: we do NOT take the actual array 'children', just every element
+   (every XML node) of it. */
+DskXml *dsk_xml_new_take_n   (const char *name,
+                              unsigned    n_children,
+                              DskXml    **children);
+
+extern DskXml dsk_xml_empty_text_global;
+#define dsk_xml_empty_text   (&dsk_xml_empty_text_global)
 
 /* --- comments (not recommended much) --- */
 DskXml *dsk_xml_comment_new_len (unsigned len,
@@ -47,7 +60,10 @@ DskXml *dsk_xml_comment_new_len (unsigned len,
 const char *dsk_xml_find_attr (const DskXml *xml,
                                const char   *name);
 
+dsk_boolean dsk_xml_is_whitespace (const DskXml *xml);
 char *dsk_xml_get_all_text (const DskXml *xml);
+dsk_boolean dsk_xml_is_element (const DskXml *xml, const char *name);
+DskXml *dsk_xml_find_solo_child (DskXml *, DskError **error);
 
 /* FOR INTERNAL USE ONLY: create an xml node from a packed set of
    attributes, and a set of children, which we will take ownership of.

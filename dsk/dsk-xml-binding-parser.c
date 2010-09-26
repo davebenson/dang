@@ -1,3 +1,4 @@
+#include <string.h>
 
 /* type_decl -> STRUCT opt_name LBRACE member_list RBRACE
 	      | UNION opt_name opt_extends LBRACE case_list RBRACE
@@ -28,9 +29,12 @@ typedef enum
   TOKEN_AS,
   TOKEN_USE,
   TOKEN_NAMESPACE,
+  TOKEN_REQUIRED,
+  TOKEN_REPEATED,
+  TOKEN_OPTIONAL,
 
   /* naked word, not a reserved word */
-  TOKEN_BAREWORD
+  TOKEN_BAREWORD,
 
   /* punctuation */
   TOKEN_LBRACE,
@@ -40,6 +44,9 @@ typedef enum
 
 } TokenType;
 #define token_type_is_word(tt)   ((tt) <= TOKEN_BAREWORD)
+
+#define LBRACE_STR  "{"
+#define RBRACE_STR  "}"
 
 typedef struct Token
 {
@@ -69,7 +76,7 @@ tokenize (const char *filename,
     n++; \
   } while(0)
 #define ADD_TOKEN_ADVANCE(type_, len_) \
-    do { ADD_TOKEN (type, at - str, (len_)); at += (len_); } while(0)
+    do { ADD_TOKEN (type_, at - str, (len_)); at += (len_); } while(0)
 
   while (*at)
     {
@@ -78,6 +85,7 @@ tokenize (const char *filename,
        || *at == '_')
         {
           const char *end = at + 1;
+          TokenType type;
           if (('a' <= *end && *end <= 'z')
            || ('A' <= *end && *end <= 'Z')
            || ('0' <= *end && *end <= '9')
@@ -127,7 +135,8 @@ tokenize (const char *filename,
       else
         {
           dsk_set_error (error, "unexpected character %s (%s:%u)",
-                         dsk_ascii_byte_name (*at));
+                         dsk_ascii_byte_name (*at),
+                         filename, line_no);
           dsk_free (rv);
           return NULL;
         }
@@ -157,6 +166,12 @@ typedef struct
   unsigned line_no;
   unsigned orig_index;
 } NewTypeInfo;
+
+typedef struct
+{
+  DskXmlBindingNamespace *ns;
+  char *as;
+} UseStatement;
 
 static char *
 make_token_string (ParseContext *context,
@@ -192,15 +207,16 @@ parse_dotted_bareword (ParseContext *context,
                      context->tokens[start].line_no);
       return NULL;
     }
+  unsigned comps;
   comps = 1;
   for (;;)
     {
       if (start + comps * 2 - 1 == context->n_tokens)
         goto done;
-      if (tokens[start + comps * 2 - 1].type != TOKEN_DOT)
+      if (context->tokens[start + comps * 2 - 1].type != TOKEN_DOT)
         goto done;
       if (start + comps * 2 == context->n_tokens
-       || !token_type_is_word (tokens[start + comps * 2].type))
+       || !token_type_is_word (context->tokens[start + comps * 2].type))
         {
           dsk_set_error (error, "expected bareword, got '%.*s' (%s:%u)",
                          context->tokens[start + comps*2].len,
@@ -211,20 +227,21 @@ parse_dotted_bareword (ParseContext *context,
         }
       comps++;
     }
+  *tokens_used_out = comps * 2 - 1;
 
 done:
   {
     unsigned alloc_len, i;
     char *rv, *at;
     for (i = 0; i < comps; i++)
-      alloc_len += tokens[start + i * 2].len + 1;
+      alloc_len += context->tokens[start + i * 2].len + 1;
     rv = dsk_malloc (alloc_len);
     at = rv;
     for (i = 0; i < comps; i++)
       {
-        memcpy (at, context->str, tokens[start + i*2].start,
-                tokens[start + i*2].len);
-        at += tokens[start + i*2].len;
+        memcpy (at, context->str + context->tokens[start + i*2].start,
+                context->tokens[start + i*2].len);
+        at += context->tokens[start + i*2].len;
         *at++ = '.';
       }
     --at;
@@ -233,6 +250,107 @@ done:
   }
 }
 
+static dsk_boolean
+parse_member_list (ParseContext *context,
+                   unsigned      lbrace_index,
+                   unsigned     *n_tokens_used_out,
+                   unsigned     *n_members_out,
+                   DskXmlBindingStructMember **members_out,
+                   DskError    **error)
+{
+  unsigned at = lbrace_index;
+  if (context->tokens[at].type != TOKEN_LBRACE)
+    {
+      dsk_set_error (error, "expected '"LBRACE_STR"' after struct NAME (%s:%u)",
+                     context->filename, context->tokens[at].line_no);
+      return DSK_FALSE;
+    }
+
+  /* maximum possible members is the number of ';' + 1 */
+  unsigned max_members;
+  max_members = 1;
+  for (at = lbrace_index + 1; at < context->n_tokens && context->tokens[at].type != TOKEN_RBRACE; at++)
+    if (context->tokens[at].type == TOKEN_SEMICOLON)
+      ++max_members;
+
+  /* parse each member */
+  unsigned n_members;
+  n_members = 0;
+  DskXmlBindingStructMember *members;
+  members = dsk_malloc (sizeof(DskXmlBindingStructMember *) * max_members);
+  while (at < context->n_tokens
+      && context->tokens[at].type != TOKEN_RBRACE)
+    {
+      DskXmlBindingStructMember member;
+      if (context->tokens[at].type == TOKEN_SEMICOLON)
+        {
+          at++;
+          continue;
+        }
+
+      /* parse type */
+      char *bw;
+      unsigned used;
+      bw = parse_dotted_bareword (context, at, &used, error);
+      if (bw == NULL)
+        goto got_error;
+      type = dotted_bareword_to_type (context, bw, error);
+      if (type == NULL)
+        goto got_error;
+      at += used;
+
+      /* parse quantity characters: * ? ! + */
+      if (at == context->n_tokens)
+        {
+          dsk_set_error (error, "too few tokens for structure member (%s:%u)",
+                         context->filename, context->tokens[at].line_no);
+          goto got_error;
+        }
+      switch (context->tokens[at].type)
+        {
+        case TOKEN_EXCLAMATION_POINT:
+          member.quantity = DSK_XML_BINDING_REQUIRED;
+          break;
+        case TOKEN_QUESTION_MARK:
+          member.quantity = DSK_XML_BINDING_OPTIONAL;
+          break;
+        case TOKEN_ASTERISK:
+          member.quantity = DSK_XML_BINDING_REPEATED;
+          break;
+        case TOKEN_PLUS:
+          member.quantity = DSK_XML_BINDING_REQUIRED_REPEATED;
+          break;
+        default:
+          dsk_set_error (error, "expected '+', '!', '*' or '?', got %.*s at (%s:%u)",
+                         context->tokens[at].len, context->str + context->tokens[at].start,
+                         context->filename,
+                         context->tokens[at].line_no);
+          goto got_error;
+        }
+
+      /* parse name */
+      if (token_type_is_word (context->tokens[at].type))
+        {
+          ...
+        }
+
+      /* add member */
+      members[n_members++] = member;
+    }
+  if (at == context->n_tokens)
+    {
+      dsk_set_error (error, "unexpected EOF, looking for end of structure members starting %s:%u",
+                     context->filename, context->tokens[lbrace_index].line_no);
+      goto got_error;
+    }
+  *members_out = members;
+  *n_members_out = n_members;
+  return DSK_TRUE;
+
+got_error:
+  dsk_free (members);
+  return DSK_FALSE;
+}
 
 static DskXmlBindingNamespace *
 parse_file (ParseContext *context,
@@ -240,6 +358,7 @@ parse_file (ParseContext *context,
 {
   unsigned n_tokens = context->n_tokens;
   Token *tokens = context->tokens;
+  unsigned n_tokens_used;
   if (n_tokens == 0 || tokens[0].type == TOKEN_NAMESPACE)
     {
       dsk_set_error (error,
@@ -248,9 +367,11 @@ parse_file (ParseContext *context,
       return DSK_FALSE;
     }
 
+  char *ns_name;
   ns_name = parse_dotted_bareword (context, 1, &n_tokens_used, error);
   if (ns_name == NULL)
     return DSK_FALSE;
+  unsigned at;
   at = 1 + n_tokens_used;
   if (at == n_tokens || tokens[at].type != TOKEN_SEMICOLON)
     {
@@ -262,10 +383,10 @@ parse_file (ParseContext *context,
     }
   at++;         /* skip semicolon */
 
-  n_ns_types = 0;
-  ns_type_info = NULL;
-  n_use_statements = 0;
-  use_statements = NULL;
+  unsigned n_ns_types = 0;
+  NewTypeInfo *ns_type_info = NULL;
+  unsigned n_use_statements = 0;
+  UseStatement *use_statements = NULL;
 
   /* parse 'use' statements */
   while (at < n_tokens)
