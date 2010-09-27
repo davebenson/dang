@@ -49,6 +49,8 @@ struct _DskXmlBindingNamespace
   DskXmlBindingType **types;
 };
 
+DskXmlBindingNamespace *dsk_xml_binding_namespace_new (const char *name);
+void dsk_xml_binding_namespace_unref (DskXmlBindingNamespace *ns);
 
 DskXmlBinding *dsk_xml_binding_new (void);
 void           dsk_xml_binding_add_searchpath (DskXmlBinding *binding,
@@ -61,6 +63,8 @@ DskXmlBindingNamespace*
 DskXmlBindingNamespace*
                dsk_xml_binding_try_ns         (DskXmlBinding *binding,
                                                const char    *name);
+DskXmlBindingType *dsk_xml_binding_namespace_lookup (DskXmlBindingNamespace *,
+                                                     const char *name);
 
 struct _DskXmlBindingStructMember
 {
@@ -78,10 +82,11 @@ struct _DskXmlBindingTypeStruct
   unsigned *members_sorted_by_name;
   unsigned sizeof_struct;
 };
-DskXmlBindingTypeStruct *dsk_xml_binding_struct_new (DskXmlBindingNamespace *ns,
+DskXmlBindingTypeStruct *dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
                                                  const char        *struct_name,
                                                  unsigned           n_members,
-                                   const DskXmlBindingStructMember *members);
+                                   const DskXmlBindingStructMember *members,
+                                                 DskError         **error);
 
 int dsk_xml_binding_type_struct_lookup_member (DskXmlBindingTypeStruct *type,
                                                const char              *name);
@@ -103,10 +108,18 @@ struct _DskXmlBindingTypeUnion
   DskXmlBindingUnionCase *cases;
 };
 
+DskXmlBindingTypeUnion *dsk_xml_binding_type_union_new (DskXmlBindingNamespace *ns,
+                                                 const char        *union_name,
+                                                 unsigned           n_cases,
+                                   const DskXmlBindingUnionCase *cases,
+                                                 DskError         **error);
+
 int dsk_xml_binding_type_union_lookup_case (DskXmlBindingTypeUnion *type,
                                             const char              *name);
 int dsk_xml_binding_type_union_lookup_case_by_tag (DskXmlBindingTypeUnion *type,
                                             DskXmlBindingTypeUnionTag tag);
+
+void dsk_xml_binding_type_unref (DskXmlBindingType *type);
 
 /* --- fundamental types --- */
 extern DskXmlBindingType dsk_xml_binding_type_int;

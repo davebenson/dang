@@ -55,7 +55,8 @@ libdsk.a: dsk-inlines.o \
 	  dsk-hex-encoder.o dsk-hex-decoder.o dsk-whitespace-trimmer.o \
 	  dsk-url-encoder.o dsk-url-decoder.o \
 	  dsk-byte-doubler.o dsk-byte-undoubler.o \
-	  dsk-print.o
+	  dsk-print.o \
+	  dsk-file-util.o
 	ar cru $@ $^
 
 %.o: %.c
