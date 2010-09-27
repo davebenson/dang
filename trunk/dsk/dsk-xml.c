@@ -60,6 +60,20 @@ DskXml *dsk_xml_text_new_len (unsigned len,
   xml->ref_count = 1;
   return xml;
 }
+DskXml *dsk_xml_text_new     (const char *data)
+{
+  return dsk_xml_text_new_len (strlen (data), data);
+}
+DskXml dsk_xml_empty_text_global = {
+  0,             /* line_no */
+  NULL,          /* filename */
+  DSK_XML_TEXT,  /* type */
+  1,             /* ref_count */
+  "",            /* str */
+  NULL,          /* attrs */
+  0,             /* n_children */
+  NULL,          /* children */
+};
 
 DskXml *dsk_xml_comment_new_len (unsigned len,
                                  const char *text)
@@ -201,4 +215,10 @@ char *dsk_xml_get_all_text (const DskXml *xml)
   rv[buffer.size] = 0;
   dsk_buffer_read (&buffer, buffer.size, rv);
   return rv;
+}
+
+dsk_boolean
+dsk_xml_is_element (const DskXml *xml, const char *name)
+{
+  return xml->type == DSK_XML_ELEMENT && strcmp (xml->str, name) == 0;
 }
