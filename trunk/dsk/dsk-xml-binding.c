@@ -1044,7 +1044,7 @@ dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
   rv->base_type.ns = ns;
   rv->base_type.parse = dsk_xml_binding_struct_parse;
   rv->base_type.to_xml = dsk_xml_binding_struct_to_xml;
-  rv->base_type.clear = dsk_xml_binding_struct_clear;
+  rv->base_type.clear = NULL;
   rv->base_type.finalize_type = struct__finalize_type;
   unsigned offset = 0;
   for (i = 0; i < n_members; i++)
@@ -1054,6 +1054,8 @@ dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
       rv->members[i].name = str_at;
       str_at = stpcpy (str_at, members[i].name) + 1;
       rv->members[i].type = dsk_xml_binding_type_ref (mtype);
+      if (mtype->clear)
+        rv->base_type.clear = dsk_xml_binding_struct_clear;
       switch (members[i].quantity)
         {
         case DSK_XML_BINDING_REQUIRED:
@@ -1335,7 +1337,7 @@ dsk_xml_binding_type_union_new (DskXmlBindingNamespace *ns,
   rv->base_type.ns = ns;
   rv->base_type.parse = dsk_xml_binding_union_parse;
   rv->base_type.to_xml = dsk_xml_binding_union_to_xml;
-  rv->base_type.clear = dsk_xml_binding_union_clear;
+  rv->base_type.clear = NULL;
   rv->base_type.finalize_type = union__finalize_type;
   rv->base_type.sizeof_instance = DSK_ALIGN (rv->variant_offset + sizeof_variant, alignof_variant);
   rv->base_type.alignof_instance = (DSK_ALIGNOF_INT > alignof_variant) ? DSK_ALIGNOF_INT : alignof_variant;
@@ -1358,7 +1360,11 @@ dsk_xml_binding_type_union_new (DskXmlBindingNamespace *ns,
       }
   for (i = 0; i < n_cases; i++)
     if (cases[i].type)
-      dsk_xml_binding_type_ref (cases[i].type);
+      {
+        dsk_xml_binding_type_ref (cases[i].type);
+        if (cases[i].type->clear)
+          rv->base_type.clear = dsk_xml_binding_union_clear;
+      }
   if (ns != NULL)
     add_type_to_namespace (ns, &rv->base_type);
   return rv;
