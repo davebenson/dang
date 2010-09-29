@@ -40,6 +40,7 @@ char       *dsk_file_get_contents (const char *filename,
     *size_out = buffer.size;
   char *rv;
   rv = dsk_malloc (buffer.size + 1);
+  rv[buffer.size] = 0;
   dsk_buffer_read (&buffer, buffer.size, rv);
   close (fd);
   return rv;

@@ -23,6 +23,8 @@ typedef int dsk_boolean;
 #ifndef DSK_DEBUG
 #define DSK_DEBUG 0
 #endif
+#define DSK_ALIGN(offset, alignment) \
+  (   ((offset) + (alignment) - 1) & (~((alignment) - 1))    )
 
 /* Seconds since 1970 GMT (aka the epoch).
    Note that many platforms define time_t as a 32-bit quantity--

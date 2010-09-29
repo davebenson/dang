@@ -53,6 +53,8 @@ DskPrint *dsk_print_new    (DskPrintAppendFunc append,
   rv->append_data = data;
   rv->append_destroy = destroy;
   rv->top = &rv->bottom;
+  rv->bottom.prev = NULL;
+  rv->bottom.vars = NULL;
   rv->tree = NULL;
   return rv;
 }
@@ -185,11 +187,13 @@ void dsk_print_pop (DskPrint *context)
   while (old->vars)
     {
       VarDef *vd = old->vars;
+      VarDef *next = vd->next_with_same_key;
       old->vars = vd->next_in_stack_node;
-      if (vd->next_with_same_key == NULL)
+      if (next == NULL)
         GSK_RBTREE_REMOVE (GET_VARDEF_TREE (context), vd);
       else
-        GSK_RBTREE_REPLACE_NODE (GET_VARDEF_TREE (context), vd, vd->next_with_same_key);
+        GSK_RBTREE_REPLACE_NODE (GET_VARDEF_TREE (context), vd, next);
+      dsk_free (vd);
     }
   dsk_free (old);
 }
