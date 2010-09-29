@@ -34,3 +34,7 @@ const char *dsk_ascii_byte_name(unsigned char byte);
       do { while (dsk_ascii_isspace (*(ptr))) ptr++; } while(0)
 #define DSK_ASCII_SKIP_NONSPACE(ptr) \
       do { while (*(ptr) && !dsk_ascii_isspace (*(ptr))) (ptr)++; } while(0)
+
+
+/* --- utf-8 string handling --- */
+void dsk_utf8_skip_whitespace (const char **p_str);

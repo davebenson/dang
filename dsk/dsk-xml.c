@@ -106,7 +106,28 @@ static DskXml *condense_text_nodes (unsigned n, DskXml **xml)
   return rv;
 }
 
+DskXml *dsk_xml_new_empty   (const char *name)
+{
+  return _dsk_xml_new_elt_parse (0, strlen (name) + 1, name,
+                                 0, NULL, DSK_FALSE);
+}
 
+DskXml *dsk_xml_new_take_1   (const char *name,
+                              DskXml     *child)
+{
+  return _dsk_xml_new_elt_parse (0, strlen (name) + 1, name,
+                                 1, &child,
+                                 DSK_FALSE);
+}
+
+DskXml *dsk_xml_new_take_n   (const char *name,
+                              unsigned    n_children,
+                              DskXml    **children)
+{
+  return _dsk_xml_new_elt_parse (0, strlen (name) + 1, name,
+                                 n_children, children,
+                                 DSK_TRUE);
+}
 
 DskXml *_dsk_xml_new_elt_parse (unsigned n_attrs,
                                 unsigned name_kv_space,
@@ -221,4 +242,40 @@ dsk_boolean
 dsk_xml_is_element (const DskXml *xml, const char *name)
 {
   return xml->type == DSK_XML_ELEMENT && strcmp (xml->str, name) == 0;
+}
+dsk_boolean
+dsk_xml_is_whitespace (const DskXml *xml)
+{
+  const char *at;
+  if (xml->type != DSK_XML_TEXT)
+    return DSK_TRUE;
+  at = xml->str;
+  dsk_utf8_skip_whitespace (&at);
+  return (*at == 0);
+}
+DskXml *
+dsk_xml_find_solo_child (DskXml *xml,
+                         DskError **error)
+{
+  if (xml->type != DSK_XML_ELEMENT)
+    {
+      dsk_set_error (error, "text or comment node has no children");
+      return NULL;
+    }
+  switch (xml->n_children)
+    {
+    case 0: return dsk_xml_empty_text;
+    case 1: return xml->children[0];
+    case 2: if (dsk_xml_is_whitespace (xml->children[0]))
+              return xml->children[1];
+            if (dsk_xml_is_whitespace (xml->children[1]))
+              return xml->children[0];
+            break;
+    case 3: if (dsk_xml_is_whitespace (xml->children[0])
+             && dsk_xml_is_whitespace (xml->children[2]))
+              return xml->children[1];
+            break;
+    }
+  dsk_set_error (error, "multiple children under <%s>", xml->str);
+  return NULL;
 }

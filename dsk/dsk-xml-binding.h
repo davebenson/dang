@@ -23,10 +23,13 @@ struct _DskXmlBindingType
   unsigned is_struct : 1;
   unsigned is_union : 1;
 
+  unsigned ref_count;           /* only used if !is_static */
+
   unsigned sizeof_instance;
   unsigned alignof_instance;
   DskXmlBindingNamespace *ns;
   char *name;
+  char *ctypename;              /* usually NULL */
 
   /* virtual functions */
   dsk_boolean (*parse)(DskXmlBindingType *type,
@@ -38,6 +41,9 @@ struct _DskXmlBindingType
 		        DskError         **error);
   void        (*clear) (DskXmlBindingType *type,
 		        void              *out);
+
+  /* to be invoked by dsk_xml_binding_unref(); only used on non-static types */
+  void        (*finalize_type)(DskXmlBindingType *);
 };
 
 
@@ -47,6 +53,9 @@ struct _DskXmlBindingNamespace
   char *name;
   unsigned n_types;
   DskXmlBindingType **types;
+  unsigned ref_count;
+
+  unsigned *types_sorted_by_name;
 };
 
 DskXmlBindingNamespace *dsk_xml_binding_namespace_new (const char *name);
@@ -65,6 +74,7 @@ DskXmlBindingNamespace*
                                                const char    *name);
 DskXmlBindingType *dsk_xml_binding_namespace_lookup (DskXmlBindingNamespace *,
                                                      const char *name);
+void           dsk_xml_binding_free (DskXmlBinding *);
 
 struct _DskXmlBindingStructMember
 {
@@ -80,7 +90,6 @@ struct _DskXmlBindingTypeStruct
   unsigned n_members;
   DskXmlBindingStructMember *members;
   unsigned *members_sorted_by_name;
-  unsigned sizeof_struct;
 };
 DskXmlBindingTypeStruct *dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
                                                  const char        *struct_name,
@@ -95,17 +104,16 @@ typedef unsigned int DskXmlBindingTypeUnionTag;
 struct _DskXmlBindingUnionCase
 {
   char *name;
-  DskXmlBindingTypeUnionTag tag;
   dsk_boolean elide_struct_outer_tag;
   DskXmlBindingType *type;
 };
 struct _DskXmlBindingTypeUnion
 {
   DskXmlBindingType base_type;
-  unsigned sizeof_union;
   unsigned variant_offset;
   unsigned n_cases;
   DskXmlBindingUnionCase *cases;
+  unsigned *cases_sorted_by_name;
 };
 
 DskXmlBindingTypeUnion *dsk_xml_binding_type_union_new (DskXmlBindingNamespace *ns,
@@ -119,6 +127,7 @@ int dsk_xml_binding_type_union_lookup_case (DskXmlBindingTypeUnion *type,
 int dsk_xml_binding_type_union_lookup_case_by_tag (DskXmlBindingTypeUnion *type,
                                             DskXmlBindingTypeUnionTag tag);
 
+DskXmlBindingType * dsk_xml_binding_type_ref (DskXmlBindingType *type);
 void dsk_xml_binding_type_unref (DskXmlBindingType *type);
 
 /* --- fundamental types --- */
@@ -127,6 +136,7 @@ extern DskXmlBindingType dsk_xml_binding_type_uint;
 extern DskXmlBindingType dsk_xml_binding_type_float;
 extern DskXmlBindingType dsk_xml_binding_type_double;
 extern DskXmlBindingType dsk_xml_binding_type_string;
+extern DskXmlBindingNamespace dsk_xml_binding_namespace_builtin;
 
 /* --- for generated code --- */
 dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,

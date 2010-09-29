@@ -4,6 +4,8 @@
 #include "dsk.h"
 #include "dsk-xml-binding-internals.h"
 #include "../gskrbtreemacros.h"
+#define DANG_SIZEOF_SIZE_T 8
+#include "../gskqsortmacro.h"
 #define DSK_STRUCT_MEMBER_P(struct_p, struct_offset)   \
     ((void*) ((char*) (struct_p) + (long) (struct_offset)))
 #define DSK_STRUCT_MEMBER(member_type, struct_p, struct_offset)   \
@@ -49,6 +51,31 @@ DskXmlBinding *dsk_xml_binding_new (void)
   rv->search_paths = NULL;
   return rv;
 }
+
+static void
+free_ns_tree_recursve (NamespaceNode *n)
+{
+  if (n == NULL)
+    return;
+  dsk_xml_binding_namespace_unref (n->ns);
+  free_ns_tree_recursve (n->left);
+  free_ns_tree_recursve (n->right);
+  dsk_free (n);
+}
+
+void           dsk_xml_binding_free (DskXmlBinding *binding)
+{
+  unsigned i;
+  free_ns_tree_recursve (binding->namespace_tree);
+  for (i = 0; i < binding->n_search_paths; i++)
+    {
+      dsk_free (binding->search_paths[i].path);
+      dsk_free (binding->search_paths[i].separator);
+    }
+  dsk_free (binding->search_paths);
+  dsk_free (binding);
+}
+
 void           dsk_xml_binding_add_searchpath (DskXmlBinding *binding,
                                                const char    *path,
                                                const char    *ns_separator)
@@ -131,6 +158,7 @@ dsk_xml_binding_get_ns         (DskXmlBinding *binding,
           if (real_ns == NULL)
             {
               dsk_free (path);
+              dsk_free (contents);
               return NULL;
             }
           dsk_free (path);
@@ -142,12 +170,70 @@ dsk_xml_binding_get_ns         (DskXmlBinding *binding,
           node->ns = real_ns;
           GSK_RBTREE_INSERT (NAMESPACE_TREE (binding), node, conflict);
           dsk_assert (conflict == NULL);
+          dsk_free (contents);
           return real_ns;
         }
       dsk_free (path);
     }
 
   dsk_set_error (error, "namespace %s could not be found on search-path", name);
+  return NULL;
+}
+
+/* --- namespaces --- */
+DskXmlBindingNamespace *
+dsk_xml_binding_namespace_new (const char *name)
+{
+  DskXmlBindingNamespace *rv = dsk_malloc (sizeof (DskXmlBindingNamespace));
+  rv->is_static = DSK_FALSE;
+  rv->name = dsk_strdup (name);
+  rv->n_types = 0;
+  rv->types = NULL;
+  rv->ref_count = 1;
+  rv->types_sorted_by_name = NULL;
+  return rv;
+}
+void dsk_xml_binding_namespace_unref (DskXmlBindingNamespace *ns)
+{
+  if (!ns->is_static)
+    {
+      if (--(ns->ref_count) == 0)
+        {
+          unsigned i;
+          for (i = 0; i < ns->n_types; i++)
+            dsk_xml_binding_type_unref (ns->types[i]);
+          dsk_free (ns->types);
+          dsk_free (ns->types_sorted_by_name);
+          dsk_free (ns->name);
+          dsk_free (ns);
+        }
+    }
+}
+DskXmlBindingType *
+dsk_xml_binding_namespace_lookup (DskXmlBindingNamespace *ns,
+                                  const char             *name)
+{
+  unsigned start = 0, count = ns->n_types;
+  const unsigned *sorted = ns->types_sorted_by_name;
+  while (count > 0)
+    {
+      unsigned mid = start + count / 2;
+      unsigned mid_index = sorted ? sorted[mid] : mid;
+      DskXmlBindingType *mid_type = ns->types[mid_index];
+      int rv = strcmp (mid_type->name, name);
+      if (rv < 0)
+        {
+          unsigned new_start = mid + 1;
+          count -= new_start - start;
+          start = new_start;
+        }
+      else if (rv > 0)
+        {
+          count /= 2;
+        }
+      else
+        return mid_type;
+    }
   return NULL;
 }
 
@@ -193,15 +279,17 @@ DskXmlBindingType dsk_xml_binding_type_int =
   DSK_TRUE,    /* is_static */
   DSK_FALSE,   /* is_struct */
   DSK_FALSE,   /* is_union */
+  0,           /* ref_count */
 
   sizeof (int),
   DSK_ALIGNOF_INT,
-
-  NULL,        /* no namespace */
+  &dsk_xml_binding_namespace_builtin,
   "int",       /* name */
+  "int",       /* ctypename */
   xml_binding_parse__int,
   xml_binding_to_xml__int,
-  NULL         /* no clear */
+  NULL,        /* no clear */
+  NULL         /* finalize_type */
 };
 
 static dsk_boolean
@@ -238,15 +326,18 @@ DskXmlBindingType dsk_xml_binding_type_uint =
   DSK_TRUE,    /* is_static */
   DSK_FALSE,   /* is_struct */
   DSK_FALSE,   /* is_union */
+  0,           /* ref_count */
 
   sizeof (unsigned int),
   DSK_ALIGNOF_INT,
 
-  NULL,        /* no namespace */
+  &dsk_xml_binding_namespace_builtin,
   "uint",      /* name */
+  "uint",      /* ctypename */
   xml_binding_parse__uint,
   xml_binding_to_xml__uint,
-  NULL         /* no clear */
+  NULL,        /* no clear */
+  NULL         /* finalize_type */
 };
 
 static dsk_boolean
@@ -283,15 +374,18 @@ DskXmlBindingType dsk_xml_binding_type_float =
   DSK_TRUE,    /* is_static */
   DSK_FALSE,   /* is_struct */
   DSK_FALSE,   /* is_union */
+  0,           /* ref_count */
 
   sizeof (float),
   DSK_ALIGNOF_FLOAT,
 
-  NULL,        /* no namespace */
+  &dsk_xml_binding_namespace_builtin,
   "float",      /* name */
+  "float",      /* ctypename */
   xml_binding_parse__float,
   xml_binding_to_xml__float,
-  NULL         /* no clear */
+  NULL,        /* no clear */
+  NULL         /* finalize_type */
 };
 
 static dsk_boolean
@@ -328,15 +422,18 @@ DskXmlBindingType dsk_xml_binding_type_double =
   DSK_TRUE,    /* is_static */
   DSK_FALSE,   /* is_struct */
   DSK_FALSE,   /* is_union */
+  0,           /* ref_count */
 
   sizeof (double),
   DSK_ALIGNOF_DOUBLE,
 
-  NULL,        /* no namespace */
+  &dsk_xml_binding_namespace_builtin,
   "double",    /* name */
+  "double",    /* ctypename */
   xml_binding_parse__double,
   xml_binding_to_xml__double,
-  NULL         /* no clear */
+  NULL,        /* no clear */
+  NULL         /* finalize_type */
 };
 
 static dsk_boolean
@@ -373,15 +470,18 @@ DskXmlBindingType dsk_xml_binding_type_string =
   DSK_TRUE,    /* is_static */
   DSK_FALSE,   /* is_struct */
   DSK_FALSE,   /* is_union */
+  0,           /* ref_count */
 
   sizeof (char *),
   DSK_ALIGNOF_POINTER,
 
-  NULL,        /* no namespace */
+  &dsk_xml_binding_namespace_builtin,
   "string",    /* name */
+  "char*",    /* ctypename */
   xml_binding_parse__string,
   xml_binding_to_xml__string,
-  clear__string
+  clear__string,
+  NULL         /* finalize_type */
 };
 static dsk_boolean xml_is_whitespace (DskXml *xml)
 {
@@ -432,6 +532,25 @@ get_value_from_value_bearing_node (DskXml *child)
     }
   return NULL;  /* can't happen since is_value_bearing_node() returned TRUE */
 }
+
+static DskXmlBindingType *builtin_namespace_types[] =
+{
+  /* NOTE: THESE MUST BE SORTED BY NAME! */
+  &dsk_xml_binding_type_double,
+  &dsk_xml_binding_type_float,
+  &dsk_xml_binding_type_int,
+  &dsk_xml_binding_type_string,
+  &dsk_xml_binding_type_uint,
+};
+DskXmlBindingNamespace dsk_xml_binding_namespace_builtin =
+{
+  DSK_TRUE,                     /* is_static */
+  NULL,                         /* name */
+  DSK_N_ELEMENTS (builtin_namespace_types),
+  builtin_namespace_types,
+  0,                            /* ref_count */
+  NULL                          /* types_sorted_by_name */
+};
 
 /* structures */
 dsk_boolean
@@ -523,8 +642,6 @@ parse_struct_ignore_outer_tag  (DskXmlBindingType *type,
           = dsk_malloc (s->members[i].type->sizeof_instance * counts[i]);
         break;
       }
-  void *strct;
-  strct = dsk_malloc0 (s->sizeof_struct);
   for (i = 0; i < to_parse->n_children; i++)
     if (to_parse->children[i]->type == DSK_XML_ELEMENT)
       {
@@ -536,7 +653,7 @@ parse_struct_ignore_outer_tag  (DskXmlBindingType *type,
           case DSK_XML_BINDING_REQUIRED:
           case DSK_XML_BINDING_OPTIONAL:
             if (!member->type->parse (member->type, value_xml,
-                                      DSK_STRUCT_MEMBER_P (strct, member->offset),
+                                      DSK_STRUCT_MEMBER_P (out, member->offset),
                                       error))
               {
                 /* TO CONSIDER: add error info */
@@ -546,9 +663,9 @@ parse_struct_ignore_outer_tag  (DskXmlBindingType *type,
           case DSK_XML_BINDING_REPEATED:
           case DSK_XML_BINDING_REQUIRED_REPEATED:
             {
-              unsigned *p_idx = DSK_STRUCT_MEMBER_P (strct, member->quantifier_offset);
+              unsigned *p_idx = DSK_STRUCT_MEMBER_P (out, member->quantifier_offset);
               unsigned idx = *p_idx;
-              char *slab = DSK_STRUCT_MEMBER (void *, strct, member->offset);
+              char *slab = DSK_STRUCT_MEMBER (void *, out, member->offset);
               if (!member->type->parse (member->type, value_xml,
                                         slab + member->type->sizeof_instance * idx,
                                         error))
@@ -561,7 +678,6 @@ parse_struct_ignore_outer_tag  (DskXmlBindingType *type,
             break;
           }
       }
-  * (void **) out = strct;
   return DSK_TRUE;
 
 error_cleanup:
@@ -574,14 +690,14 @@ error_cleanup:
         {
           DskXmlBindingType *mtype = s->members[member_index[j]].type;
           if (mtype->clear != NULL)
-            mtype->clear (mtype, DSK_STRUCT_MEMBER_P (strct, s->members[member_index[j]].offset));
+            mtype->clear (mtype, DSK_STRUCT_MEMBER_P (out, s->members[member_index[j]].offset));
         }
     for (j = 0; j < s->n_members; j++)
       if (s->members[j].quantity == DSK_XML_BINDING_REPEATED
        || s->members[j].quantity == DSK_XML_BINDING_REQUIRED_REPEATED)
         {
-          unsigned count = DSK_STRUCT_MEMBER (unsigned, strct, s->members[j].quantifier_offset);
-          char *slab = DSK_STRUCT_MEMBER (char *, strct, s->members[j].offset);
+          unsigned count = DSK_STRUCT_MEMBER (unsigned, out, s->members[j].quantifier_offset);
+          char *slab = DSK_STRUCT_MEMBER (char *, out, s->members[j].offset);
           DskXmlBindingType *mtype = s->members[j].type;
           if (mtype->clear != NULL)
             for (k = 0; k < count; k++)
@@ -758,8 +874,59 @@ void        dsk_xml_binding_struct_clear (DskXmlBindingType *type,
   dsk_free (strct);
 }
 
+static void
+add_type_to_namespace (DskXmlBindingNamespace *ns,
+                       DskXmlBindingType      *type)
+{
+  dsk_assert (!ns->is_static);
+  if ((ns->n_types & (ns->n_types-1)) == 0)
+    {
+      unsigned new_size = ns->n_types ? ns->n_types * 2 : 1;
+      ns->types = dsk_realloc (ns->types, new_size * sizeof (DskXmlBindingType*));
+      ns->types_sorted_by_name = dsk_realloc (ns->types_sorted_by_name, new_size * sizeof (unsigned));
+    }
+#if 0
+  unsigned insert_at_start = 0;
+  unsigned insert_at_n = ns->n_types;
+  while (insert_at_n > 0)
+    {
+      unsigned mid = insert_at_start + insert_at_n / 2;
+      int rv = strcmp (type->name, ns->types[mid]->name);
+      if (rv < 0)
+        insert_at_n = mid - insert_at_start;
+      else if (rv > 0)
+        {
+          unsigned new_start = mid + 1;
+          unsigned new_n = insert_at_start + insert_at_n - new_start;
+          insert_at_start = new_start;
+          insert_at_n = new_n;
+        }
+      else
+        {
+          dsk_warning ("duplicate type %s in namespace", type->name);
+          return;
+        }
+    }
+  if (insert_at_start > 0
+      && strcmp (type->name, ns->types[insert_at_start-1]->name) < 0)
+    insert_at_start--;
+  memmove (ns->types + insert_at_start,
+           ns->types + insert_at_start + 1,
+           (ns->n_types - insert_at_start) * sizeof (DskXmlBindingType*));
+#endif
+  ns->types_sorted_by_name[ns->n_types] = ns->n_types;
+  ns->types[ns->n_types++] = type;
+
+#define COMPARE_TYPES_BY_NAME(a,b, rv) \
+  rv = strcmp (ns->types[a]->name, ns->types[b]->name)
+  GSK_QSORT (ns->types_sorted_by_name, unsigned, ns->n_types,
+             COMPARE_TYPES_BY_NAME);
+#undef COMPARE_TYPES_BY_NAME
+}
+
+#if 0
 DskXmlBindingTypeStruct *
-dsk_xml_binding_struct_new (DskXmlBindingNamespace *ns,
+dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
                             const char        *struct_name,
                             unsigned           n_members,
                             const DskXmlBindingStructMember *members)
@@ -767,6 +934,7 @@ dsk_xml_binding_struct_new (DskXmlBindingNamespace *ns,
   DskXmlBindingTypeStruct *rv;
   unsigned tail_space = n_members * sizeof (DskXmlBindingStructMember);
   unsigned i;
+  dsk_warning ("dsk_xml_binding_struct_new: ns=%p, struct_name=%s", ns, struct_name);
   for (i = 0; i < n_members; i++)
     tail_space += strlen (members[i].name) + 1;
   tail_space += strlen (struct_name);
@@ -793,8 +961,11 @@ dsk_xml_binding_struct_new (DskXmlBindingNamespace *ns,
       rv->members[i].name = str_at;
       str_at = stpcpy (str_at, members[i].name) + 1;
     }
+  if (ns != NULL)
+    add_type_to_namespace (ns, &rv->base_type);
   return rv;
 }
+#endif
 
 static dsk_boolean
 is_empty_element (DskXml *xml)
@@ -806,6 +977,147 @@ is_empty_element (DskXml *xml)
   if (xml->n_children > 1)
     return DSK_FALSE;
   return dsk_xml_is_whitespace (xml->children[0]);
+}
+
+int
+dsk_xml_binding_type_struct_lookup_member (DskXmlBindingTypeStruct *s,
+                                           const char              *name)
+{
+  unsigned start = 0, count = s->n_members;
+  while (count > 0)
+    {
+      unsigned mid = start + count / 2;
+      int rv = strcmp (s->members[s->members_sorted_by_name[mid]].name, name);
+      if (rv < 0)
+        {
+          unsigned new_start = mid + 1;
+          count -= new_start - start;
+          start = new_start;
+        }
+      else if (rv > 0)
+        {
+          count /= 2;
+        }
+      else
+        return s->members_sorted_by_name[mid];
+    }
+  return -1;
+}
+
+static void
+struct__finalize_type (DskXmlBindingType *type)
+{
+  DskXmlBindingTypeStruct *s = (DskXmlBindingTypeStruct *) type;
+  unsigned i;
+  dsk_free (s->members_sorted_by_name);
+  for (i = 0; i < s->n_members; i++)
+    dsk_xml_binding_type_unref (s->members[i].type);
+}
+
+DskXmlBindingTypeStruct *
+dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
+                                 const char             *name,
+                                 unsigned                n_members,
+                                 const DskXmlBindingStructMember *members,
+                                 DskError              **error)
+{
+  unsigned max_align = DSK_ALIGNOF_STRUCTURE;
+  unsigned i;
+  unsigned str_size = name ? (strlen (name) + 1) : 0;
+  DskXmlBindingTypeStruct *rv;
+  char *str_at;
+  for (i = 0; i < n_members; i++)
+    str_size += strlen (members[i].name) + 1;
+  rv = dsk_malloc0 (sizeof (DskXmlBindingTypeStruct)
+                    + sizeof (DskXmlBindingStructMember) * n_members
+                    + str_size);
+  rv->n_members = n_members;
+  rv->members = (DskXmlBindingStructMember*)(rv + 1);
+  str_at = (char*)(rv->members + n_members);
+  if (name)
+    {
+      rv->base_type.name = str_at;
+      str_at = stpcpy (str_at, name) + 1;
+    }
+  rv->base_type.is_struct = 1;
+  rv->base_type.ref_count = 1;
+  rv->base_type.ns = ns;
+  rv->base_type.parse = dsk_xml_binding_struct_parse;
+  rv->base_type.to_xml = dsk_xml_binding_struct_to_xml;
+  rv->base_type.clear = dsk_xml_binding_struct_clear;
+  rv->base_type.finalize_type = struct__finalize_type;
+  unsigned offset = 0;
+  for (i = 0; i < n_members; i++)
+    {
+      DskXmlBindingType *mtype = members[i].type;
+      rv->members[i].quantity = members[i].quantity;
+      rv->members[i].name = str_at;
+      str_at = stpcpy (str_at, members[i].name) + 1;
+      rv->members[i].type = dsk_xml_binding_type_ref (mtype);
+      switch (members[i].quantity)
+        {
+        case DSK_XML_BINDING_REQUIRED:
+          rv->members[i].quantifier_offset = -1;
+          offset = DSK_ALIGN (offset, mtype->alignof_instance);
+          rv->members[i].offset = offset;
+          offset += mtype->sizeof_instance;
+          if (max_align < mtype->alignof_instance)
+            max_align = mtype->alignof_instance;
+          break;
+
+        case DSK_XML_BINDING_OPTIONAL:
+          offset = DSK_ALIGN (offset, DSK_ALIGNOF_INT);
+          rv->members[i].quantifier_offset = offset;
+          offset += sizeof (dsk_boolean);
+          offset = DSK_ALIGN (offset, mtype->alignof_instance);
+          rv->members[i].offset = offset;
+          offset += mtype->sizeof_instance;
+          if (max_align < DSK_ALIGNOF_INT)
+            max_align = DSK_ALIGNOF_INT;
+          if (max_align < mtype->alignof_instance)
+            max_align = mtype->alignof_instance;
+          break;
+
+        case DSK_XML_BINDING_REPEATED:
+        case DSK_XML_BINDING_REQUIRED_REPEATED:
+          offset = DSK_ALIGN (offset, DSK_ALIGNOF_INT);
+          rv->members[i].quantifier_offset = offset;
+          offset += sizeof (unsigned);
+          offset = DSK_ALIGN (offset, DSK_ALIGNOF_POINTER);
+          rv->members[i].offset = offset;
+          offset += sizeof (void*);
+          if (max_align < DSK_ALIGNOF_INT)
+            max_align = DSK_ALIGNOF_INT;
+          if (max_align < DSK_ALIGNOF_POINTER)
+            max_align = DSK_ALIGNOF_POINTER;
+          break;
+        default:
+          assert (0);
+        }
+    }
+  offset = DSK_ALIGN (offset, max_align);
+  rv->base_type.sizeof_instance = offset;
+  rv->base_type.alignof_instance = max_align;
+
+  rv->members_sorted_by_name = dsk_malloc (sizeof (unsigned) * n_members);
+  for (i = 0; i < n_members; i++)
+    rv->members_sorted_by_name[i] = i;
+#define COMPARE_MEMBERS_BY_NAME(a,b, rv) rv = strcmp (members[a].name, members[b].name)
+  GSK_QSORT (rv->members_sorted_by_name, unsigned, n_members,
+             COMPARE_MEMBERS_BY_NAME);
+#undef COMPARE_MEMBERS_BY_NAME
+  for (i = 1; i < n_members; i++)
+    if (strcmp (members[rv->members_sorted_by_name[i-1]].name,
+                members[rv->members_sorted_by_name[i]].name) == 0)
+      {
+        dsk_set_error (error, "duplicate member '%s' in struct",
+                       members[rv->members_sorted_by_name[i]].name);
+        dsk_xml_binding_type_unref (&rv->base_type);
+        return NULL;
+      }
+  if (ns != NULL)
+    add_type_to_namespace (ns, &rv->base_type);
+  return rv;
 }
 
 /* unions */
@@ -830,7 +1142,7 @@ dsk_boolean dsk_xml_binding_union_parse  (DskXmlBindingType *type,
                      to_parse->str);
       goto error_maybe_add_union_name;
     }
-  union_data = dsk_malloc (u->sizeof_union);
+  union_data = out;
   case_type = u->cases[case_i].type;
   if (case_type == NULL)
     {
@@ -862,7 +1174,7 @@ dsk_boolean dsk_xml_binding_union_parse  (DskXmlBindingType *type,
           goto error_maybe_add_union_name;
         }
     }
-  * (DskXmlBindingTypeUnionTag *) union_data = u->cases[case_i].tag;
+  * (DskXmlBindingTypeUnionTag *) union_data = case_i;
   * (void **) out = union_data;
   return DSK_TRUE;
 
@@ -880,40 +1192,37 @@ dsk_xml_binding_union_to_xml (DskXmlBindingType *type,
 {
   DskXmlBindingTypeUnionTag tag;
   DskXmlBindingTypeUnion *u = (DskXmlBindingTypeUnion *) type;
-  void *udata = * (void **) data;
-  void *variant_data = (char *)udata + u->variant_offset;
-  int case_i;
-  tag = * (DskXmlBindingTypeUnionTag *) udata;
-  case_i = dsk_xml_binding_type_union_lookup_case_by_tag (u, tag);
-  if (case_i < 0)
+  void *variant_data = (char *)data + u->variant_offset;
+  tag = * (DskXmlBindingTypeUnionTag *) data;
+  if (tag >= u->n_cases)
     {
       dsk_set_error (error, "unknown tag %u in union, while converting to XML", tag);
       goto error_maybe_add_union_name;
     }
-  if (u->cases[case_i].type == NULL)
+  if (u->cases[tag].type == NULL)
     {
-      return dsk_xml_new_empty (u->cases[case_i].name);
+      return dsk_xml_new_empty (u->cases[tag].name);
     }
-  else if (u->cases[case_i].elide_struct_outer_tag)
+  else if (u->cases[tag].elide_struct_outer_tag)
     {
       DskXml **subnodes;
       unsigned n_subnodes;
       DskXml *rv;
-      if (!struct_members_to_xml (u->cases[case_i].type,
+      if (!struct_members_to_xml (u->cases[tag].type,
                                   variant_data,
                                   &n_subnodes, &subnodes, error))
         goto error_maybe_add_union_name;
-      rv = dsk_xml_new_take_n (u->cases[case_i].name, n_subnodes, subnodes);
+      rv = dsk_xml_new_take_n (u->cases[tag].name, n_subnodes, subnodes);
       dsk_free (subnodes);
       return rv;
     }
   else
     {
-      DskXmlBindingType *subtype = u->cases[case_i].type;
+      DskXmlBindingType *subtype = u->cases[tag].type;
       DskXml *subxml = subtype->to_xml (subtype, variant_data, error);
       if (subxml == NULL)
         goto error_maybe_add_union_name;
-      return dsk_xml_new_take_1 (u->cases[case_i].name, subxml);
+      return dsk_xml_new_take_1 (u->cases[tag].name, subxml);
     }
 
 error_maybe_add_union_name:
@@ -924,25 +1233,156 @@ error_maybe_add_union_name:
 
 void
 dsk_xml_binding_union_clear  (DskXmlBindingType *type,
-                              void              *out)
+                              void              *data)
 {
   DskXmlBindingTypeUnionTag tag;
-  int case_i;
   DskXmlBindingTypeUnion *u = (DskXmlBindingTypeUnion *) type;
-  void *udata = * (void **) out;
-  void *variant_data = (char *)udata + u->variant_offset;
+  void *variant_data = (char *)data + u->variant_offset;
   DskXmlBindingType *case_type;
-  tag = * (DskXmlBindingTypeUnionTag *) udata;
-  case_i = dsk_xml_binding_type_union_lookup_case_by_tag (u, tag);
-  dsk_assert (case_i >= 0);
-  case_type = u->cases[case_i].type;
+  tag = * (DskXmlBindingTypeUnionTag *) data;
+  dsk_assert (tag < u->n_cases);
+  case_type = u->cases[tag].type;
   if (case_type == NULL)
     {
       /* nothing to do */
     }
-  else if (u->cases[case_i].elide_struct_outer_tag)
+  else if (u->cases[tag].elide_struct_outer_tag)
     clear_struct_members (case_type, variant_data);
   else if (case_type->clear != NULL)
     case_type->clear (case_type, variant_data);
-  dsk_free (udata);
+}
+int
+dsk_xml_binding_type_union_lookup_case (DskXmlBindingTypeUnion *u,
+                                        const char             *name)
+{
+  unsigned start = 0, count = u->n_cases;
+  while (count > 0)
+    {
+      unsigned mid = start + count / 2;
+      int rv = strcmp (u->cases[u->cases_sorted_by_name[mid]].name, name);
+      if (rv < 0)
+        {
+          unsigned new_start = mid + 1;
+          count -= new_start - start;
+          start = new_start;
+        }
+      else if (rv > 0)
+        {
+          count /= 2;
+        }
+      else
+        return u->cases_sorted_by_name[mid];
+    }
+  return -1;
+}
+
+static void
+union__finalize_type (DskXmlBindingType *type)
+{
+  DskXmlBindingTypeUnion *u = (DskXmlBindingTypeUnion *) type;
+  unsigned i;
+  for (i = 0; i < u->n_cases; i++)
+    if (u->cases[i].type)
+      dsk_xml_binding_type_unref (u->cases[i].type);
+  dsk_free (u->cases_sorted_by_name);
+}
+
+DskXmlBindingTypeUnion *
+dsk_xml_binding_type_union_new (DskXmlBindingNamespace *ns,
+                                const char        *name,
+                                unsigned           n_cases,
+                                const DskXmlBindingUnionCase *cases,
+                                DskError         **error)
+{
+  unsigned alignof_variant = 1;
+  unsigned sizeof_variant = 0;
+  unsigned str_size = name ? (strlen (name) + 1) : 0;
+  unsigned i;
+  DskXmlBindingTypeUnion *rv;
+  char *str_at;
+  for (i = 0; i < n_cases; i++)
+    str_size += strlen (cases[i].name) + 1;
+  rv = dsk_malloc0 (sizeof (DskXmlBindingTypeUnion)
+                    + sizeof (DskXmlBindingUnionCase) * n_cases
+                    + str_size);
+  rv->n_cases = n_cases;
+  rv->cases = (DskXmlBindingUnionCase*)(rv+1);
+  rv->base_type.ns = ns;
+  str_at = (char*)(rv->cases + n_cases);
+  if (name)
+    {
+      rv->base_type.name = str_at;
+      str_at = stpcpy (str_at, name) + 1;
+    }
+
+  for (i = 0; i < n_cases; i++)
+    {
+      rv->cases[i].elide_struct_outer_tag = cases[i].elide_struct_outer_tag;
+      rv->cases[i].type = cases[i].type;
+      rv->cases[i].name = str_at;
+      str_at = stpcpy (str_at, cases[i].name) + 1;
+      if (rv->cases[i].type)
+        {
+          if (cases[i].type->sizeof_instance > sizeof_variant)
+            sizeof_variant = cases[i].type->sizeof_instance;
+          if (cases[i].type->alignof_instance > alignof_variant)
+            alignof_variant = cases[i].type->alignof_instance;
+        }
+    }
+  rv->variant_offset = DSK_ALIGN (sizeof (DskXmlBindingTypeUnionTag), alignof_variant);
+  rv->base_type.is_union = 1;
+  rv->base_type.ref_count = 1;
+  rv->base_type.ns = ns;
+  rv->base_type.parse = dsk_xml_binding_union_parse;
+  rv->base_type.to_xml = dsk_xml_binding_union_to_xml;
+  rv->base_type.clear = dsk_xml_binding_union_clear;
+  rv->base_type.finalize_type = union__finalize_type;
+  rv->base_type.sizeof_instance = DSK_ALIGN (rv->variant_offset + sizeof_variant, alignof_variant);
+  rv->base_type.alignof_instance = (DSK_ALIGNOF_INT > alignof_variant) ? DSK_ALIGNOF_INT : alignof_variant;
+
+  rv->cases_sorted_by_name = dsk_malloc (sizeof (unsigned) * n_cases);
+  for (i = 0; i < n_cases; i++)
+    rv->cases_sorted_by_name[i] = i;
+#define COMPARE_CASES_BY_NAME(a,b, rv) rv = strcmp (cases[a].name, cases[b].name)
+  GSK_QSORT (rv->cases_sorted_by_name, unsigned, n_cases,
+             COMPARE_CASES_BY_NAME);
+  for (i = 1; i < n_cases; i++)
+    if (strcmp (cases[rv->cases_sorted_by_name[i-1]].name,
+                cases[rv->cases_sorted_by_name[i]].name) == 0)
+      {
+        dsk_set_error (error, "duplicate case-name %s in union",
+                       cases[rv->cases_sorted_by_name[i]].name);
+        dsk_free (rv->cases_sorted_by_name);
+        dsk_free (rv);
+        return NULL;
+      }
+  for (i = 0; i < n_cases; i++)
+    if (cases[i].type)
+      dsk_xml_binding_type_ref (cases[i].type);
+  if (ns != NULL)
+    add_type_to_namespace (ns, &rv->base_type);
+  return rv;
+}
+
+
+void
+dsk_xml_binding_type_unref (DskXmlBindingType *type)
+{
+  if (type->is_static)
+    return;
+  if (--(type->ref_count) == 0)
+    {
+      if (type->finalize_type != NULL)
+        type->finalize_type (type);
+      dsk_free (type);
+    }
+}
+
+DskXmlBindingType *
+dsk_xml_binding_type_ref (DskXmlBindingType *type)
+{
+  if (type->is_static)
+    return type;
+  ++(type->ref_count);
+  return type;
 }

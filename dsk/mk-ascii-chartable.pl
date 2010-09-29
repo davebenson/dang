@@ -7,9 +7,9 @@ for (my $i = 0; $i < 256; $i++) { push @table, 0 }
 for (' ', "\r", "\t", "\n") { $table[ord($_)] |= 1 }
 
 # set islower bits
-for ('a'..'z', 'A'..'Z') { $table[ord($_)] |= 2 }
+for ('a'..'z') { $table[ord($_)] |= 2 }
 # set isupper bits
-for ('a'..'z', 'A'..'Z') { $table[ord($_)] |= 4 }
+for ('A'..'Z') { $table[ord($_)] |= 4 }
 # set isdigit bits
 for ('0'..'9') { $table[ord($_)] |= 8 }
 # set isxdigit bits
