@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include "dsk.h"
 
@@ -112,6 +113,13 @@ DskXml *dsk_xml_new_empty   (const char *name)
                                  0, NULL, DSK_FALSE);
 }
 
+DskXml *
+dsk_xml_text_child_new (const char *name,
+                        const char *contents)
+{
+  return dsk_xml_new_take_1 (name, dsk_xml_text_new (contents));
+}
+
 DskXml *dsk_xml_new_take_1   (const char *name,
                               DskXml     *child)
 {
@@ -127,6 +135,29 @@ DskXml *dsk_xml_new_take_n   (const char *name,
   return _dsk_xml_new_elt_parse (0, strlen (name) + 1, name,
                                  n_children, children,
                                  DSK_TRUE);
+}
+DskXml *dsk_xml_new_take_list (const char *name,
+                               DskXml     *first_or_null,
+                               ...)
+{
+  va_list args;
+  unsigned count = 0;
+  DskXml *at;
+  DskXml **children;
+
+  va_start (args, first_or_null);
+  for (at = first_or_null; at != NULL; at = va_arg (args, DskXml *))
+    count++;
+  va_end (args);
+
+  children = alloca (sizeof (DskXml *) * count);
+  count = 0;
+  va_start (args, first_or_null);
+  for (at = first_or_null; at != NULL; at = va_arg (args, DskXml *))
+    children[count++] = at;
+  va_end (args);
+
+  return dsk_xml_new_take_n (name, count, children);
 }
 
 DskXml *_dsk_xml_new_elt_parse (unsigned n_attrs,

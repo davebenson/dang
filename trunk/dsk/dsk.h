@@ -1,3 +1,5 @@
+#ifndef DSK_H__INCLUDED
+#define DSK_H__INCLUDED
 
 #include "dsk-common.h"
 #include "dsk-fd.h"
@@ -51,3 +53,5 @@
 #include "dsk-config.h"
 
 #undef _dsk_inline_assert
+
+#endif

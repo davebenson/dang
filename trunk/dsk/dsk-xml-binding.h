@@ -138,6 +138,12 @@ extern DskXmlBindingType dsk_xml_binding_type_double;
 extern DskXmlBindingType dsk_xml_binding_type_string;
 extern DskXmlBindingNamespace dsk_xml_binding_namespace_builtin;
 
+#define dsk_xml_binding__int__type     (&dsk_xml_binding_type_int)
+#define dsk_xml_binding__uint__type    (&dsk_xml_binding_type_uint)
+#define dsk_xml_binding__float__type   (&dsk_xml_binding_type_float)
+#define dsk_xml_binding__double__type  (&dsk_xml_binding_type_double)
+#define dsk_xml_binding__string__type  (&dsk_xml_binding_type_string)
+
 /* --- for generated code --- */
 dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
 		                          DskXml            *to_parse,

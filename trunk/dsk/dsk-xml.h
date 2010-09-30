@@ -38,6 +38,8 @@ DskXml *dsk_xml_text_new     (const char *str);
 
 DskXml *dsk_xml_new_take_1   (const char *name,
                               DskXml     *child);
+DskXml *dsk_xml_text_child_new (const char *name,
+                                const char *contents);
 
 /* Create an empty xml node */
 DskXml *dsk_xml_new_empty    (const char *name);
@@ -47,6 +49,10 @@ DskXml *dsk_xml_new_empty    (const char *name);
 DskXml *dsk_xml_new_take_n   (const char *name,
                               unsigned    n_children,
                               DskXml    **children);
+
+DskXml *dsk_xml_new_take_list (const char *name,
+                               DskXml     *first_or_null,
+                               ...);
 
 extern DskXml dsk_xml_empty_text_global;
 #define dsk_xml_empty_text   (&dsk_xml_empty_text_global)
