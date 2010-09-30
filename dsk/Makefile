@@ -15,7 +15,9 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-xml-binding-0
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
            programs/dsk-octet-filter programs/dsk-make-xml-binding
-all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
+all: $(BUILT_SOURCES) $(PROGRAMS) build-tests
+
+build-tests: test-build-dependencies $(TEST_PROGRAMS)
 
 EXTRA_PROGRAMS = programs/make-validation-test-data
 extra: $(EXTRA_PROGRAMS)
@@ -64,8 +66,6 @@ libdsk.a: dsk-inlines.o \
 %.o: %.c
 	gcc $(CC_FLAGS) -c $^
 
-tests/test-xml-binding-0: tests/generated/xml-binding-test.c
-
 dsk-ascii-chartable.inc: mk-ascii-chartable.pl
 	./mk-ascii-chartable.pl > dsk-ascii-chartable.inc
 dsk-digit-chartables.inc: mk-digit-chartables.pl
@@ -85,6 +85,9 @@ tests/generated/xml-binding-test.h tests/generated/xml-binding-test.c: \
 	programs/dsk-make-xml-binding --namespace=my.test \
 		--search-dotted=tests/xml-binding-ns \
 		--output-basename=tests/generated/xml-binding-test
+
+test-build-dependencies: \
+	tests/generated/xml-binding-test.h tests/generated/xml-binding-test.c
 
 clean:
 	rm *.o libdsk.a
