@@ -553,7 +553,7 @@ DskXmlBindingNamespace dsk_xml_binding_namespace_builtin =
 };
 
 /* structures */
-dsk_boolean
+static dsk_boolean
 parse_struct_ignore_outer_tag  (DskXmlBindingType *type,
                                 DskXml            *to_parse,
                                 void              *out,
@@ -626,20 +626,21 @@ parse_struct_ignore_outer_tag  (DskXmlBindingType *type,
       case DSK_XML_BINDING_REPEATED:
         break;
       }
-  out = dsk_malloc (type->sizeof_instance);
   for (i = 0; i < s->n_members; i++)
     switch (s->members[i].quantity)
       {
       case DSK_XML_BINDING_REQUIRED:
         break;
       case DSK_XML_BINDING_OPTIONAL:
-        DSK_STRUCT_MEMBER (unsigned, out,
+        DSK_STRUCT_MEMBER (dsk_boolean, out,
                            s->members[i].quantifier_offset) = counts[i];
         break;
       case DSK_XML_BINDING_REQUIRED_REPEATED:
       case DSK_XML_BINDING_REPEATED:
         DSK_STRUCT_MEMBER (void *, out, s->members[i].offset)
           = dsk_malloc (s->members[i].type->sizeof_instance * counts[i]);
+        DSK_STRUCT_MEMBER (dsk_boolean, out,
+                           s->members[i].quantifier_offset) = 0;
         break;
       }
   for (i = 0; i < to_parse->n_children; i++)
@@ -869,9 +870,7 @@ clear_struct_members (DskXmlBindingType *type,
 void        dsk_xml_binding_struct_clear (DskXmlBindingType *type,
 		                          void              *data)
 {
-  void *strct = * (void **) data;
-  clear_struct_members (type, strct);
-  dsk_free (strct);
+  clear_struct_members (type, data);
 }
 
 static void
@@ -1054,7 +1053,9 @@ dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
       rv->members[i].name = str_at;
       str_at = stpcpy (str_at, members[i].name) + 1;
       rv->members[i].type = dsk_xml_binding_type_ref (mtype);
-      if (mtype->clear)
+      if (mtype->clear
+       || members[i].quantity == DSK_XML_BINDING_REPEATED
+       || members[i].quantity == DSK_XML_BINDING_REQUIRED_REPEATED)
         rv->base_type.clear = dsk_xml_binding_struct_clear;
       switch (members[i].quantity)
         {
