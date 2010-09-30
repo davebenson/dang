@@ -3,16 +3,6 @@
 #include <stdlib.h>
 #include "../dsk.h"
 
-/* OLD namespace_name namespace_type_name namespace_func_name namespace_enum_name
-       full_type_name full_func_name full_enum_name
-       base_type_name base_func_name base_enum_name */
-/* Sets Namespace namespace NAMESPACE
-        Typename typename TYPENAME
-        Namespace__Typename namespace__typename NAMESPACE__TYPENAME
-   Maybe sets (for structs + unions):
-        Category CATEGORY
- */
-
 typedef enum
 {
   RENDER_MODE_H_FILE,
@@ -225,7 +215,7 @@ render_member_descriptor (DskPrint *ctx, DskXmlBindingStructMember *member)
       break;
     case DSK_XML_BINDING_OPTIONAL:
       dsk_print_set_string (ctx, "quantity", "DSK_XML_BINDING_OPTIONAL");
-      dsk_print_set_template_string (ctx, "qoffset", "offsetof ($full_type_name, has_$member_name)");
+      dsk_print_set_template_string (ctx, "qoffset", "offsetof ($Typename, has_$member_name)");
       break;
     case DSK_XML_BINDING_REPEATED:
     case DSK_XML_BINDING_REQUIRED_REPEATED:
@@ -233,23 +223,23 @@ render_member_descriptor (DskPrint *ctx, DskXmlBindingStructMember *member)
         dsk_print_set_string (ctx, "quantity", "DSK_XML_BINDING_REPEATED");
       else
         dsk_print_set_string (ctx, "quantity", "DSK_XML_BINDING_REQUIRED_REPEATED");
-      dsk_print_set_template_string (ctx, "qoffset", "offsetof ($full_type_name, n_$member_name)");
+      dsk_print_set_template_string (ctx, "qoffset", "offsetof ($Typename, n_$member_name)");
       break;
     }
   if (member->type->ns->name)
-    set_string_ns (ctx, "member_namespace_func_name", member->type->ns->name, 0, 0);
+    set_string_ns (ctx, "member_namespace", member->type->ns->name, 0, 0);
   else
-    dsk_print_set_string (ctx, "member_namespace_func_name", "dsk_xml_binding");
+    dsk_print_set_string (ctx, "member_namespace", "dsk_xml_binding");
   set_struct_lowercase (ctx, "member_func_name", member->type->name);
   dsk_print_set_template_string (ctx, "member_c_type",
-                                 "${member_namespace_func_name}__${member_func_name}__type");
+                                 "${member_namespace}__${member_func_name}__type");
   dsk_print (ctx,
              "  {\n"
              "    $quantity,\n"
              "    \"$member_name\",\n"
              "    $member_c_type,\n"
              "    $qoffset,\n"
-             "    offsetof ($full_type_name, $member_name)\n"
+             "    offsetof ($Typename, $member_name)\n"
              "  },");
 }
 
@@ -258,29 +248,38 @@ set_typenames (DskPrint               *ctx,
                DskXmlBindingType      *type)
 {
   DskXmlBindingNamespace *ns = type->ns;
-  dsk_print_set_string (ctx, "namespace_name", ns->name);
-  set_string_ns (ctx, "namespace_func_name", ns->name, 0, 0);
-  set_string_ns (ctx, "namespace_type_name", ns->name, 1, 0);
-  set_string_ns (ctx, "namespace_enum_name", ns->name, 1, 1);
+  set_string_ns (ctx, "namespace", ns->name, 0, 0);
+  set_string_ns (ctx, "Namespace", ns->name, 1, 0);
+  set_string_ns (ctx, "NAMESPACE", ns->name, 1, 1);
 
-  dsk_print_set_string (ctx, "base_type_name", type->name);
-  set_struct_uppercase (ctx, "base_enum_name", type->name);
-  set_struct_lowercase (ctx, "base_func_name", type->name);
-  dsk_print_set_template_string (ctx, "full_func_name",
-                                 "${namespace_func_name}__$base_func_name");
-  dsk_print_set_template_string (ctx, "full_enum_name",
-                                 "${namespace_enum_name}__$base_enum_name");
-  dsk_print_set_template_string (ctx, "full_type_name",
-                                 "${namespace_type_name}__$base_type_name");
+  dsk_print_set_string (ctx, "Namespace__Typename", type->name);
+  set_struct_uppercase (ctx, "NAMESPACE__TYPENAME", type->name);
+  set_struct_lowercase (ctx, "namespace__typename", type->name);
+  dsk_print_set_template_string (ctx, "typename",
+                                 "${namespace}__$namespace__typename");
+  dsk_print_set_template_string (ctx, "TYPENAME",
+                                 "${NAMESPACE}__$NAMESPACE__TYPENAME");
+  dsk_print_set_template_string (ctx, "Typename",
+                                 "${Namespace}__$Namespace__Typename");
+  if (type->is_struct)
+    {
+      dsk_print_set_string (ctx, "category", "struct");
+      dsk_print_set_string (ctx, "Category", "Struct");
+    }
+  else if (type->is_union)
+    {
+      dsk_print_set_string (ctx, "category", "union");
+      dsk_print_set_string (ctx, "Category", "Union");
+    }
 }
 
 static void
 render_alignment_test (DskPrint *ctx)
 {
   dsk_print (ctx,
-             "struct ${full_type_name}__AlignmentTest {\n"
+             "struct ${Typename}__AlignmentTest {\n"
              "  char a;\n"
-             "  ${full_type_name} b;\n"
+             "  ${Typename} b;\n"
              "};");
 }
 
@@ -299,11 +298,11 @@ render_descriptor_body (DskPrint *ctx,
     dsk_print_set_string (ctx, "clear_func", "NULL");
 
   if (type->ns)
-    dsk_print_set_template_string (ctx, "ns", "${namespace_func_name}__namespace");
+    dsk_print_set_template_string (ctx, "ns", "${namespace}__namespace");
   else
     dsk_print_set_string (ctx, "ns", "NULL");
   if (type->name)
-    dsk_print_set_template_string (ctx, "name_str", "\"$base_type_name\"");
+    dsk_print_set_template_string (ctx, "name_str", "\"$Namespace__Typename\"");
   else
     dsk_print_set_string (ctx, "name_str", "NULL");
 
@@ -314,8 +313,8 @@ render_descriptor_body (DskPrint *ctx,
                  "    $is_struct,    /* is_struct */\n"
                  "    $is_union,     /* is_union */\n"
                  "    0,            /* ref_count */\n"
-                 "    sizeof (${full_type_name}),\n"
-                 "    offsetof (struct ${full_type_name}__AlignmentTest, b),\n"
+                 "    sizeof (${Typename}),\n"
+                 "    offsetof (struct ${Typename}__AlignmentTest, b),\n"
                  "    $ns,\n"
                  "    $name_str,\n"
                  "    NULL,    /* ctypename==typename */\n"
@@ -333,8 +332,8 @@ render_descriptor_body (DskPrint *ctx,
                  "{\n"
                  "  $base_type_definition,\n"
                  "  $n_members,\n"
-                 "  (DskXmlBindingStructMember *) ${full_func_name}__members,\n"
-                 "  (unsigned *) ${full_func_name}__members_sorted_by_name\n"
+                 "  (DskXmlBindingStructMember *) ${typename}__members,\n"
+                 "  (unsigned *) ${typename}__members_sorted_by_name\n"
                  "};");
     }
   else
@@ -345,9 +344,9 @@ render_descriptor_body (DskPrint *ctx,
                  "{\n"
                  "  $base_type_definition,\n"
                  "  $n_cases,\n"
-                 "  offsetof ($full_type_name, variant),\n"
-                 "  (DskXmlBindingUnionCase *) ${full_func_name}__cases,\n"
-                 "  (unsigned *) ${full_func_name}__cases_sorted_by_name\n"
+                 "  offsetof ($Typename, variant),\n"
+                 "  (DskXmlBindingUnionCase *) ${typename}__cases,\n"
+                 "  (unsigned *) ${typename}__cases_sorted_by_name\n"
                  "};");
     }
   dsk_print_pop (ctx);
@@ -398,10 +397,9 @@ render_file (DskXmlBindingNamespace *ns,
     }
 
   /* convert ns->name into camel-case, lowercase and uppercase strings */
-  dsk_print_set_string (ctx, "namespace_name", ns->name);
-  set_string_ns (ctx, "namespace_func_name", ns->name, 0, 0);
-  set_string_ns (ctx, "namespace_type_name", ns->name, 1, 0);
-  set_string_ns (ctx, "namespace_enum_name", ns->name, 1, 1);
+  set_string_ns (ctx, "namespace", ns->name, 0, 0);
+  set_string_ns (ctx, "Namespace", ns->name, 1, 0);
+  set_string_ns (ctx, "NAMESPACE", ns->name, 1, 1);
 
   /* render typedefs for structures and unions */
   if (mode == RENDER_MODE_H_FILE)
@@ -412,7 +410,7 @@ render_file (DskXmlBindingNamespace *ns,
           {
             dsk_print_push (ctx);
             set_typenames (ctx, ns->types[i]);
-            dsk_print (ctx, "typedef struct _$full_type_name $full_type_name;");
+            dsk_print (ctx, "typedef struct _$Typename $Typename;");
             dsk_print_pop (ctx);
           }
     }
@@ -432,10 +430,10 @@ render_file (DskXmlBindingNamespace *ns,
               {
                 dsk_print_push (ctx);
                 set_struct_uppercase (ctx, "label", t->cases[j].name);
-                dsk_print (ctx, "  ${full_enum_name}__$label,");
+                dsk_print (ctx, "  ${TYPENAME}__$label,");
                 dsk_print_pop (ctx);
               }
-            dsk_print (ctx, "} ${full_type_name}_Type;");
+            dsk_print (ctx, "} ${Typename}_Type;");
             dsk_print_pop (ctx);
           }
     }
@@ -458,32 +456,32 @@ render_file (DskXmlBindingNamespace *ns,
                   /* Define C structure */
                   DskXmlBindingTypeStruct *cs = (DskXmlBindingTypeStruct*)(u->cases[j].type);
                   dsk_print_set_string (ctx, "case_name", u->cases[j].name);
-                  dsk_print (ctx, "\n/* $full_type_name.$case_name */");
+                  dsk_print (ctx, "\n/* $Typename.$case_name */");
                   dsk_print (ctx,
-                             "struct _${full_type_name}__${case_name}\n"
+                             "struct _${Typename}__${case_name}\n"
                              "{");
                   dsk_print_set_string (ctx, "indent", "  ");
                   for (k = 0; k < cs->n_members; k++)
                     render_member (ctx, cs->members + k);
                   dsk_print (ctx, "};");
-                  dsk_print (ctx, "typedef struct _${full_type_name}__${case_name} ${full_type_name}__${case_name};\n");
+                  dsk_print (ctx, "typedef struct _${Typename}__${case_name} ${Typename}__${case_name};\n");
 
                   /* Render the AlignmentTest object */
                   dsk_print_push (ctx);
-                  dsk_print_set_template_string (ctx, "full_type_name",
-                                                 "${full_type_name}__$case_name");
-                  dsk_print_set_template_string (ctx, "full_func_name",
-                                                 "${full_func_name}__${case_name}");
-                  render_alignment_test (ctx); /* uses full_type_name */
+                  dsk_print_set_template_string (ctx, "Typename",
+                                                 "${Typename}__$case_name");
+                  dsk_print_set_template_string (ctx, "typename",
+                                                 "${typename}__${case_name}");
+                  render_alignment_test (ctx); /* uses Typename */
 
                   /* Define DskXmlBindingTypeStruct */
                   dsk_print (ctx,
-                             "static const DskXmlBindingStructMember ${full_func_name}__members[] =\n{");
+                             "static const DskXmlBindingStructMember ${typename}__members[] =\n{");
                   for (k = 0; k < cs->n_members; k++)
                     render_member_descriptor (ctx, cs->members + k);
                   dsk_print (ctx, "};");
                   dsk_print (ctx,
-                             "static const unsigned ${full_func_name}__members_sorted_by_name[] =\n{");
+                             "static const unsigned ${typename}__members_sorted_by_name[] =\n{");
                   for (k = 0; k < cs->n_members; k++)
                     {
                       dsk_print_push (ctx);
@@ -495,11 +493,11 @@ render_file (DskXmlBindingNamespace *ns,
                   dsk_print (ctx,
                              "};");
 
-                  dsk_print (ctx, "static const DskXmlBindingTypeStruct ${full_func_name}__descriptor =");
+                  dsk_print (ctx, "static const DskXmlBindingTypeStruct ${typename}__descriptor =");
                   render_descriptor_body (ctx, u->cases[j].type);
 
                   dsk_print (ctx,
-                       "#define ${full_func_name}__type ((DskXmlBindingType*)&(${full_func_name}__descriptor))");
+                       "#define ${typename}__type ((DskXmlBindingType*)&(${typename}__descriptor))");
                   dsk_print_pop (ctx);
                 }
             dsk_print_pop (ctx);
@@ -519,10 +517,10 @@ render_file (DskXmlBindingNamespace *ns,
         switch (mode)
           {
           case RENDER_MODE_H_FILE:
-            dsk_print (ctx, "struct _$full_type_name\n{");
+            dsk_print (ctx, "struct _$Typename\n{");
             break;
           case RENDER_MODE_C_FILE:
-            dsk_print (ctx, "static const DskXmlBindingStructMember ${full_func_name}__members[] =\n{");
+            dsk_print (ctx, "static const DskXmlBindingStructMember ${typename}__members[] =\n{");
             break;
           }
         for (j = 0; j < s->n_members; j++)
@@ -552,13 +550,13 @@ render_file (DskXmlBindingNamespace *ns,
         switch (mode)
           {
           case RENDER_MODE_H_FILE:
-            dsk_print (ctx, "struct _$full_type_name\n"
+            dsk_print (ctx, "struct _$Typename\n"
                             "{\n"
-                            "  ${full_type_name}_Type type;\n"
+                            "  ${Typename}_Type type;\n"
                             "  union {");
             break;
           case RENDER_MODE_C_FILE:
-            dsk_print (ctx, "static const DskXmlBindingUnionCase ${full_func_name}__cases[] =\n{");
+            dsk_print (ctx, "static const DskXmlBindingUnionCase ${typename}__cases[] =\n{");
             break;
           }
         for (j = 0; j < u->n_cases; j++)
@@ -598,16 +596,16 @@ render_file (DskXmlBindingNamespace *ns,
                 if (u->cases[j].type && u->cases[j].type->ns == NULL)
                   {
                     dsk_print_set_template_string (ctx, "case_type",
-             "${full_func_name}__${name}__type");
+             "${typename}__${name}__type");
                   }
                 else if (u->cases[j].type)
                   {
                     if (u->cases[j].type->ns->name)
-                      set_string_ns (ctx, "namespace_func_name", u->cases[j].type->ns->name, 0, 0);
+                      set_string_ns (ctx, "namespace", u->cases[j].type->ns->name, 0, 0);
                     else
-                      dsk_print_set_string (ctx, "namespace_func_name", "dsk_xml_binding");
+                      dsk_print_set_string (ctx, "namespace", "dsk_xml_binding");
                     set_struct_lowercase (ctx, "type_func_name", u->cases[j].type->name);
-                    dsk_print_set_template_string (ctx, "case_type", "${namespace_func_name}__${type_func_name}__type");
+                    dsk_print_set_template_string (ctx, "case_type", "${namespace}__${type_func_name}__type");
                   }
                 else
                   {
@@ -646,14 +644,14 @@ render_file (DskXmlBindingNamespace *ns,
           {
             dsk_print_push (ctx);
             set_typenames (ctx, ns->types[i]);
-            render_alignment_test (ctx);            /* uses full_type_name */
+            render_alignment_test (ctx);            /* uses Typename */
 
             if (ns->types[i]->is_struct)
               {
                 DskXmlBindingTypeStruct *s = (DskXmlBindingTypeStruct*)ns->types[i];
                 unsigned j;
                 dsk_print_set_uint (ctx, "n_members", s->n_members);
-                dsk_print (ctx, "const unsigned ${full_func_name}__members_sorted_by_name[] =\n{");
+                dsk_print (ctx, "const unsigned ${typename}__members_sorted_by_name[] =\n{");
                 for (j = 0; j < s->n_members; j++)
                   {
                     dsk_print_set_uint (ctx, "index", s->members_sorted_by_name[j]);
@@ -662,7 +660,7 @@ render_file (DskXmlBindingNamespace *ns,
                   }
                 dsk_print (ctx, "};");
                 dsk_print (ctx,
-                           "const DskXmlBindingTypeStruct ${full_func_name}__descriptor =");
+                           "const DskXmlBindingTypeStruct ${typename}__descriptor =");
                 render_descriptor_body (ctx, ns->types[i]);
               }
             else                /* is_union */
@@ -675,7 +673,7 @@ render_file (DskXmlBindingNamespace *ns,
                                           : "NULL");
                 dsk_print_set_uint (ctx, "n_cases", u->n_cases);
 
-                dsk_print (ctx, "const unsigned ${full_func_name}__cases_sorted_by_name[] =\n{");
+                dsk_print (ctx, "const unsigned ${typename}__cases_sorted_by_name[] =\n{");
                 for (j = 0; j < u->n_cases; j++)
                   {
                     dsk_print_set_uint (ctx, "index", u->cases_sorted_by_name[j]);
@@ -684,7 +682,7 @@ render_file (DskXmlBindingNamespace *ns,
                   }
                 dsk_print (ctx, "};");
                 dsk_print (ctx,
-                           "const DskXmlBindingTypeUnion ${full_func_name}__descriptor =");
+                           "const DskXmlBindingTypeUnion ${typename}__descriptor =");
                 render_descriptor_body (ctx, ns->types[i]);
               }
             dsk_print_pop (ctx);
@@ -701,7 +699,7 @@ render_file (DskXmlBindingNamespace *ns,
     {
     case RENDER_MODE_H_FILE:
       dsk_print (ctx, "\n\n/* Namespace Declaration */");
-      dsk_print (ctx, "#define ${namespace_func_name}__namespace ((DskXmlBindingNamespace*)(&${namespace_func_name}__descriptor))");
+      dsk_print (ctx, "#define ${namespace}__namespace ((DskXmlBindingNamespace*)(&${namespace}__descriptor))");
       dsk_print (ctx, "\n\n/* Struct and Union DskXmlBindingTypes */");
       for (i = 0; i < ns->n_types; i++)
         if (ns->types[i]->is_struct
@@ -709,18 +707,18 @@ render_file (DskXmlBindingNamespace *ns,
           {
             dsk_print_push (ctx);
             set_typenames (ctx, ns->types[i]);
-            dsk_print (ctx, "#define ${full_func_name}__type ((DskXmlBindingType*)(&${full_func_name}__descriptor))");
+            dsk_print (ctx, "#define ${typename}__type ((DskXmlBindingType*)(&${typename}__descriptor))");
             dsk_print_pop (ctx);
           }
       dsk_print (ctx, "\n\n\n\n/* Private */\n"
-                 "extern const DskXmlBindingNamespace ${namespace_func_name}__descriptor;");
+                 "extern const DskXmlBindingNamespace ${namespace}__descriptor;");
       for (i = 0; i < ns->n_types; i++)
         if (ns->types[i]->is_struct
          || ns->types[i]->is_union)
           {
             dsk_print_push (ctx);
             set_typenames (ctx, ns->types[i]);
-            dsk_print (ctx, "extern const DskXmlBindingType$Category ${ns_name}__descriptor;");
+            dsk_print (ctx, "extern const DskXmlBindingType$Category ${namespace__typename}__descriptor;");
             dsk_print_pop (ctx);
           }
       break;
@@ -740,7 +738,7 @@ render_file (DskXmlBindingNamespace *ns,
         {
           /* needs sorting array */
           dsk_print_set_template_string (ctx, "types_sorted_by_name",
-                                         "(unsigned *) ${namespace_func_name}__type_sorted_by_name");
+                                         "(unsigned *) ${namespace}__type_sorted_by_name");
           dsk_print (ctx, "static const unsigned $types_sorted_by_name[] =\n{");
           for (i = 0; i < ns->n_types; i++)
             {
@@ -755,22 +753,22 @@ render_file (DskXmlBindingNamespace *ns,
       else
         dsk_print_set_string (ctx, "types_sorted_by_name", "NULL");
 
-      dsk_print (ctx, "static const DskXmlBindingType *${namespace_func_name}__type_array[] =\n{");
+      dsk_print (ctx, "static const DskXmlBindingType *${namespace}__type_array[] =\n{");
       for (i = 0; i < ns->n_types; i++)
         {
           dsk_print_push (ctx);
           set_struct_lowercase (ctx, "type_lowercase", ns->types[i]->name);
-          dsk_print (ctx, "  ${namespace_func_name}__${type_lowercase}__type,");
+          dsk_print (ctx, "  ${namespace}__${type_lowercase}__type,");
           dsk_print_pop (ctx);
         }
       dsk_print (ctx, "};\n");
 
-      dsk_print (ctx, "const DskXmlBindingNamespace ${namespace_func_name}__descriptor =\n"
+      dsk_print (ctx, "const DskXmlBindingNamespace ${namespace}__descriptor =\n"
                       "{\n"
                       "  DSK_TRUE,              /* is_static */\n"
                       "  \"$ns_name\",\n"            
                       "  $n_types,               /* n_types */\n"
-                      "  (DskXmlBindingType **) ${namespace_func_name}__type_array,\n"
+                      "  (DskXmlBindingType **) ${namespace}__type_array,\n"
                       "  0,                     /* ref_count */\n"
                       "  $types_sorted_by_name\n"
                       "};");
@@ -784,9 +782,9 @@ render_file (DskXmlBindingNamespace *ns,
 int main(int argc, char **argv)
 {
   char *output_basename;
-  char *namespace_name;
   DskXmlBindingNamespace *ns;
   DskError *error = NULL;
+  char *output_ns;
 
   dsk_cmdline_init ("Make XML C-Bindings", description, NULL, 0);
   dsk_cmdline_add_string ("output-basename",
@@ -798,7 +796,7 @@ int main(int argc, char **argv)
                           "Namespace to generate prototypes/descriptors for",
                           "NS",
                           DSK_CMDLINE_MANDATORY,
-                          &namespace_name);
+                          &output_ns);
   dsk_cmdline_add_func ("search-tree",
                         "Filesystem tree to search for format files",
                         "PATH",
@@ -813,9 +811,9 @@ int main(int argc, char **argv)
   binding = dsk_xml_binding_new ();
   dsk_cmdline_process_args (&argc, &argv);
 
-  ns = dsk_xml_binding_get_ns (binding, namespace_name, &error);
+  ns = dsk_xml_binding_get_ns (binding, output_ns, &error);
   if (ns == NULL)
-    dsk_die ("getting namespace '%s': %s", namespace_name, error->message);
+    dsk_die ("getting namespace '%s': %s", output_ns, error->message);
   render_file (ns, output_basename, RENDER_MODE_H_FILE);
   render_file (ns, output_basename, RENDER_MODE_C_FILE);
 
