@@ -252,15 +252,15 @@ set_typenames (DskPrint               *ctx,
   set_string_ns (ctx, "Namespace", ns->name, 1, 0);
   set_string_ns (ctx, "NAMESPACE", ns->name, 1, 1);
 
-  dsk_print_set_string (ctx, "Namespace__Typename", type->name);
-  set_struct_uppercase (ctx, "NAMESPACE__TYPENAME", type->name);
-  set_struct_lowercase (ctx, "namespace__typename", type->name);
-  dsk_print_set_template_string (ctx, "typename",
-                                 "${namespace}__$namespace__typename");
-  dsk_print_set_template_string (ctx, "TYPENAME",
-                                 "${NAMESPACE}__$NAMESPACE__TYPENAME");
-  dsk_print_set_template_string (ctx, "Typename",
-                                 "${Namespace}__$Namespace__Typename");
+  dsk_print_set_string (ctx, "Typename", type->name);
+  set_struct_uppercase (ctx, "TYPENAME", type->name);
+  set_struct_lowercase (ctx, "typename", type->name);
+  dsk_print_set_template_string (ctx, "full_name",
+                                 "${namespace}__${typename}");
+  dsk_print_set_template_string (ctx, "FULL_NAME",
+                                 "${NAMESPACE}__$TYPENAME");
+  dsk_print_set_template_string (ctx, "Full_Name",
+                                 "${Namespace}__$Typename");
   if (type->is_struct)
     {
       dsk_print_set_string (ctx, "category", "struct");
@@ -302,7 +302,7 @@ render_descriptor_body (DskPrint *ctx,
   else
     dsk_print_set_string (ctx, "ns", "NULL");
   if (type->name)
-    dsk_print_set_template_string (ctx, "name_str", "\"$Namespace__Typename\"");
+    dsk_print_set_template_string (ctx, "name_str", "\"$Full_Name\"");
   else
     dsk_print_set_string (ctx, "name_str", "NULL");
 
@@ -707,7 +707,7 @@ render_file (DskXmlBindingNamespace *ns,
           {
             dsk_print_push (ctx);
             set_typenames (ctx, ns->types[i]);
-            dsk_print (ctx, "#define ${typename}__type ((DskXmlBindingType*)(&${typename}__descriptor))");
+            dsk_print (ctx, "#define ${full_name}__type ((DskXmlBindingType*)(&${full_name}__descriptor))");
             dsk_print_pop (ctx);
           }
       dsk_print (ctx, "\n\n\n\n/* Private */\n"
@@ -718,7 +718,7 @@ render_file (DskXmlBindingNamespace *ns,
           {
             dsk_print_push (ctx);
             set_typenames (ctx, ns->types[i]);
-            dsk_print (ctx, "extern const DskXmlBindingType$Category ${namespace__typename}__descriptor;");
+            dsk_print (ctx, "extern const DskXmlBindingType$Category ${full_name}__descriptor;");
             dsk_print_pop (ctx);
           }
       break;
