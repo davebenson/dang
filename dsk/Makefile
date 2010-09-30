@@ -11,7 +11,8 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-date-0 \
 		tests/test-unicode \
 		tests/test-xml-parser-0 \
-		tests/test-xml-validation-suite
+		tests/test-xml-validation-suite \
+		tests/test-xml-binding-0
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
            programs/dsk-octet-filter programs/dsk-make-xml-binding
 all: $(BUILT_SOURCES) $(TEST_PROGRAMS) $(PROGRAMS)
@@ -63,6 +64,8 @@ libdsk.a: dsk-inlines.o \
 %.o: %.c
 	gcc $(CC_FLAGS) -c $^
 
+tests/test-xml-binding-0: tests/generated/xml-binding-test.c
+
 dsk-ascii-chartable.inc: mk-ascii-chartable.pl
 	./mk-ascii-chartable.pl > dsk-ascii-chartable.inc
 dsk-digit-chartables.inc: mk-digit-chartables.pl
@@ -76,6 +79,12 @@ dsk-base64-char-table.inc: mk-base64-to-char-table.pl
 dsk-base64-value-table.inc: mk-base64-to-value-table.pl
 	./$^ > $@
 
+tests/generated/xml-binding-test.h tests/generated/xml-binding-test.c: \
+	tests/xml-binding-ns/my.test programs/dsk-make-xml-binding
+	@test -d tests/generated || mkdir tests/generated
+	programs/dsk-make-xml-binding --namespace=my.test \
+		--search-dotted=tests/xml-binding-ns \
+		--output-basename=tests/generated/xml-binding-test
 
 clean:
 	rm *.o libdsk.a

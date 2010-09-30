@@ -593,6 +593,7 @@ parse_case_list (ParseContext           *context,
                                                    n_members, members,
                                                    error);
           cas.type = (DskXmlBindingType*) stype;
+          cas.elide_struct_outer_tag = DSK_TRUE;
           if (cas.type == NULL)
             {
               dsk_add_error_prefix (error, "parsing case %s", cas.name);
