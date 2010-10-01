@@ -730,7 +730,7 @@ dsk_boolean dsk_xml_binding_struct_parse (DskXmlBindingType *type,
 
 static dsk_boolean
 struct_members_to_xml        (DskXmlBindingType *type,
-                              void              *strct,
+                              const void        *strct,
                               unsigned          *n_nodes_out,
                               DskXml          ***nodes_out,
                               DskError         **error)
@@ -811,14 +811,12 @@ DskXml  *   dsk_xml_binding_struct_to_xml(DskXmlBindingType *type,
 		                          const void        *data,
 		                          DskError         **error)
 {
-  void *strct = * (void **) data;
   unsigned n_children;
   DskXml **children;
-  if (!struct_members_to_xml (type, strct, &n_children, &children, error))
-    {
-      return NULL;
-    }
-  DskXml *rv = dsk_xml_new_take_n (type->name, n_children, children);
+  DskXml *rv;
+  if (!struct_members_to_xml (type, data, &n_children, &children, error))
+    return NULL;
+  rv = dsk_xml_new_take_n (type->name, n_children, children);
   dsk_free (children);
   return rv;
 
@@ -1178,7 +1176,6 @@ dsk_boolean dsk_xml_binding_union_parse  (DskXmlBindingType *type,
         }
     }
   * (DskXmlBindingTypeUnionTag *) union_data = case_i;
-  * (void **) out = union_data;
   return DSK_TRUE;
 
 error_maybe_add_union_name:
