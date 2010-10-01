@@ -19,6 +19,8 @@ _ http client stream: error conditions:
       (needs to be in DskMemorySource)
   x random data tests
   _ transport errors reading/writing
+    x read errors
+    _ write errors
   _ post-data stream read errors
   _ more responses than requests
 _ http client: request instead of request_options testing

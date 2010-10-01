@@ -254,6 +254,7 @@ handle_transport_source_readable (DskOctetSource *source,
                                stream->first_transfer,
                                "error reading from underlying transport: %s",
                                error->message);
+      do_shutdown (stream);
       dsk_error_unref (error);
       return DSK_TRUE;
     case DSK_IO_RESULT_EOF:
@@ -826,7 +827,8 @@ handle_writable (DskOctetSink *sink,
                                "error writing to http-client sink: %s",
                                error->message);
       dsk_error_unref (error);
-      break;
+      do_shutdown (stream);
+      return DSK_FALSE;
     }
 
   if (blocked && stream->outgoing_data.size == 0)

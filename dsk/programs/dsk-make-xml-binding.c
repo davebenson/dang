@@ -317,10 +317,10 @@ static void render_enums (DskPrint *ctx, DskXmlBindingNamespace *ns)
 	  {
 	    dsk_print_push (ctx);
 	    set_struct_uppercase (ctx, "label", t->cases[j].name);
-	    dsk_print (ctx, "  ${TYPENAME}__$label,");
+	    dsk_print (ctx, "  ${FULL_NAME}__TYPE__$label,");
 	    dsk_print_pop (ctx);
 	  }
-	dsk_print (ctx, "} ${Full_Name}_Type;");
+	dsk_print (ctx, "} ${Full_Name}__Type;");
 	dsk_print_pop (ctx);
       }
 }
@@ -347,7 +347,7 @@ static void render_cstruct_definitions (DskPrint *ctx, DskXmlBindingType *type)
       {
         DskXmlBindingTypeUnion *u = (DskXmlBindingTypeUnion *) type;
         unsigned j;
-            dsk_print (ctx, "  ${Full_Name}_Type type;\n"
+            dsk_print (ctx, "  ${Full_Name}__Type type;\n"
                             "  union {");
         for (j = 0; j < u->n_cases; j++)
           {
@@ -501,8 +501,8 @@ render_descriptor_body (DskPrint *ctx,
       dsk_print (ctx,
                  "{\n"
                  "  $base_type_definition,\n"
-                 "  $n_cases,\n"
                  "  offsetof ($Full_Name, variant),\n"
+                 "  $n_cases,\n"
                  "  (DskXmlBindingUnionCase *) ${full_name}__cases,\n"
                  "  (unsigned *) ${full_name}__cases_sorted_by_name\n"
                  "};");
