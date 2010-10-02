@@ -112,6 +112,10 @@ struct _DskHttpClientStreamRequestOptions
    */
   dsk_boolean uncompress_content;       
 
+  /* Cookies */
+  unsigned n_cookies;
+  DskHttpCookie *cookies;
+
   /* functions and user-data */
   DskHttpClientStreamFuncs *funcs;
   void *user_data;
@@ -130,6 +134,8 @@ struct _DskHttpClientStreamRequestOptions
   DSK_FALSE,           /* gzip_compress_post_data */   \
   DSK_FALSE,           /* post_data_is_gzipped */      \
   DSK_TRUE,            /* uncompress_content */        \
+  0,                   /* n_cookies */                 \
+  NULL,                /* cookies */                   \
   NULL,                /* funcs */                     \
   NULL                 /* user_data */                 \
 }
