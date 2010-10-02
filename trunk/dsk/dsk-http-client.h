@@ -26,13 +26,15 @@ struct _DskHttpClientOptions
 {
   unsigned max_connections_keptalive;
   unsigned max_connections_per_host_keptalive;
+  unsigned max_connections_total;
 };
 
 /* TODO: provide some sort of evidence that these are good numbers */
 #define DSK_HTTP_CLIENT_OPTIONS_DEFAULT               \
 {                                                     \
   100,      /* max_connections_keptalive */           \
-  5         /* max_connections_per_host_keptalive */  \
+  5,        /* max_connections_per_host_keptalive */  \
+  10000000  /* max_connections_total */               \
 }
 
 
@@ -88,6 +90,7 @@ struct _DskHttpClientRequestOptions
 
   /* TODO: authentication support */
   /* TODO: way to send Basic-Auth preemptively (w/o "challenge") */
+  DskHttpAuthAgent *auth_agent;
 
   /* Provide POST-data MD5Sum */
   dsk_boolean has_postdata_md5sum;
@@ -120,7 +123,9 @@ struct _DskHttpClientRequestOptions
 
   /* TODO: option to request server not to use cache (--no-cache in wget) */
 
-  /* TODO: cookie support */
+  /* Cookies to send */
+  unsigned n_cookies;
+  DskHttpCookie *cookies;
 
   /* TODO TODO: SSL options (for HTTPS obviously..) */
 };
@@ -131,3 +136,4 @@ void dsk_http_client_request       (DskHttpClient               *client,
 				    DskHttpClientRequestFuncs   *funcs,
 				    void                        *func_data,
 				    DskDestroyNotify             destroy);
+
