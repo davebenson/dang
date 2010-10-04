@@ -90,7 +90,7 @@ struct _DskHttpClientRequestOptions
 
   /* TODO: authentication support */
   /* TODO: way to send Basic-Auth preemptively (w/o "challenge") */
-  DskHttpAuthAgent *auth_agent;
+  DskHttpClientAuth *auth_agent;
 
   /* Provide POST-data MD5Sum */
   dsk_boolean has_postdata_md5sum;
