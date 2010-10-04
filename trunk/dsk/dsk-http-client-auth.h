@@ -37,18 +37,18 @@ dsk_http_client_auth_add_password(DskHttpAuthAgent *agent,
 #endif
 
 void
-dsk_http_client_auth_set_info    (DskHttpAuthAgent *agent,
+dsk_http_client_auth_set_info    (DskHttpClientAuth *agent,
                                   const char       *username,
                                   const char       *password);
 
 void
-dsk_http_client_auth_add_preemptive_basic (DskHttpAuthAgent *agent,
+dsk_http_client_auth_add_preemptive_basic (DskHttpClientAuth *agent,
                                            const char *realm,
                                            const char *username,
                                            const char *password);
 
 
-void dsk_http_client_auth_enable_caching  (DskHttpAuthAgent *agent);
+void dsk_http_client_auth_enable_caching  (DskHttpClientAuth *agent);
 
 /* --- dsk_http_client_auth_add_callback() --- */
 /* - this allows for custom response handlers,
@@ -63,8 +63,8 @@ struct _DskHttpClientAuthRequest
   char **key_value_pairs;
 
   /*< private data follows >*/
-  DskHttpAuthAgent *agent;
-  ... state
+  DskHttpClientAuth *agent;
+  //... state
 };
 typedef void (*DskHttpClientAuthHandler) (DskHttpClientAuthRequest *request,
                                           void       *handler_data);
@@ -75,7 +75,7 @@ typedef void (*DskHttpClientAuthHandler) (DskHttpClientAuthRequest *request,
  * dsk_http_client_auth_request_{respond,respond_fail,respond_na}.
  */
 void
-dsk_http_client_auth_add_callback(DskHttpAuthAgent        *agent,
+dsk_http_client_auth_add_callback(DskHttpClientAuth        *agent,
                                   DskHttpClientAuthHandler handler,
                                   void                    *handler_data,
                                   DskDestroyNotify         handler_destroy);

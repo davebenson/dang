@@ -31,6 +31,7 @@
 #include "dsk-file-util.h"
 
 #include "dsk-http-protocol.h"
+#include "dsk-http-client-auth.h"
 #include "dsk-http-client-stream.h"
 #include "dsk-http-client.h"
 #include "dsk-http-server-stream.h"
