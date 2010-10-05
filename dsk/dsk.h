@@ -49,6 +49,8 @@
 
 #include "dsk-cmdline.h"
 
+#include "dsk-checksum.h"
+
 #include "dsk-cleanup.h"
 
 #include "dsk-config.h"

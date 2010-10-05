@@ -74,6 +74,7 @@ _ octet-filter test harness [feed data in several ways]
   _ url-encode test
   _ byte doubler test
 _ dsk_octet_filter_source()
+_ more checksum tests
 
 WARNING CONDITIONS:
 _ high trap counts?
