@@ -651,8 +651,8 @@ void             dsk_http_header_add_accepted_range (DskHttpHeader *header,
   g_object_set (DSK_HTTP_HEADER(header), "content-encoding", (DskHttpContentEncoding) (enc), NULL)
 #define dsk_http_header_get_content_encoding(header)			      \
   (DSK_HTTP_HEADER(header)->content_encoding_type)
-#define dsk_http_header_set_content_length(header, len)		              \
-  g_object_set (DSK_HTTP_HEADER(header), "content-length", (gint64) (len), NULL)
+#define dsk_http_header_set_content_length(header, length)		              \
+  g_object_set (DSK_HTTP_HEADER(header), "content-length", (gint64) (length), NULL)
 #define dsk_http_header_get_content_length(header)			      \
   (DSK_HTTP_HEADER(header)->content_length)
 #define dsk_http_header_set_range(header, start, end)		              \
@@ -673,7 +673,7 @@ void dsk_http_header_set_string (gpointer         http_header,
 void dsk_http_header_set_string_len (gpointer         http_header,
                                      char           **p_str,
                                      const char      *str,
-                                     guint            len);
+                                     guint            length);
 
 void dsk_http_header_set_string_val (gpointer         http_header,
                                      char           **p_str,

@@ -603,20 +603,20 @@ check_header       (DskHttpServerStreamTransfer *transfer,
   DSK_UNUSED (transfer);
   if (options->content_stream != NULL)
     {
-      int64_t len = dsk_octet_source_get_length (options->content_stream);
-      if (len >= 0LL)
+      int64_t length = dsk_octet_source_get_length (options->content_stream);
+      if (length >= 0LL)
         {
-          if (options->content_length >= 0LL && len != options->content_length)
+          if (options->content_length >= 0LL && length != options->content_length)
             {
               dsk_set_error (error, "Content-Length mismatch (stream v response options)");
               return DSK_FALSE;
             }
-          if (header->content_length >= 0LL && len != header->content_length)
+          if (header->content_length >= 0LL && length != header->content_length)
             {
               dsk_set_error (error, "Content-Length mismatch (stream v header)");
               return DSK_FALSE;
             }
-          header->content_length = len;
+          header->content_length = length;
         }
     }
   if (options->content_length >= 0)
@@ -640,20 +640,20 @@ construct_response (DskHttpServerStreamTransfer *transfer,
   DskHttpResponse *rv;
   if (options->content_stream != NULL)
     {
-      int64_t len = dsk_octet_source_get_length (options->content_stream);
-      if (len >= 0LL)
+      int64_t length = dsk_octet_source_get_length (options->content_stream);
+      if (length >= 0LL)
         {
-          if (options->content_length >= 0LL && len != options->content_length)
+          if (options->content_length >= 0LL && length != options->content_length)
             {
               dsk_set_error (error, "Content-Length mismatch (stream v response options)");
               return NULL;
             }
-          if (hdr.content_length >= 0LL && len != hdr.content_length)
+          if (hdr.content_length >= 0LL && length != hdr.content_length)
             {
               dsk_set_error (error, "Content-Length mismatch (stream v header options)");
               return NULL;
             }
-          hdr.content_length = len;
+          hdr.content_length = length;
         }
     }
   if (options->content_length >= 0)

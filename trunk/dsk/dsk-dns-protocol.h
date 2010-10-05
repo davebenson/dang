@@ -233,7 +233,7 @@ struct _DskDnsMessage
 
 #define DSK_DNS_PORT 53
 
-DskDnsMessage *dsk_dns_message_parse     (unsigned       len,
+DskDnsMessage *dsk_dns_message_parse     (unsigned       length,
                                           const uint8_t *data,
                                           DskError     **error);
 uint8_t *      dsk_dns_message_serialize (DskDnsMessage *message,

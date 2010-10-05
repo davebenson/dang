@@ -48,13 +48,13 @@ restart:
 }
 
 /* --- TODO: add wad of constructors --- */
-DskXml *dsk_xml_text_new_len (unsigned len,
+DskXml *dsk_xml_text_new_len (unsigned length,
                               const char *data)
 {
-  DskXml *xml = dsk_malloc (len + 1 + sizeof (DskXml));
-  memcpy (xml + 1, data, len);
+  DskXml *xml = dsk_malloc (length + 1 + sizeof (DskXml));
+  memcpy (xml + 1, data, length);
   xml->str = (char*) (xml + 1);
-  xml->str[len] = 0;
+  xml->str[length] = 0;
   xml->filename = NULL;
   xml->line_no = 0;
   xml->type = DSK_XML_TEXT;
@@ -76,23 +76,23 @@ DskXml dsk_xml_empty_text_global = {
   NULL,          /* children */
 };
 
-DskXml *dsk_xml_comment_new_len (unsigned len,
+DskXml *dsk_xml_comment_new_len (unsigned length,
                                  const char *text)
 {
-  DskXml *rv = dsk_xml_text_new_len (len, text);
+  DskXml *rv = dsk_xml_text_new_len (length, text);
   rv->type = DSK_XML_COMMENT;
   return rv;
 }
 static DskXml *condense_text_nodes (unsigned n, DskXml **xml)
 {
-  unsigned len = 0;
+  unsigned length = 0;
   char *at;
   unsigned i;
   DskXml *rv;
   dsk_assert (n > 1);
   for (i = 0; i < n; i++)
-    len += strlen (xml[i]->str);
-  rv = dsk_malloc (sizeof (DskXml) + len + 1);
+    length += strlen (xml[i]->str);
+  rv = dsk_malloc (sizeof (DskXml) + length + 1);
   rv->str = (char*)(rv+1);
   rv->filename = NULL;
   rv->line_no = 0;

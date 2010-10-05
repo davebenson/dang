@@ -430,8 +430,8 @@ begin_connecting (DskClientStream *stream)
   if (stream->is_local_socket)
     {
       struct sockaddr_un addr;
-      unsigned len = strlen (stream->name);
-      if (len > sizeof (addr.sun_path))
+      unsigned length = strlen (stream->name);
+      if (length > sizeof (addr.sun_path))
         {
           /* name too long */
           /* TODO: catch this in constructor */
@@ -442,7 +442,7 @@ begin_connecting (DskClientStream *stream)
         }
       addr.sun_family = AF_LOCAL;
       memcpy (addr.sun_path, stream->name,
-              len == sizeof (addr.sun_path) ? len : len + 1);
+              length == sizeof (addr.sun_path) ? length : length + 1);
       begin_connecting_sockaddr (stream, sizeof (addr), (struct sockaddr *) &addr);
     }
   else if (stream->is_numeric_name)

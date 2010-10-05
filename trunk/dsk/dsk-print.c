@@ -206,7 +206,7 @@ handle_template_expression (DskPrint *context,
                             DskError **error)
 {
   /* For now, the only type of template expr is $variable or ${variable} */
-  unsigned len;
+  unsigned length;
   const char *start;
   VarDef *result;
   dsk_assert (*expr == '$');
@@ -223,10 +223,10 @@ handle_template_expression (DskPrint *context,
                          dsk_ascii_byte_name (*start));
           return DSK_FALSE;
         }
-      len = 1;
-      while (ascii_is_ident (start[len]))
-        len++;
-      end = start + len;
+      length = 1;
+      while (ascii_is_ident (start[length]))
+        length++;
+      end = start + length;
       while (dsk_ascii_isspace (*end))
         end++;
       if (*end != '}')
@@ -234,18 +234,18 @@ handle_template_expression (DskPrint *context,
           dsk_set_error (error,
                          "unexpected character %s after '${%.*s' in dsk_print",
                          dsk_ascii_byte_name (*end),
-                         len, start);
+                         length, start);
           return DSK_FALSE;
         }
       *expr_len_out = (end + 1) - expr;
     }
   else if (ascii_is_ident (expr[1]))
     {
-      len = 1;
+      length = 1;
       start = expr + 1;
-      while (ascii_is_ident (start[len]))
-        len++;
-      *expr_len_out = len + 1;
+      while (ascii_is_ident (start[length]))
+        length++;
+      *expr_len_out = length + 1;
     }
   else
     {
@@ -254,8 +254,8 @@ handle_template_expression (DskPrint *context,
       return DSK_FALSE;
     }
 #define COMPARE_START_LEN_TO_VAR_DEF(unused,b, rv) \
-      rv = memcmp (start, b->key, len);            \
-      if (rv == 0 && b->key[len] != '\0')          \
+      rv = memcmp (start, b->key, length);            \
+      if (rv == 0 && b->key[length] != '\0')          \
         rv = -1;
   GSK_RBTREE_LOOKUP_COMPARATOR (GET_VARDEF_TREE (context),
                                 unused, COMPARE_START_LEN_TO_VAR_DEF,
@@ -265,7 +265,7 @@ handle_template_expression (DskPrint *context,
     {
       dsk_set_error (error,
                      "unset variable $%.*s excountered in print template",
-                     len, start);
+                     length, start);
       return DSK_FALSE;
     }
   if (!context->append (result->value_length, (uint8_t*)(result+1),
@@ -446,13 +446,13 @@ void dsk_print_set_filtered_binary   (DskPrint    *context,
                                     DskOctetFilter *filter)
 {
   DskBuffer buf;
-  DskBufferFragment frag;
-  frag.buf_start = 0;
-  frag.buf = (uint8_t*) raw_string;
-  frag.buf_length = raw_string_length;
-  frag.next = NULL;
-  buf.first_frag = buf.last_frag = &frag;
-  buf.size = frag.buf_length;
+  DskBufferFragment fragment;
+  fragment.buf_start = 0;
+  fragment.buf = (uint8_t*) raw_string;
+  fragment.buf_length = raw_string_length;
+  fragment.next = NULL;
+  buf.first_frag = buf.last_frag = &fragment;
+  buf.size = fragment.buf_length;
   dsk_print_set_filtered_buffer (context, variable_name, &buf, filter);
 }
 

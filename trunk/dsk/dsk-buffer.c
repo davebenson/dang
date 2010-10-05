@@ -48,19 +48,19 @@
 
 /* --- DskBufferFragment implementation --- */
 static inline int 
-dsk_buffer_fragment_avail (DskBufferFragment *frag)
+dsk_buffer_fragment_avail (DskBufferFragment *fragment)
 {
-  return frag->buf_max_size - frag->buf_start - frag->buf_length;
+  return fragment->buf_max_size - fragment->buf_start - fragment->buf_length;
 }
 static inline uint8_t *
-dsk_buffer_fragment_start (DskBufferFragment *frag)
+dsk_buffer_fragment_start (DskBufferFragment *fragment)
 {
-  return frag->buf + frag->buf_start;
+  return fragment->buf + fragment->buf_start;
 }
 static inline uint8_t *
-dsk_buffer_fragment_end (DskBufferFragment *frag)
+dsk_buffer_fragment_end (DskBufferFragment *fragment)
 {
-  return frag->buf + frag->buf_start + frag->buf_length;
+  return fragment->buf + fragment->buf_start + fragment->buf_length;
 }
 
 /* --- DskBufferFragment recycling --- */
@@ -73,28 +73,28 @@ static DskBufferFragment* recycling_stack = 0;
 static DskBufferFragment *
 new_native_fragment()
 {
-  DskBufferFragment *frag;
+  DskBufferFragment *fragment;
 #if DSK_DEBUG_BUFFER_ALLOCATIONS
-  frag = (DskBufferFragment *) dsk_malloc (BUF_CHUNK_SIZE);
-  frag->buf_max_size = BUF_CHUNK_SIZE - sizeof (DskBufferFragment);
+  fragment = (DskBufferFragment *) dsk_malloc (BUF_CHUNK_SIZE);
+  fragment->buf_max_size = BUF_CHUNK_SIZE - sizeof (DskBufferFragment);
 #else  /* optimized (?) */
   if (recycling_stack)
     {
-      frag = recycling_stack;
+      fragment = recycling_stack;
       recycling_stack = recycling_stack->next;
       num_recycled--;
     }
   else
     {
-      frag = (DskBufferFragment *) dsk_malloc (BUF_CHUNK_SIZE);
-      frag->buf_max_size = BUF_CHUNK_SIZE - sizeof (DskBufferFragment);
+      fragment = (DskBufferFragment *) dsk_malloc (BUF_CHUNK_SIZE);
+      fragment->buf_max_size = BUF_CHUNK_SIZE - sizeof (DskBufferFragment);
     }
 #endif	/* !DSK_DEBUG_BUFFER_ALLOCATIONS */
-  frag->buf_start = frag->buf_length = 0;
-  frag->next = 0;
-  frag->buf = (uint8_t *) (frag + 1);
-  frag->is_foreign = 0;
-  return frag;
+  fragment->buf_start = fragment->buf_length = 0;
+  fragment->next = 0;
+  fragment->buf = (uint8_t *) (fragment + 1);
+  fragment->is_foreign = 0;
+  return fragment;
 }
 
 static DskBufferFragment *
@@ -117,31 +117,31 @@ new_foreign_fragment (unsigned             length,
 }
 
 #if DSK_DEBUG_BUFFER_ALLOCATIONS
-#define recycle(frag) do{ \
-    if (frag->is_foreign && frag->destroy != NULL) \
-      frag->destroy (frag->destroy_data); \
-    dsk_free (frag); \
+#define recycle(fragment) do{ \
+    if (fragment->is_foreign && fragment->destroy != NULL) \
+      fragment->destroy (fragment->destroy_data); \
+    dsk_free (fragment); \
    }while(0)
 #else	/* optimized (?) */
 static void
-recycle(DskBufferFragment* frag)
+recycle(DskBufferFragment* fragment)
 {
-  if (frag->is_foreign)
+  if (fragment->is_foreign)
     {
-      if (frag->destroy)
-        frag->destroy (frag->destroy_data);
-      dsk_free (frag);
+      if (fragment->destroy)
+        fragment->destroy (fragment->destroy_data);
+      dsk_free (fragment);
       return;
     }
 #if defined(MAX_RECYCLED)
   if (num_recycled >= MAX_RECYCLED)
     {
-      dsk_free (frag);
+      dsk_free (fragment);
       return;
     }
 #endif
-  frag->next = recycling_stack;
-  recycling_stack = frag;
+  fragment->next = recycling_stack;
+  recycling_stack = fragment;
   num_recycled++;
 }
 #endif	/* !DSK_DEBUG_BUFFER_ALLOCATIONS */
@@ -187,13 +187,13 @@ dsk_buffer_init(DskBuffer *buffer)
 static inline dsk_boolean
 verify_buffer (const DskBuffer *buffer)
 {
-  const DskBufferFragment *frag;
+  const DskBufferFragment *fragment;
   unsigned total = 0;
-  for (frag = buffer->first_frag; frag != NULL; frag = frag->next)
+  for (fragment = buffer->first_frag; fragment != NULL; fragment = fragment->next)
     {
-      if (frag->buf_length == 0)
+      if (fragment->buf_length == 0)
         return DSK_FALSE;
-      total += frag->buf_length;
+      total += fragment->buf_length;
     }
   return total == buffer->size;
 }
@@ -407,21 +407,21 @@ dsk_buffer_peek     (const DskBuffer *buffer,
                      void            *data)
 {
   int rv = 0;
-  DskBufferFragment *frag = (DskBufferFragment *) buffer->first_frag;
+  DskBufferFragment *fragment = (DskBufferFragment *) buffer->first_frag;
   CHECK_INTEGRITY (buffer);
-  while (max_length > 0 && frag)
+  while (max_length > 0 && fragment)
     {
-      if (frag->buf_length <= max_length)
+      if (fragment->buf_length <= max_length)
 	{
-	  memcpy (data, dsk_buffer_fragment_start (frag), frag->buf_length);
-	  rv += frag->buf_length;
-	  data = (char *) data + frag->buf_length;
-	  max_length -= frag->buf_length;
-	  frag = frag->next;
+	  memcpy (data, dsk_buffer_fragment_start (fragment), fragment->buf_length);
+	  rv += fragment->buf_length;
+	  data = (char *) data + fragment->buf_length;
+	  max_length -= fragment->buf_length;
+	  fragment = fragment->next;
 	}
       else
 	{
-	  memcpy (data, dsk_buffer_fragment_start (frag), max_length);
+	  memcpy (data, dsk_buffer_fragment_start (fragment), max_length);
 	  rv += max_length;
 	  data = (char *) data + max_length;
 	  max_length = 0;
@@ -445,7 +445,7 @@ dsk_buffer_peek     (const DskBuffer *buffer,
 char *
 dsk_buffer_read_line(DskBuffer *buffer)
 {
-  int len = 0;
+  int length = 0;
   char *rv;
   DskBufferFragment *at;
   int newline_length;
@@ -457,22 +457,22 @@ dsk_buffer_read_line(DskBuffer *buffer)
       got = memchr (start, '\n', at->buf_length);
       if (got)
 	{
-	  len += got - start;
+	  length += got - start;
 	  break;
 	}
-      len += at->buf_length;
+      length += at->buf_length;
     }
   if (at == NULL)
     return NULL;
-  rv = dsk_malloc (len + 1);
+  rv = dsk_malloc (length + 1);
   /* If we found a newline, read it out, truncating
    * it with NUL before we return from the function... */
   if (at)
     newline_length = 1;
   else
     newline_length = 0;
-  dsk_buffer_read (buffer, len + newline_length, rv);
-  rv[len] = 0;
+  dsk_buffer_read (buffer, length + newline_length, rv);
+  rv[length] = 0;
   CHECK_INTEGRITY (buffer);
   return rv;
 }
@@ -765,12 +765,12 @@ int
 dsk_buffer_str_index_of (DskBuffer *buffer,
                          const char *str_to_find)
 {
-  DskBufferFragment *frag = buffer->first_frag;
+  DskBufferFragment *fragment = buffer->first_frag;
   unsigned rv = 0;
-  for (frag = buffer->first_frag; frag; frag = frag->next)
+  for (fragment = buffer->first_frag; fragment; fragment = fragment->next)
     {
-      const uint8_t *frag_at = frag->buf + frag->buf_start;
-      unsigned frag_rem = frag->buf_length;
+      const uint8_t *frag_at = fragment->buf + fragment->buf_start;
+      unsigned frag_rem = fragment->buf_length;
       while (frag_rem > 0)
         {
           DskBufferFragment *subfrag;
@@ -784,7 +784,7 @@ dsk_buffer_str_index_of (DskBuffer *buffer,
               rv++;
               continue;
             }
-          subfrag = frag;
+          subfrag = fragment;
           subfrag_at = frag_at + 1;
           subfrag_rem = frag_rem - 1;
           str_at = str_to_find + 1;
@@ -834,13 +834,13 @@ dsk_buffer_drain (DskBuffer *dst,
 		  DskBuffer *src)
 {
   unsigned rv = src->size;
-  DskBufferFragment *frag;
+  DskBufferFragment *fragment;
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
-  for (frag = src->first_frag; frag; frag = frag->next)
+  for (fragment = src->first_frag; fragment; fragment = fragment->next)
     dsk_buffer_append (dst,
-                       frag->buf_length,
-                       dsk_buffer_fragment_start (frag));
+                       fragment->buf_length,
+                       dsk_buffer_fragment_start (fragment));
   dsk_buffer_discard (src, src->size);
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
@@ -896,23 +896,23 @@ dsk_buffer_transfer(DskBuffer *dst,
 		    unsigned max_transfer)
 {
   unsigned rv = 0;
-  DskBufferFragment *frag;
+  DskBufferFragment *fragment;
   CHECK_INTEGRITY (dst);
   CHECK_INTEGRITY (src);
-  for (frag = src->first_frag; frag && max_transfer > 0; frag = frag->next)
+  for (fragment = src->first_frag; fragment && max_transfer > 0; fragment = fragment->next)
     {
-      unsigned len = frag->buf_length;
-      if (len >= max_transfer)
+      unsigned length = fragment->buf_length;
+      if (length >= max_transfer)
         {
-          dsk_buffer_append (dst, max_transfer, dsk_buffer_fragment_start (frag));
+          dsk_buffer_append (dst, max_transfer, dsk_buffer_fragment_start (fragment));
           rv += max_transfer;
           break;
         }
       else
         {
-          dsk_buffer_append (dst, len, dsk_buffer_fragment_start (frag));
-          rv += len;
-          max_transfer -= len;
+          dsk_buffer_append (dst, length, dsk_buffer_fragment_start (fragment));
+          rv += length;
+          max_transfer -= length;
         }
     }
   dsk_buffer_discard (src, rv);
@@ -931,28 +931,28 @@ dsk_buffer_transfer(DskBuffer *dst,
   CHECK_INTEGRITY (src);
   while (src->first_frag && max_transfer >= src->first_frag->buf_length)
     {
-      DskBufferFragment *frag = src->first_frag;
-      src->first_frag = frag->next;
-      frag->next = NULL;
+      DskBufferFragment *fragment = src->first_frag;
+      src->first_frag = fragment->next;
+      fragment->next = NULL;
       if (src->first_frag == NULL)
 	src->last_frag = NULL;
 
       if (dst->last_frag)
-	dst->last_frag->next = frag;
+	dst->last_frag->next = fragment;
       else
-	dst->first_frag = frag;
-      dst->last_frag = frag;
+	dst->first_frag = fragment;
+      dst->last_frag = fragment;
 
-      rv += frag->buf_length;
-      max_transfer -= frag->buf_length;
+      rv += fragment->buf_length;
+      max_transfer -= fragment->buf_length;
     }
   dst->size += rv;
   if (src->first_frag && max_transfer)
     {
-      DskBufferFragment *frag = src->first_frag;
-      dsk_buffer_append (dst, max_transfer, dsk_buffer_fragment_start (frag));
-      frag->buf_start += max_transfer;
-      frag->buf_length -= max_transfer;
+      DskBufferFragment *fragment = src->first_frag;
+      dsk_buffer_append (dst, max_transfer, dsk_buffer_fragment_start (fragment));
+      fragment->buf_start += max_transfer;
+      fragment->buf_length -= max_transfer;
       rv += max_transfer;
     }
   src->size -= rv;
@@ -1053,32 +1053,32 @@ void     dsk_buffer_vprintf             (DskBuffer    *buffer,
  * starts with a particular NUL-terminated string.
  */
 static dsk_boolean
-fragment_n_str(DskBufferFragment   *frag,
+fragment_n_str(DskBufferFragment   *fragment,
                unsigned                frag_index,
                const char          *string)
 {
-  unsigned len = strlen (string);
+  unsigned length = strlen (string);
   for (;;)
     {
-      unsigned test_len = frag->buf_length - frag_index;
-      if (test_len > len)
-        test_len = len;
+      unsigned test_len = fragment->buf_length - frag_index;
+      if (test_len > length)
+        test_len = length;
 
       if (memcmp (string,
-                  dsk_buffer_fragment_start (frag) + frag_index,
+                  dsk_buffer_fragment_start (fragment) + frag_index,
                   test_len) != 0)
         return DSK_FALSE;
 
-      len -= test_len;
+      length -= test_len;
       string += test_len;
 
-      if (len <= 0)
+      if (length <= 0)
         return DSK_TRUE;
       frag_index += test_len;
-      if (frag_index >= frag->buf_length)
+      if (frag_index >= fragment->buf_length)
         {
-          frag = frag->next;
-          if (frag == NULL)
+          fragment = fragment->next;
+          if (fragment == NULL)
             return DSK_FALSE;
         }
     }
@@ -1102,7 +1102,7 @@ dsk_buffer_polystr_index_of    (DskBuffer    *buffer,
   int num_strings;
   int num_bits = 0;
   int total_index = 0;
-  DskBufferFragment *frag;
+  DskBufferFragment *fragment;
   memset (init_char_map, 0, sizeof (init_char_map));
   for (num_strings = 0; strings[num_strings] != NULL; num_strings++)
     {
@@ -1117,12 +1117,12 @@ dsk_buffer_polystr_index_of    (DskBuffer    *buffer,
     }
   if (num_bits == 0)
     return 0;
-  for (frag = buffer->first_frag; frag != NULL; frag = frag->next)
+  for (fragment = buffer->first_frag; fragment != NULL; fragment = fragment->next)
     {
       const uint8_t *frag_start;
       const uint8_t *at;
-      int remaining = frag->buf_length;
-      frag_start = dsk_buffer_fragment_start (frag);
+      int remaining = fragment->buf_length;
+      frag_start = dsk_buffer_fragment_start (fragment);
       at = frag_start;
       while (at != NULL)
         {
@@ -1157,13 +1157,13 @@ dsk_buffer_polystr_index_of    (DskBuffer    *buffer,
             char **test;
             for (test = strings; *test != NULL; test++)
               {
-                if (fragment_n_str(frag, at - frag_start, *test))
+                if (fragment_n_str(fragment, at - frag_start, *test))
                   return total_index + (at - frag_start);
               }
             at++;
           }
         }
-      total_index += frag->buf_length;
+      total_index += fragment->buf_length;
     }
   return -1;
 }
@@ -1414,60 +1414,60 @@ DskBufferFragment *dsk_buffer_find_fragment (DskBuffer   *buffer,
                                              unsigned     offset,
                                              unsigned    *frag_offset_out)
 {
-  DskBufferFragment *frag = buffer->first_frag;
+  DskBufferFragment *fragment = buffer->first_frag;
   unsigned frag_offset = 0;
   while (frag_offset < offset)
     {
-      if (offset >= frag_offset + frag->buf_length)
+      if (offset >= frag_offset + fragment->buf_length)
         {
-          frag_offset += frag->buf_length;
-          frag = frag->next;
+          frag_offset += fragment->buf_length;
+          fragment = fragment->next;
         }
       else
         {
           *frag_offset_out = frag_offset;
-          return frag;
+          return fragment;
         }
     }
   *frag_offset_out = frag_offset;
-  return frag;
+  return fragment;
 }
 
 unsigned
-dsk_buffer_fragment_peek (DskBufferFragment *frag,
+dsk_buffer_fragment_peek (DskBufferFragment *fragment,
                           unsigned           offset,
-                          unsigned           len,
+                          unsigned           length,
                           void              *buf)
 {
   char *b = buf;
   unsigned rv = 0;
-  if (frag->buf_length == offset)
+  if (fragment->buf_length == offset)
     {
       offset = 0;
-      frag = frag->next;
+      fragment = fragment->next;
     }
-  if (frag->buf_length >= len + offset)
+  if (fragment->buf_length >= length + offset)
     {
-      memcpy (buf, frag->buf + frag->buf_start + offset, len);
-      return len;
+      memcpy (buf, fragment->buf + fragment->buf_start + offset, length);
+      return length;
     }
-  rv = frag->buf_length - len;
-  memcpy (buf, frag->buf + frag->buf_start + offset, rv);
-  frag = frag->next;
+  rv = fragment->buf_length - length;
+  memcpy (buf, fragment->buf + fragment->buf_start + offset, rv);
+  fragment = fragment->next;
   b += rv;
-  while (frag)
+  while (fragment)
     {
-      if (frag->buf_length >= len - rv)
+      if (fragment->buf_length >= length - rv)
         {
-          memcpy (b, frag->buf + frag->buf_start, len - rv);
-          return len;
+          memcpy (b, fragment->buf + fragment->buf_start, length - rv);
+          return length;
         }
       else
         {
-          memcpy (b, frag->buf + frag->buf_start, frag->buf_length);
-          rv += frag->buf_length;
-          b += frag->buf_length;
-          frag = frag->next;
+          memcpy (b, fragment->buf + fragment->buf_start, fragment->buf_length);
+          rv += fragment->buf_length;
+          b += fragment->buf_length;
+          fragment = fragment->next;
         }
     }
   return rv;
@@ -1477,24 +1477,24 @@ dsk_boolean dsk_buffer_fragment_advance (DskBufferFragment **frag_inout,
                                          unsigned           *offset_inout,
                                          unsigned            skip)
 {
-  DskBufferFragment *frag = *frag_inout;
-  if (frag->buf_length >= *offset_inout + skip)
+  DskBufferFragment *fragment = *frag_inout;
+  if (fragment->buf_length >= *offset_inout + skip)
     {
       *offset_inout += skip;
       return DSK_TRUE;
     }
-  skip -= (frag->buf_length - *offset_inout);
-  while (skip > 0 && frag != NULL)
+  skip -= (fragment->buf_length - *offset_inout);
+  while (skip > 0 && fragment != NULL)
     {
-      if (skip >= frag->buf_length)
+      if (skip >= fragment->buf_length)
         {
-          skip -= frag->buf_length;
-          frag = frag->next;
+          skip -= fragment->buf_length;
+          fragment = fragment->next;
         }
       else
         {
           *offset_inout = skip;
-          *frag_inout = frag;
+          *frag_inout = fragment;
           return DSK_TRUE;
         }
     }
@@ -1504,12 +1504,12 @@ dsk_boolean dsk_buffer_fragment_advance (DskBufferFragment **frag_inout,
 void
 dsk_buffer_append_empty_fragment (DskBuffer *buffer)
 {
-  DskBufferFragment *frag = new_native_fragment ();
+  DskBufferFragment *fragment = new_native_fragment ();
   if (buffer->last_frag)
-    buffer->last_frag->next = frag;
+    buffer->last_frag->next = fragment;
   else
-    buffer->first_frag = frag;
-  buffer->last_frag = frag;
+    buffer->first_frag = fragment;
+  buffer->last_frag = fragment;
 }
 
 void dsk_buffer_maybe_remove_empty_fragment (DskBuffer *buffer)
@@ -1526,7 +1526,7 @@ void dsk_buffer_maybe_remove_empty_fragment (DskBuffer *buffer)
 }
 
 void
-dsk_buffer_fragment_free (DskBufferFragment *frag)
+dsk_buffer_fragment_free (DskBufferFragment *fragment)
 {
-  recycle (frag);
+  recycle (fragment);
 }

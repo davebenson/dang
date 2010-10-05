@@ -52,7 +52,7 @@ struct _DskDnsHeader
 
 /* Returns the name's length, including NUL */
 static dsk_boolean
-gather_name_length (unsigned       len,
+gather_name_length (unsigned       length,
                     const uint8_t *data,
                     unsigned      *used_inout,
                     unsigned      *sublen_out,
@@ -65,7 +65,7 @@ gather_name_length (unsigned       len,
   unsigned n_pieces = 0;
   for (;;)
     {
-      if (at == len)
+      if (at == length)
         {
           dsk_set_error (error, "truncated at beginning of name");
           return DSK_FALSE;
@@ -77,7 +77,7 @@ gather_name_length (unsigned       len,
               dsk_set_error (error, "too many components in message (or circular loop)");
               return DSK_FALSE;
             }
-          if (at + data[at] + 1 > len)
+          if (at + data[at] + 1 > length)
             {
               dsk_set_error (error, "string of length %u truncated", data[at]);
               return DSK_FALSE;
@@ -97,7 +97,7 @@ gather_name_length (unsigned       len,
           dsk_set_error (error, "invalid bytes in dns string");
           return DSK_FALSE;
         }
-      else if (at + 1 == len)
+      else if (at + 1 == length)
         {
           dsk_set_error (error, "string truncated in middle of pointer");
           return DSK_FALSE;
@@ -110,7 +110,7 @@ gather_name_length (unsigned       len,
               *used_inout = at + 2;
               has_followed_pointer = DSK_TRUE;
             }
-          if (new_offset >= len)
+          if (new_offset >= length)
             {
               dsk_set_error (error, "pointer out-of-bounds unpacking dns");
               return DSK_FALSE;
@@ -122,7 +122,7 @@ gather_name_length (unsigned       len,
 
 
 static dsk_boolean
-gather_name_length_resource_record (unsigned       len,
+gather_name_length_resource_record (unsigned       length,
                                     const uint8_t *data,
                                     unsigned      *used_inout, 
                                     unsigned      *str_space_inout,
@@ -132,10 +132,10 @@ gather_name_length_resource_record (unsigned       len,
   uint8_t header[10];
   unsigned sublen;
   /* owner */
-  if (!gather_name_length (len, data, used_inout, &sublen, error))
+  if (!gather_name_length (length, data, used_inout, &sublen, error))
     return DSK_FALSE;
   *str_space_inout += sublen;
-  if (*used_inout + 10 > len)
+  if (*used_inout + 10 > length)
     {
       dsk_set_error (error, "truncated resource-record");
       return DSK_FALSE;
@@ -146,7 +146,7 @@ gather_name_length_resource_record (unsigned       len,
   unsigned rdlength;
   type = ((uint16_t)header[0] << 8) | ((uint16_t)header[1] << 0);
   rdlength = ((uint16_t)header[8] << 8)  | ((uint16_t)header[9] << 0);
-  if (*used_inout + rdlength > len)
+  if (*used_inout + rdlength > length)
     {
       dsk_set_error (error, "truncated resource-data");
       return DSK_FALSE;
@@ -182,28 +182,28 @@ gather_name_length_resource_record (unsigned       len,
       switch (*code)
         {
         case 'b':
-          if (*used_inout == len)
+          if (*used_inout == length)
             goto truncated;
           *used_inout += 1;
         case 'd':
-          if (*used_inout + 4 > len)
+          if (*used_inout + 4 > length)
             goto truncated;
           *used_inout += 4;
           break;
         case 's':
           {
             unsigned c;
-            if (*used_inout == len)
+            if (*used_inout == length)
               goto truncated;
             c = data[*used_inout];
-            if (c + 1 + *used_inout > len)
+            if (c + 1 + *used_inout > length)
               goto truncated;
             *used_inout += c + 1;
             *str_space_inout += c + 1;
             break;
           }
         case 'n':
-          if (!gather_name_length (len, data, used_inout, &sublen, error))
+          if (!gather_name_length (length, data, used_inout, &sublen, error))
             return DSK_FALSE;
           *str_space_inout += sublen;
           break;
@@ -225,20 +225,20 @@ truncated:
 }
 
 static const char *
-parse_domain_name     (unsigned              len,
+parse_domain_name     (unsigned              length,
                        const uint8_t        *data,
                        unsigned             *used_inout,
                        char                **str_heap_at,
                        DskError            **error)
 {
   const char *rv = *str_heap_at;
-  while (*used_inout < len
+  while (*used_inout < length
       && data[*used_inout] != 0
       && (data[*used_inout] & 0xc0) == 0)
     {
       unsigned part_len = data[*used_inout];
       *used_inout += 1;
-      dsk_assert (*used_inout + part_len < len);
+      dsk_assert (*used_inout + part_len < length);
       if (rv < *str_heap_at)
         {
           **str_heap_at = '.';
@@ -248,7 +248,7 @@ parse_domain_name     (unsigned              len,
       *str_heap_at += part_len;
       *used_inout += part_len;
     }
-  if (*used_inout == len)
+  if (*used_inout == length)
     {
       /* truncated */
       dsk_set_error (error, "truncated in domain name");
@@ -275,7 +275,7 @@ parse_domain_name     (unsigned              len,
             {
               /* new length-prefixed name component */
               unsigned part_len = data[at++];
-              dsk_assert (at + part_len < len);
+              dsk_assert (at + part_len < length);
               if (*str_heap_at > rv)
                 {
                   **str_heap_at = '.';
@@ -309,7 +309,7 @@ parse_length_prefixed_string (const uint8_t *data,
 }
 
 static dsk_boolean
-parse_question (unsigned          len,
+parse_question (unsigned          length,
                 const uint8_t    *data,
                 unsigned         *used_inout,
                 DskDnsQuestion   *question,
@@ -318,8 +318,8 @@ parse_question (unsigned          len,
 {
   const char *name;
   uint16_t array[2];
-  name = parse_domain_name (len, data, used_inout, str_heap_at, error);
-  if (*used_inout + 4 > len)
+  name = parse_domain_name (length, data, used_inout, str_heap_at, error);
+  if (*used_inout + 4 > length)
     {
       dsk_set_error (error, "data truncated in question");
       return DSK_FALSE;
@@ -334,7 +334,7 @@ parse_question (unsigned          len,
 }
 
 static dsk_boolean
-parse_resource_record (unsigned              len,
+parse_resource_record (unsigned              length,
                        const uint8_t        *data,
                        unsigned             *used_inout,
                        DskDnsResourceRecord *rr,
@@ -346,10 +346,10 @@ parse_resource_record (unsigned              len,
   uint16_t class;
   uint32_t ttl;
   uint16_t rdlength;
-  rr->owner = parse_domain_name (len, data, used_inout, str_heap_at, error);
+  rr->owner = parse_domain_name (length, data, used_inout, str_heap_at, error);
   if (rr->owner == NULL)
     return DSK_FALSE;
-  if (*used_inout + 10 > len)
+  if (*used_inout + 10 > length)
     {
       dsk_set_error (error, "data truncated in resource-record header");
       return DSK_FALSE;
@@ -377,7 +377,7 @@ parse_resource_record (unsigned              len,
     case DSK_DNS_RR_NAME_SERVER:
     case DSK_DNS_RR_CANONICAL_NAME:
     case DSK_DNS_RR_POINTER:
-      rr->rdata.domain_name = parse_domain_name (len, data, used_inout, str_heap_at, error);
+      rr->rdata.domain_name = parse_domain_name (length, data, used_inout, str_heap_at, error);
       if (rr->rdata.domain_name == NULL)
         return DSK_FALSE;
       break;
@@ -392,12 +392,12 @@ parse_resource_record (unsigned              len,
         rr->rdata.mx.preference_value = htons (pv);
         *used_inout += 2;
       }
-      if ((rr->rdata.mx.mail_exchange_host_name = parse_domain_name (len, data, used_inout, str_heap_at, error)) == NULL)
+      if ((rr->rdata.mx.mail_exchange_host_name = parse_domain_name (length, data, used_inout, str_heap_at, error)) == NULL)
        return DSK_FALSE;
       break;
     case DSK_DNS_RR_START_OF_AUTHORITY:
-      if ((rr->rdata.soa.mname = parse_domain_name (len, data, used_inout, str_heap_at, error)) == NULL
-       || (rr->rdata.soa.rname = parse_domain_name (len, data, used_inout, str_heap_at, error)) == NULL)
+      if ((rr->rdata.soa.mname = parse_domain_name (length, data, used_inout, str_heap_at, error)) == NULL
+       || (rr->rdata.soa.rname = parse_domain_name (length, data, used_inout, str_heap_at, error)) == NULL)
        return DSK_FALSE;
       {
         uint32_t intervals[5];
@@ -432,7 +432,7 @@ validate_rcode (DskDnsRcode rcode)
 }
 
 DskDnsMessage *
-dsk_dns_message_parse (unsigned       len,
+dsk_dns_message_parse (unsigned       length,
                        const uint8_t *data,
                        DskError     **error)
 {
@@ -440,7 +440,7 @@ dsk_dns_message_parse (unsigned       len,
   unsigned i;
   unsigned total_rr;
   unsigned str_space = 0;
-  if (len < 12)
+  if (length < 12)
     {
       dsk_set_error (error, "dns packet too short (<12 bytes)");
       return NULL;
@@ -477,7 +477,7 @@ dsk_dns_message_parse (unsigned       len,
   for (i = 0; i < header.qdcount; i++)
     {
       unsigned sublen;
-      if (!gather_name_length (len, data, &used, &sublen, error))
+      if (!gather_name_length (length, data, &used, &sublen, error))
         goto cleanup;
       str_space += sublen;
       used += 4;
@@ -485,7 +485,7 @@ dsk_dns_message_parse (unsigned       len,
   total_rr = header.ancount + header.nscount + header.arcount;
   for (i = 0; i < total_rr; i++)
     {
-      if (!gather_name_length_resource_record (len, data,
+      if (!gather_name_length_resource_record (length, data,
                                                &used, &str_space, error))
         goto cleanup;
     }
@@ -519,13 +519,13 @@ dsk_dns_message_parse (unsigned       len,
   /* parse the four sections */
   used = 12;
   for (i = 0; i < header.qdcount; i++)
-    if (!parse_question (len, data, &used,
+    if (!parse_question (length, data, &used,
                          &message->questions[i],
                          &str_heap_at,
                          error))
       goto cleanup;
   for (i = 0; i < total_rr; i++)
-    if (!parse_resource_record (len, data, &used,
+    if (!parse_resource_record (length, data, &used,
                                 &message->answer_rr[i],
                                 &str_heap_at,
                                 error))
@@ -958,11 +958,11 @@ static void
 pack_len_prefixed_string (const char *str,
                           uint8_t   **data_inout)
 {
-  unsigned len = strlen (str);
-  **data_inout = len;
+  unsigned length = strlen (str);
+  **data_inout = length;
   *data_inout += 1;
-  memcpy (*data_inout, str, len);
-  *data_inout += len;
+  memcpy (*data_inout, str, length);
+  *data_inout += length;
 }
 
 static void

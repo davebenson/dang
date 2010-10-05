@@ -60,6 +60,8 @@ x XML Parser: basics
 x XML Parser: big documents
 x XML Parser: error conditions
 x XML Parser: comments
+WORK ON LUSK - the LUA/DSK HTTP Server
+
 _ XML Parser: ignore doctype and processing-instructions
 x XML Parser: multiple return paths
 x XML Parser: namespace support
@@ -165,7 +167,7 @@ DOCUMENTATION
 _ pick a documentation standard
 
 CODING STANDARDS
-_ "len" or "length"?  ANSWER: length
+_ DOCUMENT: length (not abbreviated)
 _ size_t everywhere ?
 _ DskClientStreamSource BUT DskOctetStreamSourceFd.
   Fix this inconsistency and come up with a policy for naming derived classes

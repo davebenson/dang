@@ -367,31 +367,31 @@ static inline void md5_init(ctxt)
 	bzero(ctxt->md5_buf, sizeof(ctxt->md5_buf));
 }
 
-static inline void md5_loop(ctxt, input, len)
+static inline void md5_loop(ctxt, input, length)
 	md5_ctxt *ctxt;
 	const uint8_t *input;
-	u_int len; /* number of bytes */
+	u_int length; /* number of bytes */
 {
 	u_int gap, i;
 
-	ctxt->md5_n += len * 8; /* byte to bit */
+	ctxt->md5_n += length * 8; /* byte to bit */
 	gap = MD5_BUFLEN - ctxt->md5_i;
 
-	if (len >= gap) {
+	if (length >= gap) {
 		bcopy((void *)input, (void *)(ctxt->md5_buf + ctxt->md5_i),
 			gap);
 		md5_calc(ctxt->md5_buf, ctxt);
 
-		for (i = gap; i + MD5_BUFLEN <= len; i += MD5_BUFLEN) {
+		for (i = gap; i + MD5_BUFLEN <= length; i += MD5_BUFLEN) {
 			md5_calc((uint8_t *)(input + i), ctxt);
 		}
 		
-		ctxt->md5_i = len - i;
+		ctxt->md5_i = length - i;
 		bcopy((void *)(input + i), (void *)ctxt->md5_buf, ctxt->md5_i);
 	} else {
 		bcopy((void *)input, (void *)(ctxt->md5_buf + ctxt->md5_i),
-			len);
-		ctxt->md5_i += len;
+			length);
+		ctxt->md5_i += length;
 	}
 }
 
@@ -892,10 +892,10 @@ sha1_pad(ctxt)
 }
 
 static void
-sha1_loop(ctxt, input, len)
+sha1_loop(ctxt, input, length)
 	struct sha1_ctxt *ctxt;
 	const uint8_t *input;
-	size_t len;
+	size_t length;
 {
 	size_t gaplen;
 	size_t gapstart;
@@ -904,11 +904,11 @@ sha1_loop(ctxt, input, len)
 
 	off = 0;
 
-	while (off < len) {
+	while (off < length) {
 		gapstart = COUNT % 64;
 		gaplen = 64 - gapstart;
 
-		copysiz = (gaplen < len - off) ? gaplen : len - off;
+		copysiz = (gaplen < length - off) ? gaplen : length - off;
 		bcopy(&input[off], &ctxt->m.b8[gapstart], copysiz);
 		COUNT += copysiz;
 		COUNT %= 64;
@@ -1377,10 +1377,10 @@ static const uint32_t crc32_table[256] = {
 	0x2d02ef8dL
 };
 static inline uint32_t 
-crc32(uint32_t val, const void *ss, int len)
+crc32(uint32_t val, const void *ss, int length)
 {
 	const unsigned char *s = ss;
-        while (--len >= 0)
+        while (--length >= 0)
                 val = crc32_table[(val ^ *s++) & 0xff] ^ (val >> 8);
         return val;
 }

@@ -631,8 +631,8 @@ handle_post_data_readable (DskOctetSource *source,
       if (xfer->request->transfer_encoding_chunked)
         {
           char chunked_header[MAX_CHUNK_HEADER_SIZE];
-          unsigned len = get_chunked_header (buf->size, chunked_header);
-          dsk_buffer_append (&stream->outgoing_data, len, chunked_header);
+          unsigned length = get_chunked_header (buf->size, chunked_header);
+          dsk_buffer_append (&stream->outgoing_data, length, chunked_header);
         }
       dsk_buffer_drain (&stream->outgoing_data, buf);
       if (xfer->request->transfer_encoding_chunked)

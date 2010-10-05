@@ -340,19 +340,19 @@ handle_dns_udp_socket_readable (void *socket,
     {
       DskIpAddress addr;
       unsigned port;
-      unsigned len;
+      unsigned length;
       uint8_t *data;
       DskError *error = NULL;
       DskDnsMessage *message;
 next_packet:
       switch (dsk_udp_socket_receive (socket,
-                                      &addr, &port, &len, &data,
+                                      &addr, &port, &length, &data,
                                       &error))
         {
         case DSK_IO_RESULT_SUCCESS:
           /* verify address matches id */
           {
-            if (len < 12)
+            if (length < 12)
               {
                 dsk_warning ("DNS system: message far too short");
                 dsk_free (data);
@@ -374,7 +374,7 @@ next_packet:
                 dsk_free (data);
                 goto next_packet;
               }
-            message = dsk_dns_message_parse (len, data, &error);
+            message = dsk_dns_message_parse (length, data, &error);
             if (message == NULL)
               {
                 dsk_warning ("DNS system: error parsing message: %s",
@@ -577,11 +577,11 @@ retry:
             }
           else
             {
-              unsigned len = strlen (arg);
+              unsigned length = strlen (arg);
               resolv_conf_search_paths = dsk_realloc (resolv_conf_search_paths,
                                             (n_resolv_conf_search_paths+1) * sizeof (char *));
-              if (max_resolv_conf_searchpath_len < len)
-                max_resolv_conf_searchpath_len = len;
+              if (max_resolv_conf_searchpath_len < length)
+                max_resolv_conf_searchpath_len = length;
               resolv_conf_search_paths[n_resolv_conf_search_paths++] = dsk_strdup (arg);
             }
         }

@@ -115,18 +115,18 @@ dsk_udp_socket_new     (dsk_boolean  is_ipv6,
 }
 static inline DskIOResult
 handle_truncated (unsigned rv,
-                  unsigned len,
+                  unsigned length,
                   DskError **error)
 {
   dsk_set_error (error,
                  "data truncated sending udp packet (%u of %u bytes sent)",
-                 (unsigned) rv, (unsigned) len);
+                 (unsigned) rv, (unsigned) length);
   return DSK_IO_RESULT_ERROR;
 }
 
 DskIOResult
 dsk_udp_socket_send    (DskUdpSocket  *socket,
-                        unsigned       len,
+                        unsigned       length,
                         const uint8_t *data,
                         DskError     **error)
 {
@@ -136,7 +136,7 @@ dsk_udp_socket_send    (DskUdpSocket  *socket,
       dsk_set_error (error, "cannot send udp packet without being connected");
       return DSK_IO_RESULT_ERROR;
     }
-  rv = send (socket->fd, data, len, 0);
+  rv = send (socket->fd, data, length, 0);
   if (rv < 0)
     {
       if (errno == EINTR || errno == EAGAIN)
@@ -144,8 +144,8 @@ dsk_udp_socket_send    (DskUdpSocket  *socket,
       dsk_set_error (error, "error sending udp packet: %s", strerror (errno));
       return DSK_IO_RESULT_ERROR;
     }
-  if ((size_t) rv < len)
-    return handle_truncated (rv, len, error);
+  if ((size_t) rv < length)
+    return handle_truncated (rv, length, error);
   return DSK_IO_RESULT_SUCCESS;
 }
 
@@ -153,7 +153,7 @@ DskIOResult
 dsk_udp_socket_send_to_ip      (DskUdpSocket  *socket,
                                 const DskIpAddress  *address,
                                 unsigned       port,
-                                unsigned       len,
+                                unsigned       length,
                                 const uint8_t *data,
                                 DskError     **error)
 {
@@ -161,7 +161,7 @@ dsk_udp_socket_send_to_ip      (DskUdpSocket  *socket,
   unsigned addr_len;
   ssize_t rv;
   dsk_ip_address_to_sockaddr (address, port, &addr, &addr_len);
-  rv = sendto (socket->fd, data, len, 0,
+  rv = sendto (socket->fd, data, length, 0,
                (struct sockaddr *) &addr, addr_len);
   if (rv < 0)
     {
@@ -171,8 +171,8 @@ dsk_udp_socket_send_to_ip      (DskUdpSocket  *socket,
       dsk_set_error (error, "error sending udp packet: %s", strerror (errno));
       return DSK_IO_RESULT_ERROR;
     }
-  if ((unsigned) rv < len)
-    return handle_truncated (rv, len, error);
+  if ((unsigned) rv < length)
+    return handle_truncated (rv, length, error);
   return DSK_IO_RESULT_SUCCESS;
 }
 
@@ -181,7 +181,7 @@ struct _SendBlockingDnsData
 {
   DskUdpSocket *socket;
   unsigned port;
-  unsigned len;
+  unsigned length;
   uint8_t *send_data;
 };
 
@@ -193,7 +193,7 @@ handle_send_blocking_dns_data (DskDnsLookupResult *result,
   if (result->type == DSK_DNS_LOOKUP_RESULT_FOUND)
     {
       dsk_udp_socket_send_to_ip (sbdd->socket, result->addr,
-                                 sbdd->port, sbdd->len, sbdd->send_data,
+                                 sbdd->port, sbdd->length, sbdd->send_data,
                                  NULL);
     }
   else
@@ -209,7 +209,7 @@ DskIOResult
 dsk_udp_socket_send_to (DskUdpSocket  *socket,
                         const char    *name,
                         unsigned       port,
-                        unsigned       len,
+                        unsigned       length,
                         const uint8_t *data,
                         DskError     **error)
 {
@@ -221,19 +221,19 @@ dsk_udp_socket_send_to (DskUdpSocket  *socket,
       return DSK_IO_RESULT_ERROR;
     case DSK_DNS_LOOKUP_NONBLOCKING_MUST_BLOCK:
       {
-        SendBlockingDnsData *sbdd = dsk_malloc (sizeof (SendBlockingDnsData) + len);
+        SendBlockingDnsData *sbdd = dsk_malloc (sizeof (SendBlockingDnsData) + length);
         dsk_object_ref (socket);
         sbdd->port = port;
-        sbdd->len = len;
+        sbdd->length = length;
         sbdd->send_data = (uint8_t*)(sbdd + 1);
-        memcpy (sbdd->send_data, data, len);
+        memcpy (sbdd->send_data, data, length);
         sbdd->socket = socket;
         dsk_dns_lookup (name, socket->is_ipv6, handle_send_blocking_dns_data, sbdd);
         return DSK_IO_RESULT_SUCCESS;
       }
     case DSK_DNS_LOOKUP_NONBLOCKING_FOUND:
       return dsk_udp_socket_send_to_ip (socket, &address, port,
-                                        len, data, error);
+                                        length, data, error);
     case DSK_DNS_LOOKUP_NONBLOCKING_ERROR:
       return DSK_IO_RESULT_ERROR;
     }
@@ -268,7 +268,7 @@ dsk_udp_socket_receive (DskUdpSocket  *socket,
                         DskError     **error)
 {
   void *buf = socket->recv_slab;
-  unsigned len = socket->recv_slab_len;
+  unsigned length = socket->recv_slab_len;
   ssize_t rv;
   if (buf == NULL)
     {
@@ -283,7 +283,7 @@ dsk_udp_socket_receive (DskUdpSocket  *socket,
       if (value == 0)
         return DSK_IO_RESULT_AGAIN;
       buf = dsk_malloc (value);
-      len = value;
+      length = value;
     }
   struct sockaddr_storage sysaddr;
   struct msghdr msg;
@@ -299,7 +299,7 @@ dsk_udp_socket_receive (DskUdpSocket  *socket,
       msg.msg_namelen = 0;
     }
   iov.iov_base = buf;
-  iov.iov_len = len;
+  iov.iov_len = length;
   msg.msg_iov = &iov;
   msg.msg_iovlen = 1;
   msg.msg_control = NULL;

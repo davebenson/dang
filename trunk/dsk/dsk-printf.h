@@ -4,7 +4,7 @@ void dsk_printf (const char *format,
 
 
 typedef void (*DskPrintfAppendFunc) (void          *append_data,
-                                     unsigned       len,
+                                     unsigned       length,
 				     const uint8_t *data);
 
 
