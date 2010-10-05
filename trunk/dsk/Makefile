@@ -10,6 +10,7 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-http-loopback \
 		tests/test-date-0 \
 		tests/test-unicode \
+		tests/test-checksum \
 		tests/test-xml-parser-0 \
 		tests/test-xml-validation-suite \
 		tests/test-xml-binding-0
@@ -60,6 +61,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-url-encoder.o dsk-url-decoder.o \
 	  dsk-byte-doubler.o dsk-byte-undoubler.o \
 	  dsk-print.o \
+	  dsk-checksum.o \
 	  dsk-file-util.o
 	ar cru $@ $^
 
