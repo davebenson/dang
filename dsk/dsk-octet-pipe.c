@@ -66,7 +66,7 @@ dsk_pipe_sink_write         (DskOctetSink   *sink,
                              DskError      **error)
 {
   DskPipeSink *psink = DSK_PIPE_SINK (sink);
-  unsigned len;
+  unsigned length;
   DskMemorySource *msource = psink->source;
   if (msource == NULL || msource->got_shutdown)
     {
@@ -77,11 +77,11 @@ dsk_pipe_sink_write         (DskOctetSink   *sink,
     return DSK_IO_RESULT_SUCCESS;
   if (psink->source->buffer.size >= psink->source->buffer_low_amount)
     return DSK_IO_RESULT_AGAIN;
-  len = psink->source->buffer_low_amount - psink->source->buffer.size;
-  if (len > max_len)
-    len = max_len;
-  *n_written_out = len;
-  dsk_buffer_append (&msource->buffer, len, data_out);
+  length = psink->source->buffer_low_amount - psink->source->buffer.size;
+  if (length > max_len)
+    length = max_len;
+  *n_written_out = length;
+  dsk_buffer_append (&msource->buffer, length, data_out);
   if (psink->source->buffer.size == psink->source->buffer_low_amount)
     {
       dsk_hook_set_idle_notify (&sink->writable_hook, DSK_FALSE);
@@ -101,7 +101,7 @@ dsk_pipe_sink_write_buffer  (DskOctetSink   *sink,
 {
   DskPipeSink *psink = DSK_PIPE_SINK (sink);
   DskMemorySource *msource = psink->source;
-  unsigned len;
+  unsigned length;
   if (msource == NULL)
     {
       dsk_set_error (error, "write to disconnected pipe");
@@ -111,10 +111,10 @@ dsk_pipe_sink_write_buffer  (DskOctetSink   *sink,
     return DSK_IO_RESULT_SUCCESS;
   if (psink->source->buffer.size >= psink->source->buffer_low_amount)
     return DSK_IO_RESULT_AGAIN;
-  len = psink->source->buffer_low_amount - psink->source->buffer.size;
-  if (len > write_buffer->size)
-    len = write_buffer->size;
-  dsk_buffer_transfer (&msource->buffer, write_buffer, len);
+  length = psink->source->buffer_low_amount - psink->source->buffer.size;
+  if (length > write_buffer->size)
+    length = write_buffer->size;
+  dsk_buffer_transfer (&msource->buffer, write_buffer, length);
   if (psink->source->buffer.size == psink->source->buffer_low_amount)
     {
       dsk_hook_set_idle_notify (&sink->writable_hook, DSK_FALSE);

@@ -56,7 +56,7 @@ typedef enum
 typedef struct Token
 {
   TokenType type;
-  unsigned start, len;
+  unsigned start, length;
   unsigned line_no;
 } Token;
 
@@ -77,7 +77,7 @@ tokenize (const char *filename,
   do { \
     if (n >= TOKENIZE_INIT_TOKEN_COUNT && ((n) & (n-1)) == 0) \
       rv = dsk_realloc (rv, sizeof (Token) * n * 2); \
-    rv[n].type = type_; rv[n].start = start_; rv[n].len = len_; rv[n].line_no = line_no; \
+    rv[n].type = type_; rv[n].start = start_; rv[n].length = len_; rv[n].line_no = line_no; \
     n++; \
   } while(0)
 #define ADD_TOKEN_ADVANCE(type_, len_) \
@@ -206,10 +206,10 @@ make_token_string (ParseContext *context,
 {
   char *rv;
   dsk_assert (idx < context->n_tokens);
-  rv = dsk_malloc (context->tokens[idx].len + 1);
+  rv = dsk_malloc (context->tokens[idx].length + 1);
   memcpy (rv, context->str + context->tokens[idx].start,
-          context->tokens[idx].len);
-  rv[context->tokens[idx].len] = 0;
+          context->tokens[idx].length);
+  rv[context->tokens[idx].length] = 0;
   return rv;
 }
 
@@ -228,7 +228,7 @@ parse_dotted_bareword (ParseContext *context,
   if (!token_type_is_word (context->tokens[start].type))
     {
       dsk_set_error (error, "expected bareword, got '%.*s' (%s:%u)",
-                     context->tokens[start].len,
+                     context->tokens[start].length,
                      context->str + context->tokens[start].start,
                      context->filename,
                      context->tokens[start].line_no);
@@ -246,7 +246,7 @@ parse_dotted_bareword (ParseContext *context,
        || !token_type_is_word (context->tokens[start + comps * 2].type))
         {
           dsk_set_error (error, "expected bareword after '.', got '%.*s' (%s:%u)",
-                         context->tokens[start + comps*2].len,
+                         context->tokens[start + comps*2].length,
                          context->str + context->tokens[start + comps*2].start,
                          context->filename,
                          context->tokens[start + comps*2].line_no);
@@ -261,14 +261,14 @@ done:
     unsigned alloc_len = 0, i;
     char *rv, *at;
     for (i = 0; i < comps; i++)
-      alloc_len += context->tokens[start + i * 2].len + 1;
+      alloc_len += context->tokens[start + i * 2].length + 1;
     rv = dsk_malloc (alloc_len);
     at = rv;
     for (i = 0; i < comps; i++)
       {
         memcpy (at, context->str + context->tokens[start + i*2].start,
-                context->tokens[start + i*2].len);
-        at += context->tokens[start + i*2].len;
+                context->tokens[start + i*2].length);
+        at += context->tokens[start + i*2].length;
         *at++ = '.';
       }
     --at;
@@ -452,7 +452,7 @@ parse_member_list (ParseContext *context,
           break;
         default:
           dsk_set_error (error, "expected '+', '!', '*' or '?', got %.*s at (%s:%u)",
-                         context->tokens[at].len, context->str + context->tokens[at].start,
+                         context->tokens[at].length, context->str + context->tokens[at].start,
                          context->filename,
                          context->tokens[at].line_no);
           goto got_error;
@@ -462,17 +462,17 @@ parse_member_list (ParseContext *context,
       /* parse name */
       if (token_type_is_word (context->tokens[at].type))
         {
-          unsigned len = context->tokens[at].len;
-          char *name = dsk_malloc (len + 1);
+          unsigned length = context->tokens[at].length;
+          char *name = dsk_malloc (length + 1);
           member.name = name;
-          memcpy (name, context->str + context->tokens[at].start, len);
-          name[len] = 0;
+          memcpy (name, context->str + context->tokens[at].start, length);
+          name[length] = 0;
         }
       else
         {
           dsk_set_error (error, "expected indentifier at %s:%u (got '%.*s')",
                          context->filename, context->tokens[at].line_no,
-                         context->tokens[at].len, context->str + context->tokens[at].start);
+                         context->tokens[at].length, context->str + context->tokens[at].start);
           goto got_error;
         }
       at++;
@@ -548,7 +548,7 @@ parse_case_list (ParseContext           *context,
       if (!token_type_is_word (context->tokens[at].type))
         {
           dsk_set_error (error, "expected bareword for case label, got %.*s (%s:%u)",
-                         context->tokens[at].len,
+                         context->tokens[at].length,
                          context->str + context->tokens[at].start,
                          context->filename,
                          context->tokens[at].line_no);
@@ -557,17 +557,17 @@ parse_case_list (ParseContext           *context,
       if (context->tokens[at+1].type != TOKEN_COLON)
         {
           dsk_set_error (error, "expected ':' for case label, got %.*s (%s:%u)",
-                         context->tokens[at+1].len,
+                         context->tokens[at+1].length,
                          context->str + context->tokens[at+1].start,
                          context->filename,
                          context->tokens[at+1].line_no);
           goto got_error;
         }
       DskXmlBindingUnionCase cas;
-      cas.name = dsk_malloc (context->tokens[at].len + 1);
+      cas.name = dsk_malloc (context->tokens[at].length + 1);
       memcpy (cas.name, context->str + context->tokens[at].start,
-              context->tokens[at].len);
-      cas.name[context->tokens[at].len] = 0;
+              context->tokens[at].length);
+      cas.name[context->tokens[at].length] = 0;
       cas.elide_struct_outer_tag = DSK_FALSE;
       if (at + 2 == context->n_tokens
        || context->tokens[at+2].type == TOKEN_SEMICOLON)
@@ -745,7 +745,7 @@ parse_file (ParseContext *context,
         {
           dsk_set_error (error,
                          "expected 'use', 'struct' or 'union', got '%.*s' (%s:%u)",
-                         tokens[at].len, context->str + tokens[at].start,
+                         tokens[at].length, context->str + tokens[at].start,
                          context->filename, tokens[at].line_no);
           return DSK_FALSE;
         }
@@ -836,7 +836,7 @@ parse_file (ParseContext *context,
         {
           dsk_set_error (error,
                          "unexpected token '%.*s' (%s:%u) - expected struct or union",
-                         tokens[at].len, context->str + tokens[at].start,
+                         tokens[at].length, context->str + tokens[at].start,
                          context->filename, tokens[at].line_no);
           goto error_cleanup;
         }

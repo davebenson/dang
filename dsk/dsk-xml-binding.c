@@ -122,12 +122,12 @@ dsk_xml_binding_get_ns         (DskXmlBinding *binding,
   /* look along searchpath */
   for (i = 0; i < binding->n_search_paths; i++)
     {
-      unsigned len = binding->search_paths[i].path_len
+      unsigned length = binding->search_paths[i].path_len
                    + 1
                    + n_non_dots
                    + n_dots * binding->search_paths[i].sep_len
                    + 1;
-      char *path = dsk_malloc (len);
+      char *path = dsk_malloc (length);
       char *out = path + binding->search_paths[i].path_len;
       memcpy (path, binding->search_paths[i].path,
               binding->search_paths[i].path_len);

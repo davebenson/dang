@@ -3,11 +3,11 @@
 
 /* helper function: is there space for more data at the end of this fragment? */
 static dsk_boolean
-fragment_has_empty_space (DskBufferFragment *frag)
+fragment_has_empty_space (DskBufferFragment *fragment)
 {
-  if (frag->is_foreign)
+  if (fragment->is_foreign)
     return DSK_FALSE;
-  return (frag->buf_max_size > frag->buf_start + frag->buf_length);
+  return (fragment->buf_max_size > fragment->buf_start + fragment->buf_length);
 }
 
 

@@ -55,10 +55,10 @@ static void write_octal (DskBuffer *buffer, uint8_t c)
 }
 
 static inline unsigned
-scan_unquoted_matter (unsigned len, const uint8_t *data)
+scan_unquoted_matter (unsigned length, const uint8_t *data)
 {
   unsigned rv = 0;
-  while (rv < len
+  while (rv < length
          && ' ' <= data[rv] && data[rv] <= 126
          && data[rv] != '"'
          && data[rv] != '\\')
@@ -67,10 +67,10 @@ scan_unquoted_matter (unsigned len, const uint8_t *data)
 }
 
 static inline unsigned
-scan_unquoted_matter__trigraph (unsigned len, const uint8_t *data)
+scan_unquoted_matter__trigraph (unsigned length, const uint8_t *data)
 {
   unsigned rv = 0;
-  while (rv < len
+  while (rv < length
          && ' ' <= data[rv] && data[rv] <= 126
          && data[rv] != '"'
          && data[rv] != '?'

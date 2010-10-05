@@ -91,9 +91,9 @@ dsk_strdup (const char *str)
     return NULL;
   else
     {
-      unsigned len = strlen (str);
-      char *rv = dsk_malloc (len + 1);
-      memcpy (rv, str, len + 1);
+      unsigned length = strlen (str);
+      char *rv = dsk_malloc (length + 1);
+      memcpy (rv, str, length + 1);
       return rv;
     }
 }
@@ -106,10 +106,10 @@ dsk_memdup (size_t size, const void *ptr)
 }
 char *dsk_strdup_slice (const char *str, const char *end_str)
 {
-  unsigned len = end_str - str;
-  char *rv = dsk_malloc (len + 1);
-  memcpy (rv, str, len);
-  rv[len] = '\0';
+  unsigned length = end_str - str;
+  char *rv = dsk_malloc (length + 1);
+  memcpy (rv, str, length);
+  rv[length] = '\0';
   return rv;
 }
 void
