@@ -17,6 +17,11 @@ XML:
 XML-Namespaces:
 	...
 
+Checksumming algos:
+  MD5:	
+  SHA1:
+  SHA256:
+
 ---
 NOT IMPLEMENTEDD
 
@@ -24,5 +29,6 @@ FTP?
 	...
 	
 SSL
+HTTPS
 JSON
 YAML
