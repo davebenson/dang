@@ -13,6 +13,11 @@ void     dsk_http_auth_basic_encode     (const char *username,
 
 
 /* --- digest --- */
+DskHttpAuthDigest *dsk_http_auth_digest_new (char     **kv_pairs,
+                                             DskError **error);
+void               dsk_http_auth_digest_set_userpass (DskHttpAuthDigest *digest,
+                                                      const char        *username,
+                                                      const char        *password);
 ...
 
 /* --- oauth --- */
