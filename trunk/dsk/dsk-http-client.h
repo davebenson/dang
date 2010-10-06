@@ -27,6 +27,9 @@ struct _DskHttpClientOptions
   unsigned max_connections_keptalive;
   unsigned max_connections_per_host_keptalive;
   unsigned max_connections_total;
+
+  /* logging options?  or maybe a "trap" system that can be used for it? */
+  ...
 };
 
 /* TODO: provide some sort of evidence that these are good numbers */
@@ -62,7 +65,10 @@ struct _DskHttpClientRequestOptions
   char *local_socket_path;
 
   /* TODO: POST-data CGI variables? */
-  /* TODO: GET CGI variables? */
+
+  /* GET CGI variables: will be added to query string if it exists,
+     and a query string (starting with a '?') will be added otherwise. */
+  char **extra_get_cgi_variables;
 
   /* May we attempt to pipeline this request? (default: yes for GET/HEAD) */
   unsigned pipeline_head : 1;
