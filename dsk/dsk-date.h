@@ -7,6 +7,14 @@
  * so we do not implement them at all.
  */
 
+/* Note that unixtime is defined in
+ * Coordinated Universal Time (abbreviated UTC),
+ * which has no leap seconds; however, days with a leap second are
+ * "stretched out"--meaning each second is 1/86400 times longer,
+ * but there are still 86400 UTC seconds that day,
+ * versus 86401 GMT seconds that day - which in real-world time
+ * is the same.
+ */
 
 typedef struct _DskDate DskDate;
 struct _DskDate
@@ -38,14 +46,16 @@ void        dsk_date_print_rfc850 (DskDate *date, /* unimplemented */
 void        dsk_date_print_iso8601 (DskDate *date, /* unimplemented */
                                    char    *buf);
 
-/* 'unixtime' here is seconds since epoch.
+/* 'unixtime' here is seconds since epoch in UTC.
    If the date is before the epoch (Jan 1, 1970 00:00 GMT),
    then it is negative. */
+
 /* Behavior of dsk_date_to_unixtime() is undefined if any
    of the fields are out-of-bounds.
    Behavior of dsk_unixtime_to_date() is defined for any time
    whose year fits in an unsigned integer. (therefore, no B.C. dates)
  */
+
 /* dsk_unixtime_to_date() always sets the date_out->zone_offset to 0 (ie GMT) */
 dsk_time_t  dsk_date_to_unixtime (DskDate *date);
 void        dsk_unixtime_to_date (dsk_time_t unixtime,
