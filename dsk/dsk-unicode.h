@@ -8,6 +8,7 @@ extern unsigned char dsk_ascii_chartable[256];
 #define dsk_ascii_isdigit(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 8)
 #define dsk_ascii_isxdigit(c) (dsk_ascii_chartable[(unsigned char)(c)] & 16)
 #define dsk_ascii_is_minus_or_underscore(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 32)
+#define dsk_ascii_ispunct(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 64)
 
 /* isalpha = isupper || is_lower */
 #define dsk_ascii_isalpha(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 6)

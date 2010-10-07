@@ -2,7 +2,8 @@
 
 BUILT_SOURCES = dsk-ascii-chartable.inc dsk-digit-chartables.inc \
                 dsk-http-ident-chartable.inc dsk-byte-name-table.inc \
-		dsk-base64-char-table.inc dsk-base64-value-table.inc 
+		dsk-base64-char-table.inc dsk-base64-value-table.inc \
+		dsk-pattern-char-classes.inc
 TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-dispatch \
 	        tests/test-http-client-stream-0 \
@@ -62,7 +63,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-byte-doubler.o dsk-byte-undoubler.o \
 	  dsk-print.o \
 	  dsk-checksum.o \
-	  dsk-file-util.o
+	  dsk-file-util.o dsk-pattern.o
 	ar cru $@ $^
 
 %.o: %.c
@@ -79,6 +80,8 @@ dsk-byte-name-table.inc: mk-byte-name-table.pl
 dsk-base64-char-table.inc: mk-base64-to-char-table.pl
 	./$^ > $@
 dsk-base64-value-table.inc: mk-base64-to-value-table.pl
+	./$^ > $@
+dsk-pattern-char-classes.inc: mk-pattern-char-classes.pl
 	./$^ > $@
 
 tests/generated/xml-binding-test.h tests/generated/xml-binding-test.c: \
