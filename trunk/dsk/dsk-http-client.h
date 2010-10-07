@@ -29,7 +29,6 @@ struct _DskHttpClientOptions
   unsigned max_connections_total;
 
   /* logging options?  or maybe a "trap" system that can be used for it? */
-  ...
 };
 
 /* TODO: provide some sort of evidence that these are good numbers */
