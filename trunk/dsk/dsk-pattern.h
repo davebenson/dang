@@ -9,6 +9,11 @@ struct _DskPatternEntry
 };
 
 DskPattern *dsk_pattern_compile (unsigned n_entries,
-                                 DskPatternEntry *entries);
+                                 DskPatternEntry *entries,
+                                 DskError **error);
 
 
+void      * dsk_pattern_match   (DskPattern *pattern,
+                                 const char *str);
+
+void        dsk_pattern_free (DskPattern *pattern);

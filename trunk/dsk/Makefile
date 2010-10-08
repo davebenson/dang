@@ -13,6 +13,7 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-unicode \
 		tests/test-checksum \
 		tests/test-xml-parser-0 \
+		tests/test-pattern-0 \
 		tests/test-xml-validation-suite \
 		tests/test-xml-binding-0
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
