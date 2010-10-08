@@ -16,8 +16,8 @@ struct _DskMemPool
 
 DSK_INLINE_FUNC void     dsk_mem_pool_init     (DskMemPool     *pool);
 DSK_INLINE_FUNC void     dsk_mem_pool_init_buf (DskMemPool     *pool,
-                                                void           *buffer,
-                                                size_t          buffer_size);
+                                                size_t          buffer_size,
+                                                void           *buffer);
 DSK_INLINE_FUNC void    *dsk_mem_pool_alloc    (DskMemPool     *pool,
                                                 size_t          size);
                 void    *dsk_mem_pool_alloc0   (DskMemPool     *pool,
@@ -45,8 +45,8 @@ struct _DskMemPoolFixed
 DSK_INLINE_FUNC void     dsk_mem_pool_fixed_init_buf
                                                  (DskMemPoolFixed *pool,
                                                   size_t            elt_size,
-                                                  void *         buffer,
-                                                  size_t            buffer_n_elements);
+                                                  size_t            buffer_n_elements,
+                                                  void    *         buffer);
 void     dsk_mem_pool_fixed_init (DskMemPoolFixed  *pool,
                                        unsigned           size);
 void * dsk_mem_pool_fixed_alloc     (DskMemPoolFixed  *pool);
@@ -77,8 +77,8 @@ DSK_INLINE_FUNC void     dsk_mem_pool_init    (DskMemPool     *pool)
   pool->chunk_left = 0;
 }
 DSK_INLINE_FUNC void     dsk_mem_pool_init_buf   (DskMemPool     *pool,
-                                                  void *        buffer,
-                                                  size_t           buffer_size)
+                                                  size_t           buffer_size,
+                                                  void *        buffer)
 {
   pool->all_chunk_list = NULL;
   pool->chunk = buffer;
@@ -134,8 +134,8 @@ DSK_INLINE_FUNC void     dsk_mem_pool_clear     (DskMemPool     *pool)
 DSK_INLINE_FUNC void     dsk_mem_pool_fixed_init_buf
                                                  (DskMemPoolFixed *pool,
                                                   size_t           elt_size,
-                                                  void *           buffer,
-                                                  size_t           buffer_n_elements)
+                                                  size_t           buffer_n_elements,
+                                                  void *           buffer)
 {
   pool->slab_list = NULL;
   pool->chunk = buffer;

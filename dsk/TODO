@@ -84,6 +84,32 @@ _ high trap counts?
 
 TODO:
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)
+_ client support for receiving trailers
+
+_ DskPattern:
+  _ IMPORTANT OPTIMIZATION: implement "state-trumping"
+    PROBLEM: currently something like:
+            .*a.*
+	    .*b.*
+	    .*c.*
+    Generates 2^N states (where N is the number of unanchored regexes).
+    To minimize this, note that if we have gotten 'a' and 'b', then we will
+    always return 'a', so keeping track of 'b' is unneeded,
+    and the state transition graph should have one state of each of 'a', 'b', 'c':
+    the highest character found.
+
+    A useful implementation might handle JUST .* which is very common.
+    A better implementation might allow any trailing expression, for example
+    the same situation occurs with:
+            .*ax*
+	    .*bx*
+	    .*cx*
+  _ add 'flags' to DskPatternEntry with "ignore_case",
+  _ utf-8 support
+  _ implement some sort of NFA fallback
+  _ support captures (ugh)
+  _ TEST:
+    _ empty list of patterns
 
 x HTTP Client Stream        KEEP UNTIL DONE TESTING
   x content-encoding gzip
