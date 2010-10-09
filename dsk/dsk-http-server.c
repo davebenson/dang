@@ -311,6 +311,29 @@ respond_error (DskHttpServerRequest *request,
                DskHttpStatus         status,
                const char           *message)
 {
+  /* Configure response */
+  DskHttpServerStreamResponseOptions resp_options = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
+  DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
+  resp_options.header_options = &header_options;
+  header_options.status = status;
+  header_options.content_type = "text/html/UTF-8";
+
+  /* compute content */
+  content_data = ...;
+  header->content_length = ...;
+  header->content_data = ...;
+  ...
+
+  /* Respond */
+  if (!dsk_http_server_stream_respond (request->transfer, &resp_options, &error))
+    {
+      dsk_warning ("error responding with error (original error='%s'; second error='%s')",
+                   message, error->message);
+      dsk_error_unref (error);
+    }
+  dsk_free (content_data);
+
+  /* Free request */
   ...
 }
 
@@ -318,10 +341,24 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
                                                DskHttpServerResponseOptions *options)
 {
   RealServerRequest *rreq = (RealServerRequest *) request;
-  dsk_assert (rreq->awaiting_response);
-  dsk_assert (!rreq->got_response);
-  ...
-  rreq->got_response = DSK_TRUE;
+  dsk_assert (rreq->state == REQUEST_HANDLING_INVOKING
+          ||  rreq->state == REQUEST_HANDLING_WAITING);
+  if (rreq->state == REQUEST_HANDLING_INVOKING)
+    {
+      ...
+    }
+  else
+    {
+      ...
+    }
+  if (rreq->state == REQUEST_HANDLING_INVOKING)
+    rreq->state = REQUEST_HANDLING_GOT_RESPONSE_WHILE_INVOKING;
+  else
+    {
+      /* free RealServerRequest */
+      rreq->state = REQUEST_HANDLING_GOT_RESPONSE;
+      ...
+    }
 }
 
 
@@ -332,8 +369,9 @@ void dsk_http_server_request_respond_error    (DskHttpServerRequest *request,
   RealServerRequest *rreq = (RealServerRequest *) request;
   dsk_assert (rreq->awaiting_response);
   dsk_assert (!rreq->got_response);
-  respond_error (request, status, message);
   rreq->got_response = DSK_TRUE;
+
+  respond_error (request, status, message);
 }
 
 void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
@@ -346,7 +384,18 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
 void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
                                                const char           *new_path)
 {
-  ...
+  RealServerRequest *rreq = (RealServerRequest *) request;
+  dsk_assert (rreq->awaiting_response);
+  dsk_assert (!rreq->got_response);
+  rreq->got_response = DSK_TRUE;
+  if (rreq->in_handler)
+    {
+      ...
+    }
+  else
+    {
+      ...
+    }
 }
 
 void dsk_http_server_request_pass             (DskHttpServerRequest *request)
@@ -413,6 +462,18 @@ find_next_match  (DskHttpServer  *server,
   return NULL;
 }
 
+typedef enum
+{
+  REQUEST_HANDLING_INIT,
+  REQUEST_HANDLING_INVOKING,
+  REQUEST_HANDLING_BLOCKED_ERROR,
+  REQUEST_HANDLING_BLOCKED_PASS,
+  REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT,
+  REQUEST_HANDLING_WAITING,     /* for a respond() type function */
+  REQUEST_HANDLING_GOT_RESPONSE_WHILE_INVOKING,
+  REQUEST_HANDLING_GOT_RESPONSE
+} RequestHandlingState;
+
 typedef struct _RealServerRequest RealServerRequest;
 struct _RealServerRequest
 {
@@ -421,7 +482,7 @@ struct _RealServerRequest
   Handler *handler;
 
   /* are we currently invoking the handler's function */
-  dsk_boolean in_handler;
+  RequestHandlingState state;
 };
 
 static dsk_boolean
@@ -482,7 +543,8 @@ restart:
      calls during handler invocation are processed in a loop
      (see 'if (info->in_handler_got_result)' below) instead
      of recursing to cause a very large stack. */
-  info->in_handler = DSK_TRUE;
+  dsk_assert (info->state == REQUEST_HANDLING_INIT);
+  info->state = REQUEST_HANDLING_INVOKING;
   switch (info->handler->handler_type)
     {
     case HANDLER_TYPE_STREAMING_POST_DATA:
@@ -511,34 +573,42 @@ restart:
       }
       break;
     }
-  info->in_handler = DSK_FALSE;
-
-  /* If our reetrancy guard caught anything, perform the action now. */
-  if (info->in_handler_got_result)
+  switch (info->state)
     {
-      info->in_handler_got_result = DSK_FALSE;
-
-      switch (info->in_handler_result_type)
+    case REQUEST_HANDLING_INIT:
+      dsk_assert_not_reached ();
+    case REQUEST_HANDLING_INVOKING:
+      info->state = REQUEST_HANDLING_WAITING;
+      break;
+    case REQUEST_HANDLING_BLOCKED_ERROR:
+      /* this will free the handler */
+      respond_error (...);
+      return;
+    case REQUEST_HANDLING_BLOCKED_PASS:
+      info->state = REQUEST_HANDLING_INIT;
+      if (!advance_to_next_handler (info))
         {
-        case IN_HANDLER_RESULT_ERROR:
-          ...
-        case IN_HANDLER_RESULT_REDIRECT:
-          info->got_result = DSK_FALSE;
-          ...
-          break;
-        case IN_HANDLER_RESULT_INTERNAL_REDIRECT:
-          info->got_result = DSK_FALSE;
-          ...
-          break;
-        case IN_HANDLER_RESULT_PASS:
-          if (!advance_to_next_handler (info))
-            {
-              respond_no_handler_found (info);
-              return;
-            }
-          else
-            goto restart;
+          respond_no_handler_found (info);
+          return;
         }
+      else
+        goto restart;
+    case REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT:
+      info->state = REQUEST_HANDLING_INIT;
+      ... find handler for new request ...
+      if (info->handler == NULL)
+        {
+          respond_no_handler_found (info);
+          return;
+        }
+      else
+        goto restart;
+    case REQUEST_HANDLING_WAITING:
+    case REQUEST_HANDLING_GOT_RESPONSE:
+      dsk_assert_not_reached ();
+    case REQUEST_HANDLING_GOT_RESPONSE_WHILE_INVOKING:
+      ... free handler
+      return;
     }
 }
 
