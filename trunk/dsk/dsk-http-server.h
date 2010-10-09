@@ -14,7 +14,7 @@ typedef struct
 
 struct _DskHttpServerRequest
 {
-  DskHttpServerStreamTransfer *xfer;
+  DskHttpServerStreamTransfer *transfer;
   DskHttpRequest *request_header;
   DskHttpServerBindInfo *bind_info;
 

@@ -8,6 +8,7 @@
 typedef struct _MatchTester MatchTester;
 typedef struct _MatchTesterStandard MatchTesterStandard;
 
+typedef void (*FunctionPointer)();
 
 struct _MatchTester
 {
@@ -55,12 +56,12 @@ typedef struct _Handler Handler;
 typedef enum
 {
   HANDLER_TYPE_STREAMING_POST_DATA,
-  HANDLER_TYPE_STREAMING_CGI
+  HANDLER_TYPE_CGI
 } HandlerType;
 struct _Handler
 {
   HandlerType handler_type;
-  void (*handler_func)(void);
+  FunctionPointer handler;
   void *handler_data;
   DskHookDestroy handler_destroy;
   Handler *next;
@@ -80,6 +81,11 @@ struct _MatchTestNode
 
   Handler *first_handler, *last_handler;
 };
+#define GET_HANDLER_QUEUE(match_test_node)      \
+  Handler*,                                     \
+  (match_test_node)->first_handler,             \
+  (match_test_node)->last_handler,              \
+  next
 
 struct _DskHttpServer
 {
@@ -135,13 +141,13 @@ match_tester_standard_test (MatchTester *tester,
       switch (std->types[i].match_type)
         {
         case DSK_HTTP_SERVER_MATCH_PATH:
-          test_str = request->xfer->request->path;
+          test_str = request->transfer->request->path;
           break;
         case DSK_HTTP_SERVER_MATCH_HOST:
-          test_str = request->xfer->request->host;
+          test_str = request->transfer->request->host;
           break;
         case DSK_HTTP_SERVER_MATCH_USER_AGENT:
-          test_str = request->xfer->request->user_agent;
+          test_str = request->transfer->request->user_agent;
           break;
         case DSK_HTTP_SERVER_MATCH_BIND_PORT:
           if (!request->bind_info->is_local)
@@ -268,13 +274,33 @@ void dsk_http_server_match_restore             (DskHttpServer        *server)
   server->current = server->current->parent;
 }
 
+
+static void
+add_handler_generic (DskHttpServer *server,
+                     HandlerType handler_type,
+                     FunctionPointer handler_func,
+                     void *handler_data,
+                     DskHookDestroy handler_destroy)
+{
+  Handler *handler = dsk_malloc (sizeof (Handler));
+  handler->handler_type = handler_type;
+  handler->handler = handler_func;
+  handler->handler_data = handler_data;
+  handler->handler_destroy = handler_destroy;
+  handler->next = NULL;
+
+  /* Add to handler list */
+  GSK_QUEUE_ENQUEUE (GET_HANDLER_QUEUE (server->current), handler);
+}
+
 void
 dsk_http_server_register_streaming_post_handler (DskHttpServer *server,
                                                  DskHttpServerStreamingPostFunc func,
                                                  void *func_data,
                                                  DskHookDestroy destroy)
 {
-  ...
+  add_handler_generic (server, HANDLER_TYPE_STREAMING_POST_DATA,
+                       (FunctionPointer) func, func_data, destroy);
 }
 
 /* One of these functions should be called by any handler */
@@ -305,7 +331,7 @@ void dsk_http_server_request_set_content_type_parts
                                                const char           *charset);
 static dsk_boolean
 match_test_node_matches    (MatchTestNode *node,
-                            DskHttpRequest *request)
+                            DskHttpServerRequest *request)
 {
   if (node->tester == NULL)
     return DSK_TRUE;
@@ -315,10 +341,11 @@ match_test_node_matches    (MatchTestNode *node,
 
 static MatchTestNode *
 find_first_match_recursive (MatchTestNode *node,
-                            DskHttpRequest *request)
+                            DskHttpServerRequest *request)
 {
   if (match_test_node_matches (node, request))
     {
+      MatchTestNode *child;
       for (child = node->first_child; child; child = child->next_sibling)
         {
           MatchTestNode *rv = find_first_match_recursive (child, request);
@@ -333,16 +360,18 @@ find_first_match_recursive (MatchTestNode *node,
 
 static MatchTestNode *
 find_first_match (DskHttpServer *server,
-                  DskHttpRequest *request)
+                  DskHttpServerRequest *request)
 {
   return find_first_match_recursive (&server->top, request);
 }
+
 static MatchTestNode *
 find_next_match  (DskHttpServer  *server,
                   MatchTestNode  *node,
-                  DskHttpRequest *request)
+                  DskHttpServerRequest *request)
 {
   MatchTestNode *at;
+  DSK_UNUSED (server);
   while (node)
     {
       for (at = node->next_sibling; at; at = at->next_sibling)
@@ -358,37 +387,138 @@ find_next_match  (DskHttpServer  *server,
   return NULL;
 }
 
-typedef struct _RequestHandlerInfo RequestHandlerInfo;
-struct _RequestHandlerInfo
+typedef struct _RealServerRequest RealServerRequest;
+struct _RealServerRequest
 {
-  DskHttpServerStreamTransfer *transfer;
+  DskHttpServerRequest request;
   MatchTestNode *node;
-  DskHttpServerBindInfo *bind_site;
+  Handler *handler;
+
+  /* are we currently invoking the handler's function */
   dsk_boolean in_handler;
 };
 
-static void
-handler_pass (RequestHandlerInfo *info)
+static dsk_boolean
+advance_to_next_handler (RealServerRequest *info)
 {
-  dsk_assert (info->in_handler == NULL);
-  if (info->handler->next)
+  if (info->handler->next != NULL)
     info->handler = info->handler->next;
   else
     {
-      info->node = find_next_match (info->bind_site->server, info->node,
-                                    info->transfer->request);
+      info->node = find_next_match (info->request.bind_info->server,
+                                    info->node,
+                                    &info->request);
       if (info->node == NULL)
-        {
-          respond_no_handler_found (info);
-          return;
-        }
+        return DSK_FALSE;
       info->handler = info->node->first_handler;
+    }
+  return DSK_TRUE;
+}
+
+static void
+compute_cgi_vars (RealServerRequest *info)
+{
+  ...
+
+  /* do we have a handler waiting on us? */
+  ...
+}
+
+static void
+begin_computing_cgi_vars (RealServerRequest *info)
+{
+  DskHttpVerb verb = info->request.transfer->request->verb;
+
+  /* Not a POST or PUT request, therefore we don't expect CGI vars */
+  if (verb != DSK_HTTP_VERB_PUT
+   && verb != DSK_HTTP_VERB_POST)
+    {
+      compute_cgi_vars (info);
+      return;
+    }
+  if (post_data->done_adding)
+    {
+      compute_cgi_vars (info);
+      return;
+    }
+  
+  /* trap POST completion callback (callback=compute_cgi_vars) */
+  ...
+}
+
+static void
+invoke_handler (RealServerRequest *info)
+{
+restart:
+  /* Do the actual handler invocation,
+     with 'in_handler' acting as a reentrancy guard,
+     so that dsk_http_server_request_respond_*()
+     calls during handler invocation are processed in a loop
+     (see 'if (info->in_handler_got_result)' below) instead
+     of recursing to cause a very large stack. */
+  info->in_handler = DSK_TRUE;
+  switch (info->handler->handler_type)
+    {
+    case HANDLER_TYPE_STREAMING_POST_DATA:
+      {
+        /* Invoke handler immediately */
+        DskHttpServerStreamingPostFunc func = (DskHttpServerStreamingPostFunc) info->handler->handler;
+        DskOctetSource *post_data = (DskOctetSource *) info->request.transfer->post_data;
+        func (&info->request, post_data, info->handler->handler_data);
+      }
+      break;
+    case HANDLER_TYPE_CGI:
+      {
+        if (!info->request.cgi_vars_computed)
+          begin_computing_cgi_vars (info);      /* may finish immediately! */
+        if (info->request.cgi_vars_computed)
+          {
+            /* Invoke handler immediately */
+            DskHttpServerCGIFunc func = (DskHttpServerCGIFunc) info->handler->handler;
+            func (&info->request, info->handler->handler_data);
+          }
+        else
+          {
+            /* Handler will be invoked once cgi vars are obtained 
+               (ie after waiting for POST data) */
+          }
+      }
+      break;
+    }
+  info->in_handler = DSK_FALSE;
+
+  /* If our reetrancy guard caught anything, perform the action now. */
+  if (info->in_handler_got_result)
+    {
+      info->in_handler_got_result = DSK_FALSE;
+
+      switch (info->in_handler_result_type)
+        {
+        case IN_HANDLER_RESULT_ERROR:
+          ...
+        case IN_HANDLER_RESULT_REDIRECT:
+          info->got_result = DSK_FALSE;
+          ...
+          break;
+        case IN_HANDLER_RESULT_INTERNAL_REDIRECT:
+          info->got_result = DSK_FALSE;
+          ...
+          break;
+        case IN_HANDLER_RESULT_PASS:
+          if (!advance_to_next_handler (info))
+            {
+              respond_no_handler_found (info);
+              return;
+            }
+          else
+            goto restart;
+        }
     }
 }
 
 static dsk_boolean
 handle_http_server_request_available (DskHttpServerStream *sstream,
-                                      DskHttpServerBindInfo            *bind_site)
+                                      DskHttpServerBindInfo            *bind_info)
 {
   MatchTestNode *node;
   DskHttpServerStreamTransfer *xfer;
@@ -396,12 +526,12 @@ handle_http_server_request_available (DskHttpServerStream *sstream,
   if (xfer == NULL)
     return DSK_TRUE;
 
-  request_info = dsk_malloc0 (sizeof (RequestHandlerInfo));
+  request_info = dsk_malloc0 (sizeof (RealServerRequest));
   request_info->transfer = xfer;
-  request_info->bind_site = bind_site;
+  request_info->bind_info = bind_info;
   xfer->user_data = handler_info;
 
-  node = find_first_match (bind_site->server, xfer->request);
+  node = find_first_match (bind_info->server, xfer->request);
   if (node == NULL)
     {
       respond_no_handler_found (info);
@@ -411,45 +541,12 @@ handle_http_server_request_available (DskHttpServerStream *sstream,
   request_info->handler = node->first_handler;
 
   /* invoke handler */
-  request_info->in_handler = DSK_TRUE;
-  switch (handler->handler_type)
-    {
-    case HANDLER_TYPE_STREAMING_POST_DATA:
-      ...
-    case HANDLER_TYPE_STREAMING_CGI:
-      ...
-    }
-  request_info->in_handler = DSK_FALSE;
-  if (request_info->got_result)
-    {
-      switch (request_info->handler_result_type)
-        {
-        case HANDLER_RESULT_FILE:
-          ...
-        case HANDLER_RESULT_DATA:
-          ...
-        case HANDLER_RESULT_ERROR:
-          ...
-        case HANDLER_RESULT_REDIRECT:
-          request_info->got_result = DSK_FALSE;
-          ...
-          break;
-        case HANDLER_RESULT_INTERNAL_REDIRECT:
-          request_info->got_result = DSK_FALSE;
-          ...
-          break;
-        case HANDLER_RESULT_PASS:
-          request_info->got_result = DSK_FALSE;
-          handler_pass (request_info);
-          break;
-        }
-    }
   return DSK_TRUE;
 }
 
 static dsk_boolean
 handle_listener_ready (DskOctetListener *listener,
-                       DskHttpServerBindInfo         *bind_site)
+                       DskHttpServerBindInfo         *bind_info)
 {
   DskOctetSource *source;
   DskOctetSink *sink;
@@ -466,26 +563,26 @@ handle_listener_ready (DskOctetListener *listener,
     }
 
   http_stream = dsk_http_server_stream_new (sink, source,
-                                            &bind_site->server_options);
+                                            &bind_info->server_options);
   dsk_hook_trap (&http_stream->request_available,
                  (DskHookFunc) handle_http_server_request_available,
-                 bind_site,             //???
+                 bind_info,             //???
                  NULL);
   dsk_object_unref (http_stream);
 }
 
 static void
-bind_site_destroyed (DskHttpServerBindInfo *bind_site)
+bind_info_destroyed (DskHttpServerBindInfo *bind_info)
 {
   DskHttpServerBindInfo **p;
-  for (p = &bind_site->server->bind_sites;
+  for (p = &bind_info->server->bind_infos;
        *p != NULL;
        p = &((*p)->next))
-    if (*p == bind_site)
+    if (*p == bind_info)
       {
-        *p = bind_site->next;
-        dsk_object_unref (bind_site->listener);
-        dsk_free (bind_site);
+        *p = bind_info->next;
+        dsk_object_unref (bind_info->listener);
+        dsk_free (bind_info);
         return;
       }
 }

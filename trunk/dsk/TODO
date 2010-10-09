@@ -61,6 +61,12 @@ x XML Parser: basics
 x XML Parser: big documents
 x XML Parser: error conditions
 x XML Parser: comments
+_ audit/test: i recall that any http verb may include a content-body
+  from the client -> server, even GET.
+   (1) do we handle that correctly?
+        - including checking if post_data==NULL for a POST or PUT?
+   (2) what does the CGI spec say about this?
+
 WORK ON LUSK - the LUA/DSK HTTP Server
 
 _ XML Parser: ignore doctype and processing-instructions
