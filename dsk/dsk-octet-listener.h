@@ -10,6 +10,7 @@ struct _DskOctetListenerClass
 			 DskOctetSource         **source_out,
 			 DskOctetSink           **sink_out,
                          DskError               **error);
+  void        (*shutdown)(DskOctetListener       *listener);
 };
 
 struct _DskOctetListener
@@ -23,6 +24,7 @@ DskIOResult dsk_octet_listener_accept (DskOctetListener        *listener,
 			               DskOctetSource         **source_out,
 			               DskOctetSink           **sink_out,
                                        DskError               **error);
+void        dsk_octet_listener_shutdown (DskOctetListener *listener);
 
 extern const DskOctetListenerClass dsk_octet_listener_class;
 #define DSK_OCTET_LISTENER_GET_CLASS(object) DSK_OBJECT_CAST_GET_CLASS(DskOctetListener, object, &dsk_octet_listener_class)

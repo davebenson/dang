@@ -56,6 +56,15 @@ dsk_octet_listener_socket_accept (DskOctetListener        *listener,
 }
 
 static void
+dsk_octet_listener_socket_shutdown (DskOctetListener *listener)
+{
+  DskOctetListenerSocket *s = (DskOctetListenerSocket *) listener;
+  if (s->listening_fd >= 0)
+    listen (s->listening_fd, 0);
+  dsk_hook_clear (&listener->incoming);
+}
+
+static void
 listener_handle_fd_readable (DskFileDescriptor   fd,
                              unsigned            events,
                              void               *callback_data)
@@ -123,7 +132,8 @@ const DskOctetListenerSocketClass dsk_octet_listener_socket_class =
                             &dsk_octet_listener_class,
                             dsk_octet_listener_socket_init,
                             dsk_octet_listener_socket_finalize),
-    dsk_octet_listener_socket_accept
+    dsk_octet_listener_socket_accept,
+    dsk_octet_listener_socket_shutdown
 } };
 
 static dsk_boolean

@@ -51,6 +51,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-http-internals.o \
 	  dsk-http-header-parsing.o dsk-http-protocol.o \
 	  dsk-http-header-printing.o \
+	  dsk-http-server.o \
 	  dsk-date.o \
 	  dsk-xml-parser.o dsk-xml.o \
 	  dsk-xml-binding.o \
