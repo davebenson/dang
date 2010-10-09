@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "../dsk.h"
-#include "../dsk-pattern.h"
 
 #define MK_PTR(integer)     ((void*)(size_t)(integer))
 #define GET_INT(pointer)     ((unsigned)(size_t)(pointer))

@@ -5,12 +5,12 @@
 #define DANG_SIZEOF_SIZE_T DSK_SIZEOF_POINTER
 #include "../gskqsortmacro.h"           /* TODO: USE THESE */
 
-#include "dsk-pattern.h"  /* TEMP INCLUDE */
-
 #define DEBUG_TOKENIZE    0
 #define DEBUG_PARSE       0
 #define DEBUG_NFA         0
 #define DEBUG_DFA         0
+
+#define IMPLEMENT_TRUMP_STATES   0
 
 #ifndef MIN
 #define MIN(a,b)   ((a) < (b) ? (a) : (b))
@@ -1230,8 +1230,10 @@ force_dfa (struct DFA_TreeNode **p_tree,
       nfa_states[++o] = nfa_states[i];
   n_nfa_states = o + 1;
 
+#if IMPLEMENT_TRUMP_STATES
   /* Implement state-trumping */
   //...
+#endif
 
   struct DFA_TreeNode *tree_node;
 
@@ -1385,12 +1387,40 @@ DskPattern *dsk_pattern_compile (unsigned n_entries,
       nfa_state_tree_foreach (init_states[i], count_nfa_states_one, &n_nfa_states);
     }
 
-#if 0
+#if IMPLEMENT_TRUMP_STATES
   /* implement state trumping: if two sections are
      isomorphic starting at the final state,
      then any DFA state containing both is equivalent to
      the DFA state containing just one. */
-  ...
+  for (i = 0; i < n_entries; i++)
+    nfa_state_tree_foreach (init_states[i], compute_reverse_transitions_1, &mem_pool);
+
+  /* divide states into equivalence classes */
+  for (i = 0; i < n_entries; i++)
+    if (final_states[i]->trump_class == NULL)
+      {
+        /* find the smallest subgraph containing final_states[i] with no outlinks */
+        ...
+
+        for (j = 1; j < n_entries; j++)
+          if (final_states[j]->trump_class == NULL)
+            {
+              test_subgraph_nodes[0] = final_states[j];
+              if (subgraphs_equiv (n_closed_subgraph_nodes, closed_subgraph_nodes,
+                                   test_subgraph_nodes))
+                {
+                  /* make an equiv class for nodes of i (if this is the first match) and for j. */
+                  for (k = 0; k < n_closed_subgraph_nodes; k++)
+                    {
+                      if (closed_subgraph_nodes[k]->equiv_class == NULL)
+                        closed_subgraph_nodes[k]->equiv_class = dsk_mem_pool_alloc (&mem_pool, sizeof (TrumpEquivClass));
+                      test_subgraph_nodes[k]->equiv_class = closed_subgraph_nodes[k]->equiv_class;
+                    }
+                }
+            }
+        }
+
+  /* TODO: try to extend existing equivalent classes */
 #endif
 
   /* OK, now we have the total NFA.

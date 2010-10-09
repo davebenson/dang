@@ -37,6 +37,7 @@ const DskOctetListenerClass dsk_octet_listener_class =
                           &dsk_object_class,
                           dsk_octet_listener_init,
                           dsk_octet_listener_finalize),
-  NULL          /* no accept implementation */
+  NULL,         /* no accept implementation */
+  NULL          /* no shutdown implementation */
 };
 
