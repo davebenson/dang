@@ -303,32 +303,58 @@ dsk_http_server_register_streaming_post_handler (DskHttpServer *server,
                        (FunctionPointer) func, func_data, destroy);
 }
 
-/* One of these functions should be called by any handler */
-void dsk_http_server_request_respond_stream   (DskHttpServerRequest *request,
-                                               DskOctetSource       *source);
-void dsk_http_server_request_respond_data     (DskHttpServerRequest *request,
-                                               size_t                length,
-                                               const uint8_t        *data);
-void dsk_http_server_request_respond_file     (DskHttpServerRequest *request,
-                                               const char           *filename);
+/* === One of these functions should be called by any handler === */
+
+/* An error response without the flag handling -- for use in other "respond" functions */
+static void
+respond_error (DskHttpServerRequest *request,
+               DskHttpStatus         status,
+               const char           *message)
+{
+  ...
+}
+
+void dsk_http_server_request_respond          (DskHttpServerRequest *request,
+                                               DskHttpServerResponseOptions *options)
+{
+  RealServerRequest *rreq = (RealServerRequest *) request;
+  dsk_assert (rreq->awaiting_response);
+  dsk_assert (!rreq->got_response);
+  ...
+  rreq->got_response = DSK_TRUE;
+}
+
+
 void dsk_http_server_request_respond_error    (DskHttpServerRequest *request,
                                                DskHttpStatus         status,
-                                               const char           *message);
+                                               const char           *message)
+{
+  RealServerRequest *rreq = (RealServerRequest *) request;
+  dsk_assert (rreq->awaiting_response);
+  dsk_assert (!rreq->got_response);
+  respond_error (request, status, message);
+  rreq->got_response = DSK_TRUE;
+}
+
 void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
                                                DskHttpStatus         status,
-                                               const char           *location);
-void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
-                                               const char           *new_path);
-void dsk_http_server_request_pass             (DskHttpServerRequest *request);
+                                               const char           *location)
+{
+  ...
+}
 
-/* --- used to configure our response a little --- */
-void dsk_http_server_request_set_content_type (DskHttpServerRequest *request,
-                                               const char           *triple);
-void dsk_http_server_request_set_content_type_parts
-                                              (DskHttpServerRequest *request,
-                                               const char           *type,
-                                               const char           *subtype,
-                                               const char           *charset);
+void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
+                                               const char           *new_path)
+{
+  ...
+}
+
+void dsk_http_server_request_pass             (DskHttpServerRequest *request)
+{
+  ...
+}
+
+
 static dsk_boolean
 match_test_node_matches    (MatchTestNode *node,
                             DskHttpServerRequest *request)

@@ -72,20 +72,31 @@ dsk_http_server_register_streaming_post_handler (DskHttpServer *server,
                                                  DskHookDestroy destroy);
 
 void
-dsk_http_server_register_streaming_cgi          (DskHttpServer *server,
+dsk_http_server_register_cgi_handler            (DskHttpServer *server,
                                                  DskHttpServerCGIFunc func,
                                                  void          *func_data,
                                                  DskHookDestroy destroy);
 
 
 /* One of these functions should be called by any handler */
-void dsk_http_server_request_respond_stream   (DskHttpServerRequest *request,
-                                               DskOctetSource       *source);
-void dsk_http_server_request_respond_data     (DskHttpServerRequest *request,
-                                               size_t                length,
-                                               const uint8_t        *data);
-void dsk_http_server_request_respond_file     (DskHttpServerRequest *request,
-                                               const char           *filename);
+typedef struct _DskHttpServerResponseOptions DskHttpServerResponseOptions;
+struct _DskHttpServerResponseOptions
+{
+  DskOctetSource *source;
+  const char *source_filename;
+
+  /* single string content_type: eg "text/plain" or "text/plain/utf-8" */
+  const char *content_type;
+
+  /* ... or by components */
+  const char *content_main_type;
+  const char *content_sub_type;
+  const char *content_charset;
+
+};
+
+void dsk_http_server_request_respond          (DskHttpServerRequest *request,
+                                               DskHttpServerResponseOptions *options);
 void dsk_http_server_request_respond_error    (DskHttpServerRequest *request,
                                                DskHttpStatus         status,
                                                const char           *message);
@@ -95,12 +106,3 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
 void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
                                                const char           *new_path);
 void dsk_http_server_request_pass             (DskHttpServerRequest *request);
-
-/* --- used to configure our response a little --- */
-void dsk_http_server_request_set_content_type (DskHttpServerRequest *request,
-                                               const char           *triple);
-void dsk_http_server_request_set_content_type_parts
-                                              (DskHttpServerRequest *request,
-                                               const char           *type,
-                                               const char           *subtype,
-                                               const char           *charset);
