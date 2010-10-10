@@ -1,9 +1,19 @@
-#include "../gsklistmacros.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+/* These headers are exclusively to call open(2)/fstat(2):
+   they are used for serving a file and could easily be moved
+   to dsk-http-server-stream -- except maybe for error handling */
+   
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include "dsk.h"
 
+#include "../gsklistmacros.h"
+
+/* === Request Matching Infrastructure === */
 /* a compiled test of a header */
 typedef struct _MatchTester MatchTester;
 typedef struct _MatchTesterStandard MatchTesterStandard;
@@ -303,7 +313,36 @@ dsk_http_server_register_streaming_post_handler (DskHttpServer *server,
                        (FunctionPointer) func, func_data, destroy);
 }
 
-/* === One of these functions should be called by any handler === */
+
+/* === Handling Requests === */
+typedef enum
+{
+  REQUEST_HANDLING_INIT,
+  REQUEST_HANDLING_INVOKING,
+  REQUEST_HANDLING_BLOCKED_ERROR,
+  REQUEST_HANDLING_BLOCKED_PASS,
+  REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT,
+  REQUEST_HANDLING_WAITING,     /* for a respond() type function */
+  REQUEST_HANDLING_GOT_RESPONSE_WHILE_INVOKING,
+  REQUEST_HANDLING_GOT_RESPONSE
+} RequestHandlingState;
+
+typedef struct _RealServerRequest RealServerRequest;
+struct _RealServerRequest
+{
+  DskHttpServerRequest request;
+  MatchTestNode *node;
+  Handler *handler;
+
+  /* are we currently invoking the handler's function */
+  RequestHandlingState state;
+};
+
+static void
+real_server_request_free (RealServerRequest *rreq)
+{
+  dsk_free (rreq);
+}
 
 /* An error response without the flag handling -- for use in other "respond" functions */
 static void
@@ -312,19 +351,38 @@ respond_error (DskHttpServerRequest *request,
                const char           *message)
 {
   /* Configure response */
+  RealServerRequest *rreq = (RealServerRequest *) request;
   DskHttpServerStreamResponseOptions resp_options = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
   DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
   resp_options.header_options = &header_options;
-  header_options.status = status;
+  header_options.status_code = status;
   header_options.content_type = "text/html/UTF-8";
 
   /* compute content */
-  content_data = ...;
-  header->content_length = ...;
-  header->content_data = ...;
-  ...
+  DskBuffer content_buffer = DSK_BUFFER_STATIC_INIT;
+  DskPrint *print = dsk_print_new_buffer (&content_buffer);
+  dsk_print_set_string (print, "status_message", dsk_http_status_get_message (status));
+  dsk_print_set_uint (print, "status_code", status);
+  dsk_print_set_string (print, "message", message);
+  dsk_print_set_filtered_string (print, "html_escaped_message", message,
+                                 dsk_xml_escape_new ());
+  dsk_print (print, "<html>"
+                    "<head><title>Error $status: $status_message</title></head>"
+                    "<body>"
+                    "<h1>Error $status: $status_message</h1>"
+                    "<p><pre>\n"
+                    "$html_escaped_message\n"
+                    "</pre></p>"
+                    "</body>"
+                    "</html>");
+  dsk_print_free (print);
+  uint8_t *content_data = dsk_malloc (content_buffer.size);
+  resp_options.content_data = content_data;
+  resp_options.content_length = content_buffer.size;
+  dsk_buffer_read (&content_buffer, content_buffer.size, content_data);
 
   /* Respond */
+  DskError *error = NULL;
   if (!dsk_http_server_stream_respond (request->transfer, &resp_options, &error))
     {
       dsk_warning ("error responding with error (original error='%s'; second error='%s')",
@@ -334,30 +392,82 @@ respond_error (DskHttpServerRequest *request,
   dsk_free (content_data);
 
   /* Free request */
-  ...
+  real_server_request_free (rreq);
 }
 
+/* === One of these functions should be called by any handler === */
 void dsk_http_server_request_respond          (DskHttpServerRequest *request,
                                                DskHttpServerResponseOptions *options)
 {
   RealServerRequest *rreq = (RealServerRequest *) request;
   dsk_assert (rreq->state == REQUEST_HANDLING_INVOKING
           ||  rreq->state == REQUEST_HANDLING_WAITING);
-  if (rreq->state == REQUEST_HANDLING_INVOKING)
+
+
+  /* Transform options */
+  DskHttpServerStreamResponseOptions soptions = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
+  DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
+  soptions.header_options = &header_options;
+  
+  soptions.content_stream = options->source;
+  if (options->source_filename)
+    {
+      /* XXX: need a function for this */
+      int fd = open (options->source_filename, O_RDONLY);
+      if (fd < 0)
+        {
+          /* construct error message */
+          ...
+
+          dsk_http_server_request_respond_error (request, 404, error_message);
+          dsk_free (error_message);
+          return;
+        }
+      if (fstat (fd, &stat_buf) < 0)
+        {
+          dsk_warning ("error calling fstat: %s", strerror (errno));
+        }
+      else
+        {
+          /* try to setup content-length */
+          if (S_ISREG (stat_buf.st_mode))
+            soptions.content_length = stat_buf.st_mode;
+        }
+      if (!dsk_octet_stream_new_fd (fd,
+                                    DSK_FILE_DESCRIPTOR_IS_READABLE
+                                    |DSK_FILE_DESCRIPTOR_IS_NOT_WRITABLE,
+                                    NULL,        /* do not need stream */
+                                    &soptions.content_stream,
+                                    NULL,        /* no sink */
+                                    &error))
+        {
+          dsk_add_error_prefix (error, "opening %s", options->source_filename);
+          dsk_http_server_request_respond_error (request, 404, error->message);
+          dsk_error_unref (error);
+          close (fd);
+          return;
+        }
+      must_unref_content_stream = DSK_TRUE;
+    }
+  soptions.content_type = options->content_type;
+  soptions.content_main_type = options->content_main_type;
+  soptions.content_sub_type = options->content_sub_type;
+  soptions.content_charset = options->content_charset;
+
+  /* Do lower-level response */
+  if (!dsk_http_server_stream_respond (request->transfer, &soptions, &error))
     {
       ...
     }
-  else
-    {
-      ...
-    }
+
+  /* State transitions */
   if (rreq->state == REQUEST_HANDLING_INVOKING)
     rreq->state = REQUEST_HANDLING_GOT_RESPONSE_WHILE_INVOKING;
   else
     {
       /* free RealServerRequest */
       rreq->state = REQUEST_HANDLING_GOT_RESPONSE;
-      ...
+      real_server_request_free (rreq);
     }
 }
 
@@ -385,11 +495,18 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
                                                const char           *new_path)
 {
   RealServerRequest *rreq = (RealServerRequest *) request;
-  dsk_assert (rreq->awaiting_response);
-  dsk_assert (!rreq->got_response);
-  rreq->got_response = DSK_TRUE;
-  if (rreq->in_handler)
+  dsk_assert (rreq->state == REQUEST_HANDLING_INVOKING
+          ||  rreq->state == REQUEST_HANDLING_WAITING);
+
+  /* Create the new HTTP request correspond to this redirect */
+  ...
+
+  /* Do we want to handle CGI variables? */
+  /* XXX: at LEAST we should flush them */
+
+  if (rreq->state == REQUEST_HANDLING_INVOKING)
     {
+      rreq->state = REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT;
       ...
     }
   else
@@ -461,29 +578,6 @@ find_next_match  (DskHttpServer  *server,
     }
   return NULL;
 }
-
-typedef enum
-{
-  REQUEST_HANDLING_INIT,
-  REQUEST_HANDLING_INVOKING,
-  REQUEST_HANDLING_BLOCKED_ERROR,
-  REQUEST_HANDLING_BLOCKED_PASS,
-  REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT,
-  REQUEST_HANDLING_WAITING,     /* for a respond() type function */
-  REQUEST_HANDLING_GOT_RESPONSE_WHILE_INVOKING,
-  REQUEST_HANDLING_GOT_RESPONSE
-} RequestHandlingState;
-
-typedef struct _RealServerRequest RealServerRequest;
-struct _RealServerRequest
-{
-  DskHttpServerRequest request;
-  MatchTestNode *node;
-  Handler *handler;
-
-  /* are we currently invoking the handler's function */
-  RequestHandlingState state;
-};
 
 static dsk_boolean
 advance_to_next_handler (RealServerRequest *info)

@@ -55,6 +55,7 @@ typedef enum
   DSK_HTTP_STATUS_GATEWAY_TIMEOUT               = 504,
   DSK_HTTP_STATUS_UNSUPPORTED_VERSION           = 505
 } DskHttpStatus;
+const char *dsk_http_status_get_message (DskHttpStatus status_code);
 
 /*
  * The Verb is the first text transmitted
