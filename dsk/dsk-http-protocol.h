@@ -310,12 +310,12 @@ struct _DskHttpResponseOptions
 
   /* --- post-data --- */
   /* text/plain or text/plain/utf-8 */
-  char *content_type;
+  const char *content_type;
 
   /* ... or by components */
-  char *content_main_type;
-  char *content_sub_type;
-  char *content_charset;
+  const char *content_main_type;
+  const char *content_sub_type;
+  const char *content_charset;
 
   /* --- content-length --- */
   int64_t content_length;
