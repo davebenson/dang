@@ -417,12 +417,21 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
       if (fd < 0)
         {
           /* construct error message */
-          ...
+          int open_errno = errno;
+          DskBuffer content_buffer = DSK_BUFFER_STATIC_INIT;
+          DskPrint *print = dsk_print_new_buffer (&content_buffer);
+          dsk_print_set_string (print, "filename", options->source_filename);
+          dsk_print_set_string (print, "error_message", strerror (open_errno));
+          dsk_print (print, "error opening $filename: $error_message");
+          dsk_print_free (print);
+          char *error_message = dsk_buffer_clear_to_string (&content_buffer);
 
+          /* serve response */
           dsk_http_server_request_respond_error (request, 404, error_message);
           dsk_free (error_message);
           return;
         }
+      struct stat stat_buf;
       if (fstat (fd, &stat_buf) < 0)
         {
           dsk_warning ("error calling fstat: %s", strerror (errno));
@@ -433,20 +442,23 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
           if (S_ISREG (stat_buf.st_mode))
             soptions.content_length = stat_buf.st_mode;
         }
+      DskError *error = NULL;
+      DskOctetStreamFdSource *fdsource;
       if (!dsk_octet_stream_new_fd (fd,
                                     DSK_FILE_DESCRIPTOR_IS_READABLE
                                     |DSK_FILE_DESCRIPTOR_IS_NOT_WRITABLE,
                                     NULL,        /* do not need stream */
-                                    &soptions.content_stream,
+                                    &fdsource,
                                     NULL,        /* no sink */
                                     &error))
         {
-          dsk_add_error_prefix (error, "opening %s", options->source_filename);
+          dsk_add_error_prefix (&error, "opening %s", options->source_filename);
           dsk_http_server_request_respond_error (request, 404, error->message);
           dsk_error_unref (error);
           close (fd);
           return;
         }
+      soptions.content_stream = (DskOctetSource *) fdsource;
       must_unref_content_stream = DSK_TRUE;
     }
   soptions.content_type = options->content_type;
@@ -503,16 +515,19 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
 
   /* Do we want to handle CGI variables? */
   /* XXX: at LEAST we should flush them */
+    ...
 
+  if (!advance_to_next_handler (rreq))
+    {
+      respond_no_handler_found (info);
+      return;
+    }
+
+  dsk_assert (rreq->handler != NULL)
   if (rreq->state == REQUEST_HANDLING_INVOKING)
-    {
-      rreq->state = REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT;
-      ...
-    }
+    rreq->state = REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT;
   else
-    {
-      ...
-    }
+    invoke_handler (rreq);
 }
 
 void dsk_http_server_request_pass             (DskHttpServerRequest *request)
@@ -689,14 +704,7 @@ restart:
         goto restart;
     case REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT:
       info->state = REQUEST_HANDLING_INIT;
-      ... find handler for new request ...
-      if (info->handler == NULL)
-        {
-          respond_no_handler_found (info);
-          return;
-        }
-      else
-        goto restart;
+      goto restart;
     case REQUEST_HANDLING_WAITING:
     case REQUEST_HANDLING_GOT_RESPONSE:
       dsk_assert_not_reached ();
