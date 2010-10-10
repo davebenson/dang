@@ -336,6 +336,10 @@ struct _RealServerRequest
 
   /* are we currently invoking the handler's function */
   RequestHandlingState state;
+
+  /* For BLOCKED_ERROR state */
+  char *blocked_error;
+  DskHttpStatus blocked_error_status;
 };
 
 static void
@@ -468,9 +472,14 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
   header_options.content_charset = options->content_charset;
 
   /* Do lower-level response */
+  DskError *error = NULL;
   if (!dsk_http_server_stream_respond (request->transfer, &soptions, &error))
     {
-      ...
+      dsk_http_server_request_respond_error (request, 500, error->message);
+      dsk_error_unref (error);
+      if (must_unref_content_stream)
+        dsk_object_unref (soptions.content_stream);
+      return;
     }
 
   /* State transitions */
@@ -490,18 +499,61 @@ void dsk_http_server_request_respond_error    (DskHttpServerRequest *request,
                                                const char           *message)
 {
   RealServerRequest *rreq = (RealServerRequest *) request;
-  dsk_assert (rreq->awaiting_response);
-  dsk_assert (!rreq->got_response);
-  rreq->got_response = DSK_TRUE;
-
-  respond_error (request, status, message);
+  dsk_assert (rreq->state == REQUEST_HANDLING_WAITING
+          ||  rreq->state == REQUEST_HANDLING_INVOKING);
+  if (rreq->state == REQUEST_HANDLING_INVOKING)
+    {
+      rreq->state = REQUEST_HANDLING_BLOCKED_ERROR;
+      rreq->blocked_error = dsk_strdup (message);
+      rreq->blocked_error_status = status;
+    }
+  else
+    {
+      respond_error (request, status, message);
+    }
 }
 
 void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
                                                DskHttpStatus         status,
                                                const char           *location)
 {
-  ...
+  DskHttpServerStreamResponseOptions resp_options = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
+  DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
+  if (!(300 <= status && status <= 399))
+    {
+      dsk_http_server_request_respond_error (request, 500,
+                                             "got non-3XX code for redirect");
+      return;
+    }
+  resp_options.header_options = &header_options;
+  header_options.status_code = status;
+  header_options.location = (char*)location;
+
+  /* use dsk_print to format content body */
+  DskBuffer content_buffer = DSK_BUFFER_STATIC_INIT;
+  DskPrint *print = dsk_print_new_buffer (&content_buffer);
+  dsk_print_set_uint (print, "status_code", status);
+  dsk_print_set_string (print, "location", location);
+  dsk_print_set_filtered_string (print, "location_html_escaped", location,
+                                 dsk_xml_escape_new ());
+  dsk_print (print, "<html><head><title>See $location_html_escaped</title></head>"
+             "<body>Please go <a href=\"$location\">here</a></body>"
+             "</html>\n");
+  dsk_print_free (print);
+
+  resp_options.content_length = content_buffer.size;
+  uint8_t *content_data = dsk_malloc (content_buffer.size);
+  dsk_buffer_read (&content_buffer, content_buffer.size, content_data);
+  resp_options.content_data = content_data;
+  header_options.content_type = "text/html/UTF-8";
+
+  DskError *error = NULL;
+  if (!dsk_http_server_stream_respond (request->transfer, &resp_options, &error))
+    {
+      dsk_warning ("error making redirect respond: %s", error->message);
+      dsk_error_unref (error);
+    }
+  dsk_free (content_data);
 }
 
 void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
@@ -691,9 +743,14 @@ restart:
       info->state = REQUEST_HANDLING_WAITING;
       break;
     case REQUEST_HANDLING_BLOCKED_ERROR:
-      /* this will free the handler */
-      respond_error (...);
-      return;
+      {
+        /* this will free the handler */
+        char *msg = rreq->blocked_error;
+        rreq->blocked_error = NULL;
+        respond_error (rreq, msg, rreq->blocked_error_status);
+        dsk_free (msg);
+        return;
+      }
     case REQUEST_HANDLING_BLOCKED_PASS:
       info->state = REQUEST_HANDLING_INIT;
       if (!advance_to_next_handler (info))
@@ -759,6 +816,9 @@ handle_listener_ready (DskOctetListener *listener,
       return DSK_TRUE;
     case DSK_IO_RESULT_SUCCESS:
       break;
+    case DSK_IO_RESULT_EOF
+      ...
+      return DSK_FALSE;
     }
 
   http_stream = dsk_http_server_stream_new (sink, source,
