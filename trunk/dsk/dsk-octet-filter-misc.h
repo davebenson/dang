@@ -13,6 +13,8 @@ DskOctetFilter *dsk_c_quoter_new                   (dsk_boolean add_quotes,
 DskOctetFilter *dsk_c_unquoter_new                 (dsk_boolean remove_quotes);
 DskOctetFilter *dsk_quote_printable_new            (void);
 DskOctetFilter *dsk_unquote_printable_new          (void);
+DskOctetFilter *dsk_xml_escape_new            (void);
+DskOctetFilter *dsk_xml_unescape_new  (void);
 DskOctetFilter *dsk_utf8_to_utf16_converter_new    (dsk_boolean big_endian);
 DskOctetFilter *dsk_utf16_to_utf8_converter_new    (dsk_boolean initially_big_endian,
                                                     dsk_boolean require_endian_marker);
