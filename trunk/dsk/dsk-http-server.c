@@ -409,6 +409,7 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
   DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
   soptions.header_options = &header_options;
   
+  dsk_boolean must_unref_content_stream = DSK_FALSE;
   soptions.content_stream = options->source;
   if (options->source_filename)
     {
@@ -461,10 +462,10 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
       soptions.content_stream = (DskOctetSource *) fdsource;
       must_unref_content_stream = DSK_TRUE;
     }
-  soptions.content_type = options->content_type;
-  soptions.content_main_type = options->content_main_type;
-  soptions.content_sub_type = options->content_sub_type;
-  soptions.content_charset = options->content_charset;
+  header_options.content_type = options->content_type;
+  header_options.content_main_type = options->content_main_type;
+  header_options.content_sub_type = options->content_sub_type;
+  header_options.content_charset = options->content_charset;
 
   /* Do lower-level response */
   if (!dsk_http_server_stream_respond (request->transfer, &soptions, &error))
