@@ -13,6 +13,7 @@
 
 #include "../gsklistmacros.h"
 
+
 /* === Request Matching Infrastructure === */
 /* a compiled test of a header */
 typedef struct _MatchTester MatchTester;
@@ -343,6 +344,9 @@ struct _RealServerRequest
   /* For BLOCKED_ERROR state */
   char *blocked_error;
   DskHttpStatus blocked_error_status;
+
+  /* If TRUE, the handler must be invoked when POST-data is complete */
+  unsigned post_data_cgi_vars_required : 1;
 };
 
 static void
@@ -350,6 +354,10 @@ real_server_request_free (RealServerRequest *rreq)
 {
   dsk_free (rreq);
 }
+
+static dsk_boolean find_first_match (RealServerRequest *rreq);
+static dsk_boolean advance_to_next_handler (RealServerRequest *info);
+static void invoke_handler (RealServerRequest *info);
 
 /* An error response without the flag handling -- for use in other "respond" functions */
 static void
@@ -579,6 +587,45 @@ append_cgi_var  (DskHttpServerRequest *request,
   request->cgi_vars[request->n_cgi_vars++] = *cgi;
 }
 
+static void
+respond_no_handler_found (DskHttpServerRequest *request)
+{
+  dsk_http_server_request_respond_error (request, 404,
+                                         "no handlers matched your request");
+}
+
+static void
+add_get_cgi_vars (RealServerRequest *rreq)
+{
+  const char *qm;
+  qm = strchr (rreq->request.request_header->path, '?');
+  if (qm)
+    {
+      /* compute new GET variables */
+      char **keqv_array = dsk_cgi_parse_query_string (qm);
+      if (keqv_array != NULL)
+        {
+          unsigned i;
+          for (i = 0; keqv_array[i] != NULL; i++)
+            {
+              DskHttpCgiVar cgi;
+              cgi.key = keqv_array[i];
+              cgi.value = strchr (keqv_array[i], '=');
+              if (cgi.value)
+                cgi.value++;
+              cgi.is_get = DSK_TRUE;
+              cgi.content_type = NULL;
+              append_cgi_var (&rreq->request, &cgi);
+            }
+          dsk_free (keqv_array);
+        }
+      else
+        {
+          dsk_warning ("error parsing query string of internal redirect");
+        }
+    }
+}
+
 void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
                                                const char           *new_path)
 {
@@ -598,7 +645,6 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
   /* Do we want to handle CGI variables? */
   if (request->cgi_vars_computed)
     {
-      const char *qm;
       unsigned o, i;
 
       /* remove any existing GET variables */
@@ -609,40 +655,17 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
           request->cgi_vars[o++] = request->cgi_vars[i];
       request->n_cgi_vars = o;
 
-      qm = strchr (new_path, '?');
-      if (qm)
-        {
-          /* compute new GET variables */
-          char **keqv_array = dsk_cgi_parse_query_string (qm);
-          if (keqv_array != NULL)
-            {
-              for (i = 0; keqv_array[i] != NULL; i++)
-                {
-                  DskHttpCgiVar cgi;
-                  cgi.key = keqv_array[i];
-                  cgi.value = strchr (keqv_array[i], '=');
-                  if (cgi.value)
-                    cgi.value++;
-                  cgi.is_get = DSK_TRUE;
-                  cgi.content_type = NULL;
-                  append_cgi_var (request, &cgi);
-                }
-              dsk_free (keqv_array);
-            }
-          else
-            {
-              dsk_warning ("error parsing query string of internal redirect");
-            }
-        }
+      add_get_cgi_vars (rreq);
     }
 
-  if (!advance_to_next_handler (rreq))
+  if (!find_first_match (rreq))
     {
-      respond_no_handler_found (info);
+      respond_no_handler_found (request);
       return;
     }
 
-  dsk_assert (rreq->handler != NULL)
+
+  dsk_assert (rreq->handler != NULL);
   if (rreq->state == REQUEST_HANDLING_INVOKING)
     rreq->state = REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT;
   else
@@ -651,17 +674,20 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
 
 void dsk_http_server_request_pass             (DskHttpServerRequest *request)
 {
-  if (request->state == REQUEST_HANDLING_INVOKING)
+  RealServerRequest *rreq = (RealServerRequest *) request;
+  if (rreq->state == REQUEST_HANDLING_INVOKING)
     {
-      request->state = REQUEST_HANDLING_BLOCKED_PASS;
+      rreq->state = REQUEST_HANDLING_BLOCKED_PASS;
     }
   else
     {
-      /* find next handler */
-      ...
-
-      /* invoke it */
-      ...
+      if (!advance_to_next_handler (rreq))
+        {
+          respond_no_handler_found (request);
+          return;
+        }
+      dsk_assert (rreq->handler != NULL);
+      invoke_handler (rreq);
     }
 }
 
@@ -695,11 +721,17 @@ find_first_match_recursive (MatchTestNode *node,
   return NULL;
 }
 
-static MatchTestNode *
-find_first_match (DskHttpServer *server,
-                  DskHttpServerRequest *request)
+static dsk_boolean
+find_first_match (RealServerRequest *rreq)
 {
-  return find_first_match_recursive (&server->top, request);
+  DskHttpServerRequest *request = &rreq->request;
+  MatchTestNode *node;
+  node = find_first_match_recursive (&request->server->top, request);
+  if (node == NULL)
+    return DSK_FALSE;
+  rreq->node = node;
+  rreq->handler = node->first_handler;
+  return DSK_TRUE;
 }
 
 static MatchTestNode *
@@ -742,36 +774,33 @@ advance_to_next_handler (RealServerRequest *info)
 }
 
 static void
-compute_cgi_vars (RealServerRequest *info)
+compute_cgi_vars (RealServerRequest *rreq)
 {
-  /* NOTE TO SELF: use this function */
-  static void append_cgi_var  (DskHttpServerRequest *request, DskHttpCgiVar *cgi);
-  ...
+  DskHttpServerRequest *request = &rreq->request;
+  dsk_assert (request->n_cgi_vars == 0);
 
-  /* do we have a handler waiting on us? */
-  ...
+  add_get_cgi_vars (rreq);
+  if (request->request_header->verb == DSK_HTTP_VERB_POST
+   || request->request_header->verb == DSK_HTTP_VERB_PUT)
+    {
+      // ASSERT: post-data complete
+      add_post_cgi_vars (rreq);
+    }
+  rreq->cgi_vars_computed = DSK_TRUE;
 }
 
 static void
-begin_computing_cgi_vars (RealServerRequest *info)
+begin_computing_cgi_vars (RealServerRequest *rreq)
 {
-  DskHttpVerb verb = info->request.request_header->verb;
+  DskHttpVerb verb = rreq->request.request_header->verb;
 
   /* Not a POST or PUT request, therefore we don't expect CGI vars */
-  if (verb != DSK_HTTP_VERB_PUT
-   && verb != DSK_HTTP_VERB_POST)
-    {
-      compute_cgi_vars (info);
-      return;
-    }
-  if (post_data->done_adding)
-    {
-      compute_cgi_vars (info);
-      return;
-    }
-  
-  /* trap POST completion callback (callback=compute_cgi_vars) */
-  ...
+  if (verb != DSK_HTTP_VERB_PUT && verb != DSK_HTTP_VERB_POST)
+    compute_cgi_vars (rreq);
+  else if (post_data->done_adding)
+    compute_cgi_vars (rreq);
+  else
+    rreq->post_data_cgi_vars_required = DSK_TRUE;
 }
 
 static void
@@ -799,7 +828,8 @@ restart:
     case HANDLER_TYPE_CGI:
       {
         if (!info->request.cgi_vars_computed)
-          begin_computing_cgi_vars (info);      /* may finish immediately! */
+          begin_computing_cgi_vars (info);
+
         if (info->request.cgi_vars_computed)
           {
             /* Invoke handler immediately */
@@ -867,14 +897,11 @@ handle_http_server_request_available (DskHttpServerStream *sstream,
   request_info->bind_info = bind_info;
   xfer->user_data = handler_info;
 
-  node = find_first_match (bind_info->server, xfer->request);
-  if (node == NULL)
+  if (!find_first_match (request_info))
     {
       respond_no_handler_found (info);
       return DSK_TRUE;
     }
-  request_info->node = node;
-  request_info->handler = node->first_handler;
 
   /* invoke handler */
   return DSK_TRUE;
