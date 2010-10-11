@@ -274,6 +274,8 @@ struct _DskHttpRequestOptions
 };
 DskHttpRequest *dsk_http_request_new (DskHttpRequestOptions *options,
                                       DskError             **error);
+void            dsk_http_request_init_options (DskHttpRequest *request,
+                                               DskHttpRequestOptions *out);
 
 #define DSK_HTTP_REQUEST_OPTIONS_DEFAULT \
 {                                                               \

@@ -151,13 +151,13 @@ match_tester_standard_test (MatchTester *tester,
       switch (std->types[i].match_type)
         {
         case DSK_HTTP_SERVER_MATCH_PATH:
-          test_str = request->transfer->request->path;
+          test_str = request->request_header->path;
           break;
         case DSK_HTTP_SERVER_MATCH_HOST:
-          test_str = request->transfer->request->host;
+          test_str = request->request_header->host;
           break;
         case DSK_HTTP_SERVER_MATCH_USER_AGENT:
-          test_str = request->transfer->request->user_agent;
+          test_str = request->request_header->user_agent;
           break;
         case DSK_HTTP_SERVER_MATCH_BIND_PORT:
           if (!request->bind_info->is_local)
@@ -560,15 +560,32 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
                                                const char           *new_path)
 {
   RealServerRequest *rreq = (RealServerRequest *) request;
+  DskHttpRequestOptions req_options;
+  DskHttpRequest *old_header;
   dsk_assert (rreq->state == REQUEST_HANDLING_INVOKING
           ||  rreq->state == REQUEST_HANDLING_WAITING);
 
   /* Create the new HTTP request correspond to this redirect */
-  ...
+  old_header = request->request_header;
+  dsk_http_request_init_options (old_header, &req_options);
+  req_options.path = (char*) new_path;
+  request->request_header = dsk_http_request_new (&req_options, NULL);
+  dsk_object_unref (old_header);
 
   /* Do we want to handle CGI variables? */
-  /* XXX: at LEAST we should flush them */
-    ...
+  if (request->cgi_vars_computed)
+    {
+      const char *qm;
+      /* remove any existing GET variables */
+      ...
+
+      qm = strchr (new_path, '?');
+      if (qm)
+        {
+          /* compute new GET variables */
+          ...
+        }
+    }
 
   if (!advance_to_next_handler (rreq))
     {
@@ -585,7 +602,18 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
 
 void dsk_http_server_request_pass             (DskHttpServerRequest *request)
 {
-  ...
+  if (request->state == REQUEST_HANDLING_INVOKING)
+    {
+      request->state = REQUEST_HANDLING_BLOCKED_PASS;
+    }
+  else
+    {
+      /* find next handler */
+      ...
+
+      /* invoke it */
+      ...
+    }
 }
 
 
@@ -676,7 +704,7 @@ compute_cgi_vars (RealServerRequest *info)
 static void
 begin_computing_cgi_vars (RealServerRequest *info)
 {
-  DskHttpVerb verb = info->request.transfer->request->verb;
+  DskHttpVerb verb = info->request.request_header->verb;
 
   /* Not a POST or PUT request, therefore we don't expect CGI vars */
   if (verb != DSK_HTTP_VERB_PUT
@@ -783,6 +811,7 @@ handle_http_server_request_available (DskHttpServerStream *sstream,
     return DSK_TRUE;
 
   request_info = dsk_malloc0 (sizeof (RealServerRequest));
+  request_info->request_header = dsk_object_ref (xfer->request);
   request_info->transfer = xfer;
   request_info->bind_info = bind_info;
   xfer->user_data = handler_info;
