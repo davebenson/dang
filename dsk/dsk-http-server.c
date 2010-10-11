@@ -334,6 +334,9 @@ struct _RealServerRequest
   MatchTestNode *node;
   Handler *handler;
 
+  /* For exponential resized of arrays */
+  unsigned cgi_vars_alloced;
+
   /* are we currently invoking the handler's function */
   RequestHandlingState state;
 
@@ -556,6 +559,26 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
   dsk_free (content_data);
 }
 
+static void
+dsk_http_cgi_var_clear (DskHttpCgiVar *var)
+{
+  dsk_free (var->key);     /* all key, values, etc are in one slab */
+
+}
+static void
+append_cgi_var  (DskHttpServerRequest *request,
+                 DskHttpCgiVar        *cgi)
+{
+  RealServerRequest *rreq = (RealServerRequest *) request;
+  if (request->n_cgi_vars == rreq->cgi_vars_alloced)
+    {
+      unsigned new_alloced = rreq->cgi_vars_alloced ? rreq->cgi_vars_alloced * 2 : 4;
+      request->cgi_vars = dsk_realloc (request->cgi_vars, new_alloced * sizeof (DskHttpCgiVar));
+      rreq->cgi_vars_alloced = new_alloced;
+    }
+  request->cgi_vars[request->n_cgi_vars++] = *cgi;
+}
+
 void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
                                                const char           *new_path)
 {
@@ -576,14 +599,40 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
   if (request->cgi_vars_computed)
     {
       const char *qm;
+      unsigned o, i;
+
       /* remove any existing GET variables */
-      ...
+      for (i = o = 0; i < request->n_cgi_vars; i++)
+        if (request->cgi_vars[i].is_get)
+          dsk_http_cgi_var_clear (&request->cgi_vars[i]);
+        else
+          request->cgi_vars[o++] = request->cgi_vars[i];
+      request->n_cgi_vars = o;
 
       qm = strchr (new_path, '?');
       if (qm)
         {
           /* compute new GET variables */
-          ...
+          char **keqv_array = dsk_cgi_parse_query_string (qm);
+          if (keqv_array != NULL)
+            {
+              for (i = 0; keqv_array[i] != NULL; i++)
+                {
+                  DskHttpCgiVar cgi;
+                  cgi.key = keqv_array[i];
+                  cgi.value = strchr (keqv_array[i], '=');
+                  if (cgi.value)
+                    cgi.value++;
+                  cgi.is_get = DSK_TRUE;
+                  cgi.content_type = NULL;
+                  append_cgi_var (request, &cgi);
+                }
+              dsk_free (keqv_array);
+            }
+          else
+            {
+              dsk_warning ("error parsing query string of internal redirect");
+            }
         }
     }
 
@@ -695,6 +744,8 @@ advance_to_next_handler (RealServerRequest *info)
 static void
 compute_cgi_vars (RealServerRequest *info)
 {
+  /* NOTE TO SELF: use this function */
+  static void append_cgi_var  (DskHttpServerRequest *request, DskHttpCgiVar *cgi);
   ...
 
   /* do we have a handler waiting on us? */

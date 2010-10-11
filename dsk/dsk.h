@@ -38,6 +38,7 @@
 #include "dsk-http-client.h"
 #include "dsk-http-server-stream.h"
 #include "dsk-http-server.h"
+#include "dsk-cgi.h"
 
 #include "dsk-xml.h"
 #include "dsk-xml-parser.h"
