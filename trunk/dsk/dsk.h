@@ -33,12 +33,12 @@
 #include "dsk-pattern.h"
 
 #include "dsk-http-protocol.h"
+#include "dsk-cgi.h"
 #include "dsk-http-client-auth.h"
 #include "dsk-http-client-stream.h"
 #include "dsk-http-client.h"
 #include "dsk-http-server-stream.h"
 #include "dsk-http-server.h"
-#include "dsk-cgi.h"
 
 #include "dsk-xml.h"
 #include "dsk-xml-parser.h"
