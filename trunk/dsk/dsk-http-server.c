@@ -103,7 +103,7 @@ struct _DskHttpServer
   MatchTestNode top;
   MatchTestNode *current;
   DskHttpServerStreamOptions server_stream_options;
-  DskHttpServerBindInfo *bind_sites;
+  DskHttpServerBindInfo *bind_infos;
 };
 
 void dsk_http_server_add_match                 (DskHttpServer        *server,
@@ -1003,27 +1003,28 @@ bind_info_destroyed (DskHttpServerBindInfo *bind_info)
       }
 }
 
-static dsk_boolean
+static DskHttpServerBindInfo *
 do_bind (DskHttpServer *server,
          const DskOctetListenerSocketOptions *options,
          DskError **error)
 {
   DskOctetListener *listener = dsk_octet_listener_socket_new (options, error);
+  DskHttpServerBindInfo *bind_info;
   if (listener == NULL)
-    return DSK_FALSE;
-  bind_site = dsk_malloc (sizeof (DskHttpServerBindInfo));
-  bind_site->listener = listener;
-  bind_site->server = server;
-  bind_site->next = server->bind_sites;
-  bind_site->server_stream_options = server->server_stream_options;
-  server->bind_sites = bind_site;
+    return NULL;
+  bind_info = dsk_malloc (sizeof (DskHttpServerBindInfo));
+  bind_info->listener = listener;
+  bind_info->server = server;
+  bind_info->next = server->bind_infos;
+  bind_info->server_stream_options = server->server_stream_options;
+  server->bind_infos = bind_info;
 
   dsk_hook_trap (&listener->incoming,
                  (DskHookFunc) handle_listener_ready,
-                 bind_site,
-                 (DskHookDestroy) bind_site_destroyed);
+                 bind_info,
+                 (DskHookDestroy) bind_info_destroyed);
 
-  return DSK_TRUE;
+  return bind_info;
 }
 
 dsk_boolean dsk_http_server_bind_tcp           (DskHttpServer        *server,
@@ -1032,6 +1033,7 @@ dsk_boolean dsk_http_server_bind_tcp           (DskHttpServer        *server,
                                                 DskError            **error)
 {
   DskOctetListenerSocketOptions listener_opts = DSK_OCTET_LISTENER_SOCKET_OPTIONS_DEFAULT;
+  DskHttpServerBindInfo *bind_info;
   listener_opts.is_local = DSK_FALSE;
   if (bind_addr)
     listener_opts.bind_address = *bind_addr;
@@ -1050,6 +1052,7 @@ dsk_boolean dsk_http_server_bind_local         (DskHttpServer        *server,
                                                 DskError            **error)
 {
   DskOctetListenerSocketOptions listener_opts = DSK_OCTET_LISTENER_SOCKET_OPTIONS_DEFAULT;
+  DskHttpServerBindInfo *bind_info;
   listener_opts.is_local = DSK_TRUE;
   listener_opts.local_path = path;
   bind_info = do_bind (server, &listener_opts, error);
