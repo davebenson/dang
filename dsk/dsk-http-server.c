@@ -811,44 +811,44 @@ begin_computing_cgi_vars (RealServerRequest *rreq)
   /* Not a POST or PUT request, therefore we don't expect CGI vars */
   if (verb != DSK_HTTP_VERB_PUT && verb != DSK_HTTP_VERB_POST)
     compute_cgi_vars (rreq);
-  else if (post_data->done_adding)
+  else if (rreq->request.has_raw_post_data)
     compute_cgi_vars (rreq);
   else
     rreq->post_data_cgi_vars_required = DSK_TRUE;
 }
 
 static void
-invoke_handler (RealServerRequest *info)
+invoke_handler (RealServerRequest *rreq)
 {
 restart:
   /* Do the actual handler invocation,
      with 'in_handler' acting as a reentrancy guard,
      so that dsk_http_server_request_respond_*()
      calls during handler invocation are processed in a loop
-     (see 'if (info->in_handler_got_result)' below) instead
+     (see 'if (rreq->in_handler_got_result)' below) instead
      of recursing to cause a very large stack. */
-  dsk_assert (info->state == REQUEST_HANDLING_INIT);
-  info->state = REQUEST_HANDLING_INVOKING;
-  switch (info->handler->handler_type)
+  dsk_assert (rreq->state == REQUEST_HANDLING_INIT);
+  rreq->state = REQUEST_HANDLING_INVOKING;
+  switch (rreq->handler->handler_type)
     {
     case HANDLER_TYPE_STREAMING_POST_DATA:
       {
         /* Invoke handler immediately */
-        DskHttpServerStreamingPostFunc func = (DskHttpServerStreamingPostFunc) info->handler->handler;
-        DskOctetSource *post_data = (DskOctetSource *) info->request.transfer->post_data;
-        func (&info->request, post_data, info->handler->handler_data);
+        DskHttpServerStreamingPostFunc func = (DskHttpServerStreamingPostFunc) rreq->handler->handler;
+        DskOctetSource *post_data = (DskOctetSource *) rreq->request.transfer->post_data;
+        func (&rreq->request, post_data, rreq->handler->handler_data);
       }
       break;
     case HANDLER_TYPE_CGI:
       {
-        if (!info->request.cgi_vars_computed)
-          begin_computing_cgi_vars (info);
+        if (!rreq->request.cgi_vars_computed)
+          begin_computing_cgi_vars (rreq);
 
-        if (info->request.cgi_vars_computed)
+        if (rreq->request.cgi_vars_computed)
           {
             /* Invoke handler immediately */
-            DskHttpServerCgiFunc func = (DskHttpServerCgiFunc) info->handler->handler;
-            func (&info->request, info->handler->handler_data);
+            DskHttpServerCgiFunc func = (DskHttpServerCgiFunc) rreq->handler->handler;
+            func (&rreq->request, rreq->handler->handler_data);
           }
         else
           {
@@ -858,66 +858,102 @@ restart:
       }
       break;
     }
-  switch (info->state)
+  switch (rreq->state)
     {
     case REQUEST_HANDLING_INIT:
       dsk_assert_not_reached ();
     case REQUEST_HANDLING_INVOKING:
-      info->state = REQUEST_HANDLING_WAITING;
+      rreq->state = REQUEST_HANDLING_WAITING;
       break;
     case REQUEST_HANDLING_BLOCKED_ERROR:
       {
         /* this will free the handler */
         char *msg = rreq->blocked_error;
         rreq->blocked_error = NULL;
-        respond_error (rreq, msg, rreq->blocked_error_status);
+        respond_error (&rreq->request, rreq->blocked_error_status, msg);
         dsk_free (msg);
         return;
       }
     case REQUEST_HANDLING_BLOCKED_PASS:
-      info->state = REQUEST_HANDLING_INIT;
-      if (!advance_to_next_handler (info))
+      rreq->state = REQUEST_HANDLING_INIT;
+      if (!advance_to_next_handler (rreq))
         {
-          respond_no_handler_found (info);
+          respond_no_handler_found (&rreq->request);
           return;
         }
       else
         goto restart;
     case REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT:
-      info->state = REQUEST_HANDLING_INIT;
+      rreq->state = REQUEST_HANDLING_INIT;
       goto restart;
     case REQUEST_HANDLING_WAITING:
     case REQUEST_HANDLING_GOT_RESPONSE:
       dsk_assert_not_reached ();
     case REQUEST_HANDLING_GOT_RESPONSE_WHILE_INVOKING:
-      ... free handler
+      real_server_request_free (rreq);
       return;
     }
 }
 
+static void
+stream_transfer_handle_error_notify       (DskHttpServerStreamTransfer *transfer,
+                                           DskError                    *error)
+{
+  RealServerRequest *rreq = transfer->func_data;
+  ...
+}
+
+static void
+stream_transfer_handle_post_data_complete (DskHttpServerStreamTransfer *transfer)
+{
+  RealServerRequest *rreq = transfer->func_data;
+  ...
+}
+
+static void
+stream_transfer_handle_post_data_failed   (DskHttpServerStreamTransfer *transfer)
+{
+  RealServerRequest *rreq = transfer->func_data;
+  ...
+}
+
+static void
+stream_transfer_handle_destroy            (DskHttpServerStreamTransfer *transfer)
+{
+  RealServerRequest *rreq = transfer->func_data;
+  ...
+}
+
+
+static DskHttpServerStreamFuncs stream_transfer_handlers =
+{
+  stream_transfer_handle_error_notify,
+  stream_transfer_handle_post_data_complete,
+  stream_transfer_handle_post_data_failed,
+  stream_transfer_handle_destroy
+};
+
 static dsk_boolean
-handle_http_server_request_available (DskHttpServerStream *sstream,
-                                      DskHttpServerBindInfo            *bind_info)
+handle_http_server_request_available (DskHttpServerStream   *stream,
+                                      DskHttpServerBindInfo *bind_info)
 {
   MatchTestNode *node;
+  RealServerRequest *rreq;
   DskHttpServerStreamTransfer *xfer;
   xfer = dsk_http_server_stream_get_request (stream);
   if (xfer == NULL)
     return DSK_TRUE;
 
-  request_info = dsk_malloc0 (sizeof (RealServerRequest));
-  request_info->request_header = dsk_object_ref (xfer->request);
-  request_info->transfer = xfer;
-  request_info->bind_info = bind_info;
-  xfer->user_data = handler_info;
+  rreq = dsk_malloc0 (sizeof (RealServerRequest));
+  rreq->request.request_header = dsk_object_ref (xfer->request);
+  rreq->request.transfer = xfer;
+  rreq->request.bind_info = bind_info;
+  dsk_http_server_stream_transfer_set_funcs (xfer, &stream_transfer_notify_funcs, rreq);
 
-  if (!find_first_match (request_info))
-    {
-      respond_no_handler_found (info);
-      return DSK_TRUE;
-    }
-
-  /* invoke handler */
+  if (find_first_match (rreq))
+    invoke_handler (rreq);
+  else
+    respond_no_handler_found (rreq);
   return DSK_TRUE;
 }
 
