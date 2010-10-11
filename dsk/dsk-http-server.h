@@ -4,14 +4,6 @@ typedef struct _DskHttpServerRequest DskHttpServerRequest;
 typedef struct _DskHttpServerBindInfo DskHttpServerBindInfo;
 typedef struct _DskHttpServer DskHttpServer;
 
-typedef struct
-{
-  dsk_boolean is_get;           /* if !is_get, then its a POST CGI var */
-  char *key;
-  char *value;
-  char *content_type;           /* for some POST headers */
-} DskHttpCgiVar;
-
 struct _DskHttpServerRequest
 {
   DskHttpServer *server;
@@ -21,7 +13,7 @@ struct _DskHttpServerRequest
 
   dsk_boolean cgi_vars_computed;
   unsigned n_cgi_vars;
-  DskHttpCgiVar *cgi_vars;
+  DskCgiVar *cgi_vars;
 
   dsk_boolean has_raw_post_data;
   size_t raw_post_data_size;
@@ -33,7 +25,7 @@ typedef dsk_boolean (*DskHttpServerTestFunc)   (DskHttpServerRequest *request,
 typedef void (*DskHttpServerStreamingPostFunc) (DskHttpServerRequest *request,
                                                 DskOctetSource       *post_data,
                                                 void                 *func_data);
-typedef void (*DskHttpServerCGIFunc)           (DskHttpServerRequest *request,
+typedef void (*DskHttpServerCgiFunc)           (DskHttpServerRequest *request,
                                                 void                 *func_data);
 
 /* MOST OF THESE FUNCTIONS CAN ONLY BE CALLED BEFORE THE SERVER IS STARTED */
@@ -74,7 +66,7 @@ dsk_http_server_register_streaming_post_handler (DskHttpServer *server,
 
 void
 dsk_http_server_register_cgi_handler            (DskHttpServer *server,
-                                                 DskHttpServerCGIFunc func,
+                                                 DskHttpServerCgiFunc func,
                                                  void          *func_data,
                                                  DskHookDestroy destroy);
 

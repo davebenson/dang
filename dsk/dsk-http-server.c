@@ -568,20 +568,14 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
 }
 
 static void
-dsk_http_cgi_var_clear (DskHttpCgiVar *var)
-{
-  dsk_free (var->key);     /* all key, values, etc are in one slab */
-
-}
-static void
 append_cgi_var  (DskHttpServerRequest *request,
-                 DskHttpCgiVar        *cgi)
+                 DskCgiVar        *cgi)
 {
   RealServerRequest *rreq = (RealServerRequest *) request;
   if (request->n_cgi_vars == rreq->cgi_vars_alloced)
     {
       unsigned new_alloced = rreq->cgi_vars_alloced ? rreq->cgi_vars_alloced * 2 : 4;
-      request->cgi_vars = dsk_realloc (request->cgi_vars, new_alloced * sizeof (DskHttpCgiVar));
+      request->cgi_vars = dsk_realloc (request->cgi_vars, new_alloced * sizeof (DskCgiVar));
       rreq->cgi_vars_alloced = new_alloced;
     }
   request->cgi_vars[request->n_cgi_vars++] = *cgi;
@@ -602,27 +596,47 @@ add_get_cgi_vars (RealServerRequest *rreq)
   if (qm)
     {
       /* compute new GET variables */
-      char **keqv_array = dsk_cgi_parse_query_string (qm);
-      if (keqv_array != NULL)
+      unsigned n_vars;
+      DskCgiVar *vars;
+      DskError *error = NULL;
+      if (!dsk_cgi_parse_query_string (qm, &n_vars, &vars, &error))
         {
-          unsigned i;
-          for (i = 0; keqv_array[i] != NULL; i++)
-            {
-              DskHttpCgiVar cgi;
-              cgi.key = keqv_array[i];
-              cgi.value = strchr (keqv_array[i], '=');
-              if (cgi.value)
-                cgi.value++;
-              cgi.is_get = DSK_TRUE;
-              cgi.content_type = NULL;
-              append_cgi_var (&rreq->request, &cgi);
-            }
-          dsk_free (keqv_array);
+          dsk_warning ("error parsing query string CGI vars: %s", error->message);
+          dsk_error_unref (error);
+          return;
         }
       else
         {
-          dsk_warning ("error parsing query string of internal redirect");
+          unsigned i;
+          for (i = 0; n_vars; i++)
+            append_cgi_var (&rreq->request, &vars[i]);
+          dsk_free (vars);
         }
+    }
+}
+
+static void
+add_post_cgi_vars (RealServerRequest *rreq)
+{
+  unsigned post_data_len = rreq->request.raw_post_data_size;
+  const uint8_t *post_data = rreq->request.raw_post_data;
+  unsigned n_vars;
+  DskCgiVar *vars;
+  DskError *error = NULL;
+  if (!dsk_cgi_parse_post_data (rreq->request.request_header->content_type,
+                                post_data_len, post_data,
+                                &n_vars, &vars, &error))
+    {
+      dsk_warning ("error parsing query string CGI vars: %s", error->message);
+      dsk_error_unref (error);
+      return;
+    }
+  else
+    {
+      unsigned i;
+      for (i = 0; n_vars; i++)
+        append_cgi_var (&rreq->request, &vars[i]);
+      dsk_free (vars);
     }
 }
 
@@ -650,7 +664,7 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
       /* remove any existing GET variables */
       for (i = o = 0; i < request->n_cgi_vars; i++)
         if (request->cgi_vars[i].is_get)
-          dsk_http_cgi_var_clear (&request->cgi_vars[i]);
+          dsk_cgi_var_clear (&request->cgi_vars[i]);
         else
           request->cgi_vars[o++] = request->cgi_vars[i];
       request->n_cgi_vars = o;
@@ -783,10 +797,10 @@ compute_cgi_vars (RealServerRequest *rreq)
   if (request->request_header->verb == DSK_HTTP_VERB_POST
    || request->request_header->verb == DSK_HTTP_VERB_PUT)
     {
-      // ASSERT: post-data complete
+      dsk_assert (request->has_raw_post_data);
       add_post_cgi_vars (rreq);
     }
-  rreq->cgi_vars_computed = DSK_TRUE;
+  request->cgi_vars_computed = DSK_TRUE;
 }
 
 static void
@@ -833,7 +847,7 @@ restart:
         if (info->request.cgi_vars_computed)
           {
             /* Invoke handler immediately */
-            DskHttpServerCGIFunc func = (DskHttpServerCGIFunc) info->handler->handler;
+            DskHttpServerCgiFunc func = (DskHttpServerCgiFunc) info->handler->handler;
             func (&info->request, info->handler->handler_data);
           }
         else
