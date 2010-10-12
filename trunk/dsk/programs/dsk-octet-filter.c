@@ -318,6 +318,13 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_byte_undoubler)
   return DSK_TRUE;
 }
 
+DSK_CMDLINE_CALLBACK_DECLARE(handle_xml_escape)
+{
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
+  add_filter (dsk_xml_escaper_new ());
+  return DSK_TRUE;
+}
+
 int main(int argc, char **argv)
 {
   DskError *error = NULL;
@@ -360,6 +367,8 @@ int main(int argc, char **argv)
                         handle_byte_doubler, NULL);
   dsk_cmdline_add_func ("byte-undoubler", "undouble a certain byte ('!' means ignore errors)", "BYTE_SPEC[!]", 0,
                         handle_byte_undoubler, NULL);
+  dsk_cmdline_add_func ("xml-escape", "do XML/HTML escaping", NULL, 0,
+                        handle_xml_escape, NULL);
   dsk_cmdline_process_args (&argc, &argv);
 
   DskBuffer in = DSK_BUFFER_STATIC_INIT;
