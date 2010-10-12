@@ -5,7 +5,8 @@ typedef struct _DskMimeMultipartDecoder DskMimeMultipartDecoder;
 /* 
    For "multipart/form-data" (RFC XXXX) 
  */
-DskMimeMultipartDecoder *dsk_mime_multipart_decoder_new (void);
+DskMimeMultipartDecoder *dsk_mime_multipart_decoder_new (char **kv_pairs,
+                                                         DskError **error);
 dsk_boolean dsk_mime_multipart_decoder_feed (DskMimeMultipartDecoder *decoder,
                                              size_t                   length,
 					     const uint8_t           *data,
