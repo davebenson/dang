@@ -12,6 +12,23 @@ HTTP Authentication
 HTTP Cookies
 	http://www.ietf.org/rfc/rfc2965.txt
 
+CGI:
+	...
+
+POST Forms:
+    MIME:
+	http://www.ietf.org/rfc/rfc822.txt
+    MIME: Format of Message Bodies
+	http://www.ietf.org/rfc/rfc2045.txt
+    MIME: Media Types
+	http://www.ietf.org/rfc/rfc2046.txt
+    Content-Disposition header type
+	http://www.ietf.org/rfc/rfc2183.txt
+    MIME type: MultipartDecoder/Related
+	http://www.ietf.org/rfc/rfc2387.txt
+    MIME type: MultipartDecoder/Form-Data
+	http://www.ietf.org/rfc/rfc2388.txt
+
 XML:
 	...
 
