@@ -133,6 +133,9 @@ dsk_http_server_stream_transfer_set_funcs (DskHttpServerStreamTransfer *xfer,
                                            DskHttpServerStreamFuncs    *funcs,
                                            void                        *data);
 
+void
+dsk_http_server_stream_shutdown (DskHttpServerStream *stream);
+
 struct  _DskHttpServerStreamResponseOptions
 {
   /* Provide either an HTTP response or the Options you want to copy into the new response */

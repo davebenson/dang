@@ -18,6 +18,7 @@
 /* a compiled test of a header */
 typedef struct _MatchTester MatchTester;
 typedef struct _MatchTesterStandard MatchTesterStandard;
+typedef struct _RealServerRequest RealServerRequest;
 
 typedef void (*FunctionPointer)();
 
@@ -49,6 +50,14 @@ struct _MatchTestList
   MatchTestList *prev;
 };
 
+typedef struct _ServerStream ServerStream;
+struct _ServerStream
+{
+  DskHttpServerBindInfo *bind_info;
+  DskHttpServerStream *http_stream;
+  ServerStream *prev, *next;
+};
+
 /* info about a listening port */
 struct _DskHttpServerBindInfo
 {
@@ -57,11 +66,17 @@ struct _DskHttpServerBindInfo
   DskHttpServerStreamOptions server_stream_options;
   DskOctetListener *listener;
 
+  RealServerRequest *first_request, *last_request;
+  ServerStream *first_stream, *last_stream;
+
   dsk_boolean is_local;
   unsigned bind_port;
   char *bind_local_path;
 };
 
+#define GET_BIND_INFO_STREAM_LIST(bind_info) \
+  ServerStream *, (bind_info)->first_stream, (bind_info)->last_stream, \
+  prev, next
 
 typedef struct _Handler Handler;
 typedef enum
@@ -105,6 +120,36 @@ struct _DskHttpServer
   DskHttpServerStreamOptions server_stream_options;
   DskHttpServerBindInfo *bind_infos;
 };
+
+static void
+dsk_http_server_init (DskHttpServer *server)
+{
+  static DskHttpServerStreamOptions sso = DSK_HTTP_SERVER_STREAM_OPTIONS_DEFAULT;
+  server->top.under_construction = DSK_TRUE;
+  server->server_stream_options = sso;
+}
+
+static void dsk_http_server_finalize (DskHttpServer *server);
+
+typedef struct _DskHttpServerClass DskHttpServerClass;
+struct _DskHttpServerClass
+{
+  DskObjectClass base_class;
+};
+
+DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskHttpServer);
+static DskHttpServerClass dsk_http_server_class =
+{
+  DSK_OBJECT_CLASS_DEFINE (DskHttpServer, &dsk_object_class,
+                           dsk_http_server_init,
+                           dsk_http_server_finalize)
+};
+
+DskHttpServer *
+dsk_http_server_new (void)
+{
+  return dsk_object_new (&dsk_http_server_class);
+}
 
 void dsk_http_server_add_match                 (DskHttpServer        *server,
                                                 DskHttpServerMatchType type,
@@ -314,12 +359,23 @@ dsk_http_server_register_streaming_post_handler (DskHttpServer *server,
                        (FunctionPointer) func, func_data, destroy);
 }
 
+void
+dsk_http_server_register_cgi_handler (DskHttpServer *server,
+                                      DskHttpServerCgiFunc func,
+                                      void *func_data,
+                                      DskHookDestroy destroy)
+{
+  add_handler_generic (server, HANDLER_TYPE_CGI,
+                       (FunctionPointer) func, func_data, destroy);
+}
+
 
 /* === Handling Requests === */
 typedef enum
 {
   REQUEST_HANDLING_INIT,
   REQUEST_HANDLING_INVOKING,
+  REQUEST_HANDLING_NEED_POST_DATA,
   REQUEST_HANDLING_BLOCKED_ERROR,
   REQUEST_HANDLING_BLOCKED_PASS,
   REQUEST_HANDLING_BLOCKED_INTERNAL_REDIRECT,
@@ -328,12 +384,13 @@ typedef enum
   REQUEST_HANDLING_GOT_RESPONSE
 } RequestHandlingState;
 
-typedef struct _RealServerRequest RealServerRequest;
 struct _RealServerRequest
 {
   DskHttpServerRequest request;
   MatchTestNode *node;
   Handler *handler;
+
+  RealServerRequest *prev, *next;
 
   /* For exponential resized of arrays */
   unsigned cgi_vars_alloced;
@@ -345,14 +402,25 @@ struct _RealServerRequest
   char *blocked_error;
   DskHttpStatus blocked_error_status;
 
-  /* If TRUE, the handler must be invoked when POST-data is complete */
-  unsigned post_data_cgi_vars_required : 1;
+  DskBuffer post_data_buffer;
+
+  /* We free the request when !waiting_for_response && got_transfer_destroy
+     && !invoking_handler */
+  unsigned waiting_for_response : 1;
+  unsigned got_transfer_destroy : 1;
+  unsigned invoking_handler : 1;
+
 };
 
 static void
-real_server_request_free (RealServerRequest *rreq)
+maybe_free_real_server_request (RealServerRequest *rreq)
 {
-  dsk_free (rreq);
+  if (!rreq->waiting_for_response
+   && rreq->got_transfer_destroy
+   && !rreq->invoking_handler)
+    {
+      dsk_free (rreq);
+    }
 }
 
 static dsk_boolean find_first_match (RealServerRequest *rreq);
@@ -380,7 +448,7 @@ respond_error (DskHttpServerRequest *request,
   dsk_print_set_uint (print, "status_code", status);
   dsk_print_set_string (print, "message", message);
   dsk_print_set_filtered_string (print, "html_escaped_message", message,
-                                 dsk_xml_escape_new ());
+                                 dsk_xml_escaper_new ());
   dsk_print (print, "<html>"
                     "<head><title>Error $status: $status_message</title></head>"
                     "<body>"
@@ -407,7 +475,7 @@ respond_error (DskHttpServerRequest *request,
   dsk_free (content_data);
 
   /* Free request */
-  real_server_request_free (rreq);
+  maybe_free_real_server_request (rreq);
 }
 
 /* === One of these functions should be called by any handler === */
@@ -417,7 +485,9 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
   RealServerRequest *rreq = (RealServerRequest *) request;
   dsk_assert (rreq->state == REQUEST_HANDLING_INVOKING
           ||  rreq->state == REQUEST_HANDLING_WAITING);
+  dsk_assert (rreq->waiting_for_response);
 
+  rreq->waiting_for_response = DSK_FALSE;
 
   /* Transform options */
   DskHttpServerStreamResponseOptions soptions = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
@@ -500,7 +570,7 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
     {
       /* free RealServerRequest */
       rreq->state = REQUEST_HANDLING_GOT_RESPONSE;
-      real_server_request_free (rreq);
+      maybe_free_real_server_request (rreq);
     }
 }
 
@@ -512,6 +582,8 @@ void dsk_http_server_request_respond_error    (DskHttpServerRequest *request,
   RealServerRequest *rreq = (RealServerRequest *) request;
   dsk_assert (rreq->state == REQUEST_HANDLING_WAITING
           ||  rreq->state == REQUEST_HANDLING_INVOKING);
+  dsk_assert (rreq->waiting_for_response);
+  rreq->waiting_for_response = DSK_FALSE;
   if (rreq->state == REQUEST_HANDLING_INVOKING)
     {
       rreq->state = REQUEST_HANDLING_BLOCKED_ERROR;
@@ -530,12 +602,15 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
 {
   DskHttpServerStreamResponseOptions resp_options = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
   DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
+  RealServerRequest *rreq = (RealServerRequest *) request;
+  dsk_assert (rreq->waiting_for_response);
   if (!(300 <= status && status <= 399))
     {
       dsk_http_server_request_respond_error (request, 500,
                                              "got non-3XX code for redirect");
       return;
     }
+  rreq->waiting_for_response = DSK_FALSE;
   resp_options.header_options = &header_options;
   header_options.status_code = status;
   header_options.location = (char*)location;
@@ -546,7 +621,7 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
   dsk_print_set_uint (print, "status_code", status);
   dsk_print_set_string (print, "location", location);
   dsk_print_set_filtered_string (print, "location_html_escaped", location,
-                                 dsk_xml_escape_new ());
+                                 dsk_xml_escaper_new ());
   dsk_print (print, "<html><head><title>See $location_html_escaped</title></head>"
              "<body>Please go <a href=\"$location\">here</a></body>"
              "</html>\n");
@@ -565,6 +640,7 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
       dsk_error_unref (error);
     }
   dsk_free (content_data);
+  maybe_free_real_server_request (rreq);
 }
 
 static void
@@ -648,6 +724,8 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
   DskHttpRequest *old_header;
   dsk_assert (rreq->state == REQUEST_HANDLING_INVOKING
           ||  rreq->state == REQUEST_HANDLING_WAITING);
+  dsk_assert (rreq->waiting_for_response);
+  rreq->waiting_for_response = DSK_FALSE;
 
   /* Create the new HTTP request correspond to this redirect */
   old_header = request->request_header;
@@ -689,6 +767,8 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
 void dsk_http_server_request_pass             (DskHttpServerRequest *request)
 {
   RealServerRequest *rreq = (RealServerRequest *) request;
+  dsk_assert (rreq->waiting_for_response);
+  rreq->waiting_for_response = DSK_FALSE;
   if (rreq->state == REQUEST_HANDLING_INVOKING)
     {
       rreq->state = REQUEST_HANDLING_BLOCKED_PASS;
@@ -803,7 +883,7 @@ compute_cgi_vars (RealServerRequest *rreq)
   request->cgi_vars_computed = DSK_TRUE;
 }
 
-static void
+static dsk_boolean
 begin_computing_cgi_vars (RealServerRequest *rreq)
 {
   DskHttpVerb verb = rreq->request.request_header->verb;
@@ -814,7 +894,8 @@ begin_computing_cgi_vars (RealServerRequest *rreq)
   else if (rreq->request.has_raw_post_data)
     compute_cgi_vars (rreq);
   else
-    rreq->post_data_cgi_vars_required = DSK_TRUE;
+    return DSK_FALSE;
+  return DSK_TRUE;
 }
 
 static void
@@ -827,8 +908,13 @@ restart:
      calls during handler invocation are processed in a loop
      (see 'if (rreq->in_handler_got_result)' below) instead
      of recursing to cause a very large stack. */
-  dsk_assert (rreq->state == REQUEST_HANDLING_INIT);
+  dsk_assert (rreq->state == REQUEST_HANDLING_INIT
+           || rreq->state == REQUEST_HANDLING_WAITING
+           || rreq->state == REQUEST_HANDLING_NEED_POST_DATA);
+  dsk_assert (!rreq->invoking_handler);
+  dsk_assert (!rreq->waiting_for_response);
   rreq->state = REQUEST_HANDLING_INVOKING;
+  rreq->invoking_handler = DSK_TRUE;
   switch (rreq->handler->handler_type)
     {
     case HANDLER_TYPE_STREAMING_POST_DATA:
@@ -836,18 +922,26 @@ restart:
         /* Invoke handler immediately */
         DskHttpServerStreamingPostFunc func = (DskHttpServerStreamingPostFunc) rreq->handler->handler;
         DskOctetSource *post_data = (DskOctetSource *) rreq->request.transfer->post_data;
+        rreq->waiting_for_response = DSK_TRUE;
         func (&rreq->request, post_data, rreq->handler->handler_data);
       }
       break;
     case HANDLER_TYPE_CGI:
       {
         if (!rreq->request.cgi_vars_computed)
-          begin_computing_cgi_vars (rreq);
+          {
+            if (!begin_computing_cgi_vars (rreq))
+              {
+                rreq->state = REQUEST_HANDLING_NEED_POST_DATA;
+                break;
+              }
+          }
 
         if (rreq->request.cgi_vars_computed)
           {
             /* Invoke handler immediately */
             DskHttpServerCgiFunc func = (DskHttpServerCgiFunc) rreq->handler->handler;
+            rreq->waiting_for_response = DSK_TRUE;
             func (&rreq->request, rreq->handler->handler_data);
           }
         else
@@ -858,6 +952,7 @@ restart:
       }
       break;
     }
+  rreq->invoking_handler = DSK_FALSE;
   switch (rreq->state)
     {
     case REQUEST_HANDLING_INIT:
@@ -865,6 +960,8 @@ restart:
     case REQUEST_HANDLING_INVOKING:
       rreq->state = REQUEST_HANDLING_WAITING;
       break;
+    case REQUEST_HANDLING_NEED_POST_DATA:
+      dsk_assert_not_reached ();
     case REQUEST_HANDLING_BLOCKED_ERROR:
       {
         /* this will free the handler */
@@ -890,7 +987,7 @@ restart:
     case REQUEST_HANDLING_GOT_RESPONSE:
       dsk_assert_not_reached ();
     case REQUEST_HANDLING_GOT_RESPONSE_WHILE_INVOKING:
-      real_server_request_free (rreq);
+      maybe_free_real_server_request (rreq);
       return;
     }
 }
@@ -900,28 +997,45 @@ stream_transfer_handle_error_notify       (DskHttpServerStreamTransfer *transfer
                                            DskError                    *error)
 {
   RealServerRequest *rreq = transfer->func_data;
-  ...
+  dsk_warning ("error in stream-transfer: %s [request %s]",
+               error->message,
+               rreq->request.request_header->path);
 }
 
 static void
 stream_transfer_handle_post_data_complete (DskHttpServerStreamTransfer *transfer)
 {
   RealServerRequest *rreq = transfer->func_data;
-  ...
+
+  rreq->request.has_raw_post_data = DSK_TRUE;
+  rreq->request.raw_post_data_size = rreq->post_data_buffer.size;
+  rreq->request.raw_post_data = dsk_malloc (rreq->post_data_buffer.size);
+  dsk_buffer_read (&rreq->post_data_buffer,
+                   rreq->post_data_buffer.size,
+                   rreq->request.raw_post_data);
+
+  if (rreq->state == REQUEST_HANDLING_NEED_POST_DATA)
+    invoke_handler (rreq);
 }
 
 static void
 stream_transfer_handle_post_data_failed   (DskHttpServerStreamTransfer *transfer)
 {
+  DSK_UNUSED (transfer);
+#if 0
   RealServerRequest *rreq = transfer->func_data;
-  ...
+  if (rreq->state == REQUEST_HANDLING_NEED_POST_DATA)
+    {
+    }
+#endif
 }
 
 static void
 stream_transfer_handle_destroy            (DskHttpServerStreamTransfer *transfer)
 {
   RealServerRequest *rreq = transfer->func_data;
-  ...
+  rreq->got_transfer_destroy = DSK_TRUE;
+  maybe_free_real_server_request (rreq);
 }
 
 
@@ -935,9 +1049,8 @@ static DskHttpServerStreamFuncs stream_transfer_handlers =
 
 static dsk_boolean
 handle_http_server_request_available (DskHttpServerStream   *stream,
-                                      DskHttpServerBindInfo *bind_info)
+                                      ServerStream          *sstream)
 {
-  MatchTestNode *node;
   RealServerRequest *rreq;
   DskHttpServerStreamTransfer *xfer;
   xfer = dsk_http_server_stream_get_request (stream);
@@ -947,14 +1060,26 @@ handle_http_server_request_available (DskHttpServerStream   *stream,
   rreq = dsk_malloc0 (sizeof (RealServerRequest));
   rreq->request.request_header = dsk_object_ref (xfer->request);
   rreq->request.transfer = xfer;
-  rreq->request.bind_info = bind_info;
-  dsk_http_server_stream_transfer_set_funcs (xfer, &stream_transfer_notify_funcs, rreq);
+  rreq->request.bind_info = sstream->bind_info;
+  dsk_http_server_stream_transfer_set_funcs (xfer, &stream_transfer_handlers, rreq);
 
   if (find_first_match (rreq))
     invoke_handler (rreq);
   else
-    respond_no_handler_found (rreq);
+    respond_no_handler_found (&rreq->request);
   return DSK_TRUE;
+}
+
+static void
+http_server_stream_destroyed (ServerStream *sstream)
+{
+  if (sstream->bind_info != NULL)
+    {
+      DskHttpServerBindInfo *bind_info = sstream->bind_info;
+      GSK_LIST_REMOVE (GET_BIND_INFO_STREAM_LIST (bind_info), sstream);
+    }
+  dsk_object_unref (sstream->http_stream);
+  dsk_free (sstream);
 }
 
 static dsk_boolean
@@ -963,28 +1088,38 @@ handle_listener_ready (DskOctetListener *listener,
 {
   DskOctetSource *source;
   DskOctetSink *sink;
+  DskError *error = NULL;
   switch (dsk_octet_listener_accept (listener, NULL, &source, &sink, &error))
     {
     case DSK_IO_RESULT_ERROR:
       //
-      ...
+      dsk_warning ("octet-listener failed to accept connectino: %s",
+                   error->message);
+      dsk_error_unref (error);
       return DSK_TRUE;
     case DSK_IO_RESULT_AGAIN:
       return DSK_TRUE;
     case DSK_IO_RESULT_SUCCESS:
       break;
-    case DSK_IO_RESULT_EOF
-      ...
+    case DSK_IO_RESULT_EOF:
+      dsk_warning ("octet-listener: accept returned EOF?");
       return DSK_FALSE;
     }
 
+  DskHttpServerStream *http_stream;
+
   http_stream = dsk_http_server_stream_new (sink, source,
-                                            &bind_info->server_options);
+                                            &bind_info->server_stream_options);
+  ServerStream *sstream = dsk_malloc (sizeof (ServerStream));
+  sstream->bind_info = bind_info;
+  GSK_LIST_APPEND (GET_BIND_INFO_STREAM_LIST (bind_info), sstream);
+  sstream->http_stream = http_stream;
   dsk_hook_trap (&http_stream->request_available,
                  (DskHookFunc) handle_http_server_request_available,
-                 bind_info,             //???
-                 NULL);
+                 sstream,
+                 (DskHookDestroy) http_server_stream_destroyed);
   dsk_object_unref (http_stream);
+  return DSK_TRUE;
 }
 
 static void
@@ -1063,3 +1198,73 @@ dsk_boolean dsk_http_server_bind_local         (DskHttpServer        *server,
   return DSK_TRUE;
 }
 
+
+/* --- clean up --- */
+static void
+destruct_match_node (MatchTestNode *node)
+{
+
+  /* free handlers */
+  while (node->first_handler != NULL)
+    {
+      Handler *kill = node->first_handler;
+      node->first_handler = kill->next;
+      if (kill->handler_destroy != NULL)
+        kill->handler_destroy (kill->handler_data);
+      dsk_free (kill);
+    }
+
+  /* free tests */
+  while (node->test_list)
+    {
+      MatchTestList *kill = node->test_list;
+      node->test_list = kill->prev;
+      dsk_free (kill);
+    }
+  if (node->tester && node->tester->destroy)
+    node->tester->destroy (node->tester);
+
+  /* free children */
+  while (node->first_child != NULL)
+    {
+      MatchTestNode *kill = node->first_child;
+      node->first_child = kill->next_sibling;
+      destruct_match_node (kill);
+      dsk_free (kill);
+    }
+}
+static void dsk_http_server_finalize (DskHttpServer *server)
+{
+  /* free binding sites and open requests */
+  while (server->bind_infos != NULL)
+    {
+      DskHttpServerBindInfo *bind_info = server->bind_infos;
+      server->bind_infos = bind_info->next;
+
+      /* Detach all active requests */
+      while (bind_info->first_request)
+        {
+          RealServerRequest *kill = bind_info->first_request;
+          bind_info->first_request = kill->next;
+          kill->request.server = NULL;
+          kill->request.bind_info = NULL;
+          kill->prev = kill->next = NULL;
+        }
+      bind_info->last_request = NULL;
+
+      /* Free all streams associated with the binding site */
+      while (bind_info->first_stream != NULL)
+        {
+          ServerStream *ss = bind_info->first_stream;
+          GSK_LIST_REMOVE_FIRST (GET_BIND_INFO_STREAM_LIST (bind_info));
+          ss->bind_info = NULL;
+          dsk_http_server_stream_shutdown (ss->http_stream);
+        }
+
+      dsk_object_unref (bind_info->listener);
+      dsk_free (bind_info);
+    }
+
+  /* free matching infrastructure */
+  destruct_match_node (&server->top);
+}
