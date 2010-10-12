@@ -7,13 +7,14 @@
  * so we do not implement them at all.
  */
 
-/* Note that unixtime is defined in
+/* Note that unixtime is defined as a variant of
  * Coordinated Universal Time (abbreviated UTC),
- * which has no leap seconds; however, days with a leap second are
+ * which has no leap seconds; in unix-time, days with a leap second are
  * "stretched out"--meaning each second is 1/86400 times longer,
  * but there are still 86400 UTC seconds that day,
  * versus 86401 GMT seconds that day - which in real-world time
- * is the same.
+ * is the same.   Generally speaking, you should not use
+ * "wall-clock" time for precise benchmarking.
  */
 
 typedef struct _DskDate DskDate;
