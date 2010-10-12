@@ -42,3 +42,49 @@ dsk_utf8_skip_whitespace (const char **p_str)
     }
   *p_str = (const char *) str;
 }
+int dsk_ascii_strcasecmp  (const char *a, const char *b)
+{
+  while (*a && *b)
+    {
+      char A = dsk_ascii_tolower (*a);
+      char B = dsk_ascii_tolower (*b);
+      if (A < B)
+        return -1;
+      else if (A > B)
+        return +1;
+      a++;
+      b++;
+    }
+  if (*a)
+    return +1;
+  else if (*b)
+    return -1;
+  else
+    return 0;
+}
+
+int dsk_ascii_strncasecmp (const char *a, const char *b, size_t max_len)
+{
+  unsigned rem = max_len;
+  while (*a && *b && rem)
+    {
+      char A = dsk_ascii_tolower (*a);
+      char B = dsk_ascii_tolower (*b);
+      if (A < B)
+        return -1;
+      else if (A > B)
+        return +1;
+      a++;
+      b++;
+      rem--;
+    }
+  if (rem == 0)
+    return 0;
+  if (*a)
+    return +1;
+  else if (*b)
+    return -1;
+  else
+    return 0;
+}
+
