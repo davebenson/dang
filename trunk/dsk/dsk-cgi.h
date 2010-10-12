@@ -15,7 +15,12 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
                                         DskError  **error);
 
 
-dsk_boolean dsk_cgi_parse_post_data (const char *content_type,
+/* Handles "application/x-www-form-urlencoded" (RFC XXXX)
+   and     "multipart/form-data" (RFC XXXX)
+   content-types */
+dsk_boolean dsk_cgi_parse_post_data (const char *content_main_type,
+                                     const char *content_subtype,
+                                     char      **content_type_kv_pairs,
                                      unsigned    post_data_length,
                                      const uint8_t *post_data,
                                      unsigned   *n_cgi_var_out,
