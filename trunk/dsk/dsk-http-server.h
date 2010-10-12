@@ -39,6 +39,8 @@ typedef enum
   DSK_HTTP_SERVER_MATCH_BIND_PATH
 } DskHttpServerMatchType;
 
+DskHttpServer * dsk_http_server_new (void);
+
 void dsk_http_server_add_match                 (DskHttpServer        *server,
                                                 DskHttpServerMatchType type,
                                                 const char           *pattern);
@@ -77,6 +79,8 @@ struct _DskHttpServerResponseOptions
 {
   DskOctetSource *source;
   const char *source_filename;
+  DskBuffer *source_buffer;
+  int64_t content_length;
 
   /* single string content_type: eg "text/plain" or "text/plain/utf-8" */
   const char *content_type;
@@ -87,6 +91,17 @@ struct _DskHttpServerResponseOptions
   const char *content_charset;
 
 };
+#define DSK_HTTP_SERVER_RESPONSE_OPTIONS_DEFAULT                \
+{                                                               \
+  NULL,                 /* source */                            \
+  NULL,                 /* source_filename */                   \
+  NULL,                 /* source_buffer */                     \
+  -1LL,                 /* content_length */                    \
+  NULL,                 /* content_type */                      \
+  NULL,                 /* content_main_type */                 \
+  NULL,                 /* content_sub_type */                  \
+  NULL,                 /* content_charset */                   \
+}
 
 void dsk_http_server_request_respond          (DskHttpServerRequest *request,
                                                DskHttpServerResponseOptions *options);

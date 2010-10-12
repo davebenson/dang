@@ -8,6 +8,7 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-dispatch \
 	        tests/test-http-client-stream-0 \
 		tests/test-http-server-stream-0 \
+		tests/test-http-server-0 \
 		tests/test-http-loopback \
 		tests/test-date-0 \
 		tests/test-unicode \
@@ -52,6 +53,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-http-header-parsing.o dsk-http-protocol.o \
 	  dsk-http-header-printing.o \
 	  dsk-http-server.o \
+	  dsk-cgi.o \
 	  dsk-date.o \
 	  dsk-xml-parser.o dsk-xml.o \
 	  dsk-xml-binding.o \
@@ -63,6 +65,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-hex-encoder.o dsk-hex-decoder.o dsk-whitespace-trimmer.o \
 	  dsk-url-encoder.o dsk-url-decoder.o \
 	  dsk-byte-doubler.o dsk-byte-undoubler.o \
+	  dsk-xml-escaper.o \
 	  dsk-print.o \
 	  dsk-checksum.o \
 	  dsk-file-util.o dsk-pattern.o

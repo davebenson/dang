@@ -1530,3 +1530,11 @@ dsk_buffer_fragment_free (DskBufferFragment *fragment)
 {
   recycle (fragment);
 }
+
+char *dsk_buffer_clear_to_string (DskBuffer *buffer)
+{
+  char *rv = dsk_malloc (buffer->size + 1);
+  rv[buffer->size] = 0;
+  dsk_buffer_read (buffer, buffer->size, rv);
+  return rv;
+}

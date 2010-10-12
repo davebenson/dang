@@ -586,7 +586,7 @@ dsk_http_server_stream_get_request (DskHttpServerStream *stream)
 }
 
 void
-dsk_http_server_stream_set_funcs (DskHttpServerStreamTransfer      *transfer,
+dsk_http_server_stream_transfer_set_funcs (DskHttpServerStreamTransfer      *transfer,
                                   DskHttpServerStreamFuncs         *funcs,
                                   void                             *func_data)
 {
@@ -966,7 +966,19 @@ static void
 dsk_http_server_stream_finalize (DskHttpServerStream *stream)
 {
   do_shutdown (stream, NULL);
-  dsk_hook_clear (&stream->request_available);
+  if (!stream->request_available.is_cleared)
+    dsk_hook_clear (&stream->request_available);
+}
+
+void
+dsk_http_server_stream_shutdown (DskHttpServerStream *stream)
+{
+  if (stream->source)
+    dsk_octet_source_shutdown (stream->source);
+  if (stream->sink)
+    dsk_octet_sink_shutdown (stream->source);
+  if (!stream->request_available.is_cleared)
+    dsk_hook_clear (&stream->request_available);
 }
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskHttpServerStream);
