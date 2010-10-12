@@ -31,6 +31,9 @@ static inline char dsk_ascii_toupper (int c)
 }
 const char *dsk_ascii_byte_name(unsigned char byte);
 
+int dsk_ascii_strcasecmp  (const char *a, const char *b);
+int dsk_ascii_strncasecmp (const char *a, const char *b, size_t max_len);
+
 #define DSK_ASCII_SKIP_SPACE(ptr) \
       do { while (dsk_ascii_isspace (*(ptr))) ptr++; } while(0)
 #define DSK_ASCII_SKIP_NONSPACE(ptr) \
