@@ -1,6 +1,11 @@
 TESTS:
 _ request header parsing
 _ response header parsing
+_ CGI parsing
+  _ GET variable style
+  _ MIME Multipart (POST) style
+_ MIME Multipart Decoder
+_ MIME Multipart Encoder
 x http client stream: connection-close
 x http client stream: content-length POST data, connection-close
 x http client stream: transfer-encoding chunked POST data
