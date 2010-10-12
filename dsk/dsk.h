@@ -39,6 +39,7 @@
 #include "dsk-http-client.h"
 #include "dsk-http-server-stream.h"
 #include "dsk-http-server.h"
+#include "dsk-mime-multipart.h"
 
 #include "dsk-xml.h"
 #include "dsk-xml-parser.h"
