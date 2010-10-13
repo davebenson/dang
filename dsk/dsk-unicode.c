@@ -88,3 +88,14 @@ int dsk_ascii_strncasecmp (const char *a, const char *b, size_t max_len)
     return 0;
 }
 
+void
+dsk_ascii_strchomp (char *inout)
+{
+  char *end;
+  for (end = inout; *end; end++)
+    {
+    }
+  while (end > inout && dsk_ascii_isspace (*(end-1)))
+    end--;
+  *end = '\0';
+}

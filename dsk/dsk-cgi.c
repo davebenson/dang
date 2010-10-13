@@ -79,6 +79,7 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
       if (eq)
         {
           char *out = kv + key_len + 1;
+          char *value_start = out;
           (*cgi_var_out)[n_cgi].value = out;
           for (at = eq + 1; *at != '&' && *at != '\0'; at++)
             if (*at == '%')
@@ -92,13 +93,20 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
             else
               *out++ = *at;
           *out = '\0';
+          (*cgi_var_out)[n_cgi].value_length = out - value_start;
         }
       else
         {
           (*cgi_var_out)[n_cgi].value = NULL;
+          (*cgi_var_out)[n_cgi].value_length = 0;
         }
       (*cgi_var_out)[n_cgi].content_type = NULL;
       (*cgi_var_out)[n_cgi].is_get = DSK_TRUE;
+
+      (*cgi_var_out)[n_cgi].content_type = NULL;
+      (*cgi_var_out)[n_cgi].content_location = NULL;
+      (*cgi_var_out)[n_cgi].content_description = NULL;
+      (*cgi_var_out)[n_cgi].content_disposition = NULL;
       n_cgi++;
     }
   *n_cgi_var_out = n_cgi;
@@ -160,5 +168,11 @@ dsk_boolean dsk_cgi_parse_post_data (const char *content_main_type,
 
 void        dsk_cgi_var_clear       (DskCgiVar *var)
 {
-  dsk_free (var->key);
+  if (var->key == NULL)
+    {
+      dsk_assert (!var->is_get);
+      dsk_free (var->value);
+    }
+  else
+    dsk_free (var->key);
 }

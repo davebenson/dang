@@ -19,12 +19,8 @@
 
 typedef enum
 {
-  /* multipart_decoder has been constructed,
-     but has not yet gotten an array of options.
-     (this distinction is a bit of a hack.) */
-  STATE_INITED,
-
-  /* has had set_options() called on it, successfully */
+  /* waiting for an initial boundary string (could be terminal);
+     non-boundary lines are the "preamble" and must be ignored. */
   STATE_WAITING_FOR_FIRST_SEP_LINE,
 
   /* Gathering header of next piece in 'buffer'.
@@ -84,6 +80,7 @@ struct _DskMimeMultipartDecoder
 
   /* cached for optimization */
   unsigned boundary_str_len;
+  char *boundary_buf;
 
   DskCgiVar cur_piece;
   DskBuffer cur_buffer;
@@ -97,6 +94,8 @@ struct _DskMimeMultipartDecoder
   DskCgiVar *pieces;
 #define DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES 4
   DskCgiVar pieces_init[DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES];
+#define BOUNDARY_BUF_PAD_SIZE                    64
+  char boundary_buf_init[BOUNDARY_BUF_PAD_SIZE];
 };
 
 
@@ -118,9 +117,9 @@ state_to_string (guint state)
     CASE_RET_AS_STRING(STATE_ENDED);
 #undef CASE_RET_AS_STRING
     }
-  g_return_val_if_reached (NULL);
+  dsk_return_val_if_reached (NULL);
 }
-#define YELL(decoder) g_message ("at line %u, state=%s [buf-size=%u]",__LINE__,state_to_string ((decoder)->state), (decoder)->buffer.size)
+#define YELL(decoder) dsk_message ("at line %u, state=%s [buf-size=%u]",__LINE__,state_to_string ((decoder)->state), (decoder)->buffer.size)
 #endif
 
 static dsk_boolean
@@ -129,50 +128,54 @@ process_header_line (DskMimeMultipartDecoder *decoder,
                      DskError               **error)
 {
   DskCgiVar *cur = &decoder->cur_piece;
-  if (dsk_ascii_strncasecmp (line, "content-type:", 13) == 0
-   && cur->content_type == NULL)
+  if (dsk_ascii_strncasecmp (line, "content-type:", 13) == 0)
     {
       /* Example:
 	 text/plain; charset=latin-1
 
 	 See RFC 2045, Section 5.
+
+         We ignore all pieces except charset.
        */
       const char *start = line + 13;
       const char *slash = strchr (start, '/');
-      const char *at;
-      GPtrArray *fields = NULL;
-      GSK_SKIP_WHITESPACE (start);
+      while (dsk_ascii_isspace (*start))
+        start++;
       if (slash == NULL)
 	{
-	  g_set_error (error, GSK_G_ERROR_DOMAIN,
-		       GSK_ERROR_BAD_FORMAT,
-		       _("content-type expected to contain a '/'"));
-	  return FALSE;
+	  dsk_set_error (error, "content-type expected to contain a '/'");
+	  return DSK_FALSE;
 	}
-      piece->type = g_strndup (start, slash-start);
-      slash++;
-      at = slash;
-#define IS_SUBTYPE_CHAR(c) (isalpha(c) || isdigit(c) || ((c)=='-'))
-#define IS_SEP_TYPE_CHAR(c) (isspace(c) || ((c)==';'))
-      GSK_SKIP_CHAR_TYPE (at, IS_SUBTYPE_CHAR);
-      piece->subtype = g_strndup (slash, at-slash);
+      const char *content_main_type_start = start;
+      const char *content_main_type_end = slash;
+      const char *at = slash + 1;
+      const char *content_subtype_start = at;
+#define IS_SUBTYPE_CHAR(c) dsk_ascii_istoken (c)
+#define IS_SEP_TYPE_CHAR(c) (dsk_ascii_isspace(c) || ((c)==';'))
+      while (IS_SUBTYPE_CHAR (*at))
+        at++;
+      const char *content_subtype_end = at;
+      const char *content_charset_start = NULL;
+      const char *content_charset_end = NULL;
       for (;;)
 	{
+	  const char *key_start, *key_end;
 	  const char *value_start, *value_end;
 	  const char *equals;
-	  char *key, *value;
-	  GSK_SKIP_CHAR_TYPE (at, IS_SEP_TYPE_CHAR);
+          while (IS_SEP_TYPE_CHAR (*at))
+            at++;
 	  if (*at == '\0')
 	    break;
+          key_start = at;
 	  equals = at;
-	  GSK_SKIP_CHAR_TYPE (equals, IS_SUBTYPE_CHAR);
+          while (IS_SUBTYPE_CHAR (*equals))
+            equals++;
 	  if (*equals != '=')
 	    {
-	      g_set_error (error, GSK_G_ERROR_DOMAIN,
-			   GSK_ERROR_BAD_FORMAT,
-			   _("expected '=' in key-value pairs on content-type"));
-	      return FALSE;
+	      dsk_set_error (error, "expected '=' in key-value pairs on content-type");
+	      return DSK_FALSE;
 	    }
+          key_end = equals;
 	  value_start = equals + 1;
 	  value_end = value_start;
 	  if (*value_start == '"')
@@ -180,95 +183,199 @@ process_header_line (DskMimeMultipartDecoder *decoder,
 	      value_end = strchr (value_start + 1, '"');
 	      if (value_end == NULL)
 		{
-		  g_set_error (error, GSK_G_ERROR_DOMAIN,
-			       GSK_ERROR_BAD_FORMAT,
-			       _("missing terminal '\"' in key/value pair in content-type"));
-		  return FALSE;
+		  dsk_set_error (error, "missing terminal '\"' in key/value pair in content-type");
+		  return DSK_FALSE;
 		}
-	      value = g_strndup (value_start + 1, value_end - (value_start + 1));
-	      value_end++;
+
+              at = value_end + 1;
+              value_start++;
 	    }
 	  else
 	    {
-	      GSK_SKIP_CHAR_TYPE (value_end, IS_SUBTYPE_CHAR);
-	      value = g_strndup (value_start, value_end - value_start);
+              while (IS_SUBTYPE_CHAR (*value_end))
+                value_end++;
+              at = value_end;
 	    }
-	  key = g_strndup (at, equals - at);
-	  at = value_end;
-	  if (dsk_ascii_strcasecmp (key, "charset") == 0)
+	  if (dsk_ascii_strncasecmp (key_start, "charset", 7) == 0
+              && key_end - key_start == 7)
 	    {
-	      g_free (piece->charset);
-	      piece->charset = value;
-	      g_free (key);
+              content_charset_start = value_start;
+              content_charset_end = value_end;
 	      continue;
 	    }
-	  if (!fields)
-	    fields = g_ptr_array_new ();
-	  g_ptr_array_add (fields, key);
-	  g_ptr_array_add (fields, value);
 	}
-      if (fields != NULL)
-	{
-	  g_ptr_array_add (fields, NULL);
-	  piece->other_fields = (char**) g_ptr_array_free (fields, FALSE);
-	}
-      else
-	{
-	  piece->other_fields = NULL;
-	}
+      unsigned main_len = content_main_type_end - content_main_type_start;
+      unsigned sub_len = content_subtype_end - content_subtype_start;
+      unsigned len = main_len + 1 + sub_len + 1;
+      if (content_charset_start != NULL)
+        len += content_charset_end - content_charset_start
+             + 1;
+      char *ct;
+      ct = dsk_mem_pool_alloc_unaligned (&decoder->header_storage, len);
+      memcpy (ct, content_main_type_start, main_len);
+      ct[main_len] = '/';
+      memcpy (ct + main_len + 1, content_subtype_start, sub_len);
+      if (content_charset_start)
+        {
+          ct[main_len + 1 + sub_len] = '/';
+          memcpy (ct + main_len + 1 + sub_len + 1, content_charset_start,
+                  content_charset_end - content_charset_start);
+        }
+      ct[len-1] = 0;
+      cur->content_type = ct;
     }
-  else if (dsk_ascii_strncasecmp (line, "content-id:", 11) == 0
-       && piece->id == NULL)
+  else if (dsk_ascii_strncasecmp (line, "content-id:", 11) == 0)
     {
       const char *start = strchr(line, ':') + 1;
-      GSK_SKIP_WHITESPACE (start);
-      piece->id = g_strchomp (g_strdup (start));
+      while (dsk_ascii_isspace (*start))
+        start++;
+      char *id = dsk_mem_pool_strdup (&decoder->header_storage, start);
+      dsk_ascii_strchomp (id);
+      cur->key = id;
     }
-  else if (dsk_ascii_strncasecmp (line, "content-location:", 17) == 0
-       && piece->location == NULL)
+  else if (dsk_ascii_strncasecmp (line, "content-location:", 17) == 0)
     {
       const char *start = strchr(line, ':') + 1;
-      GSK_SKIP_WHITESPACE (start);
-      piece->location = g_strchomp (g_strdup (start));
+      while (dsk_ascii_isspace (*start))
+        start++;
+      char *location = dsk_mem_pool_strdup (&decoder->header_storage, start);
+      dsk_ascii_strchomp (location);
+      cur->content_location = location;
     }
   else if (dsk_ascii_strncasecmp (line, "content-transfer-encoding:", 26) == 0)
     {
-      const char *start = strchr(line, ':') + 1;
-      GSK_SKIP_WHITESPACE (start);
-      piece->transfer_encoding = g_strchomp (g_strdup (start));
+      const char *encoding = strchr(line, ':') + 1;
+      while (dsk_ascii_isspace (*encoding))
+        encoding++;
+
+      if (decoder->transfer_decoder != NULL)
+        {
+          dsk_object_unref (decoder->transfer_decoder);
+          decoder->transfer_decoder = NULL;
+        }
+
+      /* parse various transfer-encodings */
+      if (dsk_ascii_strncasecmp (encoding, "identity", 8) == 0)
+        decoder->transfer_decoder = dsk_octet_filter_identity_new ();
+      else if (dsk_ascii_strncasecmp (encoding, "base64", 6) == 0)
+        decoder->transfer_decoder = dsk_base64_decoder_new ();
+      else if (dsk_ascii_strncasecmp (encoding, "quoted-printable", 16) == 0)
+        decoder->transfer_decoder = dsk_unquote_printable_new ();
+      else
+        {
+          dsk_set_error (error,
+                         "unknown transfer encoding '%s' making decoder stream",
+                         encoding);
+          return DSK_FALSE;
+        }
     }
   else if (dsk_ascii_strncasecmp (line, "content-description:", 20) == 0)
     {
       const char *start = strchr(line, ':') + 1;
-      GSK_SKIP_WHITESPACE (start);
-      piece->description = g_strchomp (g_strdup (start));
+      while (dsk_ascii_isspace (*start))
+        start++;
+      char *description = dsk_mem_pool_strdup (&decoder->header_storage, start);
+      dsk_ascii_strchomp (description);
+      cur->content_description = description;
     }
   else if (dsk_ascii_strncasecmp (line, "content-disposition:", 20) == 0)
     {
       const char *start = strchr(line, ':') + 1;
-      GSK_SKIP_WHITESPACE (start);
-      piece->disposition = g_strchomp (g_strdup (start));
+      while (dsk_ascii_isspace (*start))
+        start++;
+      char *disposition = dsk_mem_pool_strdup (&decoder->header_storage, start);
+      dsk_ascii_strchomp (disposition);
+      cur->content_disposition = disposition;
     }
   else
     {
-      g_message ("WARNING: could not part multipart_decoder message line: '%s'", line);
-      return FALSE;
+      dsk_set_error (error,
+                     "could not parse multipart_decoder message line: '%s'",
+                     line);
+      return DSK_FALSE;
     }
-  return TRUE;
+  return DSK_TRUE;
 }
 
 static dsk_boolean
 done_with_header (DskMimeMultipartDecoder *decoder,
                   DskError               **error)
 {
-  ...
+  DSK_UNUSED (decoder);
+  DSK_UNUSED (error);
+  return DSK_TRUE;
 }
 
 static dsk_boolean
 done_with_content_body (DskMimeMultipartDecoder *decoder,
                         DskError               **error)
 {
-  ...
+  if (!dsk_octet_filter_finish (decoder->transfer_decoder,
+                                &decoder->cur_buffer,
+                                error))
+    {
+      dsk_add_error_prefix (error, "in mime-multipart decoding");
+      return DSK_FALSE;
+    }
+
+  /* consolidate string pieces into a single allocation */
+  unsigned str_length;
+  str_length = 0;
+#define MAYBE_ADD_FIELD_LENGTH(field) \
+  do { if (decoder->cur_piece.field) \
+         str_length += strlen (decoder->cur_piece.field) + 1; } while (0)
+  MAYBE_ADD_FIELD_LENGTH (key);
+  MAYBE_ADD_FIELD_LENGTH (content_type);
+  MAYBE_ADD_FIELD_LENGTH (content_location);
+  MAYBE_ADD_FIELD_LENGTH (content_description);
+  MAYBE_ADD_FIELD_LENGTH (content_disposition);
+#undef MAYBE_ADD_FIELD_LENGTH
+  str_length += decoder->cur_buffer.size + 1;
+  char *at, *out;
+  at = dsk_malloc (str_length);
+  out = at;
+#define MAYBE_SETUP(field)                                          \
+  do { if (decoder->cur_piece.field)                                \
+         {                                                          \
+           cur.field = out;                                         \
+           out = dsk_stpcpy (out, decoder->cur_piece.field) + 1;    \
+         }                                                          \
+       else                                                         \
+         cur.field = NULL;             } while(0)
+  DskCgiVar cur;
+  cur.is_get = DSK_FALSE;
+  MAYBE_SETUP (key);
+  MAYBE_SETUP (content_type);
+  MAYBE_SETUP (content_location);
+  MAYBE_SETUP (content_description);
+  MAYBE_SETUP (content_disposition);
+#undef MAYBE_ADD_FIELD_LENGTH
+  cur.value = out;
+  out[decoder->cur_buffer.size] = '\0';
+  dsk_buffer_read (&decoder->cur_buffer, decoder->cur_buffer.size, out);
+
+  /* append CGI to queue */
+  if (decoder->n_pieces == decoder->pieces_alloced)
+    {
+      if (decoder->pieces_alloced == DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES)
+        {
+          decoder->pieces = dsk_malloc (sizeof (DskCgiVar) * decoder->pieces_alloced * 2);
+          memcpy (decoder->pieces, decoder->pieces_init,
+                  DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES * sizeof (DskCgiVar));
+        }
+      else
+        decoder->pieces = dsk_realloc (decoder->pieces,
+                                       sizeof (DskCgiVar) * decoder->pieces_alloced * 2);
+      decoder->pieces_alloced *= 2;
+    }
+  decoder->pieces[decoder->n_pieces++] = cur;
+
+  /* reset the header storage area */
+  dsk_mem_pool_clear (&decoder->header_storage);
+  dsk_mem_pool_init_buf (&decoder->header_storage,
+                         DSK_MIME_MULTIPART_DECODER_INIT_HEADER_SPACE,
+                         decoder->header_pad);
+  return DSK_TRUE;
 }
 
 
@@ -281,24 +388,67 @@ done_with_content_body (DskMimeMultipartDecoder *decoder,
    or we may done (depending on whether the boundary-mark
    ends with an extra "--").
  */
-gboolean
+dsk_boolean
 dsk_mime_multipart_decoder_feed  (DskMimeMultipartDecoder *decoder,
                                   size_t                   length,
                                   const uint8_t           *data,
                                   size_t                  *n_parts_ready_out,
-                                  DskError                *error)
+                                  DskError               **error)
 {
   char tmp_buf[256];
   dsk_buffer_append (&decoder->incoming, length, data);
   switch (decoder->state)
     {
+    state__WAITING_FOR_FIRST_SEP_LINE:
+    case STATE_WAITING_FOR_FIRST_SEP_LINE:
+      {
+        int nl = dsk_buffer_index_of (&decoder->incoming, '\n');
+        const char *after;
+        if (nl < 0)
+          goto return_true;
+
+        /* if the line is too long for boundary_buf,
+           then it cannot be a boundary, and we just skip it. */
+        if ((unsigned)nl > decoder->boundary_str_len + 5
+         || (unsigned)nl < decoder->boundary_str_len + 2)
+          {
+            dsk_buffer_discard (&decoder->incoming, nl + 1);
+            goto state__WAITING_FOR_FIRST_SEP_LINE;
+          }
+
+        dsk_buffer_read (&decoder->incoming, nl + 1, decoder->boundary_buf);
+        if (decoder->boundary_buf[0] != '-'
+         || decoder->boundary_buf[1] != '-'
+         || memcmp (decoder->boundary_buf, decoder->boundary_str,
+                    decoder->boundary_str_len) != 0)
+          {
+            /* not a boundary line */
+            goto state__WAITING_FOR_FIRST_SEP_LINE;
+          }
+        after = decoder->boundary_buf + decoder->boundary_str_len + 2;
+        if (!done_with_content_body (decoder, error))
+          return DSK_FALSE;
+        if (dsk_ascii_isspace (after[0]))
+          {
+            decoder->state = STATE_READING_HEADER;
+            goto state__READING_HEADER;
+          }
+        else
+          {
+            decoder->state = STATE_ENDED;
+            /* TODO: complain about garbage after terminator? */
+            goto return_true;
+          }
+      }
+
     state__READING_HEADER:
     case STATE_READING_HEADER:
       {
         int nl = dsk_buffer_index_of (&decoder->incoming, '\n');
         if (nl < 0)
           goto return_true;
-        char *line_buf = (nl + 1 > sizeof (tmp_buf)) ? dsk_malloc (nl+1) : tmp_buf;
+        char *line_buf = ((unsigned)nl + 1 > sizeof (tmp_buf))
+                             ? (char*)dsk_malloc (nl+1) : tmp_buf;
         dsk_buffer_read (&decoder->incoming, nl + 1, line_buf);
 
         /* cut-off newline (and possible "CR" character) */
@@ -332,9 +482,9 @@ dsk_mime_multipart_decoder_feed  (DskMimeMultipartDecoder *decoder,
     case STATE_CONTENT_MIDLINE:
       {
         int nl = dsk_buffer_index_of (&decoder->incoming, '\n');
-        if (!dsk_octet_filter_process_buffer (decoder->octet_filter,
+        if (!dsk_octet_filter_process_buffer (decoder->transfer_decoder,
                                               &decoder->cur_buffer,
-                                              nl < 0 ? decoder->incoming.size : (nl + 1),
+                                              nl < 0 ? decoder->incoming.size : ((unsigned)nl + 1),
                                               &decoder->incoming,
                                               DSK_TRUE,  /* discard from incoming */
                                               error))
@@ -354,86 +504,113 @@ dsk_mime_multipart_decoder_feed  (DskMimeMultipartDecoder *decoder,
     state__CONTENT_LINE_START:
     case STATE_CONTENT_LINE_START:
       /* Is this a boundary/terminal mark? */
-      if (decoder->incoming.size >= decoder->boundary_str_len + 5)
-        {
-          int got = dsk_buffer_peek (&decoder->incoming,
-                                     2 + decoder->boundary_str_len + 2 + 2,
-                                     decoder->boundary_buf);
-          int nl_index;
-          if (decoder->boundary_buf[0] == '-'
-           && decoder->boundary_buf[1] == '-'
-           && memcmp (decoder->boundary_buf + 2, decoder->boundary_str,
-                      decoder->boundary_str_len) == 0)
-            {
-              int rem = got - decoder->boundary_str_len - 2;
-              const char *at = decoder->boundary_buf + decoder->boundary_str_len + 2;
-              const char *nl = memchr (at, '\n', rem);
-              if (nl == NULL)
-                goto return_true;
-              unsigned discard = nl + 1 - decoder->boundary_buf;
-              if (at[0] == '-' && at[1] == '-')
-                {
-                  dsk_buffer_discard (&decoder->incoming, discard);
-
-                  if (!done_with_content_body (decoder, error))
-                    return DSK_FALSE;
-
-                  decoder->state = STATE_ENDED;
-
-                  /* TODO: complain about garbage after terminator? */
-
+      {
+        int nl_index;
+        if (decoder->incoming.size >= decoder->boundary_str_len + 5)
+          {
+            int got = dsk_buffer_peek (&decoder->incoming,
+                                       2 + decoder->boundary_str_len + 2 + 2,
+                                       decoder->boundary_buf);
+            if (decoder->boundary_buf[0] == '-'
+             && decoder->boundary_buf[1] == '-'
+             && memcmp (decoder->boundary_buf + 2, decoder->boundary_str,
+                        decoder->boundary_str_len) == 0)
+              {
+                int rem = got - decoder->boundary_str_len - 2;
+                const char *at = decoder->boundary_buf + decoder->boundary_str_len + 2;
+                const char *nl = memchr (at, '\n', rem);
+                if (nl == NULL)
                   goto return_true;
-                }
-              else if (dsk_ascii_isspace (*at))
-                {
-                  /* TODO: more precise check for spaces up to 'nl'? */
-                  dsk_buffer_discard (&decoder->incoming, discard);
+                unsigned discard = nl + 1 - decoder->boundary_buf;
+                if (at[0] == '-' && at[1] == '-')
+                  {
+                    dsk_buffer_discard (&decoder->incoming, discard);
 
-                  if (!handle_content_complete (decoder, error))
-                    return DSK_FALSE;
+                    if (!done_with_content_body (decoder, error))
+                      return DSK_FALSE;
 
-                  decoder->state = STATE_READING_HEADER;
-                  goto state__READING_HEADER;
-                }
-              else
-                {
-                  /* treat as non-boundary */
-                  nl_index = dsk_buffer_index_of (&decoder->incoming, '\n');
-                }
-            }
-        }
-      else
-        {
-          nl_index = dsk_buffer_index_of (&decoder->incoming, '\n');
-          if (nl_index < 0)
-            /* wait for more data */
+                    decoder->state = STATE_ENDED;
+
+                    /* TODO: complain about garbage after terminator? */
+
+                    goto return_true;
+                  }
+                else if (dsk_ascii_isspace (*at))
+                  {
+                    /* TODO: more precise check for spaces up to 'nl'? */
+                    dsk_buffer_discard (&decoder->incoming, discard);
+
+                    if (!done_with_content_body (decoder, error))
+                      return DSK_FALSE;
+
+                    decoder->state = STATE_READING_HEADER;
+                    goto state__READING_HEADER;
+                  }
+                else
+                  {
+                    /* treat as non-boundary */
+                    nl_index = dsk_buffer_index_of (&decoder->incoming, '\n');
+                  }
+              }
+          }
+        else
+          {
+            nl_index = dsk_buffer_index_of (&decoder->incoming, '\n');
+            if (nl_index < 0)
+              /* wait for more data */
+              goto return_true;
+          }
+
+        /* handle non-boundary text */
+        if (!dsk_octet_filter_process_buffer (decoder->transfer_decoder,
+                                              &decoder->cur_buffer,
+                                              nl_index < 0 ? decoder->incoming.size : (unsigned)(nl_index + 1),
+                                              &decoder->incoming,
+                                              DSK_TRUE,       /* discard from incoming */
+                                              error))
+          {
+            dsk_add_error_prefix (error, "in mime-multipart decoding");
+            return DSK_FALSE;
+          }
+        if (nl_index < 0)
+          {
+            decoder->state = STATE_CONTENT_MIDLINE;
             goto return_true;
-        }
-
-      /* handle non-boundary text */
-      if (!dsk_octet_filter_process_buffer (decoder->octet_filter,
-                                            &decoder->cur_buffer,
-                                            nl_index < 0 ? decoder->incoming.size : (nl_index + 1),
-                                            &decoder->incoming,
-                                            DSK_TRUE,       /* discard from incoming */
-                                            error))
-        {
-          dsk_add_error_prefix (error, "in mime-multipart decoding");
-          return DSK_FALSE;
-        }
-      if (nl_index < 0)
-        {
-          decoder->state = STATE_CONTENT_MIDLINE;
-          goto return_true;
-        }
+          }
+      }
       decoder->state = STATE_CONTENT_LINE_START;
       goto state__CONTENT_LINE_START;
+
+    case STATE_ENDED:
+      dsk_set_error (error, "got data after final terminator");
+      return DSK_FALSE;
     }
 
 return_true:
   if (n_parts_ready_out)
-    *n_parts_ready_out = decoder->n_cgi_vars;
+    *n_parts_ready_out = decoder->n_pieces;
   return DSK_TRUE;
+}
+dsk_boolean
+dsk_mime_multipart_decoder_done  (DskMimeMultipartDecoder *decoder,
+                                  size_t                  *n_parts_ready_out,
+                                  DskError               **error)
+{
+  if (decoder->state != STATE_ENDED)
+    {
+      dsk_set_error (error, "MIME multipart message ended without terminal boundary");
+      return DSK_FALSE;
+    }
+  if (n_parts_ready_out)
+    *n_parts_ready_out = decoder->n_pieces;
+  return DSK_TRUE;
+}
+
+void
+dsk_mime_multipart_decoder_dequeue_all (DskMimeMultipartDecoder *decoder,
+                                        DskCgiVar               *out)
+{
+  memcpy (out, decoder->pieces, sizeof (DskCgiVar) * decoder->n_pieces);
 }
 
 
@@ -446,6 +623,26 @@ dsk_mime_multipart_decoder_init (DskMimeMultipartDecoder *decoder)
                          decoder->header_pad);
   decoder->pieces = decoder->pieces_init;
   decoder->pieces_alloced = DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES;
+}
+
+static void
+dsk_mime_multipart_decoder_finalize (DskMimeMultipartDecoder *decoder)
+{
+  unsigned i;
+  dsk_mem_pool_clear (&decoder->header_storage);
+  dsk_free (decoder->start);
+  dsk_free (decoder->start_info);
+  dsk_free (decoder->boundary_str);
+  if (decoder->boundary_buf != decoder->boundary_buf_init)
+    dsk_free (decoder->boundary_buf);
+  dsk_buffer_clear (&decoder->cur_buffer);
+  if (decoder->transfer_decoder)
+    dsk_object_unref (decoder->transfer_decoder);
+  dsk_free (decoder->header_pad);
+  for (i = 0; i < decoder->n_pieces; i++)
+    dsk_cgi_var_clear (&decoder->pieces[i]);
+  if (decoder->pieces != decoder->pieces_init)
+    dsk_free (decoder->pieces);
 }
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskMimeMultipartDecoder);
@@ -461,6 +658,8 @@ DskMimeMultipartDecoder *
 dsk_mime_multipart_decoder_new (char **kv_pairs, DskError **error)
 {
   DskMimeMultipartDecoder *decoder;
+  unsigned i;
+  DSK_UNUSED (error);
   decoder = dsk_object_new (&dsk_mime_multipart_decoder_class);
   for (i = 0; kv_pairs[2*i] != NULL; i++)
     {
@@ -468,23 +667,24 @@ dsk_mime_multipart_decoder_new (char **kv_pairs, DskError **error)
       const char *value = kv_pairs[2*i+1];
       if (dsk_ascii_strcasecmp (key, "start") == 0)
 	{
-	  dsk_free (rv->start);
-	  rv->start = dsk_strdup (value);
+	  dsk_free (decoder->start);
+	  decoder->start = dsk_strdup (value);
 	}
-      else if (g_ascii_strcasecmp (key, "start-info") == 0)
+      else if (dsk_ascii_strcasecmp (key, "start-info") == 0)
 	{
-	  dsk_free (rv->start_info);
-	  rv->start_info = dsk_strdup (value);
+	  dsk_free (decoder->start_info);
+	  decoder->start_info = dsk_strdup (value);
 	}
-      else if (g_ascii_strcasecmp (key, "boundary") == 0)
+      else if (dsk_ascii_strcasecmp (key, "boundary") == 0)
 	{
-	  dsk_free (rv->boundary_str);
-	  rv->boundary_str = dsk_strdup (value);
-	  rv->boundary_str_len = strlen (rv->boundary_str);
+	  dsk_free (decoder->boundary_str);
+	  decoder->boundary_str = dsk_strdup (value);
+	  decoder->boundary_str_len = strlen (decoder->boundary_str);
 	}
       else
 	{
-	  g_message ("WARNING: mime-multipart_decoder: ignoring Key %s", key);
+          /* is an error appropriate here? */
+	  dsk_warning ("constructing mime-multipart-decoder: ignoring Key %s", key);
 	}
     }
   return decoder;
