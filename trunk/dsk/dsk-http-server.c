@@ -127,6 +127,7 @@ dsk_http_server_init (DskHttpServer *server)
   static DskHttpServerStreamOptions sso = DSK_HTTP_SERVER_STREAM_OPTIONS_DEFAULT;
   server->top.under_construction = DSK_TRUE;
   server->server_stream_options = sso;
+  server->current = &server->top;
 }
 
 static void dsk_http_server_finalize (DskHttpServer *server);
@@ -700,6 +701,7 @@ add_post_cgi_vars (RealServerRequest *rreq)
   DskCgiVar *vars;
   DskError *error = NULL;
   if (!dsk_cgi_parse_post_data (rreq->request.request_header->content_type,
+                                rreq->request.request_header->content_type_kv_pairs,
                                 post_data_len, post_data,
                                 &n_vars, &vars, &error))
     {

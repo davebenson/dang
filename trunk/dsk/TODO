@@ -72,6 +72,13 @@ _ audit/test: i recall that any http verb may include a content-body
         - including checking if post_data==NULL for a POST or PUT?
    (2) what does the CGI spec say about this?
 
+_ content_type_kv_pairs
+  _ in request-parser
+  _ in response-parser
+  _ in request_new
+  _ in response_new
+  _ in request_init_options
+
 WORK ON LUSK - the LUA/DSK HTTP Server
 
 _ XML Parser: ignore doctype and processing-instructions
