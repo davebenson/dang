@@ -130,6 +130,7 @@ struct _DskHttpRequest
   unsigned supports_content_encoding_gzip : 1;
 
   char *content_type;  /* Content-Type: text/plain or text/plain/UTF-8 */
+  char **content_type_kv_pairs;
   dsk_time_t date;        /* Date header, if "has_date" */
 
   int64_t content_length; /* From the Content-Length header; -1 to disable */
@@ -167,6 +168,7 @@ struct _DskHttpResponse
 
   /* Content-Type */
   char *content_type;
+  char **content_type_kv_pairs;
 
   /* the 'Date' header, parsed into unix-time, i.e.
      seconds since epoch (if the has_date flag is set) */
@@ -252,6 +254,9 @@ struct _DskHttpRequestOptions
   char *content_sub_type;
   char *content_charset;
 
+  /* additional content-type information */
+  char **content_type_kv_pairs;
+
   /* --- content-length --- */
   int64_t content_length;
   dsk_boolean content_encoding_gzip;
@@ -293,6 +298,7 @@ void            dsk_http_request_init_options (DskHttpRequest *request,
   NULL,                         /* content_main_type */         \
   NULL,                         /* content_sub_type */          \
   NULL,                         /* content_charset */           \
+  NULL,                         /* content_type_kv_pairs */     \
   -1LL,                         /* content_length */            \
   DSK_FALSE,                    /* content_encoding_gzip */     \
   DSK_FALSE,                    /* transfer_encoding_chunked */ \
@@ -322,6 +328,9 @@ struct _DskHttpResponseOptions
   const char *content_main_type;
   const char *content_sub_type;
   const char *content_charset;
+
+  /* additional content-type information */
+  char **content_type_kv_pairs;
 
   /* --- content-length --- */
   int64_t content_length;
@@ -362,6 +371,7 @@ struct _DskHttpResponseOptions
   NULL,                         /* content_main_type */         \
   NULL,                         /* content_sub_type */          \
   NULL,                         /* content_charset */           \
+  NULL,                         /* content_type_kv_pairs */     \
   -1LL,                         /* content_length */            \
   DSK_FALSE,                    /* content_encoding_gzip */     \
   DSK_FALSE,                    /* has_date */                  \
