@@ -162,6 +162,18 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_c_unquote)
   add_filter (dsk_c_unquoter_new (remove_quotes));
   return DSK_TRUE;
 }
+DSK_CMDLINE_CALLBACK_DECLARE(handle_quote_printable)
+{
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
+  add_filter (dsk_quote_printable_new ());
+  return DSK_TRUE;
+}
+DSK_CMDLINE_CALLBACK_DECLARE(handle_unquote_printable)
+{
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (arg_value); DSK_UNUSED (error);
+  add_filter (dsk_unquote_printable_new ());
+  return DSK_TRUE;
+}
 
 DSK_CMDLINE_CALLBACK_DECLARE(handle_base64_encode)
 {
@@ -348,6 +360,10 @@ int main(int argc, char **argv)
                         handle_c_quote, NULL);
   dsk_cmdline_add_func ("c-unquote", "do c unquoting", NULL, 0,
                         handle_c_unquote, NULL);
+  dsk_cmdline_add_func ("quote-printable", "do MIME-style Quoted-Printable encoding",
+                        NULL, 0, handle_quote_printable, NULL);
+  dsk_cmdline_add_func ("unquote-printable", "do MIME-style Quoted-Printable decoding",
+                        NULL, 0, handle_unquote_printable, NULL);
   dsk_cmdline_add_func ("base64-encode", "do Base-64 Encoding", NULL, 0,
                         handle_base64_encode, NULL);
   dsk_cmdline_add_func ("base64-encode-oneline", "do Base-64 Encoding, without line breaks", NULL, 0,
