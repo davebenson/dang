@@ -3,8 +3,14 @@ typedef struct
 {
   dsk_boolean is_get;           /* if !is_get, then its a POST CGI var */
   char *key;
+  unsigned value_length;        /* for POST data, value may contain NUL */
   char *value;
-  char *content_type;           /* for some POST headers */
+
+  /* the following are available for some POST headers */
+  char *content_type;
+  char *content_location;
+  char *content_description;
+  char *content_disposition;
 } DskCgiVar;
 
 
