@@ -61,7 +61,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-zlib.o \
 	  dsk-base64.o dsk-base64-encoder.o dsk-base64-decoder.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \
-	  dsk-quote-printable.o \
+	  dsk-unquote-printable.o dsk-quote-printable.o \
 	  dsk-octet-filter-chain.o dsk-octet-filter-identity.o \
 	  dsk-hex-encoder.o dsk-hex-decoder.o dsk-whitespace-trimmer.o \
 	  dsk-url-encoder.o dsk-url-decoder.o \
