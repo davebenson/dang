@@ -142,58 +142,10 @@ static void
 append_status (DskBuffer *buffer,
                DskHttpStatus status)
 {
-  switch (status)
-    {
-#define WRITE_CASE(i,s) \
-    case i: dsk_buffer_append_string (buffer, #i " " s); break;
-    WRITE_CASE (100, "Continue")
-    WRITE_CASE (101, "Switching Protocols")
-    WRITE_CASE (200, "OK")
-    WRITE_CASE (201, "Created")
-    WRITE_CASE (202, "Accepted")
-    WRITE_CASE (203, "Non-Authoritative Information")
-    WRITE_CASE (204, "No Content")
-    WRITE_CASE (205, "Reset Content")
-    WRITE_CASE (206, "Partial Content")
-    WRITE_CASE (300, "Multiple Choices")
-    WRITE_CASE (301, "Moved Permanently")
-    WRITE_CASE (302, "Found")
-    WRITE_CASE (303, "See Other")
-    WRITE_CASE (304, "Not Modified")
-    WRITE_CASE (305, "Use Proxy")
-    WRITE_CASE (307, "Temporary Redirect")
-    WRITE_CASE (400, "Bad Request")
-    WRITE_CASE (401, "Unauthorized")
-    WRITE_CASE (402, "Payment Required")
-    WRITE_CASE (403, "Forbidden")
-    WRITE_CASE (404, "Not Found")
-    WRITE_CASE (405, "Method Not Allowed")
-    WRITE_CASE (406, "Not Acceptable")
-    WRITE_CASE (407, "Proxy Authentication Required")
-    WRITE_CASE (408, "Request Time-out")
-    WRITE_CASE (409, "Conflict")
-    WRITE_CASE (410, "Gone")
-    WRITE_CASE (411, "Length Required")
-    WRITE_CASE (412, "Precondition Failed")
-    WRITE_CASE (413, "Request Entity Too Large")
-    WRITE_CASE (414, "Request-URI Too Large")
-    WRITE_CASE (415, "Unsupported Media Type")
-    WRITE_CASE (416, "Requested range not satisfiable")
-    WRITE_CASE (417, "Expectation Failed")
-    WRITE_CASE (500, "Internal Server Error")
-    WRITE_CASE (501, "Not Implemented")
-    WRITE_CASE (502, "Bad Gateway")
-    WRITE_CASE (503, "Service Unavailable")
-    WRITE_CASE (504, "Gateway Time-out")
-    WRITE_CASE (505, "HTTP Version not supported")
-    default:
-      {
-        char code_str[6];
-        snprintf (code_str, sizeof (code_str), "%u", status);
-        dsk_buffer_append_string (buffer, code_str);
-        dsk_buffer_append_string (buffer, " *unknown status-code*");
-      }
-    }
+  char buf[20];
+  snprintf (buf, sizeof (buf), "%u ", status);
+  dsk_buffer_append_string (buffer, buf);
+  dsk_buffer_append_string (buffer, dsk_http_status_get_message (status));
 }
 void
 dsk_http_response_print_buffer  (DskHttpResponse *response,

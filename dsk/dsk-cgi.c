@@ -113,8 +113,7 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
   return DSK_TRUE;
 }
 
-dsk_boolean dsk_cgi_parse_post_data (const char *content_main_type,
-                                     const char *content_subtype,
+dsk_boolean dsk_cgi_parse_post_data (const char *content_type,
                                      char      **content_type_kv_pairs,
                                      unsigned    post_data_length,
                                      const uint8_t *post_data,
@@ -122,8 +121,7 @@ dsk_boolean dsk_cgi_parse_post_data (const char *content_main_type,
                                      DskCgiVar **cgi_var_out,
                                      DskError  **error)
 {
-  if (strcmp (content_main_type, "application") == 0
-   && strcmp (content_subtype, "x-www-form-urlencoded") == 0)
+  if (strcmp (content_type, "application/x-www-form-urlencoded") == 0)
     {
       char *pd_str = dsk_malloc (post_data_length + 2);
       memcpy (pd_str + 1, post_data, post_data_length);
@@ -138,8 +136,7 @@ dsk_boolean dsk_cgi_parse_post_data (const char *content_main_type,
       dsk_free (pd_str);
       return DSK_TRUE;
     }
-  else if (strcmp (content_main_type, "multipart") == 0
-        && strcmp (content_subtype, "form-data") == 0)
+  else if (strcmp (content_type, "multipart/form-data") == 0)
     {
       DskMimeMultipartDecoder *decoder = dsk_mime_multipart_decoder_new (content_type_kv_pairs, error);
       if (decoder == NULL)
@@ -160,8 +157,8 @@ dsk_boolean dsk_cgi_parse_post_data (const char *content_main_type,
   else
     {
       dsk_set_error (error, 
-                     "parsing POST form data: unhandled content-type %s/%s",
-                     content_main_type, content_subtype);
+                     "parsing POST form data: unhandled content-type %s",
+                     content_type);
       return DSK_FALSE;
     }
 }

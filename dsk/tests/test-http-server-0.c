@@ -15,8 +15,10 @@ respond_text_string (DskHttpServerRequest *request,
   dsk_buffer_append (&source->buffer, length, func_data);
   dsk_memory_source_added_data (source);
   dsk_memory_source_done_adding (source);
+  response_options.source = (DskOctetSource *) source;
   response_options.content_length = length;             /* optional */
   dsk_http_server_request_respond (request, &response_options);
+  dsk_object_unref (source);
 }
 
 typedef struct _SimpleRequestInfo SimpleRequestInfo;
@@ -36,7 +38,19 @@ static void simple__handle_response (DskHttpClientStreamTransfer *xfer)
 }
 static void simple__handle_content_complete (DskHttpClientStreamTransfer *xfer)
 {
-  DSK_UNUSED (xfer);
+  SimpleRequestInfo *sri = xfer->user_data;
+  DskError *error = NULL;
+  switch (dsk_octet_source_read_buffer (DSK_OCTET_SOURCE (xfer->content),
+                                        &sri->content_buffer,
+                                        &error))
+    {
+    case DSK_IO_RESULT_SUCCESS:
+    case DSK_IO_RESULT_AGAIN:
+    case DSK_IO_RESULT_EOF:
+      break;
+    default:
+      dsk_die ("dsk_octet_source_read_buffer failed: %s", error->message);
+    }
 }
 static void simple__handle_error (DskHttpClientStreamTransfer *xfer)
 {
@@ -82,14 +96,20 @@ test_simple_http_server (void)
   DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
   request_options.request_options = &req_options;
   cs_options.path = "tests/sockets/http-server.socket";
-  DskOctetSink *client_sink;
-  DskOctetSource *client_source;
-  if (!dsk_client_stream_new (&cs_options, NULL, &client_sink, &client_source,
-                              &error))
-    dsk_die ("error creating client-stream");
+
+  /* Allocate a testing http_client_stream */
   DskHttpClientStream *http_client_stream;
-  http_client_stream = dsk_http_client_stream_new (client_sink, client_source,
-                                                   &http_client_stream_options);
+  {
+    DskOctetSink *client_sink;
+    DskOctetSource *client_source;
+    if (!dsk_client_stream_new (&cs_options, NULL, &client_sink, &client_source,
+                                &error))
+      dsk_die ("error creating client-stream");
+    http_client_stream = dsk_http_client_stream_new (client_sink, client_source,
+                                                     &http_client_stream_options);
+    dsk_object_unref (client_sink);
+    dsk_object_unref (client_source);
+  }
   DskHttpClientStreamTransfer *xfer;
   {
   SimpleRequestInfo sri = SIMPLE_REQUEST_INFO_INIT;
@@ -108,6 +128,7 @@ test_simple_http_server (void)
   dsk_assert (memcmp (content_buf, "hello\n", 6) == 0);
   dsk_assert (sri.status_code == 200);
   dsk_assert (!sri.failed);
+  dsk_buffer_clear (&sri.content_buffer);
   }
 
   /* use a client-stream to fetch anything else to get a 404 */
@@ -124,6 +145,7 @@ test_simple_http_server (void)
     dsk_main_run_once ();
   dsk_assert (sri.status_code == 404);
   dsk_assert (!sri.failed);
+  dsk_buffer_clear (&sri.content_buffer);
   }
 
   dsk_object_unref (http_client_stream);

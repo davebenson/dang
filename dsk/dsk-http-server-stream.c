@@ -773,6 +773,9 @@ handle_content_readable (DskOctetSource *content,
       ss->first_transfer = xfer->next;
       if (xfer->next == NULL)
         ss->last_transfer = NULL;
+      if (xfer->funcs != NULL
+       && xfer->funcs->destroy != NULL)
+        xfer->funcs->destroy (xfer);
       free_transfer (xfer);
 
       if (close)
@@ -920,6 +923,7 @@ invalid_arguments:
         opts.request = transfer->request;
         opts.status_code = 500;
         opts.content_type = "text/plain";
+        dsk_warning ("dsk_http_server_stream_respond failed: %s", (*error)->message);
         dsk_buffer_append_string (&msource->buffer,
                                   "dsk_http_server_stream_respond failed: ");
         if (error)
@@ -936,7 +940,7 @@ invalid_arguments:
         header = dsk_http_response_new (&opts, &e);
         if (header == NULL)
           dsk_die ("constructing internal server error: failed: %s", e->message);
-        dsk_assert (header == NULL);
+        dsk_assert (header != NULL);
         transfer->content = DSK_OCTET_SOURCE (msource);
       }
     }
@@ -973,12 +977,7 @@ dsk_http_server_stream_finalize (DskHttpServerStream *stream)
 void
 dsk_http_server_stream_shutdown (DskHttpServerStream *stream)
 {
-  if (stream->source)
-    dsk_octet_source_shutdown (stream->source);
-  if (stream->sink)
-    dsk_octet_sink_shutdown (stream->source);
-  if (!stream->request_available.is_cleared)
-    dsk_hook_clear (&stream->request_available);
+  do_shutdown (stream, NULL);
 }
 
 DSK_OBJECT_CLASS_DEFINE_CACHE_DATA(DskHttpServerStream);
