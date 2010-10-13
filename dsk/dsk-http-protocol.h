@@ -95,7 +95,9 @@ struct _DskHttpCookie
   unsigned    version;              /* default is 0, unspecified */
 };
 
-
+/* (maintainers: DskHttpHeaderMisc must never change from
+   being a simple key/value pair. 
+   see casts in handling unparsed_headers/unparsed_misc_headers) */
 typedef struct _DskHttpHeaderMisc DskHttpHeaderMisc;
 struct _DskHttpHeaderMisc
 {
@@ -266,6 +268,7 @@ struct _DskHttpRequestOptions
   /* --- unparsed headers --- */
   unsigned n_unparsed_headers;
   char **unparsed_headers;          /* key-value pairs */
+  DskHttpHeaderMisc *unparsed_misc_headers;
 
   /* --- parser interface --- */
   dsk_boolean parsed;
@@ -297,6 +300,7 @@ void            dsk_http_request_init_options (DskHttpRequest *request,
   NULL,                         /* referrer */                  \
   NULL,                         /* user_agent */                \
   0, NULL,                      /* n_unparsed_headers, unparsed_headers  */\
+  NULL,                         /* unparsed_misc_headers */     \
   DSK_FALSE,                    /* parsed */                    \
   DSK_FALSE,                    /* parsed_transfer_encoding_chunked */ \
   DSK_FALSE,                    /* parsed_connection_close   */ \
@@ -340,6 +344,7 @@ struct _DskHttpResponseOptions
   /* --- unparsed headers --- */
   unsigned n_unparsed_headers;
   char **unparsed_headers;          /* key-value pairs */
+  DskHttpHeaderMisc *unparsed_misc_headers;     /* alternate to unparsed_headers */
 
   /* --- parser interface --- */
   dsk_boolean parsed;
@@ -366,6 +371,7 @@ struct _DskHttpResponseOptions
   NULL,                         /* server */                    \
   NULL,                         /* location */                  \
   0, NULL,                      /* n_unparsed_headers, unparsed_headers  */\
+  NULL,                         /* unparsed_misc_headers */     \
   DSK_FALSE,                    /* parsed */                    \
   DSK_FALSE,                    /* parsed_transfer_encoding_chunked */ \
   DSK_FALSE,                    /* parsed_connection_close   */ \

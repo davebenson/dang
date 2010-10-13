@@ -337,7 +337,8 @@ dsk_http_request_new (DskHttpRequestOptions *options,
   unsigned unparsed_headers_start;
   unparsed_headers_start
     = phase1_handle_unparsed_headers (options->n_unparsed_headers,
-                                  options->unparsed_headers,
+                                  options->unparsed_headers ? options->unparsed_headers
+                                     : (char**)(options->unparsed_misc_headers),
                                   &str_alloc, &aligned_alloc);
 
   /* allocate memory */
@@ -501,3 +502,41 @@ dsk_http_response_new (DskHttpResponseOptions *options,
   return response;
 }
 #undef ObjectType
+void
+dsk_http_request_init_options (DskHttpRequest *header,
+                               DskHttpRequestOptions *out)
+{
+  out->verb = header->verb;
+  /* TODO: simple assignment */
+#define ASSIGN(field) out->field = header->field
+  ASSIGN (verb);
+  ASSIGN (http_major_version);
+  ASSIGN (http_minor_version);
+  out->full_path = header->path;
+  ASSIGN (host);
+  ASSIGN (content_type);
+  ASSIGN (content_length);
+  ASSIGN (content_encoding_gzip);
+  ASSIGN (transfer_encoding_chunked);
+  ASSIGN (has_date);
+  ASSIGN (date);
+  ASSIGN (referrer);
+  ASSIGN (user_agent);
+  ASSIGN (n_unparsed_headers);
+  out->unparsed_headers = NULL;
+  out->unparsed_misc_headers = header->unparsed_headers;
+  out->full_path = header->path;
+  out->unparsed_headers = NULL;
+  out->unparsed_misc_headers = header->unparsed_headers;
+#undef ASSIGN
+
+  /* Set to constant values */
+  out->path = NULL;
+  out->query = NULL;
+  out->content_main_type = NULL;
+  out->content_sub_type = NULL;
+  out->content_charset = NULL;
+
+  /* --- parser interface --- */
+  out->parsed = DSK_FALSE;
+}
