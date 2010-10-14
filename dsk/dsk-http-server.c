@@ -1057,7 +1057,6 @@ static void
 stream_transfer_handle_destroy            (DskHttpServerStreamTransfer *transfer)
 {
   RealServerRequest *rreq = transfer->func_data;
-  dsk_warning ("stream_transfer_handle_destroy (%p)", rreq);
   rreq->got_transfer_destroy = DSK_TRUE;
   maybe_free_real_server_request (rreq);
 }

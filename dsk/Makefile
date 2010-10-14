@@ -10,6 +10,7 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-http-server-stream-0 \
 		tests/test-http-server-0 \
 		tests/test-http-loopback \
+		tests/test-mime-multipart-decoder \
 		tests/test-date-0 \
 		tests/test-unicode \
 		tests/test-checksum \
