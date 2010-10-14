@@ -72,6 +72,26 @@ _ audit/test: i recall that any http verb may include a content-body
    (1) do we handle that correctly?
         - including checking if post_data==NULL for a POST or PUT?
    (2) what does the CGI spec say about this?
+_ http server
+  _ CGI Get-style
+  _ CGI POST multipart
+  _ CGI POST URL-Encoded-GET
+  _ streaming POST data (TODO: needs design work)
+  _ internal redirect
+  _ "pass" - ie find find next match
+  _ "serve-file" support
+  _ (broken) MD5Sum of POST data
+    _ in header
+    _ in trailer
+  _ max POST size limit
+_ http client
+  _ keepalive pool
+  _ POST
+  _ POST multipart CGI
+  _ POST URL-Encoded-GET
+  _ streaming content (from server)
+  _ in-memory/on-disk content (from server) based on data-size
+  _ max data size limits
 
 _ content_type_kv_pairs
   _ in request-parser
@@ -95,6 +115,7 @@ _ octet-filter test harness [feed data in several ways]
   _ base64 test
   _ url-encode test
   _ byte doubler test
+  _ quoted-printable test
 _ dsk_octet_filter_source()
 _ more checksum tests
 
