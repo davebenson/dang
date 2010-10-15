@@ -347,6 +347,7 @@ restart_processing:
               {
                 /* Someday we may want to give the user an opportunity to examine
                    the continue header, or to know that it happened, but we don't. */
+                xfer->read_info.need_header.checked = 0;
                 dsk_object_unref (response);
                 goto restart_processing;
               }

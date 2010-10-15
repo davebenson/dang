@@ -96,7 +96,7 @@ is_http_request_complete (DskBuffer *buf,
 static void
 test_simple (dsk_boolean byte_by_byte)
 {
-  static const char *response_content_versions[3] =  {
+  static const char *response_content_versions[] =  {
                                 "HTTP/1.1 200 OK\r\n"
                                 "Date: Mon, 17 May 2010 22:50:08 GMT\r\n"
                                 "Content-Type: text/plain\r\n"
@@ -122,6 +122,16 @@ test_simple (dsk_boolean byte_by_byte)
                                 "     7\r\n"
                                 "Connection:\r\n"
                                 "     close\r\n"
+                                "\r\n"
+                                "hi mom\n",
+
+                                "HTTP/1.1 100 Continue\r\n"
+                                "\r\n"
+                                "HTTP/1.1 200 OK\r\n"
+                                "Date: Mon, 17 May 2010 22:50:08 GMT\r\n"
+                                "Content-Type: text/plain\r\n"
+                                "Content-Length: 7\r\n"
+                                "Connection: close\r\n"
                                 "\r\n"
                                 "hi mom\n",
                         };
