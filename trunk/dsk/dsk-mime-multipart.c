@@ -493,46 +493,64 @@ dsk_mime_multipart_decoder_feed  (DskMimeMultipartDecoder *decoder,
         int nl = dsk_buffer_index_of (&decoder->incoming, '\n');
         unsigned amount;
         dsk_boolean crlf_pending = DSK_FALSE;
-        if (decoder->state != STATE_CONTENT_MIDLINE
-         && decoder->incoming.size >= decoder->boundary_str_len + 3)
+        if (decoder->state != STATE_CONTENT_MIDLINE)
           {
-            int got = dsk_buffer_peek (&decoder->incoming,
-                                       2 + decoder->boundary_str_len + 2 + 2,
-                                       decoder->boundary_buf);
-            if (decoder->boundary_buf[0] == '-'
-             && decoder->boundary_buf[1] == '-'
-             && memcmp (decoder->boundary_buf + 2, decoder->boundary_str,
-                        decoder->boundary_str_len) == 0)
+            if (nl < 0
+             && decoder->incoming.size < decoder->boundary_str_len + 6)
+              goto return_true;
+            else if (nl < 0)
               {
-                int rem = got - decoder->boundary_str_len - 2;
-                const char *at = decoder->boundary_buf + decoder->boundary_str_len + 2;
-                const char *nl = memchr (at, '\n', rem);
-                if (nl == NULL)
-                  goto return_true;
-                unsigned discard = nl + 1 - decoder->boundary_buf;
-                if (at[0] == '-' && at[1] == '-')
+                /* cannot be boundary: fall though */
+              }
+            else if (nl < (int)decoder->boundary_str_len + 2
+                  || nl > (int)decoder->boundary_str_len + 5)
+              {
+                /* cannot be boundary: fall though */
+              }
+            else
+              {
+                int got = dsk_buffer_peek (&decoder->incoming,
+                                           2 + decoder->boundary_str_len + 2 + 2,
+                                           decoder->boundary_buf);
+                if (decoder->boundary_buf[0] == '-'
+                 && decoder->boundary_buf[1] == '-'
+                 && memcmp (decoder->boundary_buf + 2, decoder->boundary_str,
+                            decoder->boundary_str_len) == 0)
                   {
-                    dsk_buffer_discard (&decoder->incoming, discard);
+                    int rem = got - decoder->boundary_str_len - 2;
+                    const char *at = decoder->boundary_buf + decoder->boundary_str_len + 2;
+                    const char *nl = memchr (at, '\n', rem);
+                    if (nl == NULL)
+                      goto return_true;
+                    unsigned discard = nl + 1 - decoder->boundary_buf;
+                    if (at[0] == '-' && at[1] == '-')
+                      {
+                        dsk_buffer_discard (&decoder->incoming, discard);
 
-                    if (!done_with_content_body (decoder, error))
-                      return DSK_FALSE;
+                        if (!done_with_content_body (decoder, error))
+                          return DSK_FALSE;
 
-                    decoder->state = STATE_ENDED;
+                        decoder->state = STATE_ENDED;
 
-                    /* TODO: complain about garbage after terminator? */
+                        /* TODO: complain about garbage after terminator? */
 
-                    goto return_true;
-                  }
-                else if (dsk_ascii_isspace (*at))
-                  {
-                    /* TODO: more precise check for spaces up to 'nl'? */
-                    dsk_buffer_discard (&decoder->incoming, discard);
+                        goto return_true;
+                      }
+                    else if (dsk_ascii_isspace (*at))
+                      {
+                        /* TODO: more precise check for spaces up to 'nl'? */
+                        dsk_buffer_discard (&decoder->incoming, discard);
 
-                    if (!done_with_content_body (decoder, error))
-                      return DSK_FALSE;
+                        if (!done_with_content_body (decoder, error))
+                          return DSK_FALSE;
 
-                    decoder->state = STATE_READING_HEADER;
-                    goto state__READING_HEADER;
+                        decoder->state = STATE_READING_HEADER;
+                        goto state__READING_HEADER;
+                      }
+                    else
+                      {
+                        /* cannot be boundary: fall though */
+                      }
                   }
               }
           }
