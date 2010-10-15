@@ -10,7 +10,6 @@ typedef struct
   char *content_type;
   char *content_location;
   char *content_description;
-  char *content_disposition;
 } DskCgiVar;
 
 

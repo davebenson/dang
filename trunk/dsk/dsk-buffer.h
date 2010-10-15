@@ -42,6 +42,9 @@ char    *dsk_buffer_parse_string0       (DskBuffer    *buffer);
 int      dsk_buffer_peek_byte           (const DskBuffer *buffer);
 int      dsk_buffer_read_byte           (DskBuffer    *buffer);
 
+uint8_t  dsk_buffer_byte_at             (DskBuffer    *buffer,
+                                         unsigned      index);
+uint8_t  dsk_buffer_last_byte           (DskBuffer    *buffer);
 /* 
  * Appending to the buffer.
  */
@@ -79,6 +82,10 @@ void     dsk_buffer_printf              (DskBuffer    *buffer,
 void     dsk_buffer_vprintf             (DskBuffer    *buffer,
 					 const char   *format,
 					 va_list       args);
+
+uint8_t  dsk_buffer_get_last_byte       (DskBuffer    *buffer);
+uint8_t  dsk_buffer_get_byte_at         (DskBuffer    *buffer,
+                                         size_t        idx);
 
 /* Take all the contents from src and append
  * them to dst, leaving src empty.

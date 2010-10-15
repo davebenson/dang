@@ -11,6 +11,7 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-http-server-0 \
 		tests/test-http-loopback \
 		tests/test-mime-multipart-decoder \
+		tests/test-cgi \
 		tests/test-date-0 \
 		tests/test-unicode \
 		tests/test-checksum \
@@ -33,8 +34,8 @@ full: all extra
 #CC_FLAGS =  -W -Wall -g -Os -DDSK_DEBUG=0 -DDSK_DISABLE_ASSERTIONS=1
 
 # For standard initial size:
-CC_FLAGS =  -W -Wall -g -O0 -DDSK_DEBUG=1
-LINK_FLAGS = -g -lz
+CC_FLAGS =  -W -Wall -g -O0 -DDSK_DEBUG=1 $(EXTRA_CFLAGS)
+LINK_FLAGS = -g -lz $(EXTRA_LDFLAGS)
 
 tests/%: tests/%.c libdsk.a
 	gcc $(CC_FLAGS) $(LINK_FLAGS) -o $@ $^
