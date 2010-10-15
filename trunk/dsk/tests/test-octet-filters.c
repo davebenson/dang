@@ -45,6 +45,7 @@ create_filter (const char *code)
 	case 'B': filters[n_filters++] = dsk_base64_decoder_new (); break;
 	case 'q': filters[n_filters++] = dsk_quote_printable_new (); break;
 	case 'Q': filters[n_filters++] = dsk_unquote_printable_new (); break;
+	case 'x': filters[n_filters++] = dsk_xml_escaper_new (); break;
 	default: dsk_die ("unexpected char %c in filter creation string",
 	                  *code);
 	}
