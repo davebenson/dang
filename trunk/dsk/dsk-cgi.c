@@ -31,42 +31,41 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
       const char *eq;
       eq = NULL;
       unsigned key_len, value_len = 0;
-      while (*at && *at != '&')
+      while (*at && *at != '&' && *at != '=')
+        at++;
+      if (*at == '=')
         {
-          if (*at == '=')
+          eq = at;
+
+          /* handle value */
+          value_len = 0;
+          at++;
+          while (*at && *at != '&')
             {
-              eq = at;
-
-              /* handle value */
-              value_len = 0;
-              at++;
-              while (*at && *at != '&')
+              if (*at == '%')
                 {
-                  if (*at == '%')
+                  if (!dsk_ascii_isxdigit (at[1])
+                   || !dsk_ascii_isxdigit (at[2]))
                     {
-                      if (!dsk_ascii_isxdigit (at[1])
-                       || !dsk_ascii_isxdigit (at[2]))
-                        {
-                          unsigned i;
-                          for (i = 0; i < n_cgi; i++)
-                            dsk_free ((*cgi_var_out)[i].key);
-                          dsk_free (*cgi_var_out);
-                          dsk_set_error (error, "'%%' in CGI-variable not followed by two hexidecimal digits");
-                          return DSK_FALSE;
+                      unsigned i;
+                      for (i = 0; i < n_cgi; i++)
+                        dsk_free ((*cgi_var_out)[i].key);
+                      dsk_free (*cgi_var_out);
+                      dsk_set_error (error, "'%%' in CGI-variable not followed by two hexidecimal digits");
+                      return DSK_FALSE;
 
-                        }
-                      value_len++;
-                      at += 3;
                     }
-                  else
-                    {
-                      value_len++;
-                      at++;
-                    }
+                  value_len++;
+                  at += 3;
+                }
+              else
+                {
+                  value_len++;
+                  at++;
                 }
             }
-          at++;
         }
+      at++;
       key_len = (eq - start);
 
       char *kv;
@@ -120,7 +119,8 @@ dsk_boolean dsk_cgi_parse_post_data (const char *content_type,
                                      DskCgiVar **cgi_var_out,
                                      DskError  **error)
 {
-  if (strcmp (content_type, "application/x-www-form-urlencoded") == 0)
+  if (strcmp (content_type, "application/x-www-form-urlencoded") == 0
+   || strcmp (content_type, "application/x-url-encoded") == 0)
     {
       char *pd_str = dsk_malloc (post_data_length + 2);
       memcpy (pd_str + 1, post_data, post_data_length);
@@ -132,6 +132,9 @@ dsk_boolean dsk_cgi_parse_post_data (const char *content_type,
           dsk_free (pd_str);
           return DSK_FALSE;
         }
+      unsigned i;
+      for (i = 0; i < *n_cgi_var_out; i++)
+        (*cgi_var_out)[i].is_get = DSK_FALSE;
       dsk_free (pd_str);
       return DSK_TRUE;
     }

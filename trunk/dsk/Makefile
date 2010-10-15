@@ -51,6 +51,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-octet-listener-socket.o dsk-cleanup.o \
 	  dsk-http-client-stream.o dsk-http-server-stream.o \
 	  dsk-memory-source.o dsk-memory-sink.o \
+	  dsk-mime.o \
 	  dsk-http-internals.o \
 	  dsk-http-header-parsing.o dsk-http-protocol.o \
 	  dsk-http-header-printing.o \

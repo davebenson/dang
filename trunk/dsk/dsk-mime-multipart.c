@@ -281,11 +281,15 @@ process_header_line (DskMimeMultipartDecoder *decoder,
     }
   else if (dsk_ascii_strncasecmp (line, "content-disposition:", 20) == 0)
     {
-      const char *start = strchr(line, ':') + 1;
-      while (dsk_ascii_isspace (*start))
-        start++;
-      char *disposition = dsk_mem_pool_strdup (&decoder->header_storage, start);
-      dsk_ascii_strchomp (disposition);
+      DskMimeContentDisposition dispos;
+      line += 20;
+      if (!dsk_parse_mime_content_disposition_header (line, &dispos, error))
+        return DSK_FALSE;
+      if (dispos.name_start)
+        cur->key = dsk_mem_pool_strcut (&decoder->header_storage,
+                                        dispos.name_start,
+                                        dispos.name_end);
+      /* TODO: handle filename */
     }
   else
     {
