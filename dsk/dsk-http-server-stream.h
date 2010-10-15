@@ -146,7 +146,7 @@ struct  _DskHttpServerStreamResponseOptions
   /* Content handling */
   DskOctetSource *content_stream;
   int64_t content_length;            /* -1 means "no content_data */
-  const uint8_t *content_data;
+  const uint8_t *content_body;
 };
 #define DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT \
 {                                                       \
@@ -154,7 +154,7 @@ struct  _DskHttpServerStreamResponseOptions
   NULL,                 /* header */                    \
   NULL,                 /* content_stream */            \
   -1LL,                 /* content_length */            \
-  NULL,                 /* content_data */              \
+  NULL,                 /* content_body */              \
 }
 
 /* Even if this returns FALSE the transfer is still destroyed */

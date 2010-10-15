@@ -424,6 +424,13 @@ maybe_free_real_server_request (RealServerRequest *rreq)
    && !rreq->invoking_handler)
     {
       dsk_object_unref (rreq->request.request_header);
+      if (rreq->request.cgi_vars_computed)
+        {
+          unsigned i;
+          for (i = 0; i < rreq->request.n_cgi_vars; i++)
+            dsk_cgi_var_clear (rreq->request.cgi_vars + i);
+          dsk_free (rreq->request.cgi_vars);
+        }
       dsk_free (rreq);
     }
 }
@@ -465,7 +472,7 @@ respond_error (DskHttpServerRequest *request,
                     "</html>");
   dsk_print_free (print);
   uint8_t *content_data = dsk_malloc (content_buffer.size);
-  resp_options.content_data = content_data;
+  resp_options.content_body = content_data;
   resp_options.content_length = content_buffer.size;
   dsk_buffer_read (&content_buffer, content_buffer.size, content_data);
 
@@ -501,6 +508,7 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
   
   dsk_boolean must_unref_content_stream = DSK_FALSE;
   soptions.content_length = options->content_length;
+  soptions.content_body = options->content_body;
   soptions.content_stream = options->source;
   if (options->source_filename)
     {
@@ -652,7 +660,7 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
   resp_options.content_length = content_buffer.size;
   uint8_t *content_data = dsk_malloc (content_buffer.size);
   dsk_buffer_read (&content_buffer, content_buffer.size, content_data);
-  resp_options.content_data = content_data;
+  resp_options.content_body = content_data;
   header_options.content_type = "text/html/UTF-8";
 
   DskError *error = NULL;
@@ -682,6 +690,8 @@ append_cgi_var  (DskHttpServerRequest *request,
 static void
 respond_no_handler_found (DskHttpServerRequest *request)
 {
+  RealServerRequest *rreq = (RealServerRequest *) request;
+  rreq->waiting_for_response = DSK_TRUE;  //HACK
   _dsk_http_server_request_respond_error (request, 404,
                                           "no handlers matched your request");
 }
@@ -693,7 +703,8 @@ add_get_cgi_vars (RealServerRequest *rreq)
   qm = strchr (rreq->request.request_header->path, '?');
   if (qm)
     {
-      /* compute new GET variables */
+      /* compute GET variables (this may be called with an initial
+       * query, or via an internal redirect). */
       unsigned n_vars;
       DskCgiVar *vars;
       DskError *error = NULL;
@@ -706,7 +717,7 @@ add_get_cgi_vars (RealServerRequest *rreq)
       else
         {
           unsigned i;
-          for (i = 0; n_vars; i++)
+          for (i = 0; i < n_vars; i++)
             append_cgi_var (&rreq->request, &vars[i]);
           dsk_free (vars);
         }
@@ -745,15 +756,17 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
   RealServerRequest *rreq = (RealServerRequest *) request;
   DskHttpRequestOptions req_options;
   DskHttpRequest *old_header;
-  dsk_assert (rreq->state == REQUEST_HANDLING_INVOKING
-          ||  rreq->state == REQUEST_HANDLING_WAITING);
   dsk_assert (rreq->waiting_for_response);
   rreq->waiting_for_response = DSK_FALSE;
+  if (rreq->state == REQUEST_HANDLING_WAITING)
+    rreq->state = REQUEST_HANDLING_INIT;
+  else
+    dsk_assert (rreq->state == REQUEST_HANDLING_INVOKING);
 
   /* Create the new HTTP request correspond to this redirect */
   old_header = request->request_header;
   dsk_http_request_init_options (old_header, &req_options);
-  req_options.path = (char*) new_path;
+  req_options.full_path = (char*) new_path;
   request->request_header = dsk_http_request_new (&req_options, NULL);
   dsk_object_unref (old_header);
 
@@ -1305,4 +1318,23 @@ static void dsk_http_server_finalize (DskHttpServer *server)
 
   /* free matching infrastructure */
   destruct_match_node (&server->top);
+}
+
+DskCgiVar *dsk_http_server_request_lookup_cgi (DskHttpServerRequest *request,
+                                               const char           *name)
+{
+  unsigned i;
+
+  /* Return nothing if variables not already computed.
+     We cannot compute them here, b/c we may need to block waiting
+     for POST data */
+  if (!request->cgi_vars_computed)
+    return NULL;
+
+  /* todo: sorted table or hash or something */
+  for (i = 0; i < request->n_cgi_vars; i++)
+    if (request->cgi_vars[i].key != NULL
+     && strcmp (request->cgi_vars[i].key, name) == 0)
+      return request->cgi_vars + i;
+  return NULL;
 }

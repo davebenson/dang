@@ -129,7 +129,7 @@ test_simple (void)
             case 0:
               stream_resp_opts.header_options = &resp_opts;
               stream_resp_opts.content_length = 7;
-              stream_resp_opts.content_data = (const uint8_t *) "hi mom\n";
+              stream_resp_opts.content_body = (const uint8_t *) "hi mom\n";
               break;
             case 1:
               /* streaming data, no content-length;
@@ -313,7 +313,7 @@ test_response_keepalive (void)
                 case 0:
                   stream_resp_opts.header_options = &resp_opts;
                   stream_resp_opts.content_length = 7;
-                  stream_resp_opts.content_data = (const uint8_t *) "hi mom\n";
+                  stream_resp_opts.content_body = (const uint8_t *) "hi mom\n";
                   break;
                 case 1:
                   /* streaming data, no content-length;
@@ -529,7 +529,7 @@ test_pipelining (void)
                 case 0:
                   stream_resp_opts.header_options = &resp_opts;
                   stream_resp_opts.content_length = 7;
-                  stream_resp_opts.content_data = (const uint8_t *) "hi mom\n";
+                  stream_resp_opts.content_body = (const uint8_t *) "hi mom\n";
                   break;
                 case 1:
                 case 2:
@@ -803,7 +803,7 @@ test_simple_post (void)
         /* send a response */
         stream_resp_opts.header_options = &resp_opts;
         stream_resp_opts.content_length = 7;
-        stream_resp_opts.content_data = (const uint8_t *) "yo mom\n";
+        stream_resp_opts.content_body = (const uint8_t *) "yo mom\n";
         if (!dsk_http_server_stream_respond (xfer, &stream_resp_opts, &error))
           dsk_die ("error responding to request: %s", error->message);
 

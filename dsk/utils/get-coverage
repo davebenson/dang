@@ -4,7 +4,7 @@ echo "XXX: i had some unexplained thing remove some .h and .c files" 1>&2
 echo "XXX: RUN THIS SCRIPT WITH CAUTION" 1>&2
 
 dirs=""
-set -x
+#set -x
 d=gcov.$$
 echo "output in $d/"
 mkdir $d

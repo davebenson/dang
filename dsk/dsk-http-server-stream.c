@@ -885,10 +885,10 @@ dsk_http_server_stream_respond (DskHttpServerStreamTransfer *transfer,
       if (options->content_stream != NULL)
         source = dsk_object_ref (options->content_stream);
       else if (header->content_length == 0
-           ||  options->content_data != NULL)
+           ||  options->content_body != NULL)
         {
           DskMemorySource *msource = dsk_memory_source_new ();
-          dsk_buffer_append (&msource->buffer, header->content_length, options->content_data);
+          dsk_buffer_append (&msource->buffer, header->content_length, options->content_body);
           dsk_memory_source_added_data (msource);
           dsk_memory_source_done_adding (msource);
           source = DSK_OCTET_SOURCE (msource);
