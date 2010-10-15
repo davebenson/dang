@@ -301,8 +301,9 @@ static dsk_boolean
 done_with_header (DskMimeMultipartDecoder *decoder,
                   DskError               **error)
 {
-  DSK_UNUSED (decoder);
   DSK_UNUSED (error);
+  if (decoder->transfer_decoder == NULL)
+    decoder->transfer_decoder = dsk_octet_filter_identity_new ();
   return DSK_TRUE;
 }
 
@@ -344,13 +345,15 @@ done_with_content_body (DskMimeMultipartDecoder *decoder,
   DskCgiVar cur;
   cur.is_get = DSK_FALSE;
   MAYBE_SETUP (key);
+  cur.value = out;
+  cur.value_length = decoder->cur_buffer.size;
+  out += decoder->cur_buffer.size;
+  *out++ = '\0';
+  dsk_buffer_read (&decoder->cur_buffer, decoder->cur_buffer.size, cur.value);
   MAYBE_SETUP (content_type);
   MAYBE_SETUP (content_location);
   MAYBE_SETUP (content_description);
 #undef MAYBE_ADD_FIELD_LENGTH
-  cur.value = out;
-  out[decoder->cur_buffer.size] = '\0';
-  dsk_buffer_read (&decoder->cur_buffer, decoder->cur_buffer.size, out);
 
   /* append CGI to queue */
   if (decoder->n_pieces == decoder->pieces_alloced)
@@ -417,26 +420,31 @@ dsk_mime_multipart_decoder_feed  (DskMimeMultipartDecoder *decoder,
         dsk_buffer_read (&decoder->incoming, nl + 1, decoder->boundary_buf);
         if (decoder->boundary_buf[0] != '-'
          || decoder->boundary_buf[1] != '-'
-         || memcmp (decoder->boundary_buf, decoder->boundary_str,
+         || memcmp (decoder->boundary_buf + 2, decoder->boundary_str,
                     decoder->boundary_str_len) != 0)
           {
             /* not a boundary line */
             goto state__WAITING_FOR_FIRST_SEP_LINE;
           }
         after = decoder->boundary_buf + decoder->boundary_str_len + 2;
-        if (!done_with_content_body (decoder, error))
-          return DSK_FALSE;
         if (dsk_ascii_isspace (after[0]))
           {
             decoder->state = STATE_READING_HEADER;
             goto state__READING_HEADER;
           }
-        else
+        else if (after[1] == '-')
           {
             decoder->state = STATE_ENDED;
             /* TODO: complain about garbage after terminator? */
             goto return_true;
           }
+        else
+          {
+            dsk_buffer_discard (&decoder->incoming, nl + 1);
+            goto state__WAITING_FOR_FIRST_SEP_LINE;
+          }
+
+
       }
 
     state__READING_HEADER:
@@ -528,10 +536,19 @@ dsk_mime_multipart_decoder_feed  (DskMimeMultipartDecoder *decoder,
                   }
               }
           }
+        if (decoder->state == STATE_CONTENT_LINE_START_CRLF)
+          {
+            if (!dsk_octet_filter_process (decoder->transfer_decoder,
+                                           &decoder->cur_buffer,
+                                           2, (uint8_t*) "\r\n",
+                                           error))
+              return DSK_FALSE;
+          }
         if (nl < 0)
           {
             amount = decoder->incoming.size;
-            if (dsk_buffer_get_last_byte (&decoder->incoming) == '\r')
+            if (amount > 0
+              && dsk_buffer_get_last_byte (&decoder->incoming) == '\r')
               amount--;
           }
         else
@@ -600,6 +617,7 @@ dsk_mime_multipart_decoder_dequeue_all (DskMimeMultipartDecoder *decoder,
                                         DskCgiVar               *out)
 {
   memcpy (out, decoder->pieces, sizeof (DskCgiVar) * decoder->n_pieces);
+  decoder->n_pieces = 0;
 }
 
 
