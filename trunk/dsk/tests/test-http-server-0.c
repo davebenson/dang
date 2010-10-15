@@ -310,6 +310,9 @@ int main(int argc, char **argv)
                            &cmdline_verbose);
   dsk_cmdline_process_args (&argc, &argv);
 
+  // HACK: we need the sockets directory to exist!
+  mkdir ("tests/sockets", 0755);
+
   for (i = 0; i < DSK_N_ELEMENTS (tests); i++)
     {
       fprintf (stderr, "Test: %s... ", tests[i].name);
