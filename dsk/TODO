@@ -113,12 +113,15 @@ _ XML Parser: strip whitespace (not implemented yet)
 x XML Parser: search for existing conformance test
 _ XML Parser: XML conformance test: suck up entities included
 _ octet-filter test harness [feed data in several ways]
-  _ c-quote test
-  _ hex test
-  _ base64 test
-  _ url-encode test
+  x c-quote test
+  x hex test
+  x base64 test
+  x XML escape
+  . XML unescape
+  x url-encode test
   _ byte doubler test
   _ quoted-printable test
+  _ zlib test
 _ dsk_octet_filter_source()
 _ more checksum tests
 
@@ -169,9 +172,9 @@ filters:
   x dsk_hex_decoder_new             
   x dsk_url_encoder_new             
   x dsk_url_decoder_new
-  _ dsk_xml_encoder_new             
-  _ dsk_quote_printable_new         
-  _ dsk_unquote_printable_new      
+  x dsk_xml_encoder_new             
+  x dsk_quote_printable_new         
+  x dsk_unquote_printable_new      
   _ dsk_utf8_to_utf16_converter_new
   _ dsk_utf16_to_utf8_converter_new
   x dsk_byte_doubler_new           

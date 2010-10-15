@@ -39,6 +39,22 @@ input=012345
 filter=bB
 output=012345
 
-input=<>
+input=<>&
 filter=x
-output=&lt;&gt;
+output=&lt;&gt;&amp;
+
+input=hi mom
+filter=u
+output=hi+mom
+
+input=hi+mom
+filter=u
+output=hi%2bmom
+
+input=hi mom
+filter=uU
+output=hi mom
+
+input=hi+mom
+filter=uU
+output=hi+mom
