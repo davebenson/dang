@@ -143,6 +143,19 @@ dsk_mem_pool_strdup       (DskMemPool     *pool,
   L = strlen (str) + 1;
   return memcpy (dsk_mem_pool_alloc_unaligned (pool, L), str, L);
 }
+char    *dsk_mem_pool_strcut   (DskMemPool      *pool,
+                                const char      *start,
+                                const char      *past_end)
+{
+  unsigned L = past_end - start;
+  char *rv;
+  if (start == NULL)
+    return NULL;
+  rv = dsk_mem_pool_alloc_unaligned (pool, L + 1);
+  memcpy (rv, start, L);
+  rv[L] = '\0';
+  return rv;
+}
 
 /**
  * dsk_mem_pool_destruct:
