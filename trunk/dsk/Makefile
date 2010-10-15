@@ -15,6 +15,7 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-date-0 \
 		tests/test-unicode \
 		tests/test-checksum \
+		tests/test-octet-filters \
 		tests/test-xml-parser-0 \
 		tests/test-pattern-0 \
 		tests/test-xml-validation-suite \

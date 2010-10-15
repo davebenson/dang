@@ -77,9 +77,16 @@ dsk_http_server_register_cgi_handler            (DskHttpServer *server,
 typedef struct _DskHttpServerResponseOptions DskHttpServerResponseOptions;
 struct _DskHttpServerResponseOptions
 {
+  /* Various ways of specifying the content-body:
+       - as a stream ("source") and optional content-length;
+       - from a file ("source_filename");
+       - from a buffer ("source_buffer");
+       - from a slab of memory ("content_body") with content_length set.
+   */
   DskOctetSource *source;
   const char *source_filename;
   DskBuffer *source_buffer;
+  const uint8_t *content_body;
   int64_t content_length;
 
   /* single string content_type: eg "text/plain" or "text/plain/utf-8" */
@@ -96,6 +103,7 @@ struct _DskHttpServerResponseOptions
   NULL,                 /* source */                            \
   NULL,                 /* source_filename */                   \
   NULL,                 /* source_buffer */                     \
+  NULL,                 /* content_body */                      \
   -1LL,                 /* content_length */                    \
   NULL,                 /* content_type */                      \
   NULL,                 /* content_main_type */                 \
@@ -114,3 +122,6 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
 void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
                                                const char           *new_path);
 void dsk_http_server_request_pass             (DskHttpServerRequest *request);
+
+DskCgiVar *dsk_http_server_request_lookup_cgi (DskHttpServerRequest *request,
+                                               const char           *name);

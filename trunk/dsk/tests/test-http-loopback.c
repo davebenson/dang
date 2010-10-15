@@ -100,7 +100,7 @@ test_simple_connection_close (void)
   DskHttpResponseOptions response_hdr_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
   response_options.header_options = &response_hdr_options;
   response_options.content_length = 7;
-  response_options.content_data = (const void *) "hi mom\n";
+  response_options.content_body = (const void *) "hi mom\n";
   if (!dsk_http_server_stream_respond (server_xfer, &response_options, &error))
     dsk_die ("dsk_http_server_respond failed: %s", error->message);
 

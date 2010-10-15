@@ -68,6 +68,7 @@ dsk_base64_encoder_process (DskOctetFilter *filter,
   if (enc->state + in_length < 3)
     {
       memcpy (enc->partial + enc->state, in_data, in_length);
+      enc->state += in_length;
       return DSK_TRUE;
     }
   memcpy (enc->partial + enc->state, in_data, 3 - enc->state);
