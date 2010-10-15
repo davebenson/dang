@@ -13,7 +13,8 @@ HTTP Cookies
 	http://www.ietf.org/rfc/rfc2965.txt
 
 CGI:
-	...
+	http://www.ietf.org/rfc/rfc3875.txt
+
 
 POST Forms:
     MIME:

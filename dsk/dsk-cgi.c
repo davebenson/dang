@@ -106,7 +106,6 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
       (*cgi_var_out)[n_cgi].content_type = NULL;
       (*cgi_var_out)[n_cgi].content_location = NULL;
       (*cgi_var_out)[n_cgi].content_description = NULL;
-      (*cgi_var_out)[n_cgi].content_disposition = NULL;
       n_cgi++;
     }
   *n_cgi_var_out = n_cgi;

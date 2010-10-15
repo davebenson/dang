@@ -26,6 +26,9 @@ DSK_INLINE_FUNC void    *dsk_mem_pool_alloc_unaligned(DskMemPool *pool,
                                                 size_t          size);
                 char    *dsk_mem_pool_strdup   (DskMemPool      *pool,
                                                 const char      *str);
+                char    *dsk_mem_pool_strcut   (DskMemPool      *pool,
+                                                const char      *start,
+                                                const char      *past_end);
 DSK_INLINE_FUNC void     dsk_mem_pool_clear    (DskMemPool     *pool);
 
 /* --- Allocate and free Memory Pool --- */

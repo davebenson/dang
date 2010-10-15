@@ -2,10 +2,13 @@ TESTS:
 _ request header parsing
 _ response header parsing
 _ CGI parsing
-  _ GET variable style
+  x GET variable style
   _ MIME Multipart (POST) style
-  _ MIME URL-Encoder GET-string style
-_ MIME Multipart Decoder (NOTE: steal from gsk)
+  x MIME URL-Encoder GET-string style
+_ MIME Multipart Decoder
+  x stole simple test from GSK
+  _ want base-64 and quoted-printable tests
+  _ tests for all supported headers
 _ MIME Multipart Encoder
 x http client stream: connection-close
 x http client stream: content-length POST data, connection-close
