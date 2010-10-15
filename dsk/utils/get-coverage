@@ -49,35 +49,43 @@ done
 
 make clean > /dev/null 2>&1
 
-perl -e 'my $total = 0; my $executed = 0;
-while (<STDIN>) { if (/Lines executed:\s*(\d*\.\d\d)% of (\d+)/) {
-  my $percent = $1; my $lines = $2;
-  $total += $lines;
-  $executed += $lines * $percent / 100;
-} }
-$executed = int($executed);
-$percent = sprintf("%.02f", int(10000 * $executed / $total)  / 100);
-print "Executed $executed lines of $total ($percent%).\n"' < $d/gcov.output > $d/summary.output
-
-perl -e 'my $total = 0; my $executed = 0;
+perl -e  \
+'
+my $total = 0; my $executed = 0;
 sub pad($$) { $_[0] . (" " x ($_[1] - length($_[0]))) }
 sub rpad($$) { (" " x ($_[1] - length($_[0]))) . $_[0]  }
-while (<STDIN>) { if (/--- (.*) ---/) {
-  my $fname = $1;
-  scalar(<STDIN>);
-  if (scalar(<STDIN>) =~ /Lines executed:\s*(\d*\.\d\d)% of (\d+)/) {
-  my $percent = $1; my $lines = $2;
-  $total += $lines;
-  $executed = int($lines * $percent / 100);
+sub pr() {
   print join(" ",
-            rpad($percent, 7),
-            rpad($executed, 4),
-            rpad($lines-$executed, 4),
-            rpad($lines, 4),
-            $fname) . "\n"
-} } }
-' < $d/gcov.output | sort -n > $d/file-summary.output
+	     rpad($percent, 7),
+	     rpad($executed, 4),
+	     rpad($lines-$executed, 4),
+	     rpad($lines, 4), $fname) . "\n"
+}
+$all_executed = 0;
+$all_total = 0;
+sub update_total {
+  $all_executed += $executed;
+  $all_total += $total;
+  $all_lines += $lines;
+}
+while (<STDIN>) { if (/--- (.*) ---/) {
+  if (defined $fname) { pr(); update_total() }
+    $fname = $1;
+  } elsif (scalar(<STDIN>) =~ /Lines executed:\s*(\d*\.\d\d)% of (\d+)/) {
+    $percent = $1; $lines = $2;
+    $total += $lines;
+    $executed = int($lines * $percent / 100);
+  }
+}
+if (defined $fname) { pr(); update_total() }
 
+$executed = $all_executed;
+$lines = $all_lines;
+$percent = sprintf("%.02f", 100.0 * $executed / $lines);
+$fname = "TOTAL";
+pr();
+print STDERR "Executed $executed lines of $lines ($percent\%).\n";
+' < $d/gcov.output > $d/file-summary.output 2> $d/summary.output
 
 cat $d/summary.output
 
