@@ -19,7 +19,7 @@ x http client stream: oddballs
   x transfer-encoding chunk extensions
   x transfer-encoding chunk trailer
   x multiline header lines (w/ indent)
-  _ "Continue" header
+  x "Continue" header
 _ http client stream: error conditions:
   x extra blank space at front of request [ignored blank space]
   x bad response code
