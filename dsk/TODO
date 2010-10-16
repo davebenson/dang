@@ -25,7 +25,7 @@ _ http client stream: error conditions:
   x bad response code
   x bad transfer-encoding chunked format
   x bad gzip data
-    _ content-stream should have a way to enqueue an error
+    x content-stream should have a way to enqueue an error
       (needs to be in DskMemorySource)
   x random data tests
   _ transport errors reading/writing
@@ -80,7 +80,7 @@ _ http server
   _ CGI POST multipart
   _ CGI POST URL-Encoded-GET
   _ streaming POST data (TODO: needs design work)
-  _ internal redirect
+  x internal redirect
   _ "pass" - ie find find next match
   _ "serve-file" support
   _ (broken) MD5Sum of POST data

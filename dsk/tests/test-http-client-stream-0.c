@@ -1615,6 +1615,7 @@ test_random_response (void)
         dsk_main_run_once ();
       dsk_object_unref (stream);
       request_data_clear (&request_data);
+
     }
 }
 
