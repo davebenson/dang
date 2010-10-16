@@ -91,7 +91,7 @@ transfer_done (DskHttpClientStreamTransfer *xfer)
           client_stream_set_error (xfer->owner, xfer,
                                    "http-client: error decompressing content: %s",
                                    error->message);
-          dsk_error_unref (error);
+          dsk_memory_source_take_error (xfer->content, error);
           return;
         }
       dsk_memory_source_added_data (xfer->content);
@@ -223,7 +223,7 @@ transfer_content (DskHttpClientStreamTransfer *xfer,
           client_stream_set_error (xfer->owner, xfer,
                                    "http-client: error decompressing content: %s",
                                    error->message);
-          dsk_error_unref (error);
+          dsk_memory_source_take_error (xfer->content, error);
           return;
         }
     }

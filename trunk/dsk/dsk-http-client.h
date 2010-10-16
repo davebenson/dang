@@ -8,7 +8,53 @@ typedef DskHttpClientStreamTransfer DskHttpClientTransfer;
 typedef struct _DskHttpClientRequestFuncs DskHttpClientRequestFuncs;
 struct _DskHttpClientRequestFuncs
 {
-  void (*handle_response) (DskHttpClientTransfer *xfer,
+  /* handle_done/handle_fail:
+     one of these two functions is always invoked once. */
+
+  /* handle_done:
+   * All the response header and body have been downloaded
+     and processed successfully.
+   */
+  void (*handle_done)     (DskHttpClientTransfer *xfer,
+                           void                  *func_data);
+
+  /* handle_fail:
+   * An error -- or many errors -- have caused the endeavor
+   * to receive a successful response to fail.
+   *
+   * We will failures to connect, retry 504 responses
+   * and all things that look like network noise (bad MD5,
+   * cut-off in the middle of content).
+   * But there is a maximum number of retries.
+   *
+   * And things like 404 headers fail after one try.
+   *
+   * And requests other than HEAD and GET are not retried.
+   * (NOT FINAL)
+   */
+  void (*handle_fail)     (DskHttpClientTransfer *xfer,
+                           DskError              *error,
+                           void                  *func_data);
+
+  /* --- low-level notifications (called before done/fail) --- */
+  void (*handle_response)    (DskHttpClientTransfer *xfer,
+                              void                  *func_data);
+
+  void (*handle_redirecting) (DskHttpClientTransfer *xfer,
+                              void                  *func_data);
+
+  void (*handle_retrying)    (DskHttpClientTransfer *xfer,
+                              void                  *func_data);
+
+  /* error: this may or may not be fatal; use the handle_fail()
+     to trap terminate errors */
+  void (*handle_error)       (DskHttpClientTransfer *xfer,
+                              DskError              *error,
+                              void                  *func_data);
+
+
+  /* called after handle_{done,fail} */
+  void (*handle_destroy)  (DskHttpClientTransfer *xfer,
                            void                  *func_data);
 };
 
@@ -93,9 +139,11 @@ struct _DskHttpClientRequestOptions
   /* Force the POST data to be gzipped. */
   dsk_boolean gzip_post_data;
 
+#if 0
   /* TODO: authentication support */
   /* TODO: way to send Basic-Auth preemptively (w/o "challenge") */
   DskHttpClientAuth *auth_agent;
+#endif
 
   /* Provide POST-data MD5Sum */
   dsk_boolean has_postdata_md5sum;
@@ -125,6 +173,7 @@ struct _DskHttpClientRequestOptions
   int max_millis;
 
   /* TODO: max memory/disk or streaming */
+  
 
   /* TODO: option to request server not to use cache (--no-cache in wget) */
 
