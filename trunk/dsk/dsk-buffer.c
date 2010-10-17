@@ -1437,7 +1437,7 @@ uint8_t dsk_buffer_get_last_byte (DskBuffer *buffer)
   DskBufferFragment *f = buffer->last_frag;
   return f->buf[f->buf_start + f->buf_length - 1];
 }
-uint8_t dsk_buffer_get_byte_at (DskBuffer *buffer, unsigned idx)
+uint8_t dsk_buffer_get_byte_at (DskBuffer *buffer, size_t idx)
 {
   unsigned frag_offset;
   DskBufferFragment *frag = dsk_buffer_find_fragment (buffer, idx, &frag_offset);
