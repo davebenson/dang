@@ -46,6 +46,13 @@
  * and GET_LIST_ARGS that return the relevant N-tuples.
  */
 
+#ifndef G_UNLIKELY
+#define G_UNLIKELY(x) x
+#endif
+#if !defined(GLIB_SIZEOF_SIZE_T)
+#define GLIB_SIZEOF_SIZE_T DSK_SIZEOF_POINTER
+#endif
+
 #define GSK_LOG2_MAX_LIST_SIZE          (GLIB_SIZEOF_SIZE_T*8)
 
 /* --- Stacks --- */
@@ -105,10 +112,10 @@
  *   which is probably faster anyways.
  */
 #define GSK_STACK_SORT_(type, top, next, comparator)			\
-  do{								\
+  do{								        \
     type _gsk_stack[GSK_LOG2_MAX_LIST_SIZE];				\
-    guint _gsk_stack_size = 0;						\
-    guint _gsk_i;                                                       \
+    unsigned _gsk_stack_size = 0;			                \
+    unsigned _gsk_i;                                                    \
     type _gsk_at;							\
     for (_gsk_at = top; _gsk_at != NULL; )				\
       {									\
@@ -146,7 +153,7 @@
 	_gsk_cur_list = _gsk_a;						\
 									\
 	/* merge _gsk_cur_list up the stack */				\
-	for (_gsk_i = 0; Z_TRUE; _gsk_i++)				\
+	for (_gsk_i = 0; 1; _gsk_i++)				        \
 	  {								\
 	    /* expanding the stack is marked unlikely,         */	\
 	    /* since in the case it matters (where the number  */	\
