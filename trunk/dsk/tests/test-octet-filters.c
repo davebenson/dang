@@ -46,6 +46,7 @@ create_filter (const char *code)
 	case 'q': filters[n_filters++] = dsk_quote_printable_new (); break;
 	case 'Q': filters[n_filters++] = dsk_unquote_printable_new (); break;
 	case 'x': filters[n_filters++] = dsk_xml_escaper_new (); break;
+	case 'w': filters[n_filters++] = dsk_whitespace_trimmer_new (); break;
 	default: dsk_die ("unexpected char %c in filter creation string",
 	                  *code);
 	}

@@ -1,0 +1,82 @@
+\documentclass{article}
+\title{A Survey of HTTP Client APIs and Implementations}
+\author{Dave Benson}
+\frenchspacing
+\usepackage{amsfonts,amsmath,amssymb,epsfig,eucal}
+\pagestyle{headings}
+\begin{document}
+\maketitle
+
+\section{Overview}
+In designing a new HTTP Client library,
+one must walk a fine line between a library
+with so many features it is practically impossible to learn,
+and a library that isn't sufficient for all uses.
+This document attempts to congeal wisdom to succor future HTTP client
+library architects.
+
+Library features can be {\bf manual}, meaning that all or most of
+the responsibility falls on the user;
+or they can be {\bf automatic}, meaning that all the work is done
+internal to the library.  Automatic features do not place
+any burden on the user of the API, except perhaps during debugging.
+Most features naturally fall between these extremes.
+
+The remainder of this document will first enumerate and
+discuss various features; we will often mention the availability
+of each feature in the various APIs we have investigated.
+Then we will briefly look at each API,
+in order to orient the reader who might wish to study some
+aspect in detail.
+
+\section{Client API Features}
+
+\subsection{Basic Operation}
+Path, port.  User-agent and other misc headers.
+blocking or nonblocking.  http 1.0 versus 1.1.
+
+\subsection{Transport Layer Issues}
+ssl, unix-domain-sockets, nagling
+
+\subsection{Keepalive and Pipelining}
+HTTP 1.1 encourages keepalive, which refers to the ability to
+make multiple requests over the same underlying connection.
+
+Manual APIs for keepalive can be implemented, especially if
+the API is transport-layer aware.
+
+However, most keepalive use is probably automatic:
+a client library can keep a pool of connections that are
+ready for reuse, and will do so if a request for the same
+host comes in.
+
+... pipelining
+... actual library/api observations
+
+\subsection{Byte-Ranges}
+
+\subsection{Authentification Support}
+
+\subsection{Cookie Support}
+
+\subsection{Robustness}
+Timeouts, retrying, following redirects, md5sums (of all sorts)
+
+\section{Client API Summaries}
+
+\subsection{{\tt wget}}
+
+\subsection{{\tt curl}}
+\subsection{java}
+\subsection{c\#}
+\subsection{gnet}
+\subsection{qt}
+\subsection{libwww}
+\subsection{php:curl}
+\subsection{python}
+\subsection{ruby}
+\subsection{apache}
+\subsection{webkit}
+\subsection{mozilla}
+
+\end{document}

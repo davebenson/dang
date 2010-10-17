@@ -106,7 +106,7 @@ test-build-dependencies: \
 	tests/generated/xml-binding-test.h tests/generated/xml-binding-test.c
 
 clean:
-	rm *.o libdsk.a
+	rm -f *.o libdsk.a
 	rm -f $(TEST_PROGRAMS)
 	rm -f $(BUILT_SOURCES)
 	rm -f $(PROGRAMS)
