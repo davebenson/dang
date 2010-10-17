@@ -1,3 +1,16 @@
+STUDY:
+_ make a survey of existing HTTP Client APIs
+  _ wget
+  _ curl
+  _ java
+  _ c#
+  _ gnet
+  _ qt
+  _ libwww
+  _ php:curl
+  _ python
+  _ ruby
+  _ apache
 TESTS:
 _ request header parsing
 _ response header parsing
@@ -81,6 +94,8 @@ _ http server
   _ CGI POST URL-Encoded-GET
   _ streaming POST data (TODO: needs design work)
   x internal redirect
+  _ internal redirect with POST data
+  _ internal redirect with changing GET params
   _ "pass" - ie find find next match
   _ "serve-file" support
   _ (broken) MD5Sum of POST data
@@ -102,6 +117,8 @@ _ content_type_kv_pairs
   _ in request_new
   _ in response_new
   _ in request_init_options
+
+_ Range-support in HTTP (client & server)
 
 WORK ON LUSK - the LUA/DSK HTTP Server
 
@@ -131,6 +148,7 @@ _ high trap counts?
 TODO:
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)
 _ client support for receiving trailers (and server too, on principle)
+_ remove DskObjectWeakPointer ?
 
 _ DskPattern:
   _ IMPORTANT OPTIMIZATION: implement "state-trumping"

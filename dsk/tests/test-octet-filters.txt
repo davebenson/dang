@@ -58,3 +58,12 @@ output=hi mom
 input=hi+mom
 filter=uU
 output=hi+mom
+
+# Whitespace trimmer
+input=hi      mom
+filter=w
+output=hi mom
+
+input=hi  \t\n   mom
+filter=w
+output=hi mom
