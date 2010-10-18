@@ -36,7 +36,7 @@ Path, port.  User-agent and other misc headers.
 blocking or nonblocking.  http 1.0 versus 1.1.
 
 \subsection{Transport Layer Issues}
-ssl, unix-domain-sockets, nagling
+ssl, unix-domain-sockets, nagling, ipv6, willingness to use proxy.
 
 \subsection{Keepalive and Pipelining}
 HTTP 1.1 encourages keepalive, which refers to the ability to
@@ -56,6 +56,7 @@ host comes in.
 \subsection{Byte-Ranges}
 
 \subsection{Authentification Support}
+Basic, Digest, NTLM, Negotiate, Kerberos
 
 \subsection{Cookie Support}
 
@@ -67,12 +68,26 @@ Timeouts, retrying, following redirects, md5sums (of all sorts)
 \subsection{{\tt wget}}
 
 \subsection{{\tt curl}}
+Curl and its library, {\tt libcurl} aim to be an omnibus library for
+file transfer.  It supports non-HTTP protocols as well.
+It has several APIs:  {\tt easy} is a specialization for
+simple uses; {\tt multi} is a specialization to get multiple URLs at
+the same time.
+
+It supports MIME multipart forms, SSL (HTTPS), IPv6,
+a number of authentication strategies, file transfer resume,
+http proxy tunneling, cookies.
+
+It is a blocking API (that's why the ``multi'' api is needed).
+XXX: perhaps it can be made nonblocking by configuring it?
+
+iasdfasfiyiiyyioo
+--
 \subsection{java}
 \subsection{c\#}
 \subsection{gnet}
 \subsection{qt}
 \subsection{libwww}
-\subsection{php:curl}
 \subsection{python}
 \subsection{ruby}
 \subsection{apache}
