@@ -39,6 +39,8 @@ struct _DskHttpClientRequestFuncs
   /* --- low-level notifications (called before done/fail) --- */
   void (*handle_response)    (DskHttpClientTransfer *xfer,
                               void                  *func_data);
+  void (*handle_stream)      (DskHttpClientTransfer *xfer,
+                              void                  *func_data);
 
   void (*handle_redirecting) (DskHttpClientTransfer *xfer,
                               void                  *func_data);
@@ -113,7 +115,8 @@ struct _DskHttpClientRequestOptions
 
   /* GET CGI variables: will be added to query string if it exists,
      and a query string (starting with a '?') will be added otherwise. */
-  char **extra_get_cgi_variables;
+  unsigned n_extra_get_cgi_vars;
+  DskCgiVar *extra_get_cgi_vars;
 
   /* May we attempt to pipeline this request? (default: yes for GET/HEAD) */
   unsigned pipeline_head : 1;
@@ -125,7 +128,16 @@ struct _DskHttpClientRequestOptions
   /* overrides */
   unsigned pipeline : 1;    /* equivalent to setting all pipeline flags */
   unsigned no_pipeline : 1; /* equivalent to unsetting all pipeline flags */
-                                                    
+
+  /* modes:
+      - normal stream: may have fatal error reading stream
+      - stream with restart: may have nonfatal error reading stream, in which case
+        a new stream may appear (handle_stream and handle response
+        will be called multiple times)
+      - safe mode: download and verify contents before. */
+  unsigned safe_mode : 1;
+  unsigned may_restart_stream : 1;
+
 
   /* Number of milliseconds to keepalive this connection */
   int keepalive_millis;
@@ -136,19 +148,18 @@ struct _DskHttpClientRequestOptions
   /* Allow Content-Encoding gzip (will be TRUE once supported) */
   dsk_boolean allow_gzip;
 
-  /* Force the POST data to be gzipped. */
-  dsk_boolean gzip_post_data;
-
-#if 0
-  /* TODO: authentication support */
-  /* TODO: way to send Basic-Auth preemptively (w/o "challenge") */
-  DskHttpClientAuth *auth_agent;
-#endif
+  /* POST data support */
 
   /* Provide POST-data MD5Sum */
   dsk_boolean has_postdata_md5sum;
   uint8_t postdata_md5sum_binary[16];
   char *postdata_md5sum_hex;
+
+  /* Force the POST data to be gzipped. */
+  dsk_boolean gzip_post_data;
+
+  /* MD5Sum checking support */
+  dsk_boolean check_md5sum;
 
   /* Retry support */
   int max_retries;
@@ -156,9 +167,6 @@ struct _DskHttpClientRequestOptions
 
   /* Redirect support */
   unsigned max_redirects;
-
-  /* MD5Sum checking support */
-  dsk_boolean check_md5sum;
 
   /* --- timeouts --- */
 
@@ -172,22 +180,29 @@ struct _DskHttpClientRequestOptions
   /* max time for the content download to finish */
   int max_millis;
 
-  /* TODO: max memory/disk or streaming */
+  /* In "safe" mode, where we download the stream
+     before notifying the user, these are the limits
+     of the largest payload we may accept. */
+  size_t safe_max_memory;
+  uint64_t safe_max_disk;
   
-
-  /* TODO: option to request server not to use cache (--no-cache in wget) */
-
   /* Cookies to send */
   unsigned n_cookies;
   DskHttpCookie *cookies;
 
-  /* TODO TODO: SSL options (for HTTPS obviously..) */
+  DskHttpClientRequestFuncs   *funcs;
+  void *func_data;
+  DskDestroyNotify destroy;
+
+
+  /* TODO:
+     - caching support
+     - authentification support
+     - SSL support */
 };
 
-void dsk_http_client_request       (DskHttpClient               *client,
-				    DskHttpClientRequestOptions *options,
-				    DskOctetSource              *post_data,
-				    DskHttpClientRequestFuncs   *funcs,
-				    void                        *func_data,
-				    DskDestroyNotify             destroy);
+dsk_boolean  dsk_http_client_request  (DskHttpClient               *client,
+				       DskHttpClientRequestOptions *options,
+				       DskOctetSource              *post_data,
+                                       DskError                   **error);
 

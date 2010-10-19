@@ -245,7 +245,6 @@ _ JSON implementation
   _ parser
   _ printer
 _ dsk_octet_filter_sink()
-_ checksum implementations
 
 LATER
 _ SSL and HTTPS [see file TODO-SSL]
@@ -258,7 +257,11 @@ DOCUMENTATION
 _ pick a documentation standard
 
 CODING STANDARDS
+"when in doubt, do NOT abbreviated"
 _ DOCUMENT: length (not abbreviated)
 _ size_t everywhere ?
+_ s/octet/byte/ ?????
+_ DskCgiVar should clearly be DskCgiVariable (and all cgi_var variables etc)
+_ break apart dsk-octet-io.h
 _ DskClientStreamSource BUT DskOctetStreamSourceFd.
   Fix this inconsistency and come up with a policy for naming derived classes
