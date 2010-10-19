@@ -118,16 +118,11 @@ struct _DskHttpClientRequestOptions
   unsigned n_extra_get_cgi_vars;
   DskCgiVar *extra_get_cgi_vars;
 
-  /* May we attempt to pipeline this request? (default: yes for GET/HEAD) */
-  unsigned pipeline_head : 1;
-  unsigned pipeline_get : 1;
-  unsigned pipeline_post : 1;
-  unsigned pipeline_put : 1;
-  unsigned pipeline_delete : 1;
+  dsk_boolean always_pipeline;
+  dsk_boolean never_pipeline;
 
-  /* overrides */
-  unsigned pipeline : 1;    /* equivalent to setting all pipeline flags */
-  unsigned no_pipeline : 1; /* equivalent to unsetting all pipeline flags */
+  unsigned n_post_cgi_vars;
+  DskCgiVar *post_get_cgi_vars;
 
   /* modes:
       - normal stream: may have fatal error reading stream
@@ -135,9 +130,13 @@ struct _DskHttpClientRequestOptions
         a new stream may appear (handle_stream and handle response
         will be called multiple times)
       - safe mode: download and verify contents before. */
-  unsigned safe_mode : 1;
-  unsigned may_restart_stream : 1;
+  dsk_boolean safe_mode;
+  dsk_boolean may_restart_stream;
 
+  /* --- unparsed headers --- */
+  unsigned n_unparsed_headers;
+  char **unparsed_headers;          /* key-value pairs */
+  DskHttpHeaderMisc *unparsed_misc_headers;
 
   /* Number of milliseconds to keepalive this connection */
   int keepalive_millis;
