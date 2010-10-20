@@ -111,6 +111,8 @@ force_host_info (DskHttpClientRequestOptions *options,
       else
         {
           /* pluck URL's host */
+          DskU
+          if (!dsk_url_scan (
           ...
         }
       port = options->port;
