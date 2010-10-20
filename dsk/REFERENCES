@@ -42,7 +42,9 @@ XML-Namespaces:
 
 Checksumming algos:
   MD5:	
+	http://www.ietf.org/rfc/rfc1321.txt
   SHA1:
+	http://www.ietf.org/rfc/rfc3174.txt
   SHA256:
 
 ---

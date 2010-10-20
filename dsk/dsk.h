@@ -32,6 +32,8 @@
 
 #include "dsk-pattern.h"
 
+#include "dsk-url.h"
+
 #include "dsk-http-protocol.h"
 #include "dsk-cgi.h"
 #include "dsk-http-client-auth.h"
