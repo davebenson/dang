@@ -31,6 +31,9 @@ POST Forms:
     MIME type: MultipartDecoder/Form-Data
 	http://www.ietf.org/rfc/rfc2388.txt
 
+URLs:
+	http://www.ietf.org/rfc/rfc3986.txt
+
 XML:
 	...
 
