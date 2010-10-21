@@ -1,0 +1,28 @@
+
+typedef enum
+{
+  DSK_URL_SCHEME_HTTP,
+  DSK_URL_SCHEME_HTTPS,
+  DSK_URL_SCHEME_FTP,
+  DSK_URL_SCHEME_FILE,
+  DSK_URL_SCHEME_MAILTO,
+  /* NOTE: We may add more schemes later. */
+  DSK_URL_SCHEME_UNKNOWN
+} DskUrlScheme;
+
+struct _DskUrlScanned
+{
+  const char *scheme_start, scheme_end;
+  DskUrlScheme scheme;
+  const char *user_start, *user_end;
+  const char *password_start, *password_end;
+  const char *host_start, *host_end;
+  const char *port_start, *port_end;
+  const char *path_start, *path_end;
+  const char *query_start, *query_end;
+  const char *fragment_start, *fragment_end;
+};
+
+dsk_boolean  dsk_url_scan  (const char     *url_string,
+                            DskUrlScanned  *out,
+                            DskError      **error);
