@@ -1,13 +1,44 @@
+#include <stdlib.h>
+#include <string.h>
+#include "dsk.h"
+
+typedef enum
+{
+  DSK_URL_INTERPRETATION_UNKNOWN,
+  DSK_URL_INTERPRETATION_RELATIVE,
+  DSK_URL_INTERPRETATION_ABSOLUTE,
+  DSK_URL_INTERPRETATION_REMOTE
+} DskUrlInterpretation;
+
+/* general sanity check */
+static dsk_boolean
+is_valid_hostname (const char *hostname_start,
+                   const char *hostname_end)
+{
+  const char *hostname;
+  for (hostname = hostname_start; hostname < hostname_end; hostname++)
+    if (!dsk_ascii_istoken (*hostname) && *hostname != '.')
+      return DSK_FALSE;
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+is_valid_generic_component (const char *start, const char *end)
+{
+  const char *at;
+  for (at = start; at < end; at++)
+    if (!(33 <= *at && *at <= 126))
+      return DSK_FALSE;
+  return DSK_TRUE;
+}
 
 dsk_boolean  dsk_url_scan  (const char     *url_string,
                             DskUrlScanned  *out,
                             DskError      **error)
 {
-			    -
   int num_slashes;
   const char *at = url_string;
   DskUrlInterpretation interpretation = DSK_URL_INTERPRETATION_UNKNOWN;
-  int port;
   out->scheme_start = at;
   while (dsk_ascii_isalnum (*at))
     at++;
@@ -43,7 +74,6 @@ dsk_boolean  dsk_url_scan  (const char     *url_string,
         out->scheme = DSK_URL_SCHEME_HTTPS;
       break;
     }
-      break;
 
   num_slashes = 0;
   while (*at == '/')
@@ -52,38 +82,38 @@ dsk_boolean  dsk_url_scan  (const char     *url_string,
       at++;
     }
   if (out->scheme == DSK_URL_SCHEME_FILE)
-    out->interpretation = DSK_URL_INTERPRETATION_ABSOLUTE;
+    interpretation = DSK_URL_INTERPRETATION_ABSOLUTE;
   else
     switch (num_slashes)
       {
 	case 0:
-	  out->interpretation = DSK_URL_INTERPRETATION_RELATIVE;
+	  interpretation = DSK_URL_INTERPRETATION_RELATIVE;
 	  break;
 	case 1:
-	  out->interpretation = DSK_URL_INTERPRETATION_ABSOLUTE;
+	  interpretation = DSK_URL_INTERPRETATION_ABSOLUTE;
 	  break;
 	case 2:
 	  /* ``schemes including a top hierarchical element for a naming
 	   *   authority'' (Section 3.2)
 	   */
-	  out->interpretation = DSK_URL_INTERPRETATION_REMOTE;
+	  interpretation = DSK_URL_INTERPRETATION_REMOTE;
 	  break;
 	case 3:
 	  /* File urls (well those are now handled above so this
 	   * is pretty dubious)
 	   */
-	  out->interpretation = DSK_URL_INTERPRETATION_ABSOLUTE;
+	  interpretation = DSK_URL_INTERPRETATION_ABSOLUTE;
 	  break;
 	default:
           /* hmm */
-	  out->interpretation = DSK_URL_INTERPRETATION_ABSOLUTE;
+	  interpretation = DSK_URL_INTERPRETATION_ABSOLUTE;
 	  break;
       }
 
 
   switch (interpretation)
     {
-      case GSK_URL_INTERPRETATION_REMOTE:
+      case DSK_URL_INTERPRETATION_REMOTE:
 	/* rfc 2396, section 3.2.2. */
 	{
 	  const char *end_hostport;
@@ -103,7 +133,7 @@ dsk_boolean  dsk_url_scan  (const char     *url_string,
 	    {
 	      /* TODO: it's kinda hard to pinpoint where this
 		 is specified.  See Section 3 in RFC 2396. */
-	      g_set_error (error, GSK_G_ERROR_DOMAIN,
+	      g_set_error (error, DSK_G_ERROR_DOMAIN,
 			   GSK_ERROR_INVALID_ARGUMENT,
 			   _("missing / after host in URL"));
 	      return NULL;
@@ -111,24 +141,35 @@ dsk_boolean  dsk_url_scan  (const char     *url_string,
 #endif
 	  at_sign = memchr (at, '@', end_hostport - at);
 	  out->host_start = at_sign != NULL ? (at_sign + 1) : at;
-	  colon = memchr (host_start, ':', end_hostport - host_start);
+	  colon = memchr (out->host_start, ':', end_hostport - out->host_start);
 	  if (at_sign != NULL)
 	    {
               const char *password_sep = memchr (at, ':', at_sign - at);
               if (password_sep)
                 {
-                  user_name = g_strndup (at, password_sep - at);
-                  password = g_strndup (password_sep + 1,
-                                        at_sign - (password_sep + 1));
+                  out->username_start = at;
+                  out->username_end = password_sep;
+                  out->password_start = password_sep + 1;
+                  out->password_end = at_sign;
                 }
               else
                 {
-                  user_name = g_strndup (at, at_sign - at);
+                  out->username_start = at;
+                  out->username_end = at_sign;
+                  out->password_start = NULL;
+                  out->password_end = NULL;
                 }
 	      /* XXX: should validate username against 
 	       *         GSK_URL_USERNAME_CHARSET
 	       */
 	    }
+          else
+            {
+              out->username_start = NULL;
+              out->username_end = NULL;
+              out->password_start = NULL;
+              out->password_end = NULL;
+            }
 	  out->host_end = colon != NULL ? colon : end_hostport;
 
 	  if (colon != NULL)
@@ -142,11 +183,12 @@ dsk_boolean  dsk_url_scan  (const char     *url_string,
 	}
 
 	/* fall through to parse the host-specific part of the url */
-      case GSK_URL_INTERPRETATION_RELATIVE:
-      case GSK_URL_INTERPRETATION_ABSOLUTE:
+      case DSK_URL_INTERPRETATION_RELATIVE:
+      case DSK_URL_INTERPRETATION_ABSOLUTE:
         {
 	  const char *query_start;
 	  const char *frag_start;
+          const char *end_string;
 
           out->host_start = out->host_end = NULL;
           out->username_start = out->username_end = NULL;
@@ -155,73 +197,60 @@ dsk_boolean  dsk_url_scan  (const char     *url_string,
           out->port = 0;
 
 	  if (num_slashes > 0
-           && interpretation == GSK_URL_INTERPRETATION_ABSOLUTE)
+           && interpretation == DSK_URL_INTERPRETATION_ABSOLUTE)
 	    at--;
 	  query_start = strchr (at, '?');
 	  frag_start = strchr (query_start != NULL ? query_start : at, '#');
+          end_string = strchr (at, 0);
+          out->path_start = at;
 	  if (query_start != NULL)
-	    path = g_strndup (at, query_start - at);
+	    out->path_end = query_start;
 	  else if (frag_start != NULL)
-	    path = g_strndup (at, frag_start - at);
+	    out->path_end = frag_start;
 	  else
-	    path = g_strdup (at);
+	    out->path_end = end_string;
 	  if (query_start != NULL)
 	    {
-	      if (frag_start != NULL)
-		query = g_strndup ((query_start+1), frag_start - (query_start+1));
-	      else
-		query = g_strdup (query_start + 1);
+              out->query_start = query_start + 1;
+              out->query_end = frag_start ? frag_start : end_string;
 	    }
+          else
+            out->query_start = out->query_end = NULL;
 	  if (frag_start != NULL)
-	    fragment = g_strdup (frag_start + 1);
+            {
+              out->fragment_start = frag_start + 1;
+              out->fragment_end = end_string;
+            }
+          else
+            out->fragment_start = out->fragment_end = NULL;
 	  break;
 	}
-      case GSK_URL_INTERPRETATION_UNKNOWN:
+      case DSK_URL_INTERPRETATION_UNKNOWN:
         {
-	  g_set_error (error, GSK_G_ERROR_DOMAIN, GSK_ERROR_BAD_FORMAT,
-		       _("cannot guess how to interpret %s:%s"),
-	  	       gsk_url_scheme_name (scheme), start);
-	  goto error;
+	  dsk_set_error (error, "cannot guess how to interpret %.*s URL",
+                         (int)(out->scheme_end - out->scheme_start), out->scheme_start);
+	  return DSK_FALSE;
 	}
     }
 
-  if (interpretation == GSK_URL_INTERPRETATION_REMOTE
-  && (host == NULL || host[0] == '\0' || !isalnum (host[0])))
+  if (interpretation == DSK_URL_INTERPRETATION_REMOTE
+  && (out->host_start == NULL || !dsk_ascii_isalnum (out->host_start[0])))
     {
-      g_set_error (error, GSK_G_ERROR_DOMAIN, GSK_ERROR_BAD_FORMAT,
-		   _("malformed host: should begin with a letter or number (%s)"),
-		   host);
-      goto error;
+      dsk_set_error (error, "malformed host: should begin with a letter or number (%.*s)",
+                     (int)(out->host_end - out->host_start), out->host_start);
+      return DSK_FALSE;
     }
 
-
-
-  url = g_object_new (GSK_TYPE_URL, NULL);
-  url->scheme = scheme;
-  if (scheme == GSK_URL_SCHEME_OTHER)
-    url->scheme_name = NULL;
-  else
-    url->scheme_name = (char *) gsk_url_scheme_name (scheme);
-  url->host = host;
-  url->user_name = user_name;
-  url->password = password;
-  url->query = query;
-  url->fragment = fragment;
-  url->port = port;
-  url->path = path;
-
-  if (!url_check_is_valid (url, error))
-    {
-      g_object_unref (url);
-      return NULL;
+#define CHECK(base, function)                                 \
+  if (out->base##_start != NULL                               \
+   && !function (out->base##_start, out->base##_end))         \
+    {                                                         \
+      dsk_set_error (error, "invalid character in %s", #base);\
+      return DSK_FALSE;                                       \
     }
-  return url;
-
-error:
-  g_free (host);
-  g_free (user_name);
-  g_free (password);
-  g_free (query);
-  g_free (fragment);
-  g_free (path);
-  return NULL;
+  CHECK (host, is_valid_hostname)
+  CHECK (path, is_valid_generic_component)
+  CHECK (query, is_valid_generic_component)
+#undef CHECK
+  return DSK_TRUE;
+}

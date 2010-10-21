@@ -90,6 +90,7 @@ struct _DskHttpClientOptions
 DskHttpClient *dsk_http_client_new (DskHttpClientOptions *options);
 
 /* host specific configuration */
+typedef struct _DskHttpClientHostOptions DskHttpClientHostOptions;
 struct _DskHttpClientHostOptions
 {
   int max_pipelined;

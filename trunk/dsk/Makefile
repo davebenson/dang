@@ -6,6 +6,7 @@ BUILT_SOURCES = dsk-ascii-chartable.inc dsk-digit-chartables.inc \
 		dsk-pattern-char-classes.inc
 TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-dispatch \
+		tests/test-url-0 \
 	        tests/test-http-client-stream-0 \
 		tests/test-http-server-stream-0 \
 		tests/test-http-server-0 \
@@ -53,6 +54,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-http-client-stream.o dsk-http-server-stream.o \
 	  dsk-memory-source.o dsk-memory-sink.o \
 	  dsk-mime.o \
+	  dsk-url.o \
 	  dsk-http-internals.o \
 	  dsk-http-header-parsing.o dsk-http-protocol.o \
 	  dsk-http-header-printing.o \
