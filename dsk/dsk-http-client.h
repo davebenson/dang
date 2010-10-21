@@ -127,8 +127,6 @@ struct _DskHttpClientRequestOptions
      This is mostly for testing. */
   char *local_socket_path;
 
-  /* TODO: POST-data CGI variables? */
-
   /* GET CGI variables: will be added to query string if it exists,
      and a query string (starting with a '?') will be added otherwise. */
   unsigned n_extra_get_cgi_vars;
@@ -137,8 +135,10 @@ struct _DskHttpClientRequestOptions
   dsk_boolean always_pipeline;
   dsk_boolean never_pipeline;
 
+  /* These are ignored unless VERB=POST.
+     They are also ignored if post_cgi_vars==NULL. */
   unsigned n_post_cgi_vars;
-  DskCgiVar *post_get_cgi_vars;
+  DskCgiVar *post_cgi_vars;
 
   /* modes:
       - normal stream: may have fatal error reading stream
@@ -147,6 +147,7 @@ struct _DskHttpClientRequestOptions
         will be called multiple times)
       - safe mode: download and verify contents before. */
   dsk_boolean safe_mode;
+
   dsk_boolean may_restart_stream;
 
   /* --- unparsed headers --- */
