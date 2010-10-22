@@ -111,9 +111,16 @@ force_host_info (DskHttpClientRequestOptions *options,
       else
         {
           /* pluck URL's host */
-          DskU
-          if (!dsk_url_scan (
-          ...
+          DskUrlScanned scanned;
+          if (!dsk_url_scan (options->url, &scanned, error))
+            return NULL;
+          if (scanned.host_start == NULL)
+            {
+              dsk_set_error (error, "URL does not contain a host");
+              return DSK_FALSE;
+            }
+          host_start = scanned.host_start;
+          host_len = scanned.host_end - scanned.host_start;
         }
       port = options->port;
       if (port == 0)
@@ -162,8 +169,7 @@ force_host_info (DskHttpClientRequestOptions *options,
     }
   else
     {
-      dsk_set_error (error, "no host given");
-      return NULL;
+      dsk_assert_not_reached ();
     }
   return host_info;
 
@@ -192,36 +198,91 @@ dsk_http_client_request  (DskHttpClient               *client,
                           DskOctetSource              *post_data,
                           DskError                   **error)
 {
+  /* Check for as many errors as possible. */
+  if (options->url == NULL
+   && options->local_socket_path == NULL
+   && options->host == NULL)
+    {
+      dsk_set_error (error, "no host given");
+      return DSK_FALSE;
+    }
+
   /* Find 'host_info' */
   HostInfo *host_info = force_host_info (options, error);
   if (host_info == NULL)
     return DSK_FALSE;
 
+  /* Create request object */
+  request = dsk_malloc0 (sizeof (Request));
+  request->host_info = host_info;
+
   /* Do we have an existing connection that we can
      use for this request? */
   Connection *conn;
   GSK_RBTREE_FIRST (GET_REUSABLE_CONNECTION_TREE (host_info), conn);
+
+  /* If a connection has a pending request
+     and the number of connections is below the "min_connections"
+     for this host, then create a new connection instead of reusing the
+     connection. */
+  if (conn != NULL
+   && conn->n_pending > 0
+   && host_info->n_connections < host_info->min_connections_before_pipelining
+   && client->n_connections < client->max_connections)
+    {
+      conn = NULL;
+    }
+
   if (conn != NULL && conn->n_pending < host_info->max_pipelined)
     {
       /* Connection available for reuse */
-      ...
+      Request *conflict;
+      GSK_RBTREE_REMOVE (GET_CONNECTION_TREE (host_info), conn);
+      ++(conn->n_pending);
+      GSK_RBTREE_INSERT (GET_CONNECTION_TREE (host_info), conn, conflict);
+      dsk_assert (conflict == NULL);
     }
   else if (host_info->n_connections < host_info->max_connections
         && client->n_connections < client->max_connections)
     {
       /* Create a new connection */
-      ...
+      conn = dsk_malloc0 (sizeof (Connection));;
+      conn->stream = dsk_http_client_stream_new (sink, source, &cs_options);
+      dsk_assert (conn->stream != NULL);
+      conn->n_pending = 1;
+      GSK_RBTREE_INSERT (GET_CONNECTION_TREE (host_info), conn, conflict);
+      dsk_assert (conflict == NULL);
     }
   else (options->block_if_busy
      && host_info->n_unassigned_requests < host_info->max_unassigned_requests)
     {
       /* Enqueue our request in the wait-queue */
       ...
+      return DSK_TRUE;
     }
   else
     {
       dsk_set_error (error, "too many connections in HTTP client");
       return DSK_FALSE;
+    }
 
+  /* Set up request options */
+  DskHttpClientStreamRequestOptions request_options
+    = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
 
+  ...
+  request_options.funcs = &client_stream_request_funcs;
+  request_options.func_data = request;
 
+  request->connection = conn;
+  request->transfer = dsk_http_client_stream_request (conn->client_stream,
+                                                      &request_options,
+                                                      error);
+  if (request->transfer == NULL)
+    {
+      GSK_RBTREE_REMOVE (GET_CONNECTION_TREE (host_info), request);
+      dsk_free (request);
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}

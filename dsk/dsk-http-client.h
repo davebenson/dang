@@ -218,6 +218,8 @@ struct _DskHttpClientRequestOptions
      - SSL support */
 };
 
+/* If this returns DSK_FALSE, then NONE
+   of your callbacks has been/will be run */
 dsk_boolean  dsk_http_client_request  (DskHttpClient               *client,
 				       DskHttpClientRequestOptions *options,
 				       DskOctetSource              *post_data,
