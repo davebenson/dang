@@ -192,6 +192,28 @@ new_host_info:
   return host_info;
 }
 
+/* Assumes that 'in', 'out' and 'in->request_options' have been initialized. */
+static dsk_boolean
+init_request_options (DskHttpClientRequestOptions *in,
+                      DskHttpClientStreamRequestOptions *out,
+                      DskMemPool *mem_pool,
+                      DskError  **error)
+{
+  DskHttpRequestOptions *header_options = in->request_options;
+  header_options->... = ...;
+  out->post_data = ???.
+  out->post_data_length = ???.
+  out->post_data_slab = ???.
+  out->gzip_compression_level = ???.
+  out->gzip_compress_post_data = ???.
+  out->post_data_is_gzipped = ???.
+  out->uncompress_content = ???.
+  out->n_cookies = ???
+  out->cookies = ???
+  out->funcs = &client_stream_request_funcs ???
+  out->user_data = request ???
+}
+
 dsk_boolean
 dsk_http_client_request  (DskHttpClient               *client,
                           DskHttpClientRequestOptions *options,
@@ -257,7 +279,8 @@ dsk_http_client_request  (DskHttpClient               *client,
      && host_info->n_unassigned_requests < host_info->max_unassigned_requests)
     {
       /* Enqueue our request in the wait-queue */
-      ...
+      GSK_QUEUE_ENQUEUE (GET_UNASSIGNED_REQUEST_QUEUE (host_info), request);
+      host_info->n_unassigned_requests += 1;
       return DSK_TRUE;
     }
   else
@@ -266,13 +289,17 @@ dsk_http_client_request  (DskHttpClient               *client,
       return DSK_FALSE;
     }
 
-  /* Set up request options */
+  /* --- Set up request options --- */
   DskHttpClientStreamRequestOptions request_options
     = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
+  DskHttpRequestOptions header_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
+  char mem_pool_buf[1024];
+  request_options.request_options = &header_options;
+  DskMemPool mem_pool;
+  dsk_mem_pool_init_buf (&mem_pool, sizeof (mem_pool_buf), mem_pool_buf);
+  if (!init_request_options (options, &request_options, &mem_pool, error))
+    return DSK_FALSE;
 
-  ...
-  request_options.funcs = &client_stream_request_funcs;
-  request_options.func_data = request;
 
   request->connection = conn;
   request->transfer = dsk_http_client_stream_request (conn->client_stream,

@@ -102,6 +102,7 @@ _ http server
     _ in header
     _ in trailer
   _ max POST size limit
+  _ max header size limit
 _ http client
   _ keepalive pool
   _ POST
