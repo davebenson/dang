@@ -192,10 +192,48 @@ new_host_info:
   return host_info;
 }
 
+static void
+client_stream__handle_response (DskHttpClientStreamTransfer *xfer)
+{
+  Request *request = xfer->user_data;
+  ...
+}
+
+static void
+client_stream__handle_content_complete (DskHttpClientStreamTransfer *xfer)
+{
+  Request *request = xfer->user_data;
+  ...
+}
+
+static void
+client_stream__handle_error (DskHttpClientStreamTransfer *xfer)
+{
+  Request *request = xfer->user_data;
+  ...
+}
+
+static void
+client_stream__handle_destroy (DskHttpClientStreamTransfer *xfer)
+{
+  Request *request = xfer->user_data;
+  ...
+}
+
+
+static DskHttpClientStreamFuncs client_stream_request_funcs =
+{
+  client_stream__handle_response,
+  client_stream__handle_content_complete,
+  client_stream__handle_error,
+  client_stream__handle_destroy
+};
+
 /* Assumes that 'in', 'out' and 'in->request_options' have been initialized. */
 static dsk_boolean
 init_request_options (DskHttpClientRequestOptions *in,
                       DskHttpClientStreamRequestOptions *out,
+                      Request *request,
                       DskMemPool *mem_pool,
                       DskError  **error)
 {
@@ -211,7 +249,7 @@ init_request_options (DskHttpClientRequestOptions *in,
   out->n_cookies = ???
   out->cookies = ???
   out->funcs = &client_stream_request_funcs ???
-  out->user_data = request ???
+  out->user_data = request;
 }
 
 dsk_boolean
@@ -297,7 +335,7 @@ dsk_http_client_request  (DskHttpClient               *client,
   request_options.request_options = &header_options;
   DskMemPool mem_pool;
   dsk_mem_pool_init_buf (&mem_pool, sizeof (mem_pool_buf), mem_pool_buf);
-  if (!init_request_options (options, &request_options, &mem_pool, error))
+  if (!init_request_options (options, &request_options, request, &mem_pool, error))
     return DSK_FALSE;
 
 
