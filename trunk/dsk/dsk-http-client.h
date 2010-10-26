@@ -137,11 +137,17 @@ struct _DskHttpClientRequestOptions
   dsk_boolean never_pipeline;
 
   /* These are ignored unless VERB=POST.
-     They are also ignored if post_cgi_vars==NULL. */
+     They are also ignored if post_cgi_vars==NULL (note that
+     n_post_cgi_vars==0 && post_cgi_vars == NULL => no mime-multipart;
+     n_post_cgi_vars==0 && post_cgi_vars != NULL => mime-multipart w/ 0 parts)
+   */
   unsigned n_post_cgi_vars;
   DskCgiVar *post_cgi_vars;
 
-  /* modes:
+  /* A stream of POST/PUT data. */
+  DskOctetSource *request_body;
+
+  /* content-retrieval modes:
       - normal stream: may have fatal error reading stream
       - stream with restart: may have nonfatal error reading stream, in which case
         a new stream may appear (handle_stream and handle response
