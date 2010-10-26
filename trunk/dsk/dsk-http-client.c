@@ -28,11 +28,28 @@ struct _Connection
   dsk_boolean is_red;
 };
 
+/* How to handle errors during content-reading */
+typedef enum
+{
+  /* Provides stream immediately */
+  REQUEST_MODE_NORMAL,
+
+  /* Gives the stream an error and may (if a new attempt connects)
+     give the user a new stream */
+  REQUEST_MODE_RESTARTING,
+
+  /* Buffers all content to disk or memory and
+     so handle_stream is only invoked once all the data
+     is downloaded correctly. */
+  REQUEST_MODE_SAFE
+} RequestMode;
+
 struct _Request
 {
   HostInfo *host_info;
   Connection *connection;       /* if assigned */
   DskHttpClientStreamTransfer *transfer;  /* iff connection!=NULL */
+  RequestMode request_mode;
 
   /* Either the prev/next withing the connection,
      or within the unassigned_requests list. */
@@ -196,6 +213,10 @@ static void
 client_stream__handle_response (DskHttpClientStreamTransfer *xfer)
 {
   Request *request = xfer->user_data;
+  if (request->funcs->handle_response)
+    {
+      ...
+    }
   switch (xfer->response->status)
     {
       /* 1xx headers */
@@ -215,7 +236,16 @@ client_stream__handle_response (DskHttpClientStreamTransfer *xfer)
 
       /* 2xx headers */
     case DSK_HTTP_STATUS_OK:
-      ...
+MODE
+      if (request->request_mode == REQUEST_MODE_SAFE)
+        {
+          ...
+        }
+      else
+        {
+          ...
+        }
+      return;
     case DSK_HTTP_STATUS_CREATED:
       ...
     case DSK_HTTP_STATUS_ACCEPTED:
