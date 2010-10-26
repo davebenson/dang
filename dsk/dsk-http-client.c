@@ -238,6 +238,35 @@ init_request_options (DskHttpClientRequestOptions *in,
                       DskError  **error)
 {
   DskHttpRequestOptions *header_options = in->request_options;
+  ... = in->url
+  ... = in->path
+  ... = in->query
+  ... = in->n_extra_get_cgi_vars
+  ... = in->extra_get_cgi_vars
+  ... = in->always_pipeline
+  ... = in->never_pipeline
+  ... = in->n_post_cgi_vars
+  ... = in->post_cgi_vars
+  ... = in->request_body
+  ... = in->safe_mode
+  ... = in->may_restart_stream
+  ... = in->n_unparsed_headers
+  ... = in->unparsed_headers
+  ... = in->unparsed_misc_headers
+  ... = in->keepalive_millis
+  ... = in->connection_close
+  ... = in->allow_gzip
+  ... = in->has_postdata_md5sum
+  ... = in->postdata_md5sum_binary
+  ... = in->postdata_md5sum_hex
+  ... = in->gzip_post_data
+  ... = in->check_md5sum
+  ... = in->max_retries
+  ... = in->retry_sleep_millis
+  ... = in->max_redirects
+  ... = in->n_cookies
+  ... = in->cookies
+
   header_options->... = ...;
   out->post_data = ???.
   out->post_data_length = ???.
@@ -306,8 +335,25 @@ dsk_http_client_request  (DskHttpClient               *client,
         && client->n_connections < client->max_connections)
     {
       /* Create a new connection */
+      DskClientStreamOptions cs_options = DSK_CLIENT_STREAM_OPTIONS_DEFAULT;
+      DskHttpClientStreamOptions hcs_options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
+
+      /* Setup client-stream options */
+      /* TODO: obey host, port, local_socket_path, has_ip_address */
+
+      if (!dsk_client_stream_new (&cs_options, NULL, &sink, &source, error))
+        {
+          ...
+        }
+
       conn = dsk_malloc0 (sizeof (Connection));;
-      conn->stream = dsk_http_client_stream_new (sink, source, &cs_options);
+
+      /* Setup http-client-stream options */
+      ...
+
+      conn->stream = dsk_http_client_stream_new (sink, source, &hcs_options);
+      dsk_object_unref (sink);
+      dsk_object_unref (source);
       dsk_assert (conn->stream != NULL);
       conn->n_pending = 1;
       GSK_RBTREE_INSERT (GET_CONNECTION_TREE (host_info), conn, conflict);
