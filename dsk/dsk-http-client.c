@@ -2,7 +2,7 @@
 
 typedef struct _DskHttpClientClass DskHttpClientClass;
 typedef struct _Connection Connection;
-typedef struct _Request Request;
+typedef struct _DskHttpClientTransfer Transfer;
 typedef struct _HostInfo HostInfo;
 
 struct _DskHttpClientClass
@@ -44,7 +44,7 @@ typedef enum
   REQUEST_MODE_SAFE
 } RequestMode;
 
-struct _Request
+struct _DskHttpClientTransfer
 {
   HostInfo *host_info;
   Connection *connection;       /* if assigned */
@@ -53,7 +53,7 @@ struct _Request
 
   /* Either the prev/next withing the connection,
      or within the unassigned_requests list. */
-  Request *prev, *next;
+  Transfer *prev, *next;
 };
 
 struct _HostInfo
@@ -82,7 +82,7 @@ struct _HostInfo
 
   /* List of requests than have not been assigned a connection yet. */
   unsigned n_unassigned_requests;
-  Request *unassigned_requests;
+  Transfer *unassigned_requests;
   unsigned max_unassigned_requests;
 
   /* host tree, sorted by key (name/port) */
@@ -212,7 +212,7 @@ new_host_info:
 static void
 client_stream__handle_response (DskHttpClientStreamTransfer *xfer)
 {
-  Request *request = xfer->user_data;
+  Transfer *request = xfer->user_data;
   if (request->funcs->handle_response)
     {
       ...
@@ -236,9 +236,11 @@ client_stream__handle_response (DskHttpClientStreamTransfer *xfer)
 
       /* 2xx headers */
     case DSK_HTTP_STATUS_OK:
-MODE
+    case DSK_HTTP_STATUS_NONAUTHORITATIVE_INFO:
       if (request->request_mode == REQUEST_MODE_SAFE)
         {
+          /* If we know the content-length is large,
+             make a temp file, otherwise try to use an in-memory buffer. */
           ...
         }
       else
@@ -247,19 +249,19 @@ MODE
         }
       return;
     case DSK_HTTP_STATUS_CREATED:
-      ...
     case DSK_HTTP_STATUS_ACCEPTED:
-      ...
-    case DSK_HTTP_STATUS_NONAUTHORITATIVE_INFO:
-      ...
     case DSK_HTTP_STATUS_NO_CONTENT:
-      ...
     case DSK_HTTP_STATUS_RESET_CONTENT:
+      /* handle responses where a body is ignored. */
       ...
     case DSK_HTTP_STATUS_PARTIAL_CONTENT:
+      /* TODO: we should not get this unless we issue a Range request,
+         which we do not support as of yet. */
       ...
+
       /* 3xx headers */
     case DSK_HTTP_STATUS_MULTIPLE_CHOICES:
+      /* not supported??? */
       ...
     case DSK_HTTP_STATUS_MOVED_PERMANENTLY:
       ...
@@ -328,14 +330,14 @@ MODE
 static void
 client_stream__handle_content_complete (DskHttpClientStreamTransfer *xfer)
 {
-  Request *request = xfer->user_data;
+  Transfer *request = xfer->user_data;
   ...
 }
 
 static void
 client_stream__handle_error (DskHttpClientStreamTransfer *xfer)
 {
-  Request *request = xfer->user_data;
+  Transfer *request = xfer->user_data;
   if (request->n_attempts_remaining == 0)
     {
       /* fail request */
@@ -352,7 +354,7 @@ client_stream__handle_error (DskHttpClientStreamTransfer *xfer)
 static void
 client_stream__handle_destroy (DskHttpClientStreamTransfer *xfer)
 {
-  Request *request = xfer->user_data;
+  Transfer *request = xfer->user_data;
   ...
 }
 
@@ -369,7 +371,7 @@ static DskHttpClientStreamFuncs client_stream_request_funcs =
 static dsk_boolean
 init_request_options (DskHttpClientRequestOptions *in,
                       DskHttpClientStreamRequestOptions *out,
-                      Request *request,
+                      Transfer *request,
                       DskMemPool *mem_pool,
                       DskError  **error)
 {
@@ -438,7 +440,7 @@ dsk_http_client_request  (DskHttpClient               *client,
     return DSK_FALSE;
 
   /* Create request object */
-  request = dsk_malloc0 (sizeof (Request));
+  request = dsk_malloc0 (sizeof (Transfer));
   request->host_info = host_info;
 
   /* Do we have an existing connection that we can
@@ -461,7 +463,7 @@ dsk_http_client_request  (DskHttpClient               *client,
   if (conn != NULL && conn->n_pending < host_info->max_pipelined)
     {
       /* Connection available for reuse */
-      Request *conflict;
+      Transfer *conflict;
       GSK_RBTREE_REMOVE (GET_CONNECTION_TREE (host_info), conn);
       ++(conn->n_pending);
       GSK_RBTREE_INSERT (GET_CONNECTION_TREE (host_info), conn, conflict);
