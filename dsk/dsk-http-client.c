@@ -210,14 +210,15 @@ new_host_info:
 }
 
 static void
-client_stream__handle_response (DskHttpClientStreamTransfer *xfer)
+client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
 {
-  Transfer *request = xfer->user_data;
+  Transfer *request = stream_xfer->user_data;
+  DskHttpResponse *response = stream_xfer->response;
   if (request->funcs->handle_response)
     {
       ...
     }
-  switch (xfer->response->status)
+  switch (response->status)
     {
       /* 1xx headers */
     case DSK_HTTP_STATUS_CONTINUE:
@@ -241,7 +242,39 @@ client_stream__handle_response (DskHttpClientStreamTransfer *xfer)
         {
           /* If we know the content-length is large,
              make a temp file, otherwise try to use an in-memory buffer. */
-          ...
+          request->content_stream = dsk_object_ref (stream_xfer->content);
+          if (response->content_length >= transfer->safe_max_disk)
+            {
+              request_fatal_fail (request, ...);
+            }
+          else if (response->content_length >= transfer->safe_max_memory_size)
+            {
+              request->safe_content_fd = dsk_fd_make_tmp (&error);
+              if (request->safe_content_fd < 0)
+                {
+                  request_fatal_fail (...);
+                  return;
+                }
+              dsk_hook_trap (&request->content_stream->base_instance.readable_hook,
+                             handle_safe_content_to_disk,
+                             request,
+                             NULL);
+            }
+          else if (response->content_length >= 0)
+            {
+              request->safe_content_slab = dsk_malloc (response->content_length);
+              dsk_hook_trap (&request->content_stream->base_instance.readable_hook,
+                             handle_safe_content_to_memory,
+                             request,
+                             NULL);
+            }
+          else
+            {
+              dsk_hook_trap (&request->content_stream->base_instance.readable_hook,
+                             handle_safe_content_to_buffer,
+                             request,
+                             NULL);
+            }
         }
       else
         {
