@@ -214,9 +214,11 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
 {
   Transfer *request = stream_xfer->user_data;
   DskHttpResponse *response = stream_xfer->response;
-  if (request->funcs->handle_response)
+  if (request->funcs->handle_response != NULL)
     {
-      ...
+      request->invoking_handler = 1;
+      request->funcs->handle_response (request);
+      request->invoking_handler = 0;
     }
   switch (response->status)
     {

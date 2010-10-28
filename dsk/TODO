@@ -7,6 +7,7 @@ _ make a survey of existing HTTP Client APIs
   _ gnet
   _ qt
   _ libwww
+  _ libsoup
   _ php:curl
   _ python
   _ ruby
