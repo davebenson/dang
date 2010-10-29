@@ -41,7 +41,10 @@ typedef enum
   /* Buffers all content to disk or memory and
      so handle_stream is only invoked once all the data
      is downloaded correctly. */
-  REQUEST_MODE_SAFE
+  REQUEST_MODE_SAFE,
+
+  /* For HEAD requests, and requests that don't trap handle_stream. */
+  REQUEST_MODE_IGNORE_CONTENT
 } RequestMode;
 
 struct _DskHttpClientTransfer
@@ -239,7 +242,24 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
 
       /* 2xx headers */
     case DSK_HTTP_STATUS_OK:
+    /* "201 Created": rfc 2616 section 10.2.2.
+       Technically, the body of this message is informative (URLs of resource
+       created).  Fortunately, the primary URL is in the Location field.
+       So the caller will probably use that instead. */
+    case DSK_HTTP_STATUS_CREATED:
+
+    /* "202 Accepted": rfc 2616 section 10.2.3.
+       The body should contain information about the status of the message.
+       Probably never used. */
+    case DSK_HTTP_STATUS_ACCEPTED:
+
     case DSK_HTTP_STATUS_NONAUTHORITATIVE_INFO:
+
+    case DSK_HTTP_STATUS_NO_CONTENT:
+
+    case DSK_HTTP_STATUS_RESET_CONTENT:
+
+    case DSK_HTTP_STATUS_PARTIAL_CONTENT:
       if (request->request_mode == REQUEST_MODE_SAFE)
         {
           /* If we know the content-length is large,
@@ -254,7 +274,7 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
               request->safe_content_fd = dsk_fd_make_tmp (&error);
               if (request->safe_content_fd < 0)
                 {
-                  request_fatal_fail (...);
+                  request_fatal_fail (request, ...);
                   return;
                 }
               dsk_hook_trap (&request->content_stream->base_instance.readable_hook,
@@ -278,21 +298,18 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
                              NULL);
             }
         }
+      else if (request->request_mode == REQUEST_MODE_IGNORE_CONTENT)
+        {
+          dsk_hook_trap (&request->content_stream->base_instance.readable_hook,
+                         handle_content_readable_discard, NULL, NULL);
+        }
       else
         {
+          /* stream to user */
           ...
         }
       return;
-    case DSK_HTTP_STATUS_CREATED:
-    case DSK_HTTP_STATUS_ACCEPTED:
-    case DSK_HTTP_STATUS_NO_CONTENT:
-    case DSK_HTTP_STATUS_RESET_CONTENT:
-      /* handle responses where a body is ignored. */
-      ...
-    case DSK_HTTP_STATUS_PARTIAL_CONTENT:
-      /* TODO: we should not get this unless we issue a Range request,
-         which we do not support as of yet. */
-      ...
+
 
       /* 3xx headers */
     case DSK_HTTP_STATUS_MULTIPLE_CHOICES:
@@ -359,6 +376,16 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
       ...
     case DSK_HTTP_STATUS_UNSUPPORTED_VERSION:
       ...
+
+    default:
+      if (response->status < 100 || response->status > 599)
+        {
+          ...
+        }
+      else
+        {
+          ...
+        }
     }
 }
 
@@ -477,6 +504,9 @@ dsk_http_client_request  (DskHttpClient               *client,
   /* Create request object */
   request = dsk_malloc0 (sizeof (Transfer));
   request->host_info = host_info;
+
+  /* Determine request->mode */
+  ...
 
   /* Do we have an existing connection that we can
      use for this request? */
