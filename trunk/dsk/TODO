@@ -34,6 +34,7 @@ x http client stream: oddballs
   x transfer-encoding chunk trailer
   x multiline header lines (w/ indent)
   x "Continue" header
+_ http client stream: HEAD requests
 _ http client stream: error conditions:
   x extra blank space at front of request [ignored blank space]
   x bad response code
@@ -66,6 +67,7 @@ x http server stream: transfer-encoding-chunked content
 _ http server stream: transfer-encoding-chunked trailer
 _ http server stream: transfer-encoding-chunked extensions
 x http server stream: pipelining
+_ http server stream: HEAD requests
 _ http server stream: error conditions:
   _ extra blank space at front of request
   _ bad transfer-encoding chunked format
@@ -75,6 +77,7 @@ _ http server stream: error conditions:
   _ post-data stream read errors
 _ tie http-server and client together with pipes
   X simple GET / close connection
+  _ simple HEAD / close connection
   _ simple POST / close connection
   _ import 'test_keepalive' (from tests/test-http-client-stream-0)
 x date parsing (each of the three formats)
