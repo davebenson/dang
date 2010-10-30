@@ -1619,6 +1619,120 @@ test_random_response (void)
     }
 }
 
+/* === HEAD request tests === */
+
+static void
+test_head_simple (dsk_boolean byte_by_byte)
+{
+  static const char *response_content_versions[] =  {
+                                "HTTP/1.1 200 OK\r\n"
+                                "Date: Mon, 17 May 2010 22:50:08 GMT\r\n"
+                                "Content-Type: text/plain\r\n"
+                                "Content-Length: 7\r\n"
+                                "Connection: close\r\n"
+                                "\r\n",
+
+                                "HTTP/1.1 200 OK\n"
+                                "Date: Mon, 17 May 2010 22:50:08 GMT\n"
+                                "Content-Type: text/plain\n"
+                                "Content-Length: 7\n"
+                                "Connection: close\n"
+                                "\n",
+
+                                "HTTP/1.1 200 OK\r\n"
+                                "Date:\r\n"
+                                "     Mon, 17 May 2010 22:50:08 GMT\r\n"
+                                "Content-Type:\r\n"
+                                "     text/plain\r\n"
+                                "Content-Length:\r\n"
+                                "     7\r\n"
+                                "Connection:\r\n"
+                                "     close\r\n"
+                                "\r\n",
+
+                  /* XXX: is 100 Continue allowed in response to HEAD? */
+                                "HTTP/1.1 100 Continue\r\n"
+                                "\r\n"
+                                "HTTP/1.1 200 OK\r\n"
+                                "Date: Mon, 17 May 2010 22:50:08 GMT\r\n"
+                                "Content-Type: text/plain\r\n"
+                                "Content-Length: 7\r\n"
+                                "Connection: close\r\n"
+                                "\r\n",
+                        };
+  unsigned iter;
+
+  for (iter = 0; iter < DSK_N_ELEMENTS (response_content_versions); iter++)
+    {
+      DskHttpClientStream *stream;
+      DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
+      RequestData request_data = REQUEST_DATA_DEFAULT;
+      DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
+      DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
+      DskHttpClientStreamTransfer *xfer;
+      DskHttpClientStreamFuncs request_funcs_0;
+      DskError *error = NULL;
+      fprintf (stderr, ".");
+      memset (&request_funcs_0, 0, sizeof (request_funcs_0));
+      request_funcs_0.handle_response = request_data__handle_response;
+      request_funcs_0.handle_content_complete = NULL;
+      request_funcs_0.destroy = request_data__destroy;
+      request_data.source = dsk_memory_source_new ();
+      request_data.sink = dsk_memory_sink_new ();
+      request_data.sink->max_buffer_size = 100000000;
+      stream = dsk_http_client_stream_new (DSK_OCTET_SINK (request_data.sink),
+                                           DSK_OCTET_SOURCE (request_data.source),
+                                           &options);
+      req_options.host = "localhost";
+      req_options.full_path = "/hello.txt";
+      cr_options.request_options = &req_options;
+      cr_options.funcs = &request_funcs_0;
+      cr_options.user_data = &request_data;
+      xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
+      if (xfer == NULL)
+        dsk_die ("dsk_http_client_stream_request failed: %s", error->message);
+
+      /* read data from sink */
+      while (!is_http_request_complete (&request_data.sink->buffer, NULL))
+        dsk_main_run_once ();
+
+      const char *content = response_content_versions[iter];
+
+      /* write response */
+      if (byte_by_byte)
+        {
+          const char *at = content;
+          while (*at)
+            {
+              dsk_buffer_append_byte (&request_data.source->buffer, *at++);
+              dsk_memory_source_added_data (request_data.source);
+              while (request_data.source->buffer.size)
+                dsk_main_run_once ();
+            }
+        }
+      else
+        {
+          dsk_buffer_append_string (&request_data.source->buffer, content);
+          dsk_memory_source_added_data (request_data.source);
+        }
+
+      while (request_data.response_header == NULL)
+        dsk_main_run_once ();
+      dsk_assert (request_data.response_header->http_major_version == 1);
+      dsk_assert (request_data.response_header->http_minor_version == 1);
+      dsk_assert (request_data.response_header->content_length == 7);
+      dsk_assert (!request_data.response_header->transfer_encoding_chunked);
+      dsk_assert (request_data.response_header->connection_close);
+
+      dsk_object_unref (stream);
+      request_data_clear (&request_data);
+    }
+}
+
+static void test_head_simple_bigwrite() { test_head_simple(DSK_FALSE); }
+static void test_head_simple_bytebybyte() { test_head_simple(DSK_TRUE); }
+
+
 static struct 
 {
   const char *name;
@@ -1639,6 +1753,14 @@ static struct
   { "bad gzipped data", test_bad_gzip },
   { "transport errors reading", test_transport_errors_reading },
   { "random-data response test", test_random_response },
+
+  /* a subset of the above tests done with HEAD instead of GET */
+  { "HEAD simple connection-close", test_head_simple_bigwrite },
+  { "HEAD simple connection-close byte-by-byte", test_head_simple_bytebybyte },
+  //{ "HEAD transfer-encoding chunked content", test_head_transfer_encoding_chunked },
+  //{ "HEAD pipelining and keepalive", test_head_keepalive },
+  //{ "HEAD bad responses", test_head_bad_responses },
+  //{ "HEAD gzip uncompression", test_head_gzip_download },
 };
 
 int main(int argc, char **argv)
