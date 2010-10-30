@@ -695,7 +695,7 @@ expunge_old_cache_entries (void)
 
 /* --- low-level ---*/
 /* MAY or MAY NOT set error.
-   Unset if we just neeed to block; set if there was an error
+   Unset if we just need to block; set if there was an error
    (too many cnames is the only possible error).
 
    name must be canonicalized. */
