@@ -3,7 +3,7 @@ typedef struct _DskHttpClient DskHttpClient;
 typedef struct _DskHttpClientClass DskHttpClientClass;
 typedef struct _DskHttpClientRequestOptions DskHttpClientRequestOptions;
 
-typedef DskHttpClientStreamTransfer DskHttpClientTransfer;
+typedef struct _DskHttpClientTransfer DskHttpClientTransfer;
 
 typedef struct _DskHttpClientRequestFuncs DskHttpClientRequestFuncs;
 struct _DskHttpClientRequestFuncs
