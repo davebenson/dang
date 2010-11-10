@@ -1,8 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
-#include "dsk-json-parser.h"
-#include "json-parser-internals.h"
-#include "dsk-error.h"
+#include "dsk.h"
 
 DskJsonParser *
 dsk_json_parser_new (void)

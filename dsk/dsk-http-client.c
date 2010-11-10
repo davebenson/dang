@@ -213,6 +213,13 @@ new_host_info:
 }
 
 static void
+transfer_fatal_fail (Transfer *xfer,
+                     const char *msg)
+{
+  ...
+}
+
+static void
 client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
 {
   Transfer *request = stream_xfer->user_data;
@@ -237,7 +244,7 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
 
          We do not directly support the Upgrade header
          and we treat 101 responses as failures. */
-      request_fatal_fail (request, ...);
+      transfer_fatal_fail (request, "Switch Protocols response not handled");
       return;
 
       /* 2xx headers */
@@ -267,14 +274,15 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
           request->content_stream = dsk_object_ref (stream_xfer->content);
           if (response->content_length >= transfer->safe_max_disk)
             {
-              request_fatal_fail (request, ...);
+              transfer_fatal_fail (request, "safe transfer not possible: data too large");
             }
           else if (response->content_length >= transfer->safe_max_memory_size)
             {
               request->safe_content_fd = dsk_fd_make_tmp (&error);
               if (request->safe_content_fd < 0)
                 {
-                  request_fatal_fail (request, ...);
+                  transfer_fatal_fail (request, error->message);
+                  dsk_error_unref (error);
                   return;
                 }
               dsk_hook_trap (&request->content_stream->base_instance.readable_hook,
