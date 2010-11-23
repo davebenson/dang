@@ -19,12 +19,12 @@ static gboolean
 add_token                (DskJsonParser *parser,
                           int           yymajor,
                           char         *str,
-                          GError      **error)
+                          DskError      **error)
 {
   DskJsonParse (parser->parser, yymajor, str, parser);
   if (parser->static_syntax_error)
     {
-      g_set_error (error, UF_ERROR_DOMAIN_QUARK, UF_ERROR_PARSE,
+      dsk_set_error (error,
                    "syntax error: %s (line %u)",
                    parser->static_syntax_error, parser->line_no);
       return FALSE;
@@ -35,7 +35,7 @@ add_token                (DskJsonParser *parser,
 static gboolean
 add_token_copying_str (DskJsonParser *parser,
                        int           yymajor,
-                       GError      **error)
+                       DskError      **error)
 {
   char *copy = g_malloc (parser->str->len + 1);
   memcpy (copy, parser->str->str, parser->str->len);
@@ -47,7 +47,7 @@ gboolean
 dsk_json_parser_feed(DskJsonParser *parser,
                     unsigned      n_bytes,
                     const guint8 *bytes,
-                    GError      **error)
+                    DskError      **error)
 {
   while (n_bytes > 0)
     {
@@ -121,7 +121,7 @@ dsk_json_parser_feed(DskJsonParser *parser,
               bytes++;
               break;
             default:
-              g_set_error (error, UF_ERROR_DOMAIN_QUARK, UF_ERROR_PARSE,
+              dsk_set_error (error,
                            "unexpected character '%c' (0x%02x) in json (line %u)",
                            *bytes, *bytes, parser->line_no);
               return FALSE;
@@ -135,7 +135,7 @@ dsk_json_parser_feed(DskJsonParser *parser,
               /* are we at end of string? */ \
               if (g_ascii_isalnum (*bytes)) \
                 { \
-                  g_set_error (error, UF_ERROR_DOMAIN_QUARK, UF_ERROR_PARSE, \
+                  dsk_set_error (error, \
                                "got %c after '%s' (line %u)", *bytes, lc, \
                                parser->line_no); \
                   return FALSE; \
@@ -157,7 +157,7 @@ dsk_json_parser_feed(DskJsonParser *parser,
             } \
           else \
             { \
-              g_set_error (error, UF_ERROR_DOMAIN_QUARK, UF_ERROR_PARSE, \
+              dsk_set_error (error, \
                            "unexpected character '%c' (parsing %s) (line %u)", \
                            *bytes, UC, parser->line_no); \
               return FALSE; \
@@ -224,9 +224,9 @@ dsk_json_parser_feed(DskJsonParser *parser,
                   n_bytes--;
                   break;
                 default:
-                  g_set_error (error, UF_ERROR_DOMAIN_QUARK, UF_ERROR_PARSE,
-                               "invalid character '%c' after '\\' (line %u)",
-                               *bytes, parser->line_no);
+                  dsk_set_error (error,
+                                 "invalid character '%c' after '\\' (line %u)",
+                                 *bytes, parser->line_no);
                   return FALSE;
                 }
             }
@@ -235,9 +235,9 @@ dsk_json_parser_feed(DskJsonParser *parser,
               /* must be \uxxxx */
               if (!g_ascii_isxdigit (*bytes))
                 {
-                  g_set_error (error, UF_ERROR_DOMAIN_QUARK, UF_ERROR_PARSE,
-                               "expected 4 hex digits after \\u, got %c (line %u)",
-                               *bytes, parser->line_no);
+                  dsk_set_error (error,
+                                 "expected 4 hex digits after \\u, got %s (line %u)",
+                                 dsk_ascii_byte_name (*bytes), parser->line_no);
                   return FALSE;
                 }
               parser->bs_sequence[parser->bs_sequence_len++] = *bytes++;
@@ -285,7 +285,7 @@ dsk_json_parser_feed(DskJsonParser *parser,
 
 gboolean
 dsk_json_parser_end_parse (DskJsonParser *parser,
-                          GError      **error)
+                          DskError      **error)
 {
   return add_token (parser, 0, NULL, error);
 }
