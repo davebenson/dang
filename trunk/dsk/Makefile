@@ -47,7 +47,7 @@ libdsk.a: dsk-inlines.o \
           dsk-dns-protocol.o dsk-error.o dsk-object.o dsk-common.o dsk-udp-socket.o dsk-dispatch.o dsk-hook.o \
 	  dsk-cmdline.o dsk-ip-address.o dsk-dns-client.o dsk-mem-pool.o \
 	  dsk-fd.o dsk-octet-io.o dsk-octet-fd.o dsk-octet-pipe.o \
-	  dsk-unicode.o dsk-client-stream.o \
+	  dsk-ascii.o dsk-utf8.o dsk-client-stream.o \
 	  dsk-buffer.o dsk-main.o dsk-octet-connection.o dsk-octet-listener.o \
 	  dsk-octet-filter.o dsk-octet-filter-source.o \
 	  dsk-octet-listener-socket.o dsk-cleanup.o \

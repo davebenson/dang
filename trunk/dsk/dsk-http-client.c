@@ -152,7 +152,7 @@ force_host_info (DskHttpClientRequestOptions *options,
     rv = 1;                                                   \
   else                                                        \
     {                                                         \
-      rv = dsk_ascii_strncmp (host_start, hi->host, host_len);\
+      rv = dsk_ascii_strncasecmp (host_start, hi->host, host_len);\
       if (rv == 0)                                            \
         {                                                     \
           if (hi->host[host_len])                             \

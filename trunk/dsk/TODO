@@ -154,6 +154,11 @@ TODO:
 _ HTTP Client implementation (search for TODO in dsk-http-client.h)
 _ client support for receiving trailers (and server too, on principle)
 _ remove DskObjectWeakPointer ?
+_ Authentication support in DskHttpServer.
+  _ support for HTTP auth
+  _ support for Cookie-based auth
+_ Authentication support in DskHttpClient.
+_ Cookie support in DskHttpClient
 
 _ DskPattern:
   _ IMPORTANT OPTIMIZATION: implement "state-trumping"
