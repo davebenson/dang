@@ -52,7 +52,8 @@
 #include "dsk-octet-filter-misc.h"
 #include "dsk-base64.h"
 
-#include "dsk-unicode.h"
+#include "dsk-ascii.h"
+#include "dsk-utf8.h"
 
 #include "dsk-cmdline.h"
 
