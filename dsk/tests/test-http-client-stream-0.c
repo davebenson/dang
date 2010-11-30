@@ -31,7 +31,8 @@ static void
 request_data__handle_content_complete (DskHttpClientStreamTransfer *xfer)
 {
   RequestData *rd = xfer->user_data;
-  dsk_buffer_drain (&rd->content, &xfer->content->buffer);
+  if (xfer->content != NULL)
+    dsk_buffer_drain (&rd->content, &xfer->content->buffer);
   rd->content_complete = DSK_TRUE;
 }
 static void
@@ -1685,6 +1686,7 @@ test_head_simple (dsk_boolean byte_by_byte)
                                            &options);
       req_options.host = "localhost";
       req_options.full_path = "/hello.txt";
+      req_options.verb = DSK_HTTP_VERB_HEAD;
       cr_options.request_options = &req_options;
       cr_options.funcs = &request_funcs_0;
       cr_options.user_data = &request_data;

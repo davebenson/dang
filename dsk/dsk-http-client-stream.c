@@ -178,9 +178,11 @@ static dsk_boolean
 has_response_body (DskHttpRequest *request,
                    DskHttpResponse *response)
 {
-  /* TODO: check all verbs */
-  DSK_UNUSED (response);
-  return (request->verb != DSK_HTTP_VERB_HEAD);
+  return (request->verb != DSK_HTTP_VERB_HEAD)
+     && (response->content_length >= 0
+         || response->transfer_encoding_chunked
+         || response->connection_close          ///????
+        );
 }
 
 
@@ -396,7 +398,7 @@ restart_processing:
             if (xfer->funcs->handle_response != NULL)
               xfer->funcs->handle_response (xfer);
             if (xfer->read_state == DSK_HTTP_CLIENT_STREAM_READ_DONE)
-              transfer_done (xfer);             /* frees transfer */
+              transfer_done (xfer);             /* frees 'xfer' */
           }
           break;
         case DSK_HTTP_CLIENT_STREAM_READ_IN_BODY:
