@@ -174,6 +174,8 @@ do_shutdown (DskHttpClientStream *stream)
     }
 }
 
+/* See RFC 2616 Section 4.3.  We rely on the header parser to error out
+   if it encounters bad Content-Length or Transfer-Encoding headers. */
 static dsk_boolean
 has_response_body (DskHttpRequest *request,
                    DskHttpResponse *response)
@@ -181,7 +183,6 @@ has_response_body (DskHttpRequest *request,
   return (request->verb != DSK_HTTP_VERB_HEAD)
      && (response->content_length >= 0
          || response->transfer_encoding_chunked
-         || response->connection_close          ///????
         );
 }
 
@@ -887,6 +888,25 @@ dsk_http_client_stream_new     (DskOctetSink        *sink,
   return stream;
 }
 
+static dsk_boolean
+request_body_is_acceptable (DskHttpVerb verb)
+{
+  /*
+     RFC 2616 Section 4.3 states: 
+         A message-body MUST NOT be included in
+         a request if the specification of the
+         request method (section 5.1.1)
+     However RFC 2616 5.1.1 does not give any obvious
+     restrictions.  So we just assume no-message-body is acceptable. */
+#if 0
+  return verb != DSK_HTTP_VERB_HEAD
+      && verb != DSK_HTTP_VERB_GET;
+#else
+  DSK_UNUSED (verb);
+  return DSK_TRUE;
+#endif
+}
+
 DskHttpClientStreamTransfer *
 dsk_http_client_stream_request (DskHttpClientStream      *stream,
                                 DskHttpClientStreamRequestOptions *options,
@@ -989,6 +1009,15 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
     }
   else
     post_data = NULL;
+
+  if (post_data != NULL && !request_body_is_acceptable (request->verb))
+    {
+      dsk_object_unref  (post_data);
+      dsk_object_unref  (request);
+      dsk_set_error (error, "verb %s does not allow request message-bodies",
+                     dsk_http_verb_name (request->verb));
+      return NULL;
+    }
 
   xfer = dsk_malloc (sizeof (DskHttpClientStreamTransfer));
   GSK_QUEUE_ENQUEUE (GET_STREAM_XFER_QUEUE (stream), xfer);
