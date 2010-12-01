@@ -75,6 +75,7 @@ _ http server stream: error conditions:
   _ random data tests
   _ transport errors reading/writing
   _ post-data stream read errors
+  _ unknown Transfer-Encodings; other bogus critical headers (Content-Length)
 _ tie http-server and client together with pipes
   X simple GET / close connection
   _ simple HEAD / close connection
@@ -161,6 +162,10 @@ _ Authentication support in DskHttpClient.
 _ Cookie support in DskHttpClient
 
 _ DskPattern:
+  _ optimize certain patterns.  e.g. q*q* ==> q*
+                                     q+q* ==> q+
+                                     q*q+ ==> q+
+    in fact, maybe we should always use q+ => qq*
   _ IMPORTANT OPTIMIZATION: implement "state-trumping"
     PROBLEM: currently something like:
             .*a.*
