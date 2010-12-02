@@ -289,7 +289,6 @@ CODING STANDARDS
 _ DOCUMENT: length (not abbreviated)
 _ size_t everywhere ?
 _ s/octet/byte/ ?????
-_ DskCgiVar should clearly be DskCgiVariable (and all cgi_var variables etc)
 _ break apart dsk-octet-io.h
 _ DskClientStreamSource BUT DskOctetStreamSourceFd.
   Fix this inconsistency and come up with a policy for naming derived classes

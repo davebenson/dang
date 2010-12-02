@@ -83,7 +83,7 @@ struct _DskMimeMultipartDecoder
   unsigned boundary_str_len;
   char *boundary_buf;
 
-  DskCgiVar cur_piece;
+  DskCgiVariable cur_piece;
   DskBuffer cur_buffer;
   DskOctetFilter *transfer_decoder;
   DskMemPool header_storage;
@@ -92,9 +92,9 @@ struct _DskMimeMultipartDecoder
   
   unsigned n_pieces;
   unsigned pieces_alloced;
-  DskCgiVar *pieces;
+  DskCgiVariable *pieces;
 #define DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES 4
-  DskCgiVar pieces_init[DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES];
+  DskCgiVariable pieces_init[DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES];
 #define BOUNDARY_BUF_PAD_SIZE                    64
   char boundary_buf_init[BOUNDARY_BUF_PAD_SIZE];
 };
@@ -128,7 +128,7 @@ process_header_line (DskMimeMultipartDecoder *decoder,
                      const char              *line,
                      DskError               **error)
 {
-  DskCgiVar *cur = &decoder->cur_piece;
+  DskCgiVariable *cur = &decoder->cur_piece;
   if (dsk_ascii_strncasecmp (line, "content-type:", 13) == 0)
     {
       /* Example:
@@ -346,7 +346,7 @@ done_with_content_body (DskMimeMultipartDecoder *decoder,
          }                                                          \
        else                                                         \
          cur.field = NULL;             } while(0)
-  DskCgiVar cur;
+  DskCgiVariable cur;
   cur.is_get = DSK_FALSE;
   MAYBE_SETUP (key);
   cur.value = out;
@@ -364,13 +364,13 @@ done_with_content_body (DskMimeMultipartDecoder *decoder,
     {
       if (decoder->pieces_alloced == DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES)
         {
-          decoder->pieces = dsk_malloc (sizeof (DskCgiVar) * decoder->pieces_alloced * 2);
+          decoder->pieces = dsk_malloc (sizeof (DskCgiVariable) * decoder->pieces_alloced * 2);
           memcpy (decoder->pieces, decoder->pieces_init,
-                  DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES * sizeof (DskCgiVar));
+                  DSK_MIME_MULTIPART_DECODER_N_INIT_PIECES * sizeof (DskCgiVariable));
         }
       else
         decoder->pieces = dsk_realloc (decoder->pieces,
-                                       sizeof (DskCgiVar) * decoder->pieces_alloced * 2);
+                                       sizeof (DskCgiVariable) * decoder->pieces_alloced * 2);
       decoder->pieces_alloced *= 2;
     }
   decoder->pieces[decoder->n_pieces++] = cur;
@@ -636,9 +636,9 @@ dsk_mime_multipart_decoder_done  (DskMimeMultipartDecoder *decoder,
 
 void
 dsk_mime_multipart_decoder_dequeue_all (DskMimeMultipartDecoder *decoder,
-                                        DskCgiVar               *out)
+                                        DskCgiVariable          *out)
 {
-  memcpy (out, decoder->pieces, sizeof (DskCgiVar) * decoder->n_pieces);
+  memcpy (out, decoder->pieces, sizeof (DskCgiVariable) * decoder->n_pieces);
   decoder->n_pieces = 0;
 }
 
@@ -669,7 +669,7 @@ dsk_mime_multipart_decoder_finalize (DskMimeMultipartDecoder *decoder)
     dsk_object_unref (decoder->transfer_decoder);
   dsk_free (decoder->header_pad);
   for (i = 0; i < decoder->n_pieces; i++)
-    dsk_cgi_var_clear (&decoder->pieces[i]);
+    dsk_cgi_variable_clear (&decoder->pieces[i]);
   if (decoder->pieces != decoder->pieces_init)
     dsk_free (decoder->pieces);
 }

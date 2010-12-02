@@ -26,7 +26,7 @@ static const uint8_t test_0__body[] =
   
 static void
 test_0__verify_results (unsigned n_cgi_vars,
-                        DskCgiVar *cgi_vars)
+                        DskCgiVariable *cgi_vars)
 {
   const char *tmp_txt;
   dsk_assert (n_cgi_vars == 2);
@@ -53,7 +53,7 @@ static const uint8_t test_1__body[] =
 
 static void
 test_1__verify_results (unsigned n_cgi_vars,
-                        DskCgiVar *cgi_vars)
+                        DskCgiVariable *cgi_vars)
 {
   dsk_assert (n_cgi_vars == 1);
 
@@ -69,7 +69,7 @@ test_1__verify_results (unsigned n_cgi_vars,
 
 static void
 run_test (const uint8_t *body,
-          void (*test_func)(unsigned n_cgi_vars, DskCgiVar *cgi_vars))
+          void (*test_func)(unsigned n_cgi_vars, DskCgiVariable *cgi_vars))
 {
   unsigned iter;
   /* Run test twice:  first feed the data as one blob,
@@ -84,8 +84,8 @@ run_test (const uint8_t *body,
           "simple boundary",
           NULL
         };
-      unsigned n_cgi_vars;
-      DskCgiVar *cgi_vars;
+      size_t n_cgi_vars;
+      DskCgiVariable *cgi_vars;
       DskMimeMultipartDecoder *decoder = dsk_mime_multipart_decoder_new ((char**)content_type_kv_pairs, &error);
       if (decoder == NULL)
         dsk_die ("dsk_mime_multipart_decoder_new failed: %s", error->message);
@@ -120,13 +120,13 @@ run_test (const uint8_t *body,
         }
       if (!dsk_mime_multipart_decoder_done (decoder, &n_cgi_vars, &error))
         dsk_die ("error calling dsk_mime_multipart_decoder_done: %s", error->message);
-      cgi_vars = dsk_malloc (sizeof (DskCgiVar) * n_cgi_vars);
+      cgi_vars = dsk_malloc (sizeof (DskCgiVariable) * n_cgi_vars);
       dsk_mime_multipart_decoder_dequeue_all (decoder, cgi_vars);
 
       test_func (n_cgi_vars, cgi_vars);
 
       for (i = 0; i < n_cgi_vars; i++)
-        dsk_cgi_var_clear (cgi_vars + i);
+        dsk_cgi_variable_clear (cgi_vars + i);
       dsk_free (cgi_vars);
       dsk_object_unref (decoder);
     }
@@ -136,7 +136,7 @@ static struct
 {
   const char *name;
   const uint8_t *content;
-  void (*test)(unsigned n_cgi_var, DskCgiVar *cgi_vars);
+  void (*test)(unsigned n_cgi_var, DskCgiVariable *cgi_vars);
 } tests[] =
 {
   { "simple example decoding", test_0__body, test_0__verify_results },

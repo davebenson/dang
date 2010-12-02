@@ -7,8 +7,8 @@ static dsk_boolean cmdline_verbose = DSK_FALSE;
 static void
 test_cgi_get (void)
 {
-  unsigned n_cgi_vars;
-  DskCgiVar *cgi_vars;
+  size_t n_cgi_vars;
+  DskCgiVariable *cgi_vars;
   unsigned i;
   DskError *error = NULL;
 
@@ -28,7 +28,7 @@ test_cgi_get (void)
   dsk_assert (cgi_vars[1].value_length == 11);
   dsk_assert (cgi_vars[1].content_type == NULL);
   for (i = 0; i < n_cgi_vars; i++)
-    dsk_cgi_var_clear (cgi_vars + i);
+    dsk_cgi_variable_clear (cgi_vars + i);
   dsk_free (cgi_vars);
 }
 
@@ -42,8 +42,8 @@ static void
 test_url_encoded_post (void)
 {
   static const uint8_t data[] = "name=Xavier+Xantico&verdict=Yes&colour=Blue&happy=sad&Utfr=Send";
-  unsigned n_cgi_vars;
-  DskCgiVar *cgi_vars;
+  size_t n_cgi_vars;
+  DskCgiVariable *cgi_vars;
   DskError *error = NULL;
   unsigned i;
   if (!dsk_cgi_parse_post_data ("application/x-url-encoded", NULL,
@@ -77,7 +77,7 @@ test_url_encoded_post (void)
   dsk_assert (cgi_vars[4].value_length == 4);
   dsk_assert (cgi_vars[4].content_type == NULL);
   for (i = 0; i < n_cgi_vars; i++)
-    dsk_cgi_var_clear (cgi_vars + i);
+    dsk_cgi_variable_clear (cgi_vars + i);
   dsk_free (cgi_vars);
 }
 

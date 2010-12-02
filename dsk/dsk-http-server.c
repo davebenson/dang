@@ -396,7 +396,7 @@ struct _RealServerRequest
   RealServerRequest *prev, *next;
 
   /* For exponential resized of arrays */
-  unsigned cgi_vars_alloced;
+  unsigned cgi_variables_alloced;
 
   /* are we currently invoking the handler's function */
   RequestHandlingState state;
@@ -424,12 +424,12 @@ maybe_free_real_server_request (RealServerRequest *rreq)
    && !rreq->invoking_handler)
     {
       dsk_object_unref (rreq->request.request_header);
-      if (rreq->request.cgi_vars_computed)
+      if (rreq->request.cgi_variables_computed)
         {
           unsigned i;
-          for (i = 0; i < rreq->request.n_cgi_vars; i++)
-            dsk_cgi_var_clear (rreq->request.cgi_vars + i);
-          dsk_free (rreq->request.cgi_vars);
+          for (i = 0; i < rreq->request.n_cgi_variables; i++)
+            dsk_cgi_variable_clear (rreq->request.cgi_variables + i);
+          dsk_free (rreq->request.cgi_variables);
         }
       dsk_free (rreq);
     }
@@ -674,17 +674,17 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
 }
 
 static void
-append_cgi_var  (DskHttpServerRequest *request,
-                 DskCgiVar        *cgi)
+append_cgi_variable  (DskHttpServerRequest *request,
+                      DskCgiVariable        *cgi)
 {
   RealServerRequest *rreq = (RealServerRequest *) request;
-  if (request->n_cgi_vars == rreq->cgi_vars_alloced)
+  if (request->n_cgi_variables == rreq->cgi_variables_alloced)
     {
-      unsigned new_alloced = rreq->cgi_vars_alloced ? rreq->cgi_vars_alloced * 2 : 4;
-      request->cgi_vars = dsk_realloc (request->cgi_vars, new_alloced * sizeof (DskCgiVar));
-      rreq->cgi_vars_alloced = new_alloced;
+      unsigned new_alloced = rreq->cgi_variables_alloced ? rreq->cgi_variables_alloced * 2 : 4;
+      request->cgi_variables = dsk_realloc (request->cgi_variables, new_alloced * sizeof (DskCgiVariable));
+      rreq->cgi_variables_alloced = new_alloced;
     }
-  request->cgi_vars[request->n_cgi_vars++] = *cgi;
+  request->cgi_variables[request->n_cgi_variables++] = *cgi;
 }
 
 static void
@@ -697,7 +697,7 @@ respond_no_handler_found (DskHttpServerRequest *request)
 }
 
 static void
-add_get_cgi_vars (RealServerRequest *rreq)
+add_get_cgi_variables (RealServerRequest *rreq)
 {
   const char *qm;
   qm = strchr (rreq->request.request_header->path, '?');
@@ -705,48 +705,48 @@ add_get_cgi_vars (RealServerRequest *rreq)
     {
       /* compute GET variables (this may be called with an initial
        * query, or via an internal redirect). */
-      unsigned n_vars;
-      DskCgiVar *vars;
+      unsigned n_variables;
+      DskCgiVariable *variables;
       DskError *error = NULL;
-      if (!dsk_cgi_parse_query_string (qm, &n_vars, &vars, &error))
+      if (!dsk_cgi_parse_query_string (qm, &n_variables, &variables, &error))
         {
-          dsk_warning ("error parsing query string CGI vars: %s", error->message);
+          dsk_warning ("error parsing query string CGI variables: %s", error->message);
           dsk_error_unref (error);
           return;
         }
       else
         {
           unsigned i;
-          for (i = 0; i < n_vars; i++)
-            append_cgi_var (&rreq->request, &vars[i]);
-          dsk_free (vars);
+          for (i = 0; i < n_variables; i++)
+            append_cgi_variable (&rreq->request, &variables[i]);
+          dsk_free (variables);
         }
     }
 }
 
 static void
-add_post_cgi_vars (RealServerRequest *rreq)
+add_post_cgi_variables (RealServerRequest *rreq)
 {
   unsigned post_data_len = rreq->request.raw_post_data_size;
   const uint8_t *post_data = rreq->request.raw_post_data;
-  unsigned n_vars;
-  DskCgiVar *vars;
+  unsigned n_variables;
+  DskCgiVariable *variables;
   DskError *error = NULL;
   if (!dsk_cgi_parse_post_data (rreq->request.request_header->content_type,
                                 rreq->request.request_header->content_type_kv_pairs,
                                 post_data_len, post_data,
-                                &n_vars, &vars, &error))
+                                &n_variables, &variables, &error))
     {
-      dsk_warning ("error parsing query string CGI vars: %s", error->message);
+      dsk_warning ("error parsing query string CGI variables: %s", error->message);
       dsk_error_unref (error);
       return;
     }
   else
     {
       unsigned i;
-      for (i = 0; n_vars; i++)
-        append_cgi_var (&rreq->request, &vars[i]);
-      dsk_free (vars);
+      for (i = 0; i < n_variables; i++)
+        append_cgi_variable (&rreq->request, &variables[i]);
+      dsk_free (variables);
     }
 }
 
@@ -771,19 +771,19 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
   dsk_object_unref (old_header);
 
   /* Do we want to handle CGI variables? */
-  if (request->cgi_vars_computed)
+  if (request->cgi_variables_computed)
     {
       unsigned o, i;
 
       /* remove any existing GET variables */
-      for (i = o = 0; i < request->n_cgi_vars; i++)
-        if (request->cgi_vars[i].is_get)
-          dsk_cgi_var_clear (&request->cgi_vars[i]);
+      for (i = o = 0; i < request->n_cgi_variables; i++)
+        if (request->cgi_variables[i].is_get)
+          dsk_cgi_variable_clear (&request->cgi_variables[i]);
         else
-          request->cgi_vars[o++] = request->cgi_vars[i];
-      request->n_cgi_vars = o;
+          request->cgi_variables[o++] = request->cgi_variables[i];
+      request->n_cgi_variables = o;
 
-      add_get_cgi_vars (rreq);
+      add_get_cgi_variables (rreq);
     }
 
   if (!find_first_match (rreq))
@@ -904,31 +904,31 @@ advance_to_next_handler (RealServerRequest *info)
 }
 
 static void
-compute_cgi_vars (RealServerRequest *rreq)
+compute_cgi_variables (RealServerRequest *rreq)
 {
   DskHttpServerRequest *request = &rreq->request;
-  dsk_assert (request->n_cgi_vars == 0);
+  dsk_assert (request->n_cgi_variables == 0);
 
-  add_get_cgi_vars (rreq);
+  add_get_cgi_variables (rreq);
   if (request->request_header->verb == DSK_HTTP_VERB_POST
    || request->request_header->verb == DSK_HTTP_VERB_PUT)
     {
       dsk_assert (request->has_raw_post_data);
-      add_post_cgi_vars (rreq);
+      add_post_cgi_variables (rreq);
     }
-  request->cgi_vars_computed = DSK_TRUE;
+  request->cgi_variables_computed = DSK_TRUE;
 }
 
 static dsk_boolean
-begin_computing_cgi_vars (RealServerRequest *rreq)
+begin_computing_cgi_variables (RealServerRequest *rreq)
 {
   DskHttpVerb verb = rreq->request.request_header->verb;
 
-  /* Not a POST or PUT request, therefore we don't expect CGI vars */
+  /* Not a POST or PUT request, therefore we don't expect CGI variables */
   if (verb != DSK_HTTP_VERB_PUT && verb != DSK_HTTP_VERB_POST)
-    compute_cgi_vars (rreq);
+    compute_cgi_variables (rreq);
   else if (rreq->request.has_raw_post_data)
-    compute_cgi_vars (rreq);
+    compute_cgi_variables (rreq);
   else
     return DSK_FALSE;
   return DSK_TRUE;
@@ -964,16 +964,16 @@ restart:
       break;
     case HANDLER_TYPE_CGI:
       {
-        if (!rreq->request.cgi_vars_computed)
+        if (!rreq->request.cgi_variables_computed)
           {
-            if (!begin_computing_cgi_vars (rreq))
+            if (!begin_computing_cgi_variables (rreq))
               {
                 rreq->state = REQUEST_HANDLING_NEED_POST_DATA;
                 break;
               }
           }
 
-        if (rreq->request.cgi_vars_computed)
+        if (rreq->request.cgi_variables_computed)
           {
             /* Invoke handler immediately */
             DskHttpServerCgiFunc func = (DskHttpServerCgiFunc) rreq->handler->handler;
@@ -982,7 +982,7 @@ restart:
           }
         else
           {
-            /* Handler will be invoked once cgi vars are obtained 
+            /* Handler will be invoked once cgi variables are obtained 
                (ie after waiting for POST data) */
           }
       }
@@ -1320,7 +1320,7 @@ static void dsk_http_server_finalize (DskHttpServer *server)
   destruct_match_node (&server->top);
 }
 
-DskCgiVar *dsk_http_server_request_lookup_cgi (DskHttpServerRequest *request,
+DskCgiVariable *dsk_http_server_request_lookup_cgi (DskHttpServerRequest *request,
                                                const char           *name)
 {
   unsigned i;
@@ -1328,13 +1328,13 @@ DskCgiVar *dsk_http_server_request_lookup_cgi (DskHttpServerRequest *request,
   /* Return nothing if variables not already computed.
      We cannot compute them here, b/c we may need to block waiting
      for POST data */
-  if (!request->cgi_vars_computed)
+  if (!request->cgi_variables_computed)
     return NULL;
 
   /* todo: sorted table or hash or something */
-  for (i = 0; i < request->n_cgi_vars; i++)
-    if (request->cgi_vars[i].key != NULL
-     && strcmp (request->cgi_vars[i].key, name) == 0)
-      return request->cgi_vars + i;
+  for (i = 0; i < request->n_cgi_variables; i++)
+    if (request->cgi_variables[i].key != NULL
+     && strcmp (request->cgi_variables[i].key, name) == 0)
+      return request->cgi_variables + i;
   return NULL;
 }

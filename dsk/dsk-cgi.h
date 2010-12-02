@@ -10,13 +10,13 @@ typedef struct
   char *content_type;
   char *content_location;
   char *content_description;
-} DskCgiVar;
+} DskCgiVariable;
 
 
 /* query_string starts (and includes) the '?'  */
 dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
-                                        unsigned   *n_cgi_var_out,
-                                        DskCgiVar **cgi_var_out,
+                                        size_t     *n_cgi_variables_out,
+                                        DskCgiVariable **cgi_variables_out,
                                         DskError  **error);
 
 
@@ -25,10 +25,10 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
    content-types */
 dsk_boolean dsk_cgi_parse_post_data (const char *content_type,
                                      char      **content_type_kv_pairs,
-                                     unsigned    post_data_length,
+                                     size_t      post_data_length,
                                      const uint8_t *post_data,
-                                     unsigned   *n_cgi_var_out,
-                                     DskCgiVar **cgi_var_out,
+                                     size_t     *n_cgi_variables_out,
+                                     DskCgiVariable **cgi_variables_out,
                                      DskError  **error);
 
-void        dsk_cgi_var_clear       (DskCgiVar *var);
+void        dsk_cgi_variable_clear  (DskCgiVariable *variable);

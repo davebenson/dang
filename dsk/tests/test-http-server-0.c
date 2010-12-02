@@ -31,7 +31,7 @@ respond_sum (DskHttpServerRequest *request,
   DskHttpServerResponseOptions response_options = DSK_HTTP_SERVER_RESPONSE_OPTIONS_DEFAULT;
   int a = 0, b = 0;
   char sum_str[100];
-  DskCgiVar *var;
+  DskCgiVariable *var;
   DSK_UNUSED (func_data);
   var = dsk_http_server_request_lookup_cgi (request, "a");
   if (var)
@@ -48,7 +48,7 @@ static void
 internal_redirect (DskHttpServerRequest *request,
                      void                 *func_data)
 {
-  DskCgiVar *path = dsk_http_server_request_lookup_cgi (request, "path");
+  DskCgiVariable *path = dsk_http_server_request_lookup_cgi (request, "path");
   DSK_UNUSED (func_data);
   if (path == NULL)
     dsk_http_server_request_respond_error (request, 400,
