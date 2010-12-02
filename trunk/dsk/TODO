@@ -117,6 +117,12 @@ _ http client
   _ in-memory/on-disk content (from server) based on data-size
   _ max data size limits
 
+_ Get-If-Modified Server support 
+  _ On serving a file:
+    _ include modification time header (is that a Date header??)
+    _ Obey If-Modified-Since header (with a flag to suppress?)
+  _ A simple flag for non-file data
+
 _ content_type_kv_pairs
   _ in request-parser
   _ in response-parser
@@ -231,6 +237,13 @@ _ HTTP Header Work:
       Cache-Control: post-check=0, pre-check=0
     HTTP/1.0:
       Pragma: no-cache
+
+_ fix dsk_utf8_skip_whitespace()
+_ other utf8 functions
+  _ strdown? strup?
+  _ diacritical normalization
+
+
 
 _ HTTP Server Stream implementation
   _ content-encoding gzip
