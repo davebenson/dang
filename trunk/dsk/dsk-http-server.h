@@ -11,9 +11,9 @@ struct _DskHttpServerRequest
   DskHttpRequest *request_header;
   DskHttpServerBindInfo *bind_info;
 
-  dsk_boolean cgi_vars_computed;
-  unsigned n_cgi_vars;
-  DskCgiVar *cgi_vars;
+  dsk_boolean cgi_variables_computed;
+  unsigned n_cgi_variables;
+  DskCgiVariable *cgi_variables;
 
   dsk_boolean has_raw_post_data;
   size_t raw_post_data_size;
@@ -123,5 +123,5 @@ void dsk_http_server_request_internal_redirect(DskHttpServerRequest *request,
                                                const char           *new_path);
 void dsk_http_server_request_pass             (DskHttpServerRequest *request);
 
-DskCgiVar *dsk_http_server_request_lookup_cgi (DskHttpServerRequest *request,
+DskCgiVariable *dsk_http_server_request_lookup_cgi (DskHttpServerRequest *request,
                                                const char           *name);

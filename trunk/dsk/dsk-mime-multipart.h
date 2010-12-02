@@ -17,8 +17,8 @@ dsk_boolean dsk_mime_multipart_decoder_done (DskMimeMultipartDecoder *decoder,
 					     DskError               **error);
 
 void dsk_mime_multipart_decoder_dequeue_all (DskMimeMultipartDecoder *decoder,
-                                             DskCgiVar            *out);
+                                             DskCgiVariable       *out);
 
 /* --- Encoding --- */
-void dsk_mime_multipart_encode_1            (const DskCgiVar     *var,
-                                             DskBuffer           *output);
+void dsk_mime_multipart_encode_1            (const DskCgiVariable *variable,
+                                             DskBuffer            *output);

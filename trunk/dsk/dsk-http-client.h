@@ -130,8 +130,8 @@ struct _DskHttpClientRequestOptions
 
   /* GET CGI variables: will be added to query string if it exists,
      and a query string (starting with a '?') will be added otherwise. */
-  unsigned n_extra_get_cgi_vars;
-  DskCgiVar *extra_get_cgi_vars;
+  unsigned n_extra_get_cgi_variables;
+  DskCgiVariable *extra_get_cgi_variables;
 
   dsk_boolean always_pipeline;
   dsk_boolean never_pipeline;
@@ -141,8 +141,8 @@ struct _DskHttpClientRequestOptions
      n_post_cgi_vars==0 && post_cgi_vars == NULL => no mime-multipart;
      n_post_cgi_vars==0 && post_cgi_vars != NULL => mime-multipart w/ 0 parts)
    */
-  unsigned n_post_cgi_vars;
-  DskCgiVar *post_cgi_vars;
+  unsigned n_post_cgi_variables;
+  DskCgiVariable *post_cgi_variables;
 
   /* A stream of POST/PUT data. */
   DskOctetSource *request_body;

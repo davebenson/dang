@@ -449,12 +449,12 @@ init_request_options (DskHttpClientRequestOptions *in,
   ... = in->url
   ... = in->path
   ... = in->query
-  ... = in->n_extra_get_cgi_vars
-  ... = in->extra_get_cgi_vars
+  ... = in->n_extra_get_cgi_variables
+  ... = in->extra_get_cgi_variables
   ... = in->always_pipeline
   ... = in->never_pipeline
-  ... = in->n_post_cgi_vars
-  ... = in->post_cgi_vars
+  ... = in->n_post_cgi_variables
+  ... = in->post_cgi_variables
   ... = in->request_body
   ... = in->safe_mode
   ... = in->may_restart_stream
