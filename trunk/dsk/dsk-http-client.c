@@ -212,8 +212,23 @@ new_host_info:
   return host_info;
 }
 
+typedef enum
+{
+  /* probably a valid HTTP response, but not one supported by
+     this client. */
+  TRANSFER_FATAL_ERROR_UNSUPPORTED,
+
+  /* invalid HTTP response, cannot recover; connection must be closed. */
+  TRANSFER_FATAL_ERROR_INVALID,
+
+  /* too many redirects or circular redirect detected */
+  TRANSFER_FATAL_ERROR_TOO_MANY_REDIRECTS
+} TransferFatalErrorType;
+
+
 static void
 transfer_fatal_fail (Transfer *xfer,
+                     TransferFatalErrorType type,
                      const char *msg)
 {
   ...
@@ -244,7 +259,8 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
 
          We do not directly support the Upgrade header
          and we treat 101 responses as failures. */
-      transfer_fatal_fail (request, "Switch Protocols response not handled");
+      transfer_fatal_fail (request, TRANSFER_FATAL_ERROR_UNSUPPORTED,
+                           "Switch Protocols response not handled");
       return;
 
       /* 2xx headers */
@@ -267,6 +283,8 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
     case DSK_HTTP_STATUS_RESET_CONTENT:
 
     case DSK_HTTP_STATUS_PARTIAL_CONTENT:
+
+    case DSK_HTTP_STATUS_NOT_MODIFIED:
       if (request->request_mode == REQUEST_MODE_SAFE)
         {
           /* If we know the content-length is large,
@@ -318,25 +336,65 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
         }
       return;
 
-
       /* 3xx headers */
     case DSK_HTTP_STATUS_MULTIPLE_CHOICES:
-      /* not supported??? */
-      ...
+      transfer_fatal_fail (transfer, TRANSFER_FATAL_ERROR_UNSUPPORTED,
+                           "Multiple Choices response not handled");
+      return;
+
     case DSK_HTTP_STATUS_MOVED_PERMANENTLY:
-      ...
     case DSK_HTTP_STATUS_FOUND:
-      ...
     case DSK_HTTP_STATUS_SEE_OTHER:
-      ...
-    case DSK_HTTP_STATUS_NOT_MODIFIED:
+    case DSK_HTTP_STATUS_TEMPORARY_REDIRECT:
+      notify_redirect (transfer);
+      if (transfer->follow_redirects)
+        {
+          if (transfer->n_redirects == transfer->max_redirects)
+            {
+              transfer_fatal_fail (transfer,
+                                   TRANSFER_FATAL_ERROR_TOO_MANY_REDIRECTS,
+                                   "Too many redirects");
+              return;
+            }
+          else if (has_redirect_cycles (transfer))
+            {
+              transfer_fatal_fail (transfer,
+                                   TRANSFER_FATAL_ERROR_TOO_MANY_REDIRECTS,
+                                   "Redirect cycle detected");
+              return;
+            }
+
+          /* XXX: it would be nice if the user could supply a function
+             to see if they wanted to follow the redirect. */
+
+          /* Move response to redirect queue/tree */
+          ...
+
+          /* Compute request */
+          ...
+
+          /* Lookup/create suitable client.  If none can be had,
+             either put in waiting or fail ("busy"). */
+          ...
+
+        }
+      else
+        {
+          ...
+        }
       ...
     case DSK_HTTP_STATUS_USE_PROXY:
-      ...
-    case DSK_HTTP_STATUS_TEMPORARY_REDIRECT:
+      transfer_fatal_fail (transfer,
+                           TRANSFER_FATAL_ERROR_UNSUPPORTED,
+                           "Use-Proxy not supported");
+      return;
+
       /* 4xx headers */
     case DSK_HTTP_STATUS_BAD_REQUEST:
-      ...
+      transfer_fatal_fail (transfer,
+                           TRANSFER_FATAL_ERROR_INVALID
+                           "Use-Proxy not supported");
+      return;
     case DSK_HTTP_STATUS_UNAUTHORIZED:
       ...
     case DSK_HTTP_STATUS_PAYMENT_REQUIRED:
