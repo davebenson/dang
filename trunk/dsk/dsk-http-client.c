@@ -14,7 +14,6 @@ struct _Connection
 {
   DskHttpClientStream *stream;
   HostInfo *host;
-  unsigned n_pipelined;
   DskDispatchTimer *kill_timer;
   dsk_boolean closed;
 
@@ -26,6 +25,10 @@ struct _Connection
           for the host's tree of connections by n-pending. */
   Connection *left, *right, *parent;
   dsk_boolean is_red;
+  unsigned ref_count;
+
+  unsigned n_pipelined;
+  DskHttpClientTransfer *first_pipelined, *last_pipelined;
 };
 
 /* How to handle errors during content-reading */
@@ -227,11 +230,100 @@ typedef enum
 
 
 static void
-transfer_fatal_fail (Transfer *xfer,
-                     TransferFatalErrorType type,
-                     const char *msg)
+connection_fatal_fail (Connection *connection,
+                       TransferFatalErrorType type,
+                       const char *msg)
 {
-  ...
+  switch (type)
+    {
+    case TRANSFER_FATAL_ERROR_INVALID:
+      {
+        HostInfo *host_info = connection->host_info;
+
+        /* remove connection from host-info */
+        GSK_RBTREE_REMOVE (GET_REUSABLE_CONNECTION_TREE (host_info), conn);
+        host_info->n_connections--;
+
+        /* comb the pipelined requests list for items that have
+           gotten too many retries */
+        {
+          DskHttpClientTransfer *prev = NULL;
+          DskHttpClientTransfer *cur = connection->first_pipelined;
+          while (cur != NULL)
+            {
+              if (cur->attempt >= cur->max_retries)
+                {
+                  DskHttpClientTransfer *next = cur->next;
+
+                  if (prev == NULL)
+                    connection->first_pipelined = next;
+                  else
+                    prev->next = next;
+
+                  /* fail 'cur': too many retries */
+                  ...
+                }
+              else
+                {
+                  prev = cur;
+                  cur = cur->next;
+                  cur->attempt++;
+
+                  /* notify retrying??? */
+                }
+            }
+        }
+
+        /* redistribute pipelined requests */
+        while (connection->first_pipelined)
+          {
+            DskHttpClientTransfer *to_move = connection->first_pipelined;
+            connection->first_pipelined = to_move->next;
+
+            Connection *new;
+            GSK_RBTREE_FIRST (GET_REUSABLE_CONNECTION_TREE (host_info), new);
+            if (new->n_pipelined >= host_info->max_pipelined)
+              break;
+
+            /* Pipeline to_move to this new connection. */
+            GSK_RBTREE_REMOVE (GET_REUSABLE_CONNECTION_TREE (host_info), new);
+            new->n_pipelined += 1;
+            GSK_RBTREE_INSERT (GET_REUSABLE_CONNECTION_TREE (host_info), new, conflict);
+
+            request_options ...
+            if (!dsk_http_client_stream_request (new->stream,
+                                                 &request_options, &error))
+              {
+                ...
+              }
+          }
+
+        if (connection->first_pipelined != NULL)
+          {
+            /* Make new connection to dump the remaining items into.
+               I guess 1 connection should be adequate,
+               and we should always be able to create a new one,
+               since our old one just failed. */
+            ...
+          }
+
+        /* disband connection */
+        DskHttpClientStream *stream = connection->stream;
+        connection->stream = NULL;
+        dsk_object_unref (stream);
+      }
+      return;
+
+    case TRANSFER_FATAL_ERROR_UNSUPPORTED:
+    case TRANSFER_FATAL_ERROR_TOO_MANY_REDIRECTS:
+      /* The connection is OK, but we are done with this request. */
+      break;
+    }
+  if (xfer->funcs->handle_fail != NULL)
+    {
+      ...
+    }
+  transfer_unref (xfer);
 }
 
 static void
@@ -391,66 +483,48 @@ client_stream__handle_response (DskHttpClientStreamTransfer *stream_xfer)
 
       /* 4xx headers */
     case DSK_HTTP_STATUS_BAD_REQUEST:
-      transfer_fatal_fail (transfer,
-                           TRANSFER_FATAL_ERROR_INVALID
-                           "Use-Proxy not supported");
-      return;
     case DSK_HTTP_STATUS_UNAUTHORIZED:
-      ...
     case DSK_HTTP_STATUS_PAYMENT_REQUIRED:
-      ...
     case DSK_HTTP_STATUS_FORBIDDEN:
-      ...
     case DSK_HTTP_STATUS_NOT_FOUND:
-      ...
     case DSK_HTTP_STATUS_METHOD_NOT_ALLOWED:
-      ...
     case DSK_HTTP_STATUS_NOT_ACCEPTABLE:
-      ...
     case DSK_HTTP_STATUS_PROXY_AUTH_REQUIRED:
-      ...
     case DSK_HTTP_STATUS_REQUEST_TIMEOUT:
-      ...
     case DSK_HTTP_STATUS_CONFLICT:
-      ...
     case DSK_HTTP_STATUS_GONE:
-      ...
     case DSK_HTTP_STATUS_LENGTH_REQUIRED:
-      ...
     case DSK_HTTP_STATUS_PRECONDITION_FAILED:
-      ...
     case DSK_HTTP_STATUS_ENTITY_TOO_LARGE:
-      ...
     case DSK_HTTP_STATUS_URI_TOO_LARGE:
-      ...
     case DSK_HTTP_STATUS_UNSUPPORTED_MEDIA:
-      ...
     case DSK_HTTP_STATUS_BAD_RANGE:
-      ...
     case DSK_HTTP_STATUS_EXPECTATION_FAILED:
-      ...
+      transfer_request_failed_permanently (transfer);
+      return;
+
       /* 5xx headers */
     case DSK_HTTP_STATUS_INTERNAL_SERVER_ERROR:
-      ...
     case DSK_HTTP_STATUS_NOT_IMPLEMENTED:
-      ...
     case DSK_HTTP_STATUS_BAD_GATEWAY:
-      ...
     case DSK_HTTP_STATUS_SERVICE_UNAVAILABLE:
-      ...
     case DSK_HTTP_STATUS_GATEWAY_TIMEOUT:
-      ...
     case DSK_HTTP_STATUS_UNSUPPORTED_VERSION:
-      ...
+      transfer_request_failed_permanently (transfer);
+      return;
 
     default:
       if (response->status < 100 || response->status > 599)
         {
-          ...
+          transfer_fatal_fail (transfer, TRANSFER_FATAL_ERROR_INVALID,
+                               "Out-of-Range HTTP Status code");
+          return;
         }
       else
         {
-          ...
+          transfer_fatal_fail (transfer, TRANSFER_FATAL_ERROR_INVALID,
+                               "Unknown HTTP Status code");
+          return;
         }
     }
 }

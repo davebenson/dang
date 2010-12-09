@@ -58,6 +58,7 @@ DskHttpClientStream *
 dsk_http_client_stream_new     (DskOctetSink        *sink,
                                 DskOctetSource      *source,
                                 const DskHttpClientStreamOptions *options);
+//void dsk_http_client_stream_shutdown (DskHttpClientStream *stream);
 
 typedef enum
 {
@@ -211,4 +212,6 @@ struct _DskHttpClientStreamTransfer
     struct { DskHookTrap *post_data_trap; uint64_t bytes; } in_content;
   } write_info;
 };
+
+
 
