@@ -8,6 +8,9 @@ struct _DskTableFileOptions
   unsigned gzip_level;
   const char *base_filename;
 };
+typedef struct _DskTableFileWriter DskTableFileWriter;
+typedef struct _DskTableFileReader DskTableFileReader;
+typedef struct _DskTableFileSeeker DskTableFileSeeker;
 
 /* --- Writer --- */
 DskTableFileWriter *dsk_table_file_writer_new (DskTableFileOptions *options,
