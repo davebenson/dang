@@ -26,17 +26,23 @@ dsk_boolean dsk_table_file_writer_close   (DskTableFileWriter *writer,
 void        dsk_table_file_writer_destroy (DskTableFileWriter *writer);
 
 /* --- Reader --- */
+struct _DskTableFileReader
+{
+  dsk_boolean at_eof;
+  unsigned key_len;
+  unsigned value_len;
+  const uint8_t *key_data;
+  const uint8_t *value_data;
+
+  /*< private data follows >*/
+};
 DskTableFileReader *dsk_table_file_reader_new (DskTableFileOptions *options,
                                                DskError           **error);
-dsk_boolean dsk_table_file_read  (DskTableFileReader *reader,
-                                  unsigned           *key_length_out,
-			          const uint8_t     **key_data_out,
-                                  unsigned           *value_length_out,
-			          const uint8_t     **value_data_out,
-			          DskError          **error);
-dsk_boolean dsk_table_file_reader_close   (DskTableFileReader *reader,
-                                           DskError           **error);
-void        dsk_table_file_reader_destroy (DskTableFileReader *reader);
+
+/* Returns FALSE on EOF or error. */
+dsk_boolean dsk_table_file_reader_advance     (DskTableFileReader *reader,
+			                       DskError          **error);
+void        dsk_table_file_reader_destroy     (DskTableFileReader *reader);
 
 /* --- Searcher --- */
 DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,

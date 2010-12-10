@@ -564,22 +564,163 @@ void        dsk_table_file_writer_destroy (DskTableFileWriter *writer)
 }
 
 /* --- Reader --- */
+#define READER_INBUF_SIZE  4096
+#define READER_OUTBUF_SIZE 8192
+typedef struct _Reader Reader;
+struct _Reader
+{
+  DskTableFileReader base;
+  z_stream decompressor;
+  uint8_t inbuf[READER_INBUF_SIZE];    /* input from file to decompressor */
+  uint8_t outbuf[READER_OUTBUF_SIZE];  /* output of decompressor */
+  unsigned outbuf_bytes_used;    /* as in, have been returned as entries */
+  int fd;
+  uint8_t *scratch;
+  unsigned scratch_alloced;
+  char *filename;
+};
+
 DskTableFileReader *
 dsk_table_file_reader_new (DskTableFileOptions *options,
                            DskError           **error)
 {
-  ...
+  Reader *rv;
+  unsigned baselen = strlen (options->base_filename);
+  char *name = dsk_malloc (baselen + 4);                /* .gz and NUL */
+  memcpy (name, options->base_filename, baselen);
+  strcpy (name + baselen, ".gz");
+  int fd;
+  if (options->openat_fd < 0)
+    fd = open (name, O_RDONLY);
+  else
+    fd = openat (options->openat_fd, name, O_RDONLY);
+  if (fd < 0)
+    {
+      dsk_set_error (error, "%s(): error reading %s: %s",
+                     options->openat_fd < 0 ? "open" : "openat", name,
+                     strerror (errno));
+      dsk_free (name);
+      return NULL;
+    }
+  rv = dsk_malloc (sizeof (Reader));
+  memset (&rv->decompressor, 0, sizeof (z_stream));
+  inflateInit (&rv->decompressor);
+  rv->fd = fd;
+  
+  DskError *e = NULL;
+  if (!dsk_table_file_reader_advance (&rv->base, &e))
+    {
+      if (e != NULL)
+        {
+          dsk_table_file_reader_destroy (&rv->base);
+          if (error)
+            *error = e;
+          else
+            dsk_error_unref (e);
+          return NULL;
+        }
+    }
+  rv->filename = name;
+  return &rv->base;
 }
 
 dsk_boolean
-dsk_table_file_read  (DskTableFileReader *reader,
-                      unsigned           *key_length_out,
-                      const uint8_t     **key_data_out,
-                      unsigned           *value_length_out,
-                      const uint8_t     **value_data_out,
-                      DskError          **error)
+dsk_table_file_reader_advance  (DskTableFileReader *reader,
+                                DskError          **error)
 {
-  ...
+  Reader *r = (Reader *) reader;
+  const uint8_t *o = r->outbuf + r->outbuf_bytes_used;
+  unsigned decompressed = r->decompressor.next_out - o;
+  int zrv;
+  if (decompressed < 8)
+    {
+      memmove (r->outbuf, o, decompressed);
+      r->decompressor.next_out = r->outbuf + decompressed;
+      r->decompressor.avail_out = READER_OUTBUF_SIZE - decompressed;
+      r->outbuf_bytes_used = 0;
+      o = r->outbuf;
+      if (r->decompressor.avail_in > 0)
+        {
+          zrv = inflate(&r->decompressor, r->fd < 0 ? Z_FINISH : 0);
+          if (zrv != Z_OK && zrv != Z_STREAM_END && zrv != Z_BUF_ERROR)
+            goto zlib_error;
+          decompressed = r->decompressor.next_out - o;
+        }
+      if (decompressed < 8)
+        {
+          if (r->fd < 0)
+            {
+              /* at EOF. */
+              if (decompressed > 0)
+                dsk_set_error (error, "partial data at end of buffer");
+              return DSK_FALSE;
+            }
+
+          /* read more data */
+          if (r->decompressor.avail_in > 0)
+            memmove (r->inbuf, r->decompressor.next_in,
+                     r->decompressor.avail_in);
+          int read_rv;
+retry_read:
+          read_rv = read (r->fd,
+                          r->inbuf + r->decompressor.avail_in,
+                          READER_INBUF_SIZE - r->decompressor.avail_in);
+          if (read_rv == 0)
+            {
+              close (r->fd);
+              r->fd = -1;
+            }
+          else if (read_rv < 0)
+            {
+              if (errno == EINTR || errno == EAGAIN)
+                goto retry_read;
+              dsk_set_error (error, "error reading from %s: %s",
+                             r->filename, strerror (errno));
+              return DSK_FALSE;
+            }
+          else
+            {
+              r->decompressor.avail_in += read_rv;
+              r->decompressor.next_in = r->decompressor.inbuf;
+            }
+          if (r->decompressor.avail_in > 0)
+            {
+              int zrv = inflate (&r->decompressor);
+              decompressed = r->decompressor.next_out - r->outbuf;
+              if (zrv != Z_OK && zrv != Z_STREAM_END && zrv != Z_BUF_ERROR)
+                goto zlib_error;
+            }
+        }
+      if (decompressed == 0)
+        return DSK_FALSE;
+      if (decompressed < 8)
+        {
+          dsk_set_error (error, "internal error: data too short");
+          return DSK_FALSE;
+        }
+    }
+
+  uint32_t d[2];
+  memcpy (d, o, 8);
+  d[0] = UINT32_TO_LITTLE_ENDIAN (d[0]);
+  d[1] = UINT32_TO_LITTLE_ENDIAN (d[1]);
+
+  if (decompressed >= 8 + d[0] + d[1])
+    {
+      /* no copying / allocation required */
+      ...
+    }
+  else
+    {
+      /* ensure scratch space is big enough.
+         decompress until it is filled in. */
+      ...
+    }
+  return DSK_TRUE;
+
+zlib_error:
+  dsk_set_error (error, "zlib's inflate returned error code %d", zrv);
+  return DSK_FALSE;
 }
 
 dsk_boolean
