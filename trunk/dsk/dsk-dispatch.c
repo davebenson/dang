@@ -840,12 +840,31 @@ void  dsk_dispatch_adjust_timer    (DskDispatchTimer *timer,
 {
   DskDispatchTimer *conflict;
   RealDispatch *d = timer->dispatch;
+  dsk_boolean was_first = DSK_FALSE;
+  if (d->first_idle == NULL)
+    {
+      DskDispatchTimer *first;
+      GSK_RBTREE_FIRST (GET_TIMER_TREE (d), first);
+      if (first == timer)
+        was_first = DSK_TRUE;
+    }
   dsk_assert (timer->func != NULL);
   GSK_RBTREE_REMOVE (GET_TIMER_TREE (d), timer);
   timer->timeout_secs = timeout_secs;
   timer->timeout_usecs = timeout_usecs;
   GSK_RBTREE_INSERT (GET_TIMER_TREE (d), timer, conflict);
   dsk_assert (conflict == NULL);
+
+  if (d->first_idle == NULL)
+    {
+      DskDispatchTimer *first;
+      GSK_RBTREE_FIRST (GET_TIMER_TREE (d), first);
+      if (was_first || first == timer)
+        {
+          d->base.timeout_secs = first->timeout_secs;
+          d->base.timeout_usecs = first->timeout_usecs;
+        }
+    }
 }
 
 void  dsk_dispatch_adjust_timer_millis (DskDispatchTimer *timer,
