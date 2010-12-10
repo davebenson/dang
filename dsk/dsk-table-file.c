@@ -1,42 +1,81 @@
+/* portability issues:
+     openat()
+     O_NOATIME
+     pread
+ */
+
+/* IDEAS:
+    - mmap()
+ */
+
+/* For openat() */
+#define _ATFILE_SOURCE
+#define _XOPEN_SOURCE 1000
+
+/* O_NOATIME */
+#define _GNU_SOURCE
 
 
-typedef struct _DskTableFileOptions DskTableFileOptions;
-struct _DskTableFileOptions
-{
-  unsigned index_fanout;
-  int openat_fd;
-  const char *base_filename;
-};
+#include <fcntl.h>
+#include <string.h>
+#include <stdio.h>
+#include "dsk.h"
+#include "dsk-table-file.h"
+#include <zlib.h>
+
+#define INDEX_WRITER_HEAP_BUF_SIZE          4096
+
+/* Must be a multiple of 6, since index0 has records of 6 uint32;
+   all other index levels have records of 3 uint32. */
+#define INDEX_WRITER_INDEX_BUF_COUNT        (6*128)
 
 /* --- Writer --- */
 typedef struct _IndexWriter IndexWriter;
 struct _IndexWriter
 {
-  FILE *index_fp;
-  FILE *heap_fp;
+  int index_fd, heap_fd;
+  uint8_t heap_buf[INDEX_WRITER_HEAP_BUF_SIZE];
+  unsigned heap_buf_used;
+  uint64_t heap_buf_written;
+  uint32_t index_buf[INDEX_WRITER_INDEX_BUF_COUNT];
+  unsigned index_buf_used;
   unsigned entries_left;
+  IndexWriter *up;
 };
 
+#define COMPRESSOR_BUF_SIZE 4096
 struct _DskTableFileWriter
 {
   z_stream compressor;
-  uint8_t out_buf[4096];
+  uint8_t out_buf[COMPRESSOR_BUF_SIZE];
+
+  /* is this duplicated work that compressor already does?
+     probably not b/c of the 'reset' calls. */
+  uint64_t out_buf_file_offset;
+
   unsigned fanout;
   unsigned entries_until_flush;
   dsk_boolean is_first;
+  dsk_boolean is_closed;
   int compressed_data_fd;
+  uint8_t gzip_level;
+  uint64_t last_compressor_flush_offset;
+  uint32_t last_gzip_size;
 
-  unsigned first_value_len;
-  uint8_t *first_value_data;
+  unsigned first_key_len;
+  uint8_t *first_key_data;
 
-  unsigned n_index_levels;
   IndexWriter *index_levels;
-  unsigned index_levels_alloced;
+
+  uint64_t total_n_entries;
+  uint64_t total_key_bytes;
+  uint64_t total_value_bytes;
 
   /* basefilename has 20 characters of padding to allow
      adding suffixes with snprintf(basefilename+basefilename_len, 20, ...); */
   char *basefilename;
   unsigned basefilename_len;   
+  int openat_fd;
 };
 
 static int
@@ -56,33 +95,115 @@ create_fd (DskTableFileWriter *writer,
   return fd;
 }
 
+static dsk_boolean
+write_to_fd(int         fd, 
+            size_t      size,
+            const void *buf,
+            DskError  **error)
+{
+  while (size > 0)
+    {
+      int write_rv = write (fd, buf, size);
+      if (write_rv < 0)
+        {
+          if (errno == EINTR || errno == EAGAIN)
+            continue;
+          dsk_set_error (error, "error writing to file-descriptor %d: %s",
+                         fd, strerror (errno));
+          return DSK_FALSE;
+        }
+      size -= write_rv;
+      buf = ((char*)buf) + write_rv;
+    }
+  return DSK_TRUE;
+}
+
+
+
+
+static dsk_boolean
+alloc_index_level (DskTableFileWriter *writer,
+                   IndexWriter       **out,
+                   unsigned            index_level,
+                   DskError          **error)
+{
+  int index_fd, heap_fd;
+  char buf[10];
+  snprintf (buf, sizeof (buf), ".%03uh", index_level);
+  heap_fd = create_fd (writer, buf, error);
+  if (index_fd < 0)
+    return DSK_FALSE;
+  buf[4] = 'i';
+  index_fd = create_fd (writer, buf, error);
+  if (index_fd < 0)
+    {
+      close (heap_fd);
+      return DSK_FALSE;
+    }
+  *out = dsk_malloc (sizeof (IndexWriter));
+  (*out)->index_fd = index_fd;
+  (*out)->heap_fd = heap_fd;
+  (*out)->heap_buf_used = 0;
+  (*out)->heap_buf_written = 0;
+  (*out)->index_buf_used = 0;
+  (*out)->entries_left = writer->fanout;
+  (*out)->up = NULL;
+  return DSK_TRUE;
+}
+static void
+free_index_level (IndexWriter *index)
+{
+  close (index->index_fd);
+  close (index->heap_fd);
+  dsk_free (index);
+}
+
 DskTableFileWriter *dsk_table_file_writer_new (DskTableFileOptions *options,
                                                DskError           **error)
 {
-  DskTableFileWriter *writer = dsk_malloc (sizeof (DskTableFileWriter));
-  writer->n_index_levels = 1;
-  writer->index_levels_alloced = 8;
-  writer->index_levels = dsk_malloc (sizeof (IndexWriter) * writer->index_levels_alloced);
-  writer->index_levels[0].data_fp = ...;
-  writer->index_levels[0].index_fp = ...;
-  writer->index_levels[0].entries_left = options->fanout;
-  writer->fanout = options->fanout;
+  DskTableFileWriter *writer = dsk_malloc0 (sizeof (DskTableFileWriter));
+  writer->basefilename_len = strlen (options->base_filename);
+  writer->basefilename = dsk_malloc (writer->basefilename_len + 30);
+  strcpy (writer->basefilename, options->base_filename);
   writer->entries_until_flush = 0;
   writer->is_first = DSK_TRUE;
+  writer->fanout = options->index_fanout;
   writer->openat_fd = options->openat_fd;
   if (writer->openat_fd < 0)
     writer->openat_fd = AT_FDCWD;
-  writer->basefilename_len = strlen (options->base_filename);
-  writer->basefilename = dsk_malloc (writer->basefilename_len + 30);
-  if (writer->gzip_level > 0)
-    writer->compressed_data_fd = create_fd (writer, ".data.gz");
-  else
-    writer->compressed_data_fd = create_fd (writer, ".data");
+  if (!alloc_index_level (writer, &writer->index_levels, 0, error))
+    goto error_cleanup_0;
+  writer->gzip_level = options->gzip_level;
+  writer->compressed_data_fd = create_fd (writer, ".gz", error);
+  if (writer->compressed_data_fd < 0)
+    goto error_cleanup_2;
+  writer->compressor.avail_in = 0;
+  writer->compressor.next_in = NULL;
+  writer->compressor.avail_out = COMPRESSOR_BUF_SIZE;
+  writer->compressor.next_in = writer->out_buf;
+  int zrv;
+  zrv = deflateInit2 (&writer->compressor,
+                      writer->gzip_level,
+                      Z_DEFLATED,
+                      31, 8,
+                      Z_DEFAULT_STRATEGY);
+  if (zrv != Z_OK)
+    {
+      dsk_warning ("deflateInit2 returned error");
+      goto error_cleanup_3;
+    }
 
-  memset (&writer->compressor, 0, sizeof (zstream));
-  initDeflator (...);
-  ...
   return writer;
+
+error_cleanup_3:
+  close (writer->compressed_data_fd);
+error_cleanup_2:
+  free_index_level (writer->index_levels);
+error_cleanup_0:
+  dsk_free (writer->index_levels);
+  dsk_free (writer->basefilename);
+  dsk_free (writer);
+  return NULL;
 }
 
 #if DSK_IS_LITTLE_ENDIAN
@@ -95,23 +216,183 @@ DskTableFileWriter *dsk_table_file_writer_new (DskTableFileOptions *options,
 #endif
 
 static dsk_boolean
-write_index_entry (DskTableFileWriter *writer,
-                   unsigned            index_level,
-                   unsigned            key_length,
-                   const uint8_t      *key_data,
-                   DskError          **error)
+flush_index_index_to_disk (IndexWriter *index,
+                           DskError   **error)
 {
-  if (index_level == 0)
-    {
-      /* Data needs to include offset into (possibly) gzipped file */
-      ...
-    }
-  else
-    {
-      /* Data just include index into this index's level of heap file. */
-      ...
-    }
+  if (index->index_buf_used == 0)
+    return DSK_TRUE;
+  if (!write_to_fd (index->index_fd, index->index_buf_used * 4,
+                   index->index_buf, error))
+    return DSK_FALSE;
+  index->index_buf_used = 0;
+  return DSK_TRUE;
 }
+
+static dsk_boolean
+write_index0_compressed_len (DskTableFileWriter *writer,
+                             DskError          **error)
+{
+  IndexWriter *index = writer->index_levels;
+  uint32_t *at = index->index_buf + index->index_buf_used;
+  *at++ = writer->last_gzip_size;
+  index->index_buf_used++;
+  if (index->index_buf_used == INDEX_WRITER_INDEX_BUF_COUNT)
+    {
+      /* flush to disk */
+      if (!flush_index_index_to_disk (index, error))
+        return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+flush_index_heap_to_disk (IndexWriter *index,
+                          DskError          **error)
+{
+  if (!write_to_fd (index->heap_fd, index->heap_buf_used,
+                    index->heap_buf, error))
+    return DSK_FALSE;
+  index->heap_buf_written += index->heap_buf_used;
+  index->heap_buf_used = 0;
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+write_index_key (IndexWriter        *index,
+                 unsigned            key_len,
+                 const uint8_t      *key_data,
+                 DskError          **error)
+{
+  while (index->heap_buf_used + key_len >= INDEX_WRITER_HEAP_BUF_SIZE)
+    {
+      unsigned used = INDEX_WRITER_HEAP_BUF_SIZE - index->heap_buf_used;
+      memcpy (index->heap_buf + index->heap_buf_used, key_data, used);
+      index->heap_buf_used += used;
+      if (!flush_index_heap_to_disk (index, error))
+        return DSK_FALSE;
+      key_data += used;
+      key_len -= used;
+    }
+  memcpy (index->heap_buf + index->heap_buf_used, key_data, key_len);
+  return DSK_TRUE;
+}
+
+/* This is the first part of the index entry; the last part is
+   just the compressed size of the next was of data -- but
+   we haven't compressed it yet... */
+static dsk_boolean
+write_index0_partial_entry (DskTableFileWriter *writer,
+                            unsigned            key_length,
+                            const uint8_t      *key_data,
+                            DskError          **error)
+{
+  /* Each entry is an offset into the data file,
+     plus an index into the gzipped file.  (both uint64le).
+     and the size of the gzipped data, and the size of the key.
+     (both uint32le) */
+  IndexWriter *index = writer->index_levels;
+  uint64_t data_offset = index->heap_buf_written + index->heap_buf_used;
+  uint64_t gzip_offset = writer->last_compressor_flush_offset;
+  uint32_t *at = index->index_buf + index->index_buf_used;
+  *at++ = data_offset;
+  *at++ = ((data_offset) >> 32);
+  *at++ = gzip_offset;
+  *at++ = ((gzip_offset) >> 32);
+  *at++ = key_length;
+  index->index_buf_used += 5;
+  return write_index_key (index, key_length, key_data, error);
+}
+static dsk_boolean
+write_index_entry  (IndexWriter        *index,
+                    unsigned            key_length,
+                    const uint8_t      *key_data,
+                    DskError          **error)
+{
+  /* Data just include offset into this index's level of heap file;
+     the start and end of the range in the next finer grained index
+     can be found be multiplying by fanout, and the size of the key. */
+  uint64_t data_offset = index->heap_buf_written + index->heap_buf_used;
+  uint32_t *at = index->index_buf + index->index_buf_used;
+  *at++ = data_offset;
+  *at++ = ((data_offset) >> 32);
+  *at++ = key_length;
+  index->index_buf_used += 3;
+  if (index->index_buf_used == INDEX_WRITER_INDEX_BUF_COUNT)
+    {
+      if (!flush_index_index_to_disk (index, error))
+        return DSK_FALSE;
+    }
+  return write_index_key (index, key_length, key_data, error);
+}
+
+static dsk_boolean
+flush_compressor_to_disk (DskTableFileWriter *writer,
+                          DskError          **error)
+{
+  unsigned to_write = COMPRESSOR_BUF_SIZE - writer->compressor.avail_in;
+  if (to_write == 0)
+    return DSK_TRUE;
+  if (!write_to_fd (writer->compressed_data_fd,
+                   to_write, writer->out_buf, error))
+    return DSK_FALSE;
+  writer->out_buf_file_offset += to_write;
+  writer->compressor.next_out = writer->out_buf;
+  writer->compressor.avail_out = COMPRESSOR_BUF_SIZE;
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+flush_compressed_data (DskTableFileWriter *writer,
+                       DskError          **error)
+{
+  writer->compressor.avail_in = 0;
+  writer->compressor.next_in = NULL;
+  int zrv;
+retry_deflate:
+  zrv = deflate (&writer->compressor, Z_FINISH);
+  if (zrv == Z_STREAM_END)
+    {
+      uint64_t offset = writer->out_buf_file_offset
+                      + (writer->compressor.next_out - writer->out_buf);
+      writer->last_gzip_size = offset - writer->last_compressor_flush_offset;
+      writer->last_compressor_flush_offset = offset;
+      return DSK_TRUE;
+    }
+  if (zrv == Z_OK)
+    {
+      if (!flush_compressor_to_disk (writer, error))
+        return DSK_FALSE;
+      goto retry_deflate;
+    }
+  dsk_set_error (error, "error compressing (zlib error code %d)", zrv);
+  return DSK_FALSE;
+}
+
+static dsk_boolean
+table_file_write_data (DskTableFileWriter *writer,
+                       unsigned            length,
+                       const uint8_t      *data,
+                       DskError          **error)
+{
+  writer->compressor.next_in = (void*) data;
+  writer->compressor.avail_in = length;
+  while (writer->compressor.avail_in > 0)
+    {
+      int zrv = deflate (&writer->compressor, Z_NO_FLUSH);
+      if (zrv != Z_OK)
+        {
+          dsk_set_error (error, "zlib's deflate returned error code %d", zrv);
+          return DSK_FALSE;
+        }
+      if (writer->compressor.avail_out == 0)
+        {
+          if (!flush_compressor_to_disk (writer, error))
+            return DSK_FALSE;
+        }
+    }
+  return DSK_TRUE;
+}
+
 
 dsk_boolean dsk_table_file_write (DskTableFileWriter *writer,
                                   unsigned            key_length,
@@ -120,97 +401,163 @@ dsk_boolean dsk_table_file_write (DskTableFileWriter *writer,
 			          const uint8_t      *value_data,
 			          DskError          **error)
 {
-  guint32 le;
+  dsk_assert (!writer->is_closed);
 
   if (writer->entries_until_flush == 0)
     {
       if (writer->is_first)
         {
-          ...
+          writer->first_key_data = dsk_memdup (key_length, key_data);
+          writer->first_key_len = key_length;
           writer->is_first = DSK_FALSE;
         }
       else
         {
           /* Flush the existing inflator */
-          ...
+          if (!flush_compressed_data (writer, error))
+            return DSK_FALSE;
+          if (!write_index0_compressed_len (writer, error))
+            return DSK_FALSE;
         }
 
-      for (i = 0; i < writer->n_index_levels; i++)
+      /* Write first-level index entry */
+      if (!write_index0_partial_entry (writer, key_length, key_data, error))
+        return DSK_FALSE;
+
+      /* Do we need to go the next level? */
+      IndexWriter *index;
+      if (--(writer->index_levels->entries_left) > 0)
+        index = NULL;
+      else
+        index = writer->index_levels->up;
+
+      while (index != NULL)
         {
-          /* Write index entry */
-          if (!write_index_entry (writer, i, key_len, key_data, error))
+          if (!write_index_entry (index, key_length, key_data, error))
             return DSK_FALSE;
 
           /* Do we need to go the next level? */
-          if (--writer->index_levels[i].entries_left > 0)
+          if (--(index->entries_left) > 0)
             break;
-          writer->index_levels[i].entries_left = writer->fanout;
+          index = index->up;
         }
-      if (i == writer->n_index_levels)
+      if (index == NULL)
         {
           /* Create a new level of index */
-          if (writer->n_index_levels == writer->index_levels_alloced)
+          index = writer->index_levels;
+          while (index->up)
+            index = index->up;
+          if (!alloc_index_level (writer, &index->up, 0, error))
             {
-              writer->index_levels_alloced *= 2;
-              writer->index_levels = dsk_realloc (writer->index_levels,
-                                                  writer->index_levels_alloced * sizeof (IndexWriter));
+              /* Every index should begin with the first key. */
+              if (!write_index_entry (index, writer->first_key_len, writer->first_key_data, error))
+                return DSK_FALSE;
+
+              /* Write index entry */
+              if (!write_index_entry (index, key_length, key_data, error))
+                return DSK_FALSE;
             }
-          writer->index_levels[writer->n_index_levels].data_fp = ...
-          writer->index_levels[writer->n_index_levels].index_fp = ...;
-          writer->index_levels[writer->n_index_levels].entries_left = writer->fanout;
-          writer->n_index_levels++;
-
-          /* Every index should begin with the first key. */
-          if (!write_index_entry (writer, i, writer->first_key_len, writer->first_key_data, error))
-            return DSK_FALSE;
-
-          /* Write index entry */
-          if (!write_index_entry (writer, i, key_len, key_data, error))
-            return DSK_FALSE;
         }
     }
 
+  uint32_t le;
   le = UINT32_TO_LITTLE_ENDIAN (key_length);
   if (!table_file_write_data (writer, 4, (const uint8_t *) &le, error)
    || !table_file_write_data (writer, key_length, key_data, error))
     return DSK_FALSE;
-  le = UINT32_TO_LITTLE_ENDIAN (value_data);
+  le = UINT32_TO_LITTLE_ENDIAN (value_length);
   if (!table_file_write_data (writer, 4, (const uint8_t *) &le, error)
    || !table_file_write_data (writer, value_length, value_data, error))
     return DSK_FALSE;
+
+  writer->total_n_entries += 1;
+  writer->total_key_bytes += key_length;
+  writer->total_value_bytes += value_length;
+
   return DSK_TRUE;
 }
 
 dsk_boolean dsk_table_file_writer_close   (DskTableFileWriter *writer,
                                            DskError           **error)
 {
+
   if (!flush_compressed_data (writer, error))
     return DSK_FALSE;
+  if (!writer->is_first && !write_index0_compressed_len (writer, error))
+    return DSK_FALSE;
+  if (!flush_compressor_to_disk (writer, error))
+    return DSK_FALSE;
 
-  /* flush compression buffer to disk */
-  ...
+  /* write metadata: number of index levels, fanout, fanout0. */
+  int fd = create_fd (writer, ".info", error);
+  if (fd < 0)
+    return DSK_FALSE;
+  char metadata_buf[1024];
+  unsigned n_levels = 0;
+  IndexWriter *index;
+  for (index = writer->index_levels; index; index = index->up)
+    n_levels++;
+  snprintf (metadata_buf, sizeof (metadata_buf),
+            "entries: %llu\n"
+            "key-bytes: %llu\n"
+            "data-bytes: %llu\n"
+            "compressed-size: %llu\n"
+            "n-index-levels: %u\n",
+            writer->total_n_entries,
+            writer->total_key_bytes,
+            writer->total_value_bytes,
+            writer->out_buf_file_offset,
+            n_levels);
+  if (!write_to_fd (fd, strlen (metadata_buf),
+                   (const uint8_t *) metadata_buf, error))
+    {
+      close (fd);
+      return DSK_FALSE;
+    }
+  close (fd);
 
   writer->is_closed = DSK_TRUE;
+  return DSK_TRUE;
+}
+
+static void
+unlink_by_suffix (DskTableFileWriter *writer,
+                  const char *suffix)
+{
+  strcpy (writer->basefilename + writer->basefilename_len, suffix);
+  unlinkat (writer->openat_fd, writer->basefilename, 0);
 }
 
 void        dsk_table_file_writer_destroy (DskTableFileWriter *writer)
 {
   /* Close all file descriptors */
-  unsigned i;
-  for (i = 0; i < writer->n_index_levels; i++)
+  unsigned n_levels = 0;
+  IndexWriter *index;
+  for (index = writer->index_levels; index; )
     {
-      fclose (writer->index_levels[i].index_fp);
-      fclose (writer->index_levels[i].heap_fp);
+      IndexWriter *up = index->up;
+      free_index_level (index);
+      index = up;
+      n_levels++;
     }
-  dsk_free (writer->index_levels);
   close (writer->compressed_data_fd);
 
   deflateEnd (&writer->compressor);
 
   if (!writer->is_closed)
     {
+      unsigned i;
       /* Delete all files if not closed. */
-      ...
+      unlink_by_suffix (writer, ".metadata");
+      unlink_by_suffix (writer, ".gz");
+      for (i = 0; i < n_levels; i++)
+        {
+          char buf[10];
+          snprintf (buf, sizeof (buf), ".%03uh", i);
+          unlink_by_suffix (writer, buf);
+          buf[4] = 'i';
+          unlink_by_suffix (writer, buf);
+        }
     }
   dsk_free (writer->basefilename);
   dsk_free (writer);
