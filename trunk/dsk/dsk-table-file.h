@@ -8,6 +8,13 @@ struct _DskTableFileOptions
   unsigned gzip_level;
   const char *base_filename;
 };
+#define DSK_TABLE_FILE_OPTIONS_DEFAULT             \
+{                                                  \
+  16,           /* index_fanout */                 \
+  -1,           /* openat_fd */                    \
+  6,            /* gzip_level */                   \
+  NULL                                             \
+}
 typedef struct _DskTableFileWriter DskTableFileWriter;
 typedef struct _DskTableFileReader DskTableFileReader;
 typedef struct _DskTableFileSeeker DskTableFileSeeker;
@@ -29,8 +36,8 @@ void        dsk_table_file_writer_destroy (DskTableFileWriter *writer);
 struct _DskTableFileReader
 {
   dsk_boolean at_eof;
-  unsigned key_len;
-  unsigned value_len;
+  unsigned key_length;
+  unsigned value_length;
   const uint8_t *key_data;
   const uint8_t *value_data;
 
