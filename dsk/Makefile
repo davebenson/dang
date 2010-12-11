@@ -20,7 +20,8 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-xml-parser-0 \
 		tests/test-pattern-0 \
 		tests/test-xml-validation-suite \
-		tests/test-xml-binding-0
+		tests/test-xml-binding-0 \
+		tests/test-table-file-0
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
            programs/dsk-octet-filter programs/dsk-make-xml-binding
 all: $(BUILT_SOURCES) $(PROGRAMS) build-tests

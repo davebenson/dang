@@ -20,7 +20,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "dsk.h"
-#include "dsk-table-file.h"
 #include <zlib.h>
 
 #define INDEX_WRITER_HEAP_BUF_SIZE          4096
@@ -180,7 +179,7 @@ DskTableFileWriter *dsk_table_file_writer_new (DskTableFileOptions *options,
   writer->compressor.avail_in = 0;
   writer->compressor.next_in = NULL;
   writer->compressor.avail_out = COMPRESSOR_BUF_SIZE;
-  writer->compressor.next_in = writer->out_buf;
+  writer->compressor.next_out = writer->out_buf;
   int zrv;
   zrv = deflateInit2 (&writer->compressor,
                       writer->gzip_level,
@@ -329,7 +328,7 @@ static dsk_boolean
 flush_compressor_to_disk (DskTableFileWriter *writer,
                           DskError          **error)
 {
-  unsigned to_write = COMPRESSOR_BUF_SIZE - writer->compressor.avail_in;
+  unsigned to_write = COMPRESSOR_BUF_SIZE - writer->compressor.avail_out;
   if (to_write == 0)
     return DSK_TRUE;
   if (!write_to_fd (writer->compressed_data_fd,
@@ -356,6 +355,7 @@ retry_deflate:
                       + (writer->compressor.next_out - writer->out_buf);
       writer->last_gzip_size = offset - writer->last_compressor_flush_offset;
       writer->last_compressor_flush_offset = offset;
+      deflateReset (&writer->compressor);
       return DSK_TRUE;
     }
   if (zrv == Z_OK)
@@ -460,13 +460,12 @@ dsk_boolean dsk_table_file_write (DskTableFileWriter *writer,
         }
     }
 
-  uint32_t le;
-  le = UINT32_TO_LITTLE_ENDIAN (key_length);
-  if (!table_file_write_data (writer, 4, (const uint8_t *) &le, error)
-   || !table_file_write_data (writer, key_length, key_data, error))
-    return DSK_FALSE;
-  le = UINT32_TO_LITTLE_ENDIAN (value_length);
-  if (!table_file_write_data (writer, 4, (const uint8_t *) &le, error)
+  uint32_t littleendian_vals[2] = {
+    UINT32_TO_LITTLE_ENDIAN (key_length),
+    UINT32_TO_LITTLE_ENDIAN (value_length)
+  };
+  if (!table_file_write_data (writer, 8, (const uint8_t *) &littleendian_vals, error)
+   || !table_file_write_data (writer, key_length, key_data, error)
    || !table_file_write_data (writer, value_length, value_data, error))
     return DSK_FALSE;
 
@@ -604,8 +603,12 @@ dsk_table_file_reader_new (DskTableFileOptions *options,
     }
   rv = dsk_malloc (sizeof (Reader));
   memset (&rv->decompressor, 0, sizeof (z_stream));
-  inflateInit (&rv->decompressor);
+  if (inflateInit2 (&rv->decompressor, 47) != 0)
+    dsk_die ("inflateInit2 failed");
   rv->fd = fd;
+  rv->base.at_eof = DSK_FALSE;
+  rv->decompressor.next_out = rv->outbuf;
+  rv->decompressor.avail_out = READER_OUTBUF_SIZE;
   
   DskError *e = NULL;
   if (!dsk_table_file_reader_advance (&rv->base, &e))
@@ -632,6 +635,7 @@ dsk_table_file_reader_advance  (DskTableFileReader *reader,
   const uint8_t *o = r->outbuf + r->outbuf_bytes_used;
   unsigned decompressed = r->decompressor.next_out - o;
   int zrv;
+  dsk_warning ("dsk_table_file_reader_advance: decompressed=%u",decompressed);
   if (decompressed < 8)
     {
       memmove (r->outbuf, o, decompressed);
@@ -653,6 +657,7 @@ dsk_table_file_reader_advance  (DskTableFileReader *reader,
               /* at EOF. */
               if (decompressed > 0)
                 dsk_set_error (error, "partial data at end of buffer");
+              r->base.at_eof = DSK_TRUE;
               return DSK_FALSE;
             }
 
@@ -681,11 +686,12 @@ retry_read:
           else
             {
               r->decompressor.avail_in += read_rv;
-              r->decompressor.next_in = r->decompressor.inbuf;
+              r->decompressor.next_in = r->inbuf;
             }
+          dsk_warning ("after reading: %u bytes for decompressor", r->decompressor.avail_in);
           if (r->decompressor.avail_in > 0)
             {
-              int zrv = inflate (&r->decompressor);
+              zrv = inflate (&r->decompressor, r->fd < 0 ? Z_FINISH : 0);
               decompressed = r->decompressor.next_out - r->outbuf;
               if (zrv != Z_OK && zrv != Z_STREAM_END && zrv != Z_BUF_ERROR)
                 goto zlib_error;
@@ -704,36 +710,104 @@ retry_read:
   memcpy (d, o, 8);
   d[0] = UINT32_TO_LITTLE_ENDIAN (d[0]);
   d[1] = UINT32_TO_LITTLE_ENDIAN (d[1]);
+  unsigned kv = d[0] + d[1];
 
-  if (decompressed >= 8 + d[0] + d[1])
+  r->base.key_length = d[0];
+  r->base.value_length = d[1];
+  if (decompressed >= 8 + kv)
     {
       /* no copying / allocation required */
-      ...
+      r->base.key_data = o + 8;
+      r->base.value_data = r->base.key_data + d[0];
+      o += 8 + kv;
+      r->outbuf_bytes_used = o - r->outbuf;
+      dsk_warning ("short close data : now outbuf_bytes_used=%u", r->outbuf_bytes_used);
     }
   else
     {
-      /* ensure scratch space is big enough.
-         decompress until it is filled in. */
-      ...
+      /* ensure scratch space is big enough */
+      if (r->scratch_alloced < kv)
+        {
+          unsigned new_alloced = r->scratch_alloced;
+          if (new_alloced == 0)
+            new_alloced = 256;
+          while (new_alloced < kv)
+            new_alloced *= 2;
+          r->scratch = dsk_realloc (r->scratch, new_alloced);
+          r->scratch_alloced = new_alloced;
+        }
+
+      /* copy in already uncompressed data */
+      memcpy (r->scratch, o + 8, decompressed - 8);
+      o = r->outbuf;
+
+      /* decompress until key and value are filled in. */
+      r->decompressor.next_out = r->scratch + (decompressed - 8);
+      r->decompressor.avail_out = kv - (decompressed - 8);
+      while (r->decompressor.avail_out > 0)
+        {
+          if (r->decompressor.avail_in == 0)
+            {
+              /* Read into inbuf */
+              if (r->fd < 0)
+                {
+                  dsk_set_error (error, "partial data at end of buffer");
+                  return DSK_FALSE;
+                }
+              int read_rv = read (r->fd, r->inbuf, READER_INBUF_SIZE);
+              if (read_rv < 0)
+                {
+                  if (errno == EINTR || errno == EAGAIN)
+                    continue;
+                  dsk_set_error (error, "error reading from %s: %s",
+                                 r->filename, strerror (errno));
+                  return DSK_FALSE;
+                }
+              else if (read_rv == 0)
+                {
+                  close (r->fd);
+                  r->fd = -1;
+                }
+              else
+                {
+                  r->decompressor.next_in = r->inbuf;
+                  r->decompressor.avail_in = read_rv;
+                }
+            }
+          zrv = inflate (&r->decompressor, 0);
+          if (zrv != Z_OK && zrv != Z_STREAM_END && zrv != Z_BUF_ERROR)
+            goto zlib_error;
+          if (r->fd < 0 && r->decompressor.avail_out > 0)
+            {
+              dsk_set_error (error, "partial data at end of buffer");
+              return DSK_FALSE;
+            }
+        }
+
+      r->decompressor.next_out = r->outbuf;
+      r->decompressor.avail_out = READER_OUTBUF_SIZE;
+      r->outbuf_bytes_used = 0;
+      r->base.key_data = r->scratch;
+      r->base.value_data = r->scratch + d[0];
     }
   return DSK_TRUE;
 
 zlib_error:
-  dsk_set_error (error, "zlib's inflate returned error code %d", zrv);
-  return DSK_FALSE;
-}
+  dsk_set_error (error, "zlib's inflate returned error code %d (%s)", zrv,
+                 r->decompressor.msg);
 
-dsk_boolean
-dsk_table_file_reader_close   (DskTableFileReader *reader,
-                               DskError           **error)
-{
-  ...
+  return DSK_FALSE;
 }
 
 void
 dsk_table_file_reader_destroy (DskTableFileReader *reader)
 {
-  ...
+  Reader *r = (Reader *) reader;
+  if (r->fd)
+    close (r->fd);
+  inflateEnd (&r->decompressor);
+  dsk_free (r->scratch);
+  dsk_free (r);
 }
 
 
@@ -741,10 +815,6 @@ dsk_table_file_reader_destroy (DskTableFileReader *reader)
 DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
                                                DskError           **error);
 
-/* Returns whether this value is in the set. */
-typedef dsk_boolean (*DskTableSeekerTestFunc) (unsigned               len,
-                                               const uint8_t         *data,
-                                               void                  *user_data);
 
 /* The comparison function should return TRUE if the value
    is greater than or equal to some threshold determined by func_data. */
