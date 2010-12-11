@@ -84,7 +84,7 @@ create_fd (DskTableFileWriter *writer,
 {
   strcpy (writer->basefilename + writer->basefilename_len, suffix);
   int fd = openat (writer->openat_fd, writer->basefilename,
-                   O_CREAT|O_WRONLY|O_NOATIME, 0666);
+                   O_CREAT|O_WRONLY|O_NOATIME|O_TRUNC, 0666);
   if (fd < 0)
     {
       dsk_set_error (error, "error opening %s: %s", writer->basefilename,
@@ -128,9 +128,10 @@ alloc_index_level (DskTableFileWriter *writer,
 {
   int index_fd, heap_fd;
   char buf[10];
+  //dsk_warning ("alloc_index_level: %u", index_level);
   snprintf (buf, sizeof (buf), ".%03uh", index_level);
   heap_fd = create_fd (writer, buf, error);
-  if (index_fd < 0)
+  if (heap_fd < 0)
     return DSK_FALSE;
   buf[4] = 'i';
   index_fd = create_fd (writer, buf, error);
@@ -172,8 +173,12 @@ DskTableFileWriter *dsk_table_file_writer_new (DskTableFileOptions *options,
     writer->openat_fd = AT_FDCWD;
   if (!alloc_index_level (writer, &writer->index_levels, 0, error))
     goto error_cleanup_0;
+
+  /* special handling of the very first entry written requires this */
+  writer->index_levels->entries_left += 1;
+
   writer->gzip_level = options->gzip_level;
-  writer->compressed_data_fd = create_fd (writer, ".gz", error);
+  writer->compressed_data_fd = create_fd (writer, "", error);
   if (writer->compressed_data_fd < 0)
     goto error_cleanup_2;
   writer->compressor.avail_in = 0;
@@ -184,11 +189,10 @@ DskTableFileWriter *dsk_table_file_writer_new (DskTableFileOptions *options,
   zrv = deflateInit2 (&writer->compressor,
                       writer->gzip_level,
                       Z_DEFLATED,
-                      31, 8,
+                      15, 8,
                       Z_DEFAULT_STRATEGY);
   if (zrv != Z_OK)
     {
-      dsk_warning ("deflateInit2 returned error");
       goto error_cleanup_3;
     }
 
@@ -347,19 +351,22 @@ flush_compressed_data (DskTableFileWriter *writer,
   writer->compressor.avail_in = 0;
   writer->compressor.next_in = NULL;
   int zrv;
+  if (writer->compressor.avail_out < 6)
+    if (!flush_compressor_to_disk (writer, error))
+      return DSK_FALSE;
 retry_deflate:
-  zrv = deflate (&writer->compressor, Z_FINISH);
-  if (zrv == Z_STREAM_END)
+  zrv = deflate (&writer->compressor, Z_FULL_FLUSH);
+  if (zrv == Z_OK && writer->compressor.avail_out > 0)
     {
       uint64_t offset = writer->out_buf_file_offset
                       + (writer->compressor.next_out - writer->out_buf);
       writer->last_gzip_size = offset - writer->last_compressor_flush_offset;
       writer->last_compressor_flush_offset = offset;
-      deflateReset (&writer->compressor);
       return DSK_TRUE;
     }
   if (zrv == Z_OK)
     {
+      /* Probably never happens. */
       if (!flush_compressor_to_disk (writer, error))
         return DSK_FALSE;
       goto retry_deflate;
@@ -403,6 +410,8 @@ dsk_boolean dsk_table_file_write (DskTableFileWriter *writer,
 {
   dsk_assert (!writer->is_closed);
 
+  //dsk_warning ("dsk_table_file_write [0x%llx]: key_len/value_len=%u/%u",writer->total_n_entries,key_length,value_length);
+
   if (writer->entries_until_flush == 0)
     {
       if (writer->is_first)
@@ -421,44 +430,74 @@ dsk_boolean dsk_table_file_write (DskTableFileWriter *writer,
         }
 
       /* Write first-level index entry */
+      //dsk_warning ("writing index 0 entry");
       if (!write_index0_partial_entry (writer, key_length, key_data, error))
         return DSK_FALSE;
 
       /* Do we need to go the next level? */
       IndexWriter *index;
+      dsk_boolean write_index = DSK_FALSE;
       if (--(writer->index_levels->entries_left) > 0)
         index = NULL;
       else
-        index = writer->index_levels->up;
-
-      while (index != NULL)
         {
-          if (!write_index_entry (index, key_length, key_data, error))
-            return DSK_FALSE;
-
-          /* Do we need to go the next level? */
-          if (--(index->entries_left) > 0)
-            break;
-          index = index->up;
+          writer->index_levels->entries_left = writer->fanout;
+          index = writer->index_levels->up;
+          write_index = DSK_TRUE;
         }
-      if (index == NULL)
+
+      if (write_index)
         {
-          /* Create a new level of index */
-          index = writer->index_levels;
-          while (index->up)
-            index = index->up;
-          if (!alloc_index_level (writer, &index->up, 0, error))
+          while (index != NULL)
             {
+              //dsk_warning ("writing index non-0 entry (entries_left=%u)", index->entries_left);
+              if (!write_index_entry (index, key_length, key_data, error))
+                return DSK_FALSE;
+
+              /* Do we need to go the next level? */
+              if (--(index->entries_left) > 0)
+                break;
+              index->entries_left = writer->fanout;
+              index = index->up;
+            }
+          if (index == NULL)
+            {
+              /* Create a new level of index */
+              unsigned new_level = 1;
+              index = writer->index_levels;
+              while (index->up)
+                {
+                  index = index->up;
+                  new_level++;
+                }
+              if (!alloc_index_level (writer, &index->up, new_level, error))
+                return DSK_FALSE;
+
+              /* make 'index' point to the new index level */
+              index = index->up;
+
+              //dsk_warning ("writing init index %u entries", new_level);
               /* Every index should begin with the first key. */
-              if (!write_index_entry (index, writer->first_key_len, writer->first_key_data, error))
+              if (!write_index_entry (index,
+                                      writer->first_key_len,
+                                      writer->first_key_data,
+                                      error))
                 return DSK_FALSE;
 
               /* Write index entry */
               if (!write_index_entry (index, key_length, key_data, error))
                 return DSK_FALSE;
+
+              /* it might seem like "-= 2" would be better
+                 here.  but it doesn't work.  TODO: better doc/describe
+                 the role of entries_left. */
+              index->entries_left -= 1;
             }
         }
+      writer->entries_until_flush = writer->fanout - 1;
     }
+  else
+    writer->entries_until_flush -= 1;
 
   uint32_t littleendian_vals[2] = {
     UINT32_TO_LITTLE_ENDIAN (key_length),
@@ -495,7 +534,12 @@ dsk_boolean dsk_table_file_writer_close   (DskTableFileWriter *writer,
   unsigned n_levels = 0;
   IndexWriter *index;
   for (index = writer->index_levels; index; index = index->up)
-    n_levels++;
+    {
+      if (!flush_index_heap_to_disk (index, error)
+       || !flush_index_index_to_disk (index, error))
+        return DSK_FALSE;
+      n_levels++;
+    }
   snprintf (metadata_buf, sizeof (metadata_buf),
             "entries: %llu\n"
             "key-bytes: %llu\n"
@@ -548,7 +592,7 @@ void        dsk_table_file_writer_destroy (DskTableFileWriter *writer)
       unsigned i;
       /* Delete all files if not closed. */
       unlink_by_suffix (writer, ".metadata");
-      unlink_by_suffix (writer, ".gz");
+      unlink_by_suffix (writer, "");
       for (i = 0; i < n_levels; i++)
         {
           char buf[10];
@@ -576,7 +620,6 @@ struct _Reader
   int fd;
   uint8_t *scratch;
   unsigned scratch_alloced;
-  char *filename;
 };
 
 DskTableFileReader *
@@ -584,26 +627,22 @@ dsk_table_file_reader_new (DskTableFileOptions *options,
                            DskError           **error)
 {
   Reader *rv;
-  unsigned baselen = strlen (options->base_filename);
-  char *name = dsk_malloc (baselen + 4);                /* .gz and NUL */
-  memcpy (name, options->base_filename, baselen);
-  strcpy (name + baselen, ".gz");
   int fd;
   if (options->openat_fd < 0)
-    fd = open (name, O_RDONLY);
+    fd = open (options->base_filename, O_RDONLY);
   else
-    fd = openat (options->openat_fd, name, O_RDONLY);
+    fd = openat (options->openat_fd, options->base_filename, O_RDONLY);
   if (fd < 0)
     {
       dsk_set_error (error, "%s(): error reading %s: %s",
-                     options->openat_fd < 0 ? "open" : "openat", name,
+                     options->openat_fd < 0 ? "open" : "openat", 
+                     options->base_filename,
                      strerror (errno));
-      dsk_free (name);
       return NULL;
     }
   rv = dsk_malloc (sizeof (Reader));
   memset (&rv->decompressor, 0, sizeof (z_stream));
-  if (inflateInit2 (&rv->decompressor, 47) != 0)
+  if (inflateInit2 (&rv->decompressor, 15) != 0)
     dsk_die ("inflateInit2 failed");
   rv->fd = fd;
   rv->base.at_eof = DSK_FALSE;
@@ -623,7 +662,6 @@ dsk_table_file_reader_new (DskTableFileOptions *options,
           return NULL;
         }
     }
-  rv->filename = name;
   return &rv->base;
 }
 
@@ -635,7 +673,6 @@ dsk_table_file_reader_advance  (DskTableFileReader *reader,
   const uint8_t *o = r->outbuf + r->outbuf_bytes_used;
   unsigned decompressed = r->decompressor.next_out - o;
   int zrv;
-  dsk_warning ("dsk_table_file_reader_advance: decompressed=%u",decompressed);
   if (decompressed < 8)
     {
       memmove (r->outbuf, o, decompressed);
@@ -679,8 +716,8 @@ retry_read:
             {
               if (errno == EINTR || errno == EAGAIN)
                 goto retry_read;
-              dsk_set_error (error, "error reading from %s: %s",
-                             r->filename, strerror (errno));
+              dsk_set_error (error, "error reading from file: %s",
+                             strerror (errno));
               return DSK_FALSE;
             }
           else
@@ -688,7 +725,6 @@ retry_read:
               r->decompressor.avail_in += read_rv;
               r->decompressor.next_in = r->inbuf;
             }
-          dsk_warning ("after reading: %u bytes for decompressor", r->decompressor.avail_in);
           if (r->decompressor.avail_in > 0)
             {
               zrv = inflate (&r->decompressor, r->fd < 0 ? Z_FINISH : 0);
@@ -698,7 +734,10 @@ retry_read:
             }
         }
       if (decompressed == 0)
-        return DSK_FALSE;
+        {
+          r->base.at_eof = DSK_TRUE;
+          return DSK_FALSE;
+        }
       if (decompressed < 8)
         {
           dsk_set_error (error, "internal error: data too short");
@@ -721,7 +760,6 @@ retry_read:
       r->base.value_data = r->base.key_data + d[0];
       o += 8 + kv;
       r->outbuf_bytes_used = o - r->outbuf;
-      dsk_warning ("short close data : now outbuf_bytes_used=%u", r->outbuf_bytes_used);
     }
   else
     {
@@ -759,8 +797,8 @@ retry_read:
                 {
                   if (errno == EINTR || errno == EAGAIN)
                     continue;
-                  dsk_set_error (error, "error reading from %s: %s",
-                                 r->filename, strerror (errno));
+                  dsk_set_error (error, "error reading from file: %s",
+                                 strerror (errno));
                   return DSK_FALSE;
                 }
               else if (read_rv == 0)
