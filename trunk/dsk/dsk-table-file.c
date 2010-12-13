@@ -1,3 +1,5 @@
+/* TODO: saw close() return EBADFD in writer/reader pairing somewhere */
+
 /* portability issues:
      openat()
      O_NOATIME
@@ -19,6 +21,8 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
+#include <sys/stat.h>
 #include "dsk.h"
 #include <zlib.h>
 
@@ -277,6 +281,7 @@ write_index_key (IndexWriter        *index,
       key_len -= used;
     }
   memcpy (index->heap_buf + index->heap_buf_used, key_data, key_len);
+  index->heap_buf_used += key_len;
   return DSK_TRUE;
 }
 
@@ -849,24 +854,154 @@ dsk_table_file_reader_destroy (DskTableFileReader *reader)
 }
 
 
+/* --- Metadata parsing --- */
+#define MAX_METADATA_SIZE    1024
+typedef struct _DskTableFileMetadata DskTableFileMetadata;
+struct _DskTableFileMetadata
+{
+  uint64_t entries;
+  uint64_t key_bytes;
+  uint64_t data_bytes;
+  uint64_t compressed_size;
+  unsigned n_index_levels;
+};
+static dsk_boolean
+dsk_table_file_metadata_parse (const DskTableFileOptions *options,
+                               DskTableFileMetadata      *out,
+                               DskError                 **error)
+{
+  unsigned basefilename_len = strlen (options->base_filename);
+  char *filename_buf = dsk_malloc (basefilename_len + 16);
+  int fd;
+  struct stat stat_buf;
+  memcpy (filename_buf, options->base_filename, basefilename_len);
+
+  /* Read metadata (needed for the number of index levels) */
+  strcpy (filename_buf + basefilename_len, ".metadata");
+retry_metadata_open:
+  if (options->openat_fd < 0)
+    fd = open (filename_buf, O_RDONLY);
+  else
+    fd = openat (options->openat_fd, filename_buf, O_RDONLY);
+  if (fd < 0)
+    {
+      if (errno == EINTR || errno == EAGAIN)
+        goto retry_metadata_open;
+      dsk_set_error (error, "error opening %s: %s", filename_buf,
+                     strerror (errno));
+      dsk_free (filename_buf);
+      return DSK_FALSE;
+    }
+  if (fstat (fd, &stat_buf) < 0)
+    {
+      dsk_set_error (error, "error finding size of %s: %s", filename_buf,
+                     strerror (errno));
+      dsk_free (filename_buf);
+      close (fd);
+      return DSK_FALSE;
+    }
+  if (stat_buf.st_size > MAX_METADATA_SIZE)
+    {
+      dsk_set_error (error, "table-file metadata too long? (%s)", filename_buf);
+      dsk_free (filename_buf);
+      close (fd);
+      return DSK_FALSE;
+    }
+
+  /* split into lines */
+  ...
+}
+
+
 /* --- Searcher --- */
+typedef struct _SeekerIndex SeekerIndex;
+struct _SeekerIndex
+{
+  int index_fd, heap_fd;
+};
+struct _DskTableFileSeeker
+{
+  unsigned n_levels;
+  unsigned fanout;
+  SeekerIndex *indexes;
+  int compressed_data_fd;
+};
+
+static void
+seeker_free_index_level_array (unsigned n_levels, SeekerIndex *index_levels)
+{
+  unsigned i;
+  for (i = 0; i < n_levels; i++)
+    {
+      close (index_levels[i].heap_fd);
+      close (index_levels[i].index_fd);
+    }
+  dsk_free (index_levels);
+}
+
 DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
-                                               DskError           **error);
+                                               DskError           **error)
+{
+  DskTableFileMetadata metadata;
+  unsigned n_index_levels;
+  unsigned i;
+
+  unsigned basefilename_len = strlen (options->base_filename);
+  char *filename_buf = dsk_malloc (basefilename_len + 32);
+  SeekerIndex *index_levels;
+  int openat_fd = options->openat_fd < 0 ? AT_FDCWD : options->openat_fd;
+  if (!dsk_table_file_metadata_parse (options, &metadata, error))
+    return NULL;
+  memcpy (filename_buf, options->base_filename, basefilename_len);
+
+  /* Open the indices */
+  n_index_levels = metadata.n_index_levels;
+  index_levels = dsk_malloc (sizeof (SeekerIndex) * n_index_levels);
+  for (i = 0; i < n_index_levels; i++)
+    {
+      snprintf (filename_buf + basefilename_len, 32, ".%03ui", i);
+      index_levels[i].index_fd = openat (openat_fd, filename_buf, O_RDONLY);
+      if (index_levels[i].index_fd < 0)
+        {
+          seeker_free_index_level_array (i, index_levels);
+          dsk_free (filename_buf);
+          return NULL;
+        }
+      snprintf (filename_buf + basefilename_len, 32, ".%03uh", i);
+      index_levels[i].heap_fd = openat (openat_fd, filename_buf, O_RDONLY);
+      if (index_levels[i].heap_fd < 0)
+        {
+          close (index_levels[i].index_fd);
+          seeker_free_index_level_array (i, index_levels);
+          dsk_free (filename_buf);
+          return NULL;
+        }
+    }
+
+  /* Open the compressed data fd */
+  ...
+
+  DskTableFileSeeker *rv = dsk_malloc (sizeof (DskTableFileSeeker));
+  seeker->n_index_levels = n_index_levels;
+  seeker->index_levels = index_levels;
+  seeker->compressed_data_fd = compressed_data_fd;
+  return rv;
+}
 
 
-/* The comparison function should return TRUE if the value
-   is greater than or equal to some threshold determined by func_data. */
-dsk_boolean  dsk_table_file_seeker_find_first (DskTableFileSeeker    *seeker,
-					       DskTableSeekerTestFunc func,
-					       void                  *func_data,
-                                               DskError             **error);
-
-/* The comparison function should return TRUE if the value
-   is less than or equal to some threshold determined by func_data. */
-dsk_boolean  dsk_table_file_seeker_find_last  (DskTableFileSeeker    *seeker,
-					       DskTableSeekerTestFunc func,
-					       void                  *func_data,
-                                               DskError             **error);
+dsk_boolean
+dsk_table_file_seeker_find_first (DskTableFileSeeker    *seeker,
+                                  DskTableSeekerTestFunc func,
+                                  void                  *func_data,
+                                  DskError             **error);
+ 
+#if 0
+dsk_boolean
+dsk_table_file_seeker_find_last  (DskTableFileSeeker    *seeker,
+                                  DskTableSeekerTestFunc func,
+                                  void                  *func_data,
+                                  DskError             **error);
+#endif
 
 /* Information about our current location. */
 dsk_boolean  dsk_table_file_seeker_peek_cur   (DskTableFileSeeker    *seeker,
@@ -879,4 +1014,10 @@ dsk_boolean  dsk_table_file_seeker_peek_index (DskTableFileSeeker    *seeker,
 dsk_boolean  dsk_table_file_seeker_advance    (DskTableFileSeeker    *seeker);
 
 
-void         dsk_table_file_seeker_destroy    (DskTableFileSeeker    *seeker);
+void         dsk_table_file_seeker_destroy    (DskTableFileSeeker    *seeker)
+{
+  ...
+  seeker_free_index_level_array (seeker->n_index_levels, seeker->index_levels);
+  ...
+  dsk_free (seeker);
+}
