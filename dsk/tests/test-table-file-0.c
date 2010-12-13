@@ -345,14 +345,15 @@ static struct
 {
   { "simple writing/reading", test_simple_write_read },
   { "extensive write/read testing", test_various_read_write },
+  { "partial recovery after corruption", test_read_corruption_write },
 };
 
 int main(int argc, char **argv)
 {
   unsigned i;
 
-  dsk_cmdline_init ("test CGI parsing",
-                    "Test the CGI Parsing Code",
+  dsk_cmdline_init ("test table internals (the 'file' abstraction)",
+                    "Test Table Internals",
                     NULL, 0);
   dsk_cmdline_add_boolean ("verbose", "extra logging", NULL, 0,
                            &cmdline_verbose);
@@ -376,6 +377,17 @@ int main(int argc, char **argv)
       fprintf (stderr, "Test: %s... ", tests[i].name);
       tests[i].test ();
       fprintf (stderr, " done.\n");
+    }
+
+  if (cmdline_keep_testdir)
+    {
+      fprintf (stderr,
+               "test-table-file: keep-testdir: preserving test directory %u\n",
+               test_dir);
+    }
+  else
+    {
+      rm_rf (test_dir);
     }
   dsk_cleanup ();
   return 0;
