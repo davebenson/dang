@@ -1108,29 +1108,62 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
 
 
 dsk_boolean
-dsk_table_file_seeker_find_first (DskTableFileSeeker    *seeker,
+dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
                                   DskTableSeekerTestFunc func,
                                   void                  *func_data,
-                                  DskError             **error);
+                                  unsigned              *key_len_out,
+                                  const void           **key_data_out,
+                                  unsigned              *value_len_out,
+                                  const void           **value_data_out,
+                                  DskError             **error)
+{
+  /* search in index layers, starting at n_index_levels-1 ending at 0. */
+  unsigned layer;
+  for (layer = seeker->n_index_levels - 1; layer != (unsigned)(-1); layer--)
+    {
+      ...
+    }
+
+  /* decompress/cache lookup appropriate chunk */
+  cache_entry = force_cache_entry (seeker, offset, length, error);
+  if (cache_entry == NULL)
+    {
+      ...
+    }
+
+  /* search in chunk */
+  ...
+}
  
-#if 0
-dsk_boolean
-dsk_table_file_seeker_find_last  (DskTableFileSeeker    *seeker,
+DskTableFileReader *
+dsk_table_file_seeker_find_reader(DskTableFileSeeker    *seeker,
                                   DskTableSeekerTestFunc func,
                                   void                  *func_data,
-                                  DskError             **error);
-#endif
-
-/* Information about our current location. */
-dsk_boolean  dsk_table_file_seeker_peek_cur   (DskTableFileSeeker    *seeker,
-					       unsigned              *len_out,
-					       const uint8_t        **data_out);
-dsk_boolean  dsk_table_file_seeker_peek_index (DskTableFileSeeker    *seeker,
-					       uint64_t              *index_out);
-
-/* Advance forward in the file. */
-dsk_boolean  dsk_table_file_seeker_advance    (DskTableFileSeeker    *seeker);
-
+                                  DskError             **error)
+{
+  ...
+}
+ 
+dsk_boolean
+dsk_table_file_seeker_index      (DskTableFileSeeker    *seeker,
+                                  uint64_t               index,
+                                  unsigned              *key_len_out,
+                                  const void           **key_data_out,
+                                  unsigned              *value_len_out,
+                                  const void           **value_data_out,
+                                  DskError             **error)
+{
+  ...
+}
+ 
+DskTableFileReader *
+dsk_table_file_seeker_index_reader(DskTableFileSeeker    *seeker,
+                                   uint64_t               index,
+                                   DskError             **error)
+{
+  ...
+}
+ 
 
 void         dsk_table_file_seeker_destroy    (DskTableFileSeeker    *seeker)
 {
