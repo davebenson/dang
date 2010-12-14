@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include "dsk.h"
@@ -117,6 +118,29 @@ write_to_fd(int         fd,
         }
       size -= write_rv;
       buf = ((char*)buf) + write_rv;
+    }
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+read_from_fd(int         fd, 
+             size_t      size,
+             void       *buf,
+             DskError  **error)
+{
+  while (size > 0)
+    {
+      int read_rv = read (fd, buf, size);
+      if (read_rv < 0)
+        {
+          if (errno == EINTR || errno == EAGAIN)
+            continue;
+          dsk_set_error (error, "error reading from file-descriptor %d: %s",
+                         fd, strerror (errno));
+          return DSK_FALSE;
+        }
+      size -= read_rv;
+      buf = ((char*)buf) + read_rv;
     }
   return DSK_TRUE;
 }
@@ -550,12 +574,14 @@ dsk_boolean dsk_table_file_writer_close   (DskTableFileWriter *writer,
             "key-bytes: %llu\n"
             "data-bytes: %llu\n"
             "compressed-size: %llu\n"
-            "n-index-levels: %u\n",
+            "n-index-levels: %u\n"
+            "fanout: %u\n",
             writer->total_n_entries,
             writer->total_key_bytes,
             writer->total_value_bytes,
             writer->out_buf_file_offset,
-            n_levels);
+            n_levels,
+            writer->fanout);
   if (!write_to_fd (fd, strlen (metadata_buf),
                    (const uint8_t *) metadata_buf, error))
     {
@@ -864,6 +890,7 @@ struct _DskTableFileMetadata
   uint64_t data_bytes;
   uint64_t compressed_size;
   unsigned n_index_levels;
+  unsigned fanout;
 };
 static dsk_boolean
 dsk_table_file_metadata_parse (const DskTableFileOptions *options,
@@ -909,9 +936,87 @@ retry_metadata_open:
     }
 
   /* split into lines */
-  ...
-}
+  char *metadata_buf;
+  char *metadata_buf_end;
+  metadata_buf = dsk_malloc (stat_buf.st_size);
+  if (!read_from_fd (fd, stat_buf.st_size, metadata_buf, error))
+    {
+      dsk_free (filename_buf);
+      dsk_free (metadata_buf);
+      return DSK_FALSE;
+    }
+  metadata_buf_end = metadata_buf + stat_buf.st_size;
+  char *at = metadata_buf;
+  unsigned got = 0;
+  while (at < metadata_buf_end)
+    {
+      char *nl = memchr (at, '\n', metadata_buf_end - at);
+      if (nl == NULL)
+        {
+          dsk_set_error (error, "unended line in metadata file (%s)", filename_buf);
+          dsk_free (metadata_buf);
+          dsk_free (filename_buf);
+          return DSK_FALSE;
+        }
+      *nl = 0;
+      
+      if (strncmp (at, "entries: ", 9) == 0)
+        {
+          out->entries = strtoull (at + 9, NULL, 10);
+          got |= 1;
+        }
+      else if (strncmp (at, "key-bytes: ", 11) == 0)
+        {
+          out->key_bytes = strtoull (at + 11, NULL, 10);
+          got |= 2;
+        }
+      else if (strncmp (at, "data-bytes: ", 12) == 0)
+        {
+          out->data_bytes = strtoull (at + 12, NULL, 10);
+          got |= 4;
+        }
+      else if (strncmp (at, "compressed-size: ", 17) == 0)
+        {
+          out->compressed_size = strtoull (at + 17, NULL, 10);
+          got |= 8;
+        }
+      else if (strncmp (at, "n-index-levels: ", 16) == 0)
+        {
+          out->n_index_levels = strtoul (at + 16, NULL, 10);
+          got |= 16;
+        }
+      else if (strncmp (at, "fanout: ", 8) == 0)
+        {
+          out->fanout = strtoul (at + 8, NULL, 10);
+          got |= 32;
+        }
+      else
+        {
+          dsk_set_error (error, "unparsable line '%s' in %s", at, filename_buf);
+          dsk_free (metadata_buf);
+          dsk_free (filename_buf);
+          return DSK_FALSE;
+        }
+    }
+  if (got != 63)
+    {
+      dsk_set_error (error, "missing fields in %s:%s%s%s%s%s%s",
+                     filename_buf,
+                     (got&1) ? "" : " entries",
+                     (got&2) ? "" : " key-bytes",
+                     (got&4) ? "" : " data-bytes",
+                     (got&8) ? "" : " compressed-size",
+                     (got&16) ? "" : " n-index-levels",
+                     (got&32) ? "" : " fanout");
+      dsk_free (metadata_buf);
+      dsk_free (filename_buf);
+      return DSK_FALSE;
+    }
 
+  dsk_free (metadata_buf);
+  dsk_free (filename_buf);
+  return DSK_TRUE;
+}
 
 /* --- Searcher --- */
 typedef struct _SeekerIndex SeekerIndex;
@@ -923,7 +1028,7 @@ struct _DskTableFileSeeker
 {
   unsigned n_levels;
   unsigned fanout;
-  SeekerIndex *indexes;
+  SeekerIndex *index_levels;
   int compressed_data_fd;
 };
 
@@ -943,7 +1048,6 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
                                                DskError           **error)
 {
   DskTableFileMetadata metadata;
-  unsigned n_index_levels;
   unsigned i;
 
   unsigned basefilename_len = strlen (options->base_filename);
@@ -955,7 +1059,7 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
   memcpy (filename_buf, options->base_filename, basefilename_len);
 
   /* Open the indices */
-  n_index_levels = metadata.n_index_levels;
+  unsigned n_index_levels = metadata.n_index_levels;
   index_levels = dsk_malloc (sizeof (SeekerIndex) * n_index_levels);
   for (i = 0; i < n_index_levels; i++)
     {
@@ -963,6 +1067,8 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
       index_levels[i].index_fd = openat (openat_fd, filename_buf, O_RDONLY);
       if (index_levels[i].index_fd < 0)
         {
+          dsk_set_error (error, "opening index %s failed: %s",
+                         filename_buf, strerror (errno));
           seeker_free_index_level_array (i, index_levels);
           dsk_free (filename_buf);
           return NULL;
@@ -971,6 +1077,8 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
       index_levels[i].heap_fd = openat (openat_fd, filename_buf, O_RDONLY);
       if (index_levels[i].heap_fd < 0)
         {
+          dsk_set_error (error, "opening heap %s failed: %s",
+                         filename_buf, strerror (errno));
           close (index_levels[i].index_fd);
           seeker_free_index_level_array (i, index_levels);
           dsk_free (filename_buf);
@@ -979,12 +1087,22 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
     }
 
   /* Open the compressed data fd */
-  ...
+  filename_buf[basefilename_len] = 0;
+  int compressed_data_fd;
+  compressed_data_fd = openat (openat_fd, filename_buf, O_RDONLY);
+  if (compressed_data_fd < 0)
+    {
+      dsk_set_error (error, "opening compressed-file %s failed: %s",
+                     filename_buf, strerror (errno));
+      seeker_free_index_level_array (n_index_levels, index_levels);
+      dsk_free (filename_buf);
+      return NULL;
+    }
 
   DskTableFileSeeker *rv = dsk_malloc (sizeof (DskTableFileSeeker));
-  seeker->n_index_levels = n_index_levels;
-  seeker->index_levels = index_levels;
-  seeker->compressed_data_fd = compressed_data_fd;
+  rv->n_levels = metadata.n_index_levels;
+  rv->index_levels = index_levels;
+  rv->compressed_data_fd = compressed_data_fd;
   return rv;
 }
 
