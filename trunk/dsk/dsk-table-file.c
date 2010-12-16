@@ -10,6 +10,17 @@
     - mmap()
  */
 
+/* Format of record in nonzero "index" files:
+ *     key_data_offset     uint64
+ *     key_length          uint32 
+ * Format of record in zero "index" files:
+ *     key_data_offset     uint64
+ *     gzip_offset         uint64
+ *     key_length          uint32 
+ *     gzip_length         uint32
+ */
+/* TODO: add end-key to index/data files to allow more effective bsearch. */
+
 /* For openat() */
 #define _ATFILE_SOURCE
 #define _XOPEN_SOURCE 1000
@@ -26,6 +37,7 @@
 #include <sys/stat.h>
 #include "dsk.h"
 #include <zlib.h>
+#include "../gsklistmacros.h"
 
 #define INDEX_WRITER_HEAP_BUF_SIZE          4096
 
@@ -1029,13 +1041,62 @@ struct _SeekerIndex
   int index_fd, heap_fd;
   uint64_t count;
 };
+
+typedef struct _IndexKeyValue IndexKeyValue;
+struct _IndexKeyValue
+{
+  unsigned key_length;
+  uint8_t *key_data;
+  unsigned value_length;
+  uint8_t *value_data;
+};
+
+typedef struct _IndexCacheEntry IndexCacheEntry;
+struct _IndexCacheEntry
+{
+  uint64_t offset;                /* hash key: offset into compressed data */
+
+  /* hash-table list (per bin) */
+  IndexCacheEntry *next_in_bin;
+
+  /* LRU list */
+  IndexCacheEntry *less_recent, *more_recent;
+
+  /* uncompress key-value slab */
+  unsigned n_uncompressed;
+  IndexKeyValue *uncompressed;
+};
+
+#define INDEX_CACHE_TABLE_SIZE          8
+#define INDEX_CACHE_TABLE_MAX_OCCUPANCY 8
+
 struct _DskTableFileSeeker
 {
   unsigned n_index_levels;
   unsigned fanout;
   SeekerIndex *index_levels;
   int compressed_data_fd;
+
+  unsigned index_key_data_alloced;
+  uint8_t *index_key_data;
+  unsigned index_key_length;
+
+  unsigned compressed_data_alloced;
+  uint8_t *compressed_data;
+
+  unsigned uncompressed_alloced;
+  uint8_t *uncompressed_data;
+  unsigned uncompressed_len;
+
+  IndexCacheEntry *index_cache_table[INDEX_CACHE_TABLE_SIZE];
+  unsigned index_cache_occupancy;
+  IndexCacheEntry *least_recent, *most_recent;
 };
+#define SEEKER_GET_BIN_FROM_OFFSET(seeker, offset) \
+  (((unsigned)(offset)) % INDEX_CACHE_TABLE_SIZE)
+#define SEEKER_GET_LRU(seeker) \
+  IndexCacheEntry *, (seeker)->most_recent, (seeker)->least_recent, \
+  more_recent, less_recent
 
 static void
 seeker_free_index_level_array (unsigned n_index_levels, SeekerIndex *index_levels)
@@ -1125,13 +1186,377 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
       return NULL;
     }
 
-  DskTableFileSeeker *rv = dsk_malloc (sizeof (DskTableFileSeeker));
+  DskTableFileSeeker *rv = dsk_malloc0 (sizeof (DskTableFileSeeker));
   rv->n_index_levels = metadata.n_index_levels;
   rv->index_levels = index_levels;
   rv->compressed_data_fd = compressed_data_fd;
   return rv;
 }
 
+static dsk_boolean
+seeker_get_nonzero_index_key (DskTableFileSeeker *seeker,
+                              unsigned            level,
+                              uint64_t            index,
+                              DskError          **error)
+{
+  /* Read index entry corresponding to mid */
+  ssize_t pread_rv;
+  uint32_t index_entry[3];
+retry_pread:
+  pread_rv = pread (seeker->index_levels[level].index_fd,
+                    index_entry, 12, 12ULL * index);
+  if (pread_rv < 0)
+    {
+      if (errno == EINTR || errno == EAGAIN)
+        goto retry_pread;
+      dsk_set_error (error, "error reading from index file: %s (offset=%llu)",
+                     strerror (errno), 12ULL * index);
+      return DSK_FALSE;
+    }
+  if (pread_rv < 12)
+    {
+      dsk_set_error (error, "index file too short- needed 12 bytes at offset=%llu",
+                     12ULL * index);
+      return DSK_FALSE;
+    }
+  uint64_t offset =
+    ((uint64_t)UINT32_TO_LITTLE_ENDIAN (index_entry[0]))
+   |((uint64_t)UINT32_TO_LITTLE_ENDIAN (index_entry[1]) << 32);
+  uint32_t key_length = UINT32_TO_LITTLE_ENDIAN (index_entry[2]);
+
+  /* Read key corresponding to mid */
+  if (seeker->index_key_data_alloced < key_length)
+    {
+      seeker->index_key_data_alloced = key_length;
+      seeker->index_key_data = dsk_realloc (seeker->index_key_data, key_length);
+    }
+  seeker->index_key_length = key_length;
+  if (key_length != 0)
+    {
+retry_pread2:
+      pread_rv = pread (seeker->index_levels[level].heap_fd,
+                        seeker->index_key_data, key_length, offset);
+      if (pread_rv < 0)
+        {
+          if (errno == EINTR || errno == EAGAIN)
+            goto retry_pread2;
+          dsk_set_error (error,
+                         "error reading from heap file: %s (offset=%llu)",
+                         strerror (errno), offset);
+          return DSK_FALSE;
+        }
+      if ((unsigned)pread_rv < key_length)
+        {
+          dsk_set_error (error,
+                         "heap file too short at offset %llu",
+                         offset);
+          return DSK_FALSE;
+        }
+    }
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+seeker_get_zero_index_key (DskTableFileSeeker *seeker,
+                           uint64_t            index,
+                           unsigned           *compressed_length_out,
+                           uint64_t           *compressed_offset_out,
+                           DskError          **error)
+{
+  /* Read index entry corresponding to mid */
+  ssize_t pread_rv;
+  uint32_t index_entry[6];
+retry_pread:
+  pread_rv = pread (seeker->index_levels[0].index_fd,
+                    index_entry, 24, 24ULL * index);
+  if (pread_rv < 0)
+    {
+      if (errno == EINTR || errno == EAGAIN)
+        goto retry_pread;
+      dsk_set_error (error, "error reading from index file: %s (offset=%llu)",
+                     strerror (errno), 24ULL * index);
+      return DSK_FALSE;
+    }
+  if (pread_rv < 24)
+    {
+      dsk_set_error (error, "index file too short- needed 24 bytes at offset=%llu",
+                     12ULL * index);
+      return DSK_FALSE;
+    }
+  uint64_t key_offset =
+    ((uint64_t)UINT32_TO_LITTLE_ENDIAN (index_entry[0]))
+   |((uint64_t)UINT32_TO_LITTLE_ENDIAN (index_entry[1]) << 32);
+  uint32_t key_length = UINT32_TO_LITTLE_ENDIAN (index_entry[4]);
+  *compressed_offset_out =
+    ((uint64_t)UINT32_TO_LITTLE_ENDIAN (index_entry[2]))
+   |((uint64_t)UINT32_TO_LITTLE_ENDIAN (index_entry[3]) << 32);
+  *compressed_length_out = UINT32_TO_LITTLE_ENDIAN (index_entry[5]);
+
+  /* Read key corresponding to mid */
+  if (seeker->index_key_data_alloced < key_length)
+    {
+      seeker->index_key_data_alloced = key_length;
+      seeker->index_key_data = dsk_realloc (seeker->index_key_data, key_length);
+    }
+  seeker->index_key_length = key_length;
+  if (key_length != 0)
+    {
+retry_pread2:
+      pread_rv = pread (seeker->index_levels[0].heap_fd,
+                        seeker->index_key_data, key_length, key_offset);
+      if (pread_rv < 0)
+        {
+          if (errno == EINTR || errno == EAGAIN)
+            goto retry_pread2;
+          dsk_set_error (error,
+                         "error reading from heap file: %s (offset=%llu)",
+                         strerror (errno), key_offset);
+          return DSK_FALSE;
+        }
+      if ((unsigned)pread_rv < key_length)
+        {
+          dsk_set_error (error,
+                         "heap file too short at offset %llu",
+                         key_offset);
+          return DSK_FALSE;
+        }
+    }
+  return DSK_TRUE;
+}
+
+
+static void
+kill_least_recently_used (DskTableFileSeeker *seeker)
+{
+  IndexCacheEntry *to_kill = seeker->least_recent;
+  unsigned bin = SEEKER_GET_BIN_FROM_OFFSET (seeker, to_kill->offset);
+  GSK_LIST_REMOVE (SEEKER_GET_LRU (seeker), to_kill);
+  IndexCacheEntry **p = seeker->index_cache_table + bin;
+  while (*p && *p != to_kill)
+    p = &((*p)->next_in_bin);
+  dsk_assert (*p == to_kill);
+  *p = to_kill->next_in_bin;
+  dsk_free (to_kill);
+  seeker->index_cache_occupancy -= 1;
+}
+
+static IndexCacheEntry *
+force_cache_entry (DskTableFileSeeker *seeker,
+                   unsigned            compressed_length,
+                   uint64_t            compressed_offset,
+                   DskError          **error)
+{
+  unsigned bin = SEEKER_GET_BIN_FROM_OFFSET (seeker, compressed_offset);
+  IndexCacheEntry *entry = seeker->index_cache_table[bin];
+  while (entry != NULL)
+    {
+      if (entry->offset == compressed_offset)
+        break;
+      entry = entry->next_in_bin;
+    }
+  if (entry != NULL)
+    {
+      /* touch LRU list */
+      GSK_LIST_REMOVE (SEEKER_GET_LRU (seeker), entry);
+      GSK_LIST_PREPEND (SEEKER_GET_LRU (seeker), entry);
+      return entry;
+    }
+
+  while (seeker->index_cache_occupancy >= INDEX_CACHE_TABLE_MAX_OCCUPANCY)
+    kill_least_recently_used (seeker);
+
+  /* -- Create a new cache entry -- */
+
+  /* read compressed data */
+  if (seeker->compressed_data_alloced < compressed_length)
+    {
+      seeker->compressed_data_alloced = compressed_length;
+      seeker->compressed_data = dsk_realloc (seeker->compressed_data,
+                                             compressed_length);
+    }
+  ssize_t pread_rv;
+retry_pread:
+  pread_rv = pread (seeker->compressed_data_fd,
+                    seeker->compressed_data, compressed_length,
+                    compressed_offset);
+  if (pread_rv < 0)
+    {
+      if (errno == EINTR || errno == EAGAIN)
+        goto retry_pread;
+      dsk_set_error (error, "error reading from compressed-data file: %s (offset=%llu)",
+                     strerror (errno), compressed_offset);
+      return DSK_FALSE;
+    }
+  if ((unsigned)pread_rv < compressed_length)
+    {
+      dsk_set_error (error, "compressed-data file too short");
+      return DSK_FALSE;
+    }
+
+  /* uncompress */
+  z_stream stream;
+  memset (&stream, 0, sizeof (stream));
+  stream.next_in = seeker->compressed_data;
+  stream.avail_in = compressed_length;
+
+  if (seeker->uncompressed_alloced < compressed_length)
+    {
+      unsigned new_size = seeker->uncompressed_alloced
+                        ? seeker->uncompressed_alloced * 2
+                        : 1024;
+      seeker->uncompressed_data = dsk_realloc (seeker->uncompressed_data, new_size);
+      seeker->uncompressed_alloced = new_size;
+    }
+  stream.next_out = seeker->uncompressed_data;
+  stream.avail_out = seeker->uncompressed_alloced;
+
+  int zrv;
+  if (inflateInit2 (&stream, 15) != 0)
+    dsk_die ("inflateInit2 failed");
+  unsigned uncompressed_len;
+do_inflate:
+  zrv = inflate (&stream, Z_FINISH);
+  if (zrv == Z_OK)
+    {
+      /* resize output buffer */
+      uncompressed_len = stream.next_out - seeker->uncompressed_data;
+      seeker->uncompressed_alloced *= 2;
+      seeker->uncompressed_data = dsk_realloc (seeker->uncompressed_data, seeker->uncompressed_alloced);
+      stream.next_out = seeker->uncompressed_data + seeker->uncompressed_len;
+      stream.avail_out = (seeker->uncompressed_data + seeker->uncompressed_alloced) - stream.next_out;
+
+      goto do_inflate;
+    }
+  else if (zrv == Z_STREAM_END)
+    {
+      uncompressed_len = stream.next_out - seeker->uncompressed_data;
+      inflateEnd (&stream);
+    }
+  else
+    {
+      dsk_set_error (error, "error inflating compressed data: %s", stream.msg);
+      inflateEnd (&stream);
+      return DSK_FALSE;
+    }
+
+  /* scan for keys */
+  IndexKeyValue *keys = alloca (seeker->fanout * sizeof (IndexKeyValue));
+  unsigned i;
+  unsigned dec_len = uncompressed_len;
+  uint8_t *dec_at = seeker->uncompressed_data;
+  size_t total_kv_size = 0;
+  for (i = 0; i < seeker->fanout && dec_len > 0; i++)
+    {
+      /* parse key/value length */
+      uint32_t kv[2];
+      if (dec_len < 8)
+        {
+          /* data too short */
+          dsk_set_error (error, "data too short in middle of key/value header");
+          return DSK_FALSE;
+        }
+      memcpy (kv, dec_at, 8);
+      dec_at += 8;
+      dec_len -= 8;
+      kv[0] = UINT32_TO_LITTLE_ENDIAN (kv[0]);
+      kv[1] = UINT32_TO_LITTLE_ENDIAN (kv[1]);
+      if (kv[0] + kv[1] < kv[0])
+        {
+          /* overflow */
+          dsk_set_error (error, "key/value lengths too long");
+          return DSK_FALSE;
+        }
+      if (dec_len < kv[0] + kv[1])
+        {
+          /* data too short */
+          dsk_set_error (error, "data too short in middle of key/value");
+          return DSK_FALSE;
+        }
+
+      /* scan key/value */
+      keys[i].key_length = kv[0];
+      keys[i].key_data = dec_at;
+      dec_at += kv[0];
+      keys[i].value_length = kv[1];
+      keys[i].key_data = dec_at;
+      dec_at += kv[1];
+      total_kv_size += kv[0] + kv[1];
+    }
+  entry = dsk_malloc (sizeof (IndexCacheEntry)
+                      + sizeof (IndexKeyValue) * i
+                      + total_kv_size);
+  entry->n_uncompressed = i;
+  entry->uncompressed = (IndexKeyValue*)(entry+1);
+  uint8_t *copy_at;
+  copy_at = (uint8_t*)(entry->uncompressed + i);
+  for (i = 0; i < entry->n_uncompressed; i++)
+    {
+      entry->uncompressed[i].key_length = keys[i].key_length;
+      memcpy (copy_at, keys[i].key_data, keys[i].key_length);
+      entry->uncompressed[i].key_data = copy_at;
+      copy_at += keys[i].key_length;
+
+      entry->uncompressed[i].value_length = keys[i].value_length;
+      memcpy (copy_at, keys[i].value_data, keys[i].value_length);
+      entry->uncompressed[i].value_data = copy_at;
+      copy_at += keys[i].value_length;
+    }
+
+  /* add to hash table */
+  entry->next_in_bin = seeker->index_cache_table[bin];
+  seeker->index_cache_table[bin] = entry;
+  seeker->index_cache_occupancy += 1;
+
+  /* add to LRU list */
+  GSK_LIST_PREPEND (SEEKER_GET_LRU (seeker), entry);
+
+  return entry;
+}
+
+static dsk_boolean
+bsearch_cache_entry (IndexCacheEntry *cache_entry,
+                     DskTableSeekerTestFunc func,
+                     void            *func_data,
+                     unsigned        *key_len_out,
+                     const void     **key_data_out,
+                     unsigned        *value_len_out,
+                     const void     **value_data_out)
+{
+  unsigned start = 0, count = cache_entry->n_uncompressed;
+  while (count > 2)
+    {
+      unsigned mid = start + count / 2;
+      if (func (cache_entry->uncompressed[mid].key_length,
+                cache_entry->uncompressed[mid].key_data,
+                func_data))
+        count = count / 2 + 1;
+      else
+        {
+          count = start + count - mid;
+          start = mid;
+        }
+    }
+  while (count > 0)
+    {
+      if (func (cache_entry->uncompressed[start].key_length,
+                cache_entry->uncompressed[start].key_data,
+                func_data))
+        {
+          if (key_len_out)
+            *key_len_out = cache_entry->uncompressed[start].key_length;
+          if (key_data_out)
+            *key_data_out = cache_entry->uncompressed[start].key_data;
+          if (value_len_out)
+            *value_len_out = cache_entry->uncompressed[start].value_length;
+          if (value_data_out)
+            *value_data_out = cache_entry->uncompressed[start].value_data;
+          return DSK_TRUE;
+        }
+      start++;
+      count--;
+    }
+  return DSK_FALSE;
+}
 
 dsk_boolean
 dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
@@ -1143,6 +1568,7 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
                                   const void           **value_data_out,
                                   DskError             **error)
 {
+  IndexCacheEntry *cache_entry;
   /* Only happens for empty files. */
   if (seeker->n_index_levels == 0)
     return DSK_FALSE;
@@ -1156,22 +1582,16 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
       while (count > 2)
         {
           uint64_t mid = first + count / 2;
-
-          /* Read index entry corresponding to mid */
-          ...
-
-          /* Read key corresponding to mid */
-          ...
-          
-          is_returnable = func (...);
-
-          if (is_returnable)
-            {
-              count = count / 2 + 1;
-            }
+          if (!seeker_get_nonzero_index_key (seeker, layer, mid, error))
+            return DSK_FALSE;
+          if ((*func) (seeker->index_key_length,
+                       seeker->index_key_data,
+                       func_data))
+            count = count / 2 + 1;
           else
             {
               count = (first + count) - mid;
+              first = mid;
             }
         }
       if (count == 0)
@@ -1190,10 +1610,15 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
       else
         {
           dsk_assert (count==2);
-          if (! is second key in set)
+          if (!seeker_get_nonzero_index_key (seeker, layer, first+1, error))
+            return DSK_FALSE;
+          if (!(*func) (seeker->index_key_length,
+                        seeker->index_key_data,
+                        func_data))
             {
               /* the correct result must be in the second set */
-              ...
+              first++;
+              count--;
             }
         }
 
@@ -1203,25 +1628,25 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
     }
 
   /* handle layer 0 bsearch */
+  unsigned compressed_len;
+  uint64_t compressed_offset;
   while (count > 2)
     {
       uint64_t mid = first + count / 2;
 
-      /* Read index entry corresponding to mid */
-      ...
+      if (!seeker_get_zero_index_key (seeker, mid,
+                                      &compressed_len, &compressed_offset,
+                                      error))
+        return DSK_FALSE;
 
-      /* Read key corresponding to mid */
-      ...
-      
-      is_returnable = func (...);
-
-      if (is_returnable)
-        {
-          count = count / 2 + 1;
-        }
+      if ((*func) (seeker->index_key_length,
+                   seeker->index_key_data,
+                   func_data))
+        count = count / 2 + 1;
       else
         {
           count = (first + count) - mid;
+          first = mid;
         }
     }
   if (count == 0)
@@ -1229,26 +1654,71 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
       /* The saught key would be before first element in the file. */
       return DSK_FALSE;
     }
+  else if (count == 1)
+    {
+      if (!seeker_get_zero_index_key (seeker, first,
+                                      &compressed_len, &compressed_offset,
+                                      error))
+        return DSK_FALSE;
+    }
   else if (count == 2)
     {
-      if (! is second key in set)
+      if (!seeker_get_zero_index_key (seeker, first+1,
+                                      &compressed_len, &compressed_offset,
+                                      error))
+        return DSK_FALSE;
+      if (!(*func) (seeker->index_key_length,
+                    seeker->index_key_data,
+                    func_data))
         {
           /* the correct result must be in the second set */
-          ...
+          first++;
+          count--;
+        }
+      else
+        {
+          if (!seeker_get_zero_index_key (seeker, first,
+                                          &compressed_len, &compressed_offset,
+                                          error))
+            return DSK_FALSE;
         }
     }
 
+search_compressed_chunk:
+
   /* decompress/cache lookup appropriate chunk */
-  cache_entry = force_cache_entry (seeker, offset, length, error);
+  cache_entry = force_cache_entry (seeker,
+                                   compressed_len,
+                                   compressed_offset,
+                                   error);
   if (cache_entry == NULL)
+    return DSK_FALSE;
+
+  /* search in cache_entry */
+  if (bsearch_cache_entry (cache_entry, 
+                           func, func_data,
+                           key_len_out, key_data_out,
+                           value_len_out, value_data_out))
+    return DSK_TRUE;
+
+  /* If we had two chunks to search, go back and try the second */
+  if (count == 2)
     {
-      ...
+      /* try second chunk */
+      first++;
+      count--;
+      if (!seeker_get_zero_index_key (seeker, first,
+                                      &compressed_len,
+                                      &compressed_offset,
+                                      error))
+        return DSK_FALSE;
+      goto search_compressed_chunk;
     }
 
-  /* search in compressed chunk[s] */
-  ...
+  return DSK_TRUE;
 }
  
+#if 0
 DskTableFileReader *
 dsk_table_file_seeker_find_reader(DskTableFileSeeker    *seeker,
                                   DskTableSeekerTestFunc func,
@@ -1277,12 +1747,17 @@ dsk_table_file_seeker_index_reader(DskTableFileSeeker    *seeker,
 {
   ...
 }
- 
+#endif
 
 void         dsk_table_file_seeker_destroy    (DskTableFileSeeker    *seeker)
 {
-  ...
+  dsk_free (seeker->index_key_data);
+  dsk_free (seeker->compressed_data);
+  dsk_free (seeker->uncompressed_data);
+  close (seeker->compressed_data_fd);
+  while (seeker->least_recent)
+    kill_least_recently_used (seeker);
+  dsk_assert (seeker->index_cache_occupancy == 0);
   seeker_free_index_level_array (seeker->n_index_levels, seeker->index_levels);
-  ...
   dsk_free (seeker);
 }
