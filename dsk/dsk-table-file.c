@@ -31,8 +31,12 @@
 
 /* Must be a multiple of 6, since index0 has records of 6 uint32;
    all other index levels have records of 3 uint32. */
+#define INDEX_0_PACKED_ENTRY_SIZE            24
+#define INDEX_NON0_PACKED_ENTRY_SIZE         12
 #define INDEX_WRITER_INDEX_BUF_COUNT        (6*128)
 
+#define INDEX_PACKED_ENTRY_SIZE(level) \
+      ((level) == 0 ? INDEX_0_PACKED_ENTRY_SIZE : INDEX_NON0_PACKED_ENTRY_SIZE)
 /* --- Writer --- */
 typedef struct _IndexWriter IndexWriter;
 struct _IndexWriter
@@ -1023,20 +1027,21 @@ typedef struct _SeekerIndex SeekerIndex;
 struct _SeekerIndex
 {
   int index_fd, heap_fd;
+  uint64_t count;
 };
 struct _DskTableFileSeeker
 {
-  unsigned n_levels;
+  unsigned n_index_levels;
   unsigned fanout;
   SeekerIndex *index_levels;
   int compressed_data_fd;
 };
 
 static void
-seeker_free_index_level_array (unsigned n_levels, SeekerIndex *index_levels)
+seeker_free_index_level_array (unsigned n_index_levels, SeekerIndex *index_levels)
 {
   unsigned i;
-  for (i = 0; i < n_levels; i++)
+  for (i = 0; i < n_index_levels; i++)
     {
       close (index_levels[i].heap_fd);
       close (index_levels[i].index_fd);
@@ -1063,6 +1068,7 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
   index_levels = dsk_malloc (sizeof (SeekerIndex) * n_index_levels);
   for (i = 0; i < n_index_levels; i++)
     {
+      unsigned index_entry_size = INDEX_PACKED_ENTRY_SIZE (i);
       snprintf (filename_buf + basefilename_len, 32, ".%03ui", i);
       index_levels[i].index_fd = openat (openat_fd, filename_buf, O_RDONLY);
       if (index_levels[i].index_fd < 0)
@@ -1073,6 +1079,26 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
           dsk_free (filename_buf);
           return NULL;
         }
+
+      struct stat stat_buf;
+      if (fstat (index_levels[i].index_fd, &stat_buf) < 0)
+        {
+          dsk_set_error (error, "opening stat'ing index level %u (%s) failed: %s",
+                         i, filename_buf, strerror (errno));
+          seeker_free_index_level_array (i, index_levels);
+          dsk_free (filename_buf);
+          return NULL;
+        }
+      if (stat_buf.st_size % index_entry_size != 0)
+        {
+          dsk_set_error (error, "index at %s was not a multiple of %u bytes",
+                         filename_buf, index_entry_size);
+          seeker_free_index_level_array (i, index_levels);
+          dsk_free (filename_buf);
+          return NULL;
+        }
+      index_levels[i].count = stat_buf.st_size / index_entry_size;
+
       snprintf (filename_buf + basefilename_len, 32, ".%03uh", i);
       index_levels[i].heap_fd = openat (openat_fd, filename_buf, O_RDONLY);
       if (index_levels[i].heap_fd < 0)
@@ -1100,7 +1126,7 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
     }
 
   DskTableFileSeeker *rv = dsk_malloc (sizeof (DskTableFileSeeker));
-  rv->n_levels = metadata.n_index_levels;
+  rv->n_index_levels = metadata.n_index_levels;
   rv->index_levels = index_levels;
   rv->compressed_data_fd = compressed_data_fd;
   return rv;
@@ -1117,11 +1143,99 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
                                   const void           **value_data_out,
                                   DskError             **error)
 {
+  /* Only happens for empty files. */
+  if (seeker->n_index_levels == 0)
+    return DSK_FALSE;
+
   /* search in index layers, starting at n_index_levels-1 ending at 0. */
   unsigned layer;
-  for (layer = seeker->n_index_levels - 1; layer != (unsigned)(-1); layer--)
+  uint64_t first = 0;
+  uint64_t count = seeker->index_levels[seeker->n_index_levels - 1].count;
+  for (layer = seeker->n_index_levels - 1; layer != 0; layer--)
     {
+      while (count > 2)
+        {
+          uint64_t mid = first + count / 2;
+
+          /* Read index entry corresponding to mid */
+          ...
+
+          /* Read key corresponding to mid */
+          ...
+          
+          is_returnable = func (...);
+
+          if (is_returnable)
+            {
+              count = count / 2 + 1;
+            }
+          else
+            {
+              count = (first + count) - mid;
+            }
+        }
+      if (count == 0)
+        {
+          /* The saught key would be before first element in the file. */
+          return DSK_FALSE;
+        }
+      else if (count == 1)
+        {
+          /* proceed */
+          /* Admittedly, if the size of this index level is 1, it is possible
+             that we could have ruled out a miss at this level.  oh well.
+           * A first_key and last_key member of the metadata might be the
+             nicest way to handle that situation. */
+        }
+      else
+        {
+          dsk_assert (count==2);
+          if (! is second key in set)
+            {
+              /* the correct result must be in the second set */
+              ...
+            }
+        }
+
+      /* prepare for next level */
+      first *= seeker->fanout;
+      count *= seeker->fanout;
+    }
+
+  /* handle layer 0 bsearch */
+  while (count > 2)
+    {
+      uint64_t mid = first + count / 2;
+
+      /* Read index entry corresponding to mid */
       ...
+
+      /* Read key corresponding to mid */
+      ...
+      
+      is_returnable = func (...);
+
+      if (is_returnable)
+        {
+          count = count / 2 + 1;
+        }
+      else
+        {
+          count = (first + count) - mid;
+        }
+    }
+  if (count == 0)
+    {
+      /* The saught key would be before first element in the file. */
+      return DSK_FALSE;
+    }
+  else if (count == 2)
+    {
+      if (! is second key in set)
+        {
+          /* the correct result must be in the second set */
+          ...
+        }
     }
 
   /* decompress/cache lookup appropriate chunk */
@@ -1131,7 +1245,7 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
       ...
     }
 
-  /* search in chunk */
+  /* search in compressed chunk[s] */
   ...
 }
  
