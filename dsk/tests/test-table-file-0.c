@@ -433,6 +433,8 @@ test_various_write_seek (const char *name,
 
   /* do negative tests */
   ...
+
+  dsk_table_file_seeker_destroy (seeker);
 }
 
 static void
