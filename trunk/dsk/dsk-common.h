@@ -14,6 +14,8 @@ typedef int dsk_boolean;
 #define DSK_TRUE		1
 
 #define DSK_N_ELEMENTS(array)   ( sizeof(array) / sizeof((array)[0]) )
+#define DSK_MIN(a,b)            (((a) < (b)) ? (a) : (b))
+#define DSK_MAX(a,b)            (((a) > (b)) ? (a) : (b))
 
 /* branch-hinting macros */
 #define DSK_LIKELY(condition)     (condition)

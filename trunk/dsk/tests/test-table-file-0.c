@@ -337,6 +337,116 @@ test_various_read_write (void)
                                  test_slow_datasets[i].to_write);
 }
 
+static dsk_boolean
+str_test_func (unsigned len,
+               const uint8_t *data,
+               void *func_data)
+{
+  unsigned func_data_len = strlen (func_data);
+  int rv = memcmp (data, func_data, DSK_MIN (len, func_data_len));
+  if (rv < 0)
+    return DSK_FALSE;
+  else if (rv > 0)
+    return DSK_TRUE;
+  else
+    return len < func_data_len;
+}
+
+static void
+test_various_write_seek (const char *name,
+                         unsigned    n_entries,
+                         TestEntry  *entries)
+{
+  DskTableFileOptions opts = DSK_TABLE_FILE_OPTIONS_DEFAULT;
+  DskError *error = NULL;
+  unsigned i;
+  opts.openat_fd = test_dir_fd;
+  opts.base_filename = "base";
+
+  if (cmdline_verbose)
+    fprintf (stderr, "running dataset %s [%u]\n", name, n_entries);
+  else
+    fprintf (stderr, ".");
+
+  DskTableFileWriter *writer = dsk_table_file_writer_new (&opts, &error);
+  if (writer == NULL)
+    dsk_die ("%s", error->message);
+  for (i = 0; i < n_entries; i++)
+    {
+      TestEntry *e = entries + i;
+      if (!dsk_table_file_write (writer,
+                                 strlen (e->key), (uint8_t*) e->key,
+                                 strlen (e->value), (uint8_t*) e->value,
+                                 &error))
+        dsk_die ("error writing: %s", error->message);
+    }
+  if (!dsk_table_file_writer_close (writer, &error))
+    dsk_die ("error closing writer: %s", error->message);
+  dsk_table_file_writer_destroy (writer);
+
+  /* --- now test seeker --- */
+
+  /* pick the step size. */
+  static unsigned prime_table[] = { 29, 31, 37, 41, 43, 47, 53, 59, 61, 67 };
+  unsigned *p_ptr = prime_table + DSK_N_ELEMENTS (prime_table) - 1;
+  while (n_entries % *p_ptr == 0)
+    p_ptr--;
+  unsigned step = *p_ptr;
+
+  /* create seeker */
+  DskTableFileSeeker *seeker = dsk_table_file_seeker_new (&opts, &error);
+  if (seeker == NULL)
+    dsk_die ("error creating seeker from newly finished writer: %s",
+             error->message);
+
+  unsigned max_test = cmdline_slow ? 100000 : 1000;
+  unsigned n_test = DSK_MIN (n_entries, max_test);
+  unsigned test_i = step;
+  for (i = 0; i < n_test; i++)
+    {
+      unsigned key_len, value_len;
+      const uint8_t *key_data, *value_data;
+      /* do the seek */
+      if (!dsk_table_file_seeker_find (seeker,
+                                       str_test_func,
+                                       (void*) entries[test_i].key,
+                                       &key_len, &key_data,
+                                       &value_len, &value_data,
+                                       &error))
+        {
+          if (error)
+            dsk_die ("error doing seek that should have succeeded: %s",
+                     error->message);
+          else
+            dsk_die ("not found doing seek that should have succeeded");
+        }
+      dsk_assert (key_len == strlen (entries[test_i].key));
+      dsk_assert (value_len == strlen (entries[test_i].value));
+      dsk_assert (memcmp (key_data, entries[test_i].key, key_len) == 0);
+      dsk_assert (memcmp (value_data, entries[test_i].value, value_len) == 0);
+
+      /* advance test_i */
+      test_i += step;
+      if (test_i >= n_entries)
+        test_i -= n_entries;
+    }
+
+  /* do negative tests */
+  ...
+}
+
+static void
+test_various_write_seek (void)
+{
+  unsigned i;
+  for (i = 0; i < DSK_N_ELEMENTS (test_datasets); i++)
+    test_various_write_seek_1 (test_seek_datasets[i].name,
+                               test_seek_datasets[i].n_entries,
+                               test_seek_datasets[i].entries,
+                               test_seek_datasets[i].to_write);
+}
+
+
 static struct 
 {
   const char *name;
