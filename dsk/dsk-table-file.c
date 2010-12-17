@@ -1518,9 +1518,9 @@ bsearch_cache_entry (IndexCacheEntry *cache_entry,
                      DskTableSeekerTestFunc func,
                      void            *func_data,
                      unsigned        *key_len_out,
-                     const void     **key_data_out,
+                     const uint8_t  **key_data_out,
                      unsigned        *value_len_out,
-                     const void     **value_data_out)
+                     const uint8_t  **value_data_out)
 {
   unsigned start = 0, count = cache_entry->n_uncompressed;
   while (count > 2)
@@ -1563,9 +1563,9 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
                                   DskTableSeekerTestFunc func,
                                   void                  *func_data,
                                   unsigned              *key_len_out,
-                                  const void           **key_data_out,
+                                  const uint8_t        **key_data_out,
                                   unsigned              *value_len_out,
-                                  const void           **value_data_out,
+                                  const uint8_t        **value_data_out,
                                   DskError             **error)
 {
   IndexCacheEntry *cache_entry;
