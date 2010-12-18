@@ -11,6 +11,7 @@ static char *test_dir = NULL;
 static int   test_dir_fd = -1;
 static dsk_boolean cmdline_verbose = DSK_FALSE;
 static dsk_boolean cmdline_slow = DSK_FALSE;
+static dsk_boolean cmdline_keep_testdir = DSK_FALSE;
 
 
 
@@ -353,9 +354,11 @@ str_test_func (unsigned len,
 }
 
 static void
-test_various_write_seek (const char *name,
-                         unsigned    n_entries,
-                         TestEntry  *entries)
+test_various_write_seek_1 (const char *name,
+                           unsigned    n_entries,
+                           TestEntry  *entries,
+                           unsigned    n_negative,
+                           TestEntry  *neg_entries)
 {
   DskTableFileOptions opts = DSK_TABLE_FILE_OPTIONS_DEFAULT;
   DskError *error = NULL;
@@ -432,10 +435,61 @@ test_various_write_seek (const char *name,
     }
 
   /* do negative tests */
-  ...
+  for (i = 0; i < n_negative; i++)
+    {
+      unsigned key_len, value_len;
+      const uint8_t *key_data, *value_data;
+      /* do the seek */
+      if (!dsk_table_file_seeker_find (seeker,
+                                       str_test_func,
+                                       (void*) neg_entries[i].key,
+                                       &key_len, &key_data,
+                                       &value_len, &value_data,
+                                       &error))
+        {
+          if (error)
+            dsk_die ("error doing seek that should have returned nothing: %s",
+                     error->message);
+        }
+      else if (key_len == strlen (neg_entries[i].key)
+               && memcmp (key_data, neg_entries[i].key, key_len) == 0)
+        {
+          dsk_die ("found result when none expected");
+        }
+    }
+
 
   dsk_table_file_seeker_destroy (seeker);
 }
+
+static TestEntry write_seek__odd_letters_to_cap[] = {
+  { "a", "A" }, { "c", "C" }, { "e", "E" }, { "g", "G" },
+  { "i", "I" }, { "k", "K" }, { "m", "M" }, { "o", "O" },
+  { "q", "Q" }, { "s", "S" }, { "u", "U" }, { "w", "W" },
+  { "y", "Y" },
+};
+static TestEntry write_seek__even_letters_to_cap[] = {
+  { "b", "B" }, { "d", "D" }, { "f", "F" }, { "h", "H" },
+  { "j", "J" }, { "l", "L" }, { "n", "N" }, { "p", "P" },
+  { "r", "R" }, { "t", "T" }, { "v", "V" }, { "x", "X" },
+  { "z", "Z" },
+};
+
+static struct {
+  const char *name;
+  unsigned n_entries;
+  TestEntry *entries;
+  unsigned n_neg_entries;
+  TestEntry *neg_entries;
+} test_seek_datasets[] =
+{
+#define WRITE_ENTRY(name, pos, neg) \
+  { name, DSK_N_ELEMENTS(pos), pos, DSK_N_ELEMENTS(neg), neg }
+  WRITE_ENTRY ("odd/even", write_seek__odd_letters_to_cap, write_seek__even_letters_to_cap),
+  WRITE_ENTRY ("even/odd", write_seek__even_letters_to_cap, write_seek__odd_letters_to_cap)
+#undef WRITE_ENTRY
+};
+
 
 static void
 test_various_write_seek (void)
@@ -445,7 +499,8 @@ test_various_write_seek (void)
     test_various_write_seek_1 (test_seek_datasets[i].name,
                                test_seek_datasets[i].n_entries,
                                test_seek_datasets[i].entries,
-                               test_seek_datasets[i].to_write);
+                               test_seek_datasets[i].n_neg_entries,
+                               test_seek_datasets[i].neg_entries);
 }
 
 
@@ -457,7 +512,7 @@ static struct
 {
   { "simple writing/reading", test_simple_write_read },
   { "extensive write/read testing", test_various_read_write },
-  { "partial recovery after corruption", test_read_corruption_write },
+  { "extensive write/seek testing", test_various_write_seek },
 };
 
 int main(int argc, char **argv)
@@ -471,6 +526,8 @@ int main(int argc, char **argv)
                            &cmdline_verbose);
   dsk_cmdline_add_boolean ("slow", "run tests that are fairly slow", NULL, 0,
                            &cmdline_slow);
+  dsk_cmdline_add_boolean ("keep-testdir", "do not delete working directory", NULL, 0,
+                           &cmdline_keep_testdir);
   dsk_cmdline_process_args (&argc, &argv);
 
   char test_dir_buf[256];
@@ -494,12 +551,14 @@ int main(int argc, char **argv)
   if (cmdline_keep_testdir)
     {
       fprintf (stderr,
-               "test-table-file: keep-testdir: preserving test directory %u\n",
+               "test-table-file: keep-testdir: preserving test directory %s\n",
                test_dir);
     }
   else
     {
-      rm_rf (test_dir);
+//      DskError *error = NULL;
+//      if (!dsk_remove_dir_recursive (test_dir, &error))
+//        dsk_die ("error removing directory %s: %s", test_dir, error->message);
     }
   dsk_cleanup ();
   return 0;

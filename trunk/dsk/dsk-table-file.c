@@ -638,7 +638,7 @@ void        dsk_table_file_writer_destroy (DskTableFileWriter *writer)
     {
       unsigned i;
       /* Delete all files if not closed. */
-      unlink_by_suffix (writer, ".metadata");
+      unlink_by_suffix (writer, ".info");
       unlink_by_suffix (writer, "");
       for (i = 0; i < n_levels; i++)
         {
@@ -920,7 +920,7 @@ dsk_table_file_metadata_parse (const DskTableFileOptions *options,
   memcpy (filename_buf, options->base_filename, basefilename_len);
 
   /* Read metadata (needed for the number of index levels) */
-  strcpy (filename_buf + basefilename_len, ".metadata");
+  strcpy (filename_buf + basefilename_len, ".info");
 retry_metadata_open:
   if (options->openat_fd < 0)
     fd = open (filename_buf, O_RDONLY);
