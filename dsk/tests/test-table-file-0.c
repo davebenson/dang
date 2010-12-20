@@ -56,10 +56,9 @@ test_simple_write_read (void)
   dsk_assert (reader->key_data[0] == 'c');
   dsk_assert (reader->value_length == 1);
   dsk_assert (reader->value_data[0] == 'C');
-  if (dsk_table_file_reader_advance (reader, &error))
-    dsk_die ("expected EOF");
-  if (error)
-    dsk_die ("expected EOF, got error: %s", error->message);
+  if (!dsk_table_file_reader_advance (reader, &error))
+    dsk_die ("error advancing reader: %s", error->message);
+  dsk_assert (reader->at_eof);
   dsk_table_file_reader_destroy (reader);
 }
 
@@ -302,21 +301,10 @@ test_various_read_write_1 (const char *name,
       dsk_assert (memcmp (reader->key_data, e->key, reader->key_length) == 0);
       dsk_assert (memcmp (reader->value_data, e->value, reader->value_length) == 0);
 
+      if (!dsk_table_file_reader_advance (reader, &error))
+        dsk_die ("error reading file: %s", error->message);
       if (big_i + 1 == n_write)
-        {
-          if (dsk_table_file_reader_advance (reader, &error))
-            dsk_die ("expected EOF");
-        }
-      else
-        {
-          if (!dsk_table_file_reader_advance (reader, &error))
-            {
-              if (error)
-                dsk_die ("error reading file: %s", error->message);
-              else
-                dsk_die ("unexpected EOF");
-            }
-        }
+        break;
     }
   dsk_assert (reader->at_eof);
   dsk_table_file_reader_destroy (reader);
@@ -344,13 +332,14 @@ str_test_func (unsigned len,
                void *func_data)
 {
   unsigned func_data_len = strlen (func_data);
+  dsk_warning ("comparing test key %s with %.*s", (char*)func_data, len, data);
   int rv = memcmp (data, func_data, DSK_MIN (len, func_data_len));
   if (rv < 0)
     return DSK_FALSE;
   else if (rv > 0)
     return DSK_TRUE;
   else
-    return len < func_data_len;
+    return len >= func_data_len;
 }
 
 static void
@@ -394,7 +383,7 @@ test_various_write_seek_1 (const char *name,
   unsigned *p_ptr = prime_table + DSK_N_ELEMENTS (prime_table) - 1;
   while (n_entries % *p_ptr == 0)
     p_ptr--;
-  unsigned step = *p_ptr;
+  unsigned step = *p_ptr % n_entries;
 
   /* create seeker */
   DskTableFileSeeker *seeker = dsk_table_file_seeker_new (&opts, &error);
@@ -418,11 +407,13 @@ test_various_write_seek_1 (const char *name,
                                        &error))
         {
           if (error)
-            dsk_die ("error doing seek that should have succeeded: %s",
+            dsk_die ("error doing find that should have succeeded: %s",
                      error->message);
           else
-            dsk_die ("not found doing seek that should have succeeded");
+            dsk_die ("not found doing find that should have succeeded");
         }
+      dsk_warning ("test=%s, got result %.*s", entries[test_i].key,
+                   key_len, key_data);
       dsk_assert (key_len == strlen (entries[test_i].key));
       dsk_assert (value_len == strlen (entries[test_i].value));
       dsk_assert (memcmp (key_data, entries[test_i].key, key_len) == 0);
@@ -448,7 +439,7 @@ test_various_write_seek_1 (const char *name,
                                        &error))
         {
           if (error)
-            dsk_die ("error doing seek that should have returned nothing: %s",
+            dsk_die ("error doing find that should have returned nothing: %s",
                      error->message);
         }
       else if (key_len == strlen (neg_entries[i].key)
@@ -474,6 +465,82 @@ static TestEntry write_seek__even_letters_to_cap[] = {
   { "r", "R" }, { "t", "T" }, { "v", "V" }, { "x", "X" },
   { "z", "Z" },
 };
+static TestEntry write_seek__dict_head_to_dict_tail[] = {
+{"","weal's"}, {"A","weals"}, {"A's","wealth"}, {"AOL","wealth's"},
+{"AOL's","wealthier"}, {"Aachen","wealthiest"}, {"Aachen's","wealthiness"},
+{"Aaliyah","wealthiness's"}, {"Aaliyah's","wealthy"}, {"Aaron","wean"},
+{"Aaron's","weaned"}, {"Abbas","weaning"}, {"Abbasid","weans"},
+{"Abbasid's","weapon"}, {"Abbott","weapon's"}, {"Abbott's","weaponless"},
+{"Abby","weaponry"}, {"Abby's","weaponry's"}, {"Abdul","weapons"},
+{"Abdul's","wear"}, {"Abe","wearable"}, {"Abe's","wearer"},
+{"Abel","wearer's"}, {"Abel's","wearers"}, {"Abelard","wearied"},
+{"Abelard's","wearier"}, {"Abelson","wearies"}, {"Abelson's","weariest"},
+{"Aberdeen","wearily"}, {"Aberdeen's","weariness"}, {"Abernathy","weariness's"},
+{"Abernathy's","wearing"}, {"Abidjan","wearisome"}, {"Abidjan's","wears"},
+{"Abigail","weary"}, {"Abigail's","wearying"}, {"Abilene","weasel"},
+{"Abilene's","weasel's"}, {"Abner","weaseled"}, {"Abner's","weaseling"},
+{"Abraham","weasels"}, {"Abraham's","weather"}, {"Abram","weather's"},
+{"Abram's","weathercock"}, {"Abrams","weathercock's"},
+{"Absalom","weathercocked"}, {"Absalom's","weathercocking"},
+{"Abuja","weathercocks"}, {"Abyssinia","weathered"},
+{"Abyssinia's","weathering"}, {"Abyssinian","weathering's"},
+{"Ac","weatherize"}, {"Ac's","weatherized"}, {"Acadia","weatherizes"},
+{"Acadia's","weatherizing"}, {"Acapulco","weatherman"},
+{"Acapulco's","weatherman's"}, {"Accra","weathermen"},
+{"Accra's","weatherproof"}, {"Acevedo","weatherproofed"},
+{"Acevedo's","weatherproofing"}, {"Achaean","weatherproofs"},
+{"Achaean's","weathers"}, {"Achebe","weave"}, {"Achebe's","weaved"},
+{"Achernar","weaver"}, {"Achernar's","weaver's"}, {"Acheson","weavers"},
+{"Acheson's","weaves"}, {"Achilles","weaving"}, {"Aconcagua","web"},
+{"Aconcagua's","web's"}, {"Acosta","webbed"}, {"Acosta's","webbing"},
+{"Acropolis","webbing's"}, {"Acropolis's","webs"}, {"Acrux","website"},
+{"Acrux's","websites"}, {"Actaeon","wed"}, {"Actaeon's","wedded"},
+{"Acton","wedder"}, {"Acton's","wedding"}, {"Acts","wedding's"},
+{"Acuff","weddings"}, {"Acuff's","wedge"}, {"Ada","wedge's"},
+{"Ada's","wedged"}, {"Adam","wedges"}, {"Adam's","wedging"},
+{"Adams","wedlock"}, {"Adan","wedlock's"}, {"Adan's","weds"},
+{"Adana","wee"}, {"Adana's","weed"}, {"Adar","weed's"},
+{"Adar's","weeded"}, {"Addams","weeder"}, {"Adderley","weeder's"},
+{"Adderley's","weeders"}, {"Addie","weedier"}, {"Addie's","weediest"},
+{"Addison","weeding"}, {"Addison's","weeds"}, {"Adela","weedy"},
+{"Adela's","weeing"}, {"Adelaide","week"}, {"Adelaide's","week's"},
+{"Adele","weekday"}, {"Adele's","weekday's"}, {"Adeline","weekdays"},
+{"Adeline's","weekend"}, {"Aden","weekend's"}, {"Aden's","weekended"},
+{"Adenauer","weekending"}, {"Adenauer's","weekends"}, {"Adhara","weeklies"},
+{"Adhara's","weekly"}, {"Adidas","weeknight"}, {"Adidas's","weeknight's"},
+{"Adirondack","weeknights"}, {"Adirondack's","weeks"}, {"Adirondacks","weep"},
+{"Adkins","weeper"}, {"Adkins's","weeper's"}, {"Adler","weepers"},
+{"Adler's","weepier"}, {"Adolf","weepies"}, {"Adolf's","weepiest"},
+{"Adolfo","weeping"}, {"Adolfo's","weepings"}, {"Adolph","weeps"},
+{"Adolph's","weepy"}, {"Adonis","weer"}, {"Adonis's","wees"},
+{"Adonises","weest"}, {"Adrian","weevil"}, {"Adrian's","weevil's"},
+{"Adriana","weevils"}, {"Adriana's","weft"}, {"Adriatic","weft's"},
+{"Adrienne","wefted"}, {"Adrienne's","wefting"}, {"Advent","wefts"},
+{"Advent's","weigh"}, {"Adventist","weighed"}, {"Adventist's","weighing"},
+{"Advents","weighs"}, {"Advil","weight"}, {"Advil's","weight's"},
+{"Aegean","weighted"}, {"Aelfric","weightier"}, {"Aelfric's","weightiest"},
+{"Aeneas","weightiness"}, {"Aeneid","weightiness's"}, {"Aeneid's","weighting"},
+{"Aeolus","weighting's"}, {"Aeolus's","weightless"}, {"Aeroflot","weightlessness"},
+{"Aeroflot's","weightlessness's"}, {"Aeschylus","weightlifter"},
+{"Aeschylus's","weightlifters"}, {"Aesculapius","weightlifting"},
+{"Aesculapius's","weightlifting's"}, {"Aesop","weights"}, {"Aesop's","weighty"},
+{"Afghan","weir"}, {"Afghan's","weir's"}, {"Afghanistan","weird"},
+{"Afghanistan's","weirded"}, {"Afghans","weirder"}, {"Africa","weirdest"},
+{"Africa's","weirding"}, {"African","weirdly"}, {"Africans","weirdness"},
+{"Afrikaans","weirdness's"}, {"Afrikaans's","weirdo"}, {"Afrikaner","weirdo's"},
+{"Afrikaner's","weirdos"}, {"Afrikaners","weirds"}, {"Afro","weired"},
+{"Afro's","weiring"}, {"Afrocentrism","weirs"}, {"Afros","welcome"},
+{"Ag","welcomed"}, {"Ag's","welcomes"}, {"Agamemnon","welcoming"},
+{"Agamemnon's","weld"}, {"Agassi","welded"}, {"Agassi's","welder"},
+{"Agassiz","welder's"}, {"Agassiz's","welders"}, {"Agatha","welding"},
+{"Agatha's","welds"}, {"Aggie","welfare"}, {"Aggie's","welfare's"},
+{"Aglaia","welkin"}, {"Aglaia's","welkin's"}, {"Agnes","well"},
+{"Agnes's","welled"}, {"Agnew","welling"}};
+
+static TestEntry write_seek__nonwords[] = {
+ {"AAX",""}, {"AaX",""}, {"AbX",""}, {"AcX",""}, {"AdX",""}, {"AeX",""},
+ {"AfX",""}, {"AgX",""}, {"AzX",""},
+};
 
 static struct {
   const char *name;
@@ -486,16 +553,17 @@ static struct {
 #define WRITE_ENTRY(name, pos, neg) \
   { name, DSK_N_ELEMENTS(pos), pos, DSK_N_ELEMENTS(neg), neg }
   WRITE_ENTRY ("odd/even", write_seek__odd_letters_to_cap, write_seek__even_letters_to_cap),
-  WRITE_ENTRY ("even/odd", write_seek__even_letters_to_cap, write_seek__odd_letters_to_cap)
+  WRITE_ENTRY ("even/odd", write_seek__even_letters_to_cap, write_seek__odd_letters_to_cap),
+  WRITE_ENTRY ("dict list 1", write_seek__dict_head_to_dict_tail, write_seek__nonwords),
 #undef WRITE_ENTRY
 };
 
 
 static void
-test_various_write_seek (void)
+test_simple_write_seek (void)
 {
   unsigned i;
-  for (i = 0; i < DSK_N_ELEMENTS (test_datasets); i++)
+  for (i = 0; i < DSK_N_ELEMENTS (test_seek_datasets); i++)
     test_various_write_seek_1 (test_seek_datasets[i].name,
                                test_seek_datasets[i].n_entries,
                                test_seek_datasets[i].entries,
@@ -511,8 +579,9 @@ static struct
 } tests[] =
 {
   { "simple writing/reading", test_simple_write_read },
+  { "simple write/seek testing", test_simple_write_seek },
   { "extensive write/read testing", test_various_read_write },
-  { "extensive write/seek testing", test_various_write_seek },
+  //{ "extensive write/seek testing", test_various_write_seek },
 };
 
 int main(int argc, char **argv)
