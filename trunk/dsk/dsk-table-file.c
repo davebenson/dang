@@ -1,4 +1,12 @@
-/* TODO: saw close() return EBADFD in writer/reader pairing somewhere */
+/* TODO:
+     _ track first/last key for each index entry
+     _ track max uncompressed/compressed data (maximum for any given chunk)
+     _ max index files/fanout schedule
+     _ prefix compression of index files
+     _ record sizes should be in bytes instead of entries so we can give
+       nice results.
+     
+ */
 
 /* portability issues:
      openat()
@@ -13,11 +21,13 @@
 /* Format of record in nonzero "index" files:
  *     key_data_offset     uint64
  *     key_length          uint32 
+ * +   last_key_length     uint32 
  * Format of record in zero "index" files:
  *     key_data_offset     uint64
  *     gzip_offset         uint64
  *     key_length          uint32 
  *     gzip_length         uint32
+ * +   last_key_length     uint32 
  */
 /* TODO: add end-key to index/data files to allow more effective bsearch. */
 
@@ -96,6 +106,9 @@ struct _DskTableFileWriter
   char *basefilename;
   unsigned basefilename_len;   
   int openat_fd;
+
+  unsigned max_compressed_size, max_uncompressed_size;
+  unsigned cur_uncompressed_size;
 };
 
 static int
@@ -153,6 +166,12 @@ read_from_fd(int         fd,
             continue;
           dsk_set_error (error, "error reading from file-descriptor %d: %s",
                          fd, strerror (errno));
+          return DSK_FALSE;
+        }
+      if (read_rv == 0)
+        {
+          dsk_set_error (error, "unexpected EOF reading from file-descriptor %d",
+                         fd);
           return DSK_FALSE;
         }
       size -= read_rv;
@@ -276,8 +295,8 @@ flush_index_index_to_disk (IndexWriter *index,
 }
 
 static dsk_boolean
-write_index0_compressed_len (DskTableFileWriter *writer,
-                             DskError          **error)
+write_index0_entry_end (DskTableFileWriter *writer,
+                        DskError          **error)
 {
   IndexWriter *index = writer->index_levels;
   uint32_t *at = index->index_buf + index->index_buf_used;
@@ -329,7 +348,7 @@ write_index_key (IndexWriter        *index,
    just the compressed size of the next was of data -- but
    we haven't compressed it yet... */
 static dsk_boolean
-write_index0_partial_entry (DskTableFileWriter *writer,
+write_index0_entry_start (DskTableFileWriter *writer,
                             unsigned            key_length,
                             const uint8_t      *key_data,
                             DskError          **error)
@@ -400,13 +419,26 @@ flush_compressed_data (DskTableFileWriter *writer,
     if (!flush_compressor_to_disk (writer, error))
       return DSK_FALSE;
 retry_deflate:
-  zrv = deflate (&writer->compressor, Z_FULL_FLUSH);
-  if (zrv == Z_OK && writer->compressor.avail_out > 0)
+  zrv = deflate (&writer->compressor, Z_FINISH);
+  if ((zrv == Z_OK && writer->compressor.avail_out > 0) || zrv == Z_STREAM_END)
     {
       uint64_t offset = writer->out_buf_file_offset
                       + (writer->compressor.next_out - writer->out_buf);
       writer->last_gzip_size = offset - writer->last_compressor_flush_offset;
+      if (writer->max_compressed_size < writer->last_gzip_size)
+        writer->max_compressed_size = writer->last_gzip_size;
+      if (writer->max_uncompressed_size < writer->cur_uncompressed_size)
+        writer->max_uncompressed_size = writer->cur_uncompressed_size;
+      writer->cur_uncompressed_size = 0;
       writer->last_compressor_flush_offset = offset;
+      deflateReset (&writer->compressor);
+
+      if (writer->compressor.avail_out == 0)
+        {
+          if (!flush_compressor_to_disk (writer, error))
+            return DSK_FALSE;
+        }
+
       return DSK_TRUE;
     }
   if (zrv == Z_OK)
@@ -470,13 +502,13 @@ dsk_boolean dsk_table_file_write (DskTableFileWriter *writer,
           /* Flush the existing inflator */
           if (!flush_compressed_data (writer, error))
             return DSK_FALSE;
-          if (!write_index0_compressed_len (writer, error))
+          if (!write_index0_entry_end (writer, error))
             return DSK_FALSE;
         }
 
       /* Write first-level index entry */
       //dsk_warning ("writing index 0 entry");
-      if (!write_index0_partial_entry (writer, key_length, key_data, error))
+      if (!write_index0_entry_start (writer, key_length, key_data, error))
         return DSK_FALSE;
 
       /* Do we need to go the next level? */
@@ -553,6 +585,7 @@ dsk_boolean dsk_table_file_write (DskTableFileWriter *writer,
    || !table_file_write_data (writer, value_length, value_data, error))
     return DSK_FALSE;
 
+  writer->cur_uncompressed_size += 8 + key_length + value_length;
   writer->total_n_entries += 1;
   writer->total_key_bytes += key_length;
   writer->total_value_bytes += value_length;
@@ -566,7 +599,7 @@ dsk_boolean dsk_table_file_writer_close   (DskTableFileWriter *writer,
 
   if (!flush_compressed_data (writer, error))
     return DSK_FALSE;
-  if (!writer->is_first && !write_index0_compressed_len (writer, error))
+  if (!writer->is_first && !write_index0_entry_end (writer, error))
     return DSK_FALSE;
   if (!flush_compressor_to_disk (writer, error))
     return DSK_FALSE;
@@ -591,13 +624,17 @@ dsk_boolean dsk_table_file_writer_close   (DskTableFileWriter *writer,
             "data-bytes: %llu\n"
             "compressed-size: %llu\n"
             "n-index-levels: %u\n"
-            "fanout: %u\n",
+            "fanout: %u\n"
+            "max-compressed-size: %u\n"
+            "max-uncompressed-size: %u\n",
             writer->total_n_entries,
             writer->total_key_bytes,
             writer->total_value_bytes,
             writer->out_buf_file_offset,
             n_levels,
-            writer->fanout);
+            writer->fanout,
+            writer->max_compressed_size,
+            writer->max_uncompressed_size);
   if (!write_to_fd (fd, strlen (metadata_buf),
                    (const uint8_t *) metadata_buf, error))
     {
@@ -653,249 +690,6 @@ void        dsk_table_file_writer_destroy (DskTableFileWriter *writer)
   dsk_free (writer);
 }
 
-/* --- Reader --- */
-#define READER_INBUF_SIZE  4096
-#define READER_OUTBUF_SIZE 8192
-typedef struct _Reader Reader;
-struct _Reader
-{
-  DskTableFileReader base;
-  z_stream decompressor;
-  uint8_t inbuf[READER_INBUF_SIZE];    /* input from file to decompressor */
-  uint8_t outbuf[READER_OUTBUF_SIZE];  /* output of decompressor */
-  unsigned outbuf_bytes_used;    /* as in, have been returned as entries */
-  int fd;
-  uint8_t *scratch;
-  unsigned scratch_alloced;
-};
-
-DskTableFileReader *
-dsk_table_file_reader_new (DskTableFileOptions *options,
-                           DskError           **error)
-{
-  Reader *rv;
-  int fd;
-  if (options->openat_fd < 0)
-    fd = open (options->base_filename, O_RDONLY);
-  else
-    fd = openat (options->openat_fd, options->base_filename, O_RDONLY);
-  if (fd < 0)
-    {
-      dsk_set_error (error, "%s(): error reading %s: %s",
-                     options->openat_fd < 0 ? "open" : "openat", 
-                     options->base_filename,
-                     strerror (errno));
-      return NULL;
-    }
-  rv = dsk_malloc (sizeof (Reader));
-  memset (&rv->decompressor, 0, sizeof (z_stream));
-  if (inflateInit2 (&rv->decompressor, 15) != 0)
-    dsk_die ("inflateInit2 failed");
-  rv->fd = fd;
-  rv->base.at_eof = DSK_FALSE;
-  rv->decompressor.next_out = rv->outbuf;
-  rv->decompressor.avail_out = READER_OUTBUF_SIZE;
-  
-  DskError *e = NULL;
-  if (!dsk_table_file_reader_advance (&rv->base, &e))
-    {
-      if (e != NULL)
-        {
-          dsk_table_file_reader_destroy (&rv->base);
-          if (error)
-            *error = e;
-          else
-            dsk_error_unref (e);
-          return NULL;
-        }
-    }
-  return &rv->base;
-}
-
-dsk_boolean
-dsk_table_file_reader_advance  (DskTableFileReader *reader,
-                                DskError          **error)
-{
-  Reader *r = (Reader *) reader;
-  const uint8_t *o = r->outbuf + r->outbuf_bytes_used;
-  unsigned decompressed = r->decompressor.next_out - o;
-  int zrv;
-  if (decompressed < 8)
-    {
-      memmove (r->outbuf, o, decompressed);
-      r->decompressor.next_out = r->outbuf + decompressed;
-      r->decompressor.avail_out = READER_OUTBUF_SIZE - decompressed;
-      r->outbuf_bytes_used = 0;
-      o = r->outbuf;
-      if (r->decompressor.avail_in > 0)
-        {
-          zrv = inflate(&r->decompressor, r->fd < 0 ? Z_FINISH : 0);
-          if (zrv != Z_OK && zrv != Z_STREAM_END && zrv != Z_BUF_ERROR)
-            goto zlib_error;
-          decompressed = r->decompressor.next_out - o;
-        }
-      if (decompressed < 8)
-        {
-          if (r->fd < 0)
-            {
-              /* at EOF. */
-              if (decompressed > 0)
-                dsk_set_error (error, "partial data at end of buffer");
-              r->base.at_eof = DSK_TRUE;
-              return DSK_FALSE;
-            }
-
-          /* read more data */
-          if (r->decompressor.avail_in > 0)
-            memmove (r->inbuf, r->decompressor.next_in,
-                     r->decompressor.avail_in);
-          int read_rv;
-retry_read:
-          read_rv = read (r->fd,
-                          r->inbuf + r->decompressor.avail_in,
-                          READER_INBUF_SIZE - r->decompressor.avail_in);
-          if (read_rv == 0)
-            {
-              close (r->fd);
-              r->fd = -1;
-            }
-          else if (read_rv < 0)
-            {
-              if (errno == EINTR || errno == EAGAIN)
-                goto retry_read;
-              dsk_set_error (error, "error reading from file: %s",
-                             strerror (errno));
-              return DSK_FALSE;
-            }
-          else
-            {
-              r->decompressor.avail_in += read_rv;
-              r->decompressor.next_in = r->inbuf;
-            }
-          if (r->decompressor.avail_in > 0)
-            {
-              zrv = inflate (&r->decompressor, r->fd < 0 ? Z_FINISH : 0);
-              decompressed = r->decompressor.next_out - r->outbuf;
-              if (zrv != Z_OK && zrv != Z_STREAM_END && zrv != Z_BUF_ERROR)
-                goto zlib_error;
-            }
-        }
-      if (decompressed == 0)
-        {
-          r->base.at_eof = DSK_TRUE;
-          return DSK_FALSE;
-        }
-      if (decompressed < 8)
-        {
-          dsk_set_error (error, "internal error: data too short");
-          return DSK_FALSE;
-        }
-    }
-
-  uint32_t d[2];
-  memcpy (d, o, 8);
-  d[0] = UINT32_TO_LITTLE_ENDIAN (d[0]);
-  d[1] = UINT32_TO_LITTLE_ENDIAN (d[1]);
-  unsigned kv = d[0] + d[1];
-
-  r->base.key_length = d[0];
-  r->base.value_length = d[1];
-  if (decompressed >= 8 + kv)
-    {
-      /* no copying / allocation required */
-      r->base.key_data = o + 8;
-      r->base.value_data = r->base.key_data + d[0];
-      o += 8 + kv;
-      r->outbuf_bytes_used = o - r->outbuf;
-    }
-  else
-    {
-      /* ensure scratch space is big enough */
-      if (r->scratch_alloced < kv)
-        {
-          unsigned new_alloced = r->scratch_alloced;
-          if (new_alloced == 0)
-            new_alloced = 256;
-          while (new_alloced < kv)
-            new_alloced *= 2;
-          r->scratch = dsk_realloc (r->scratch, new_alloced);
-          r->scratch_alloced = new_alloced;
-        }
-
-      /* copy in already uncompressed data */
-      memcpy (r->scratch, o + 8, decompressed - 8);
-      o = r->outbuf;
-
-      /* decompress until key and value are filled in. */
-      r->decompressor.next_out = r->scratch + (decompressed - 8);
-      r->decompressor.avail_out = kv - (decompressed - 8);
-      while (r->decompressor.avail_out > 0)
-        {
-          if (r->decompressor.avail_in == 0)
-            {
-              /* Read into inbuf */
-              if (r->fd < 0)
-                {
-                  dsk_set_error (error, "partial data at end of buffer");
-                  return DSK_FALSE;
-                }
-              int read_rv = read (r->fd, r->inbuf, READER_INBUF_SIZE);
-              if (read_rv < 0)
-                {
-                  if (errno == EINTR || errno == EAGAIN)
-                    continue;
-                  dsk_set_error (error, "error reading from file: %s",
-                                 strerror (errno));
-                  return DSK_FALSE;
-                }
-              else if (read_rv == 0)
-                {
-                  close (r->fd);
-                  r->fd = -1;
-                }
-              else
-                {
-                  r->decompressor.next_in = r->inbuf;
-                  r->decompressor.avail_in = read_rv;
-                }
-            }
-          zrv = inflate (&r->decompressor, 0);
-          if (zrv != Z_OK && zrv != Z_STREAM_END && zrv != Z_BUF_ERROR)
-            goto zlib_error;
-          if (r->fd < 0 && r->decompressor.avail_out > 0)
-            {
-              dsk_set_error (error, "partial data at end of buffer");
-              return DSK_FALSE;
-            }
-        }
-
-      r->decompressor.next_out = r->outbuf;
-      r->decompressor.avail_out = READER_OUTBUF_SIZE;
-      r->outbuf_bytes_used = 0;
-      r->base.key_data = r->scratch;
-      r->base.value_data = r->scratch + d[0];
-    }
-  return DSK_TRUE;
-
-zlib_error:
-  dsk_set_error (error, "zlib's inflate returned error code %d (%s)", zrv,
-                 r->decompressor.msg);
-
-  return DSK_FALSE;
-}
-
-void
-dsk_table_file_reader_destroy (DskTableFileReader *reader)
-{
-  Reader *r = (Reader *) reader;
-  if (r->fd)
-    close (r->fd);
-  inflateEnd (&r->decompressor);
-  dsk_free (r->scratch);
-  dsk_free (r);
-}
-
-
 /* --- Metadata parsing --- */
 #define MAX_METADATA_SIZE    1024
 typedef struct _DskTableFileMetadata DskTableFileMetadata;
@@ -907,6 +701,13 @@ struct _DskTableFileMetadata
   uint64_t compressed_size;
   unsigned n_index_levels;
   unsigned fanout;
+
+  /* We zlib-compress the data in chunks.  The following numbers
+     give the size of the largest compressed data and the largest
+     uncompressed data.  It is useful to pre-allocate buffers of these sizes
+     to do the compression/decompression. */
+  unsigned max_compressed_size;
+  unsigned max_uncompressed_size;
 };
 static dsk_boolean
 dsk_table_file_metadata_parse (const DskTableFileOptions *options,
@@ -1006,6 +807,16 @@ retry_metadata_open:
           out->fanout = strtoul (at + 8, NULL, 10);
           got |= 32;
         }
+      else if (strncmp (at, "max-compressed-size: ", 21) == 0)
+        {
+          out->max_compressed_size = strtoull (at + 21, NULL, 10);
+          got |= 64;
+        }
+      else if (strncmp (at, "max-uncompressed-size: ", 23) == 0)
+        {
+          out->max_uncompressed_size = strtoull (at + 23, NULL, 10);
+          got |= 128;
+        }
       else
         {
           dsk_set_error (error, "unparsable line '%s' in %s", at, filename_buf);
@@ -1013,17 +824,20 @@ retry_metadata_open:
           dsk_free (filename_buf);
           return DSK_FALSE;
         }
+      at = nl + 1;
     }
-  if (got != 63)
+  if (got != 255)
     {
-      dsk_set_error (error, "missing fields in %s:%s%s%s%s%s%s",
+      dsk_set_error (error, "missing fields in %s:%s%s%s%s%s%s%s%s",
                      filename_buf,
                      (got&1) ? "" : " entries",
                      (got&2) ? "" : " key-bytes",
                      (got&4) ? "" : " data-bytes",
                      (got&8) ? "" : " compressed-size",
                      (got&16) ? "" : " n-index-levels",
-                     (got&32) ? "" : " fanout");
+                     (got&32) ? "" : " fanout",
+                     (got&64) ? "" : " max-compressed-size",
+                     (got&128) ? "" : " max-uncompressed-size");
       dsk_free (metadata_buf);
       dsk_free (filename_buf);
       return DSK_FALSE;
@@ -1033,6 +847,283 @@ retry_metadata_open:
   dsk_free (filename_buf);
   return DSK_TRUE;
 }
+
+/* --- Reader --- */
+#define READER_INBUF_SIZE  4096
+#define READER_OUTBUF_SIZE 8192
+typedef struct _Reader Reader;
+struct _Reader
+{
+  DskTableFileReader base;
+  int compressed_data_fd;
+  int index0_fd;
+  unsigned compressed_length;
+  uint8_t *compressed_data;
+  unsigned uncompressed_length;
+  uint8_t *uncompressed_data;
+  unsigned compressed_alloced;
+  unsigned uncompressed_alloced;
+  unsigned uncompressed_at;
+
+  DskTableErrorHandler error_handler;
+  void *error_handler_data;
+};
+
+static void* my_zalloc (voidpf opaque, uInt items, uInt size)
+{
+  DSK_UNUSED (opaque);
+  return calloc (items, size);
+}
+static void   my_zfree  (voidpf opaque, voidpf address)
+{
+  DSK_UNUSED (opaque);
+  free (address);
+}
+static void
+pre_init_zstream (z_stream *to_init)
+{
+  memset (to_init, 0, sizeof (z_stream));
+  to_init->zalloc = my_zalloc;
+  to_init->zfree = my_zfree;
+}
+
+static dsk_boolean
+reader_parse_entry (Reader *r,
+                    DskError **error)
+{
+  dsk_assert (r->uncompressed_at < r->uncompressed_length);
+
+  if (r->uncompressed_at + 8 > r->uncompressed_length)
+    {
+      dsk_set_error (error, "data too short mid-record (in record header)");
+      return DSK_FALSE;
+    }
+  uint32_t kv[2];
+  memcpy (kv, r->uncompressed_data + r->uncompressed_at, 8);
+  r->uncompressed_at += 8;
+  kv[0] = UINT32_TO_LITTLE_ENDIAN (kv[0]);
+  kv[1] = UINT32_TO_LITTLE_ENDIAN (kv[1]);
+  if (kv[0] + kv[1] < kv[0]
+   || kv[0] + kv[1] + r->uncompressed_at < r->uncompressed_at)
+    {
+      dsk_set_error (error,
+                     "overflow adding %u and %u (key/value lengths)",
+                     kv[0], kv[1]);
+      return DSK_FALSE;
+    }
+  if (r->uncompressed_at + kv[0] + kv[1] > r->uncompressed_length)
+    {
+      dsk_set_error (error,
+                     "expected %u bytes of key and %u of value, got only %u remaining",
+                     kv[0], kv[1],
+                     r->uncompressed_length - r->uncompressed_at);
+      return DSK_FALSE;
+    }
+  r->base.key_length = kv[0];
+  r->base.value_length = kv[1];
+  r->base.key_data = r->uncompressed_data + r->uncompressed_at;
+  r->uncompressed_at += kv[0];
+  r->base.value_data = r->uncompressed_data + r->uncompressed_at;
+  r->uncompressed_at += kv[1];
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+read_next_slab (Reader             *reader,
+                DskError          **error)
+{
+  /* Read index entry */
+  dsk_boolean must_seek = DSK_FALSE;
+  for (;;)
+    {
+      union { uint32_t ie[6]; uint8_t buf[24]; } buf;
+      DskError *e = NULL;
+      int nread;
+retry_read:
+      nread = read (reader->index0_fd, buf.buf, 24);
+      if (nread == 0)
+        {
+          /* eof */
+          reader->base.at_eof = DSK_TRUE;
+          return DSK_TRUE;
+        }
+      else  if (nread < 0)
+        {
+          if (errno == EINTR || errno == EAGAIN)
+            goto retry_read;
+          dsk_set_error (error, "error reading from index: %s",
+                         strerror (errno));
+          return DSK_FALSE;
+        }
+      else if (nread < 24)
+        {
+          if (!read_from_fd (reader->index0_fd, 24-nread, buf.buf, error))
+            return DSK_FALSE;
+        }
+      uint32_t compressed_length = UINT32_TO_LITTLE_ENDIAN (buf.ie[5]);
+      if (compressed_length > reader->compressed_alloced)
+        {
+          e = dsk_error_new ("compressed data too long (compared to metadata)");
+          goto got_error;
+        }
+      if (must_seek)
+        {
+          uint64_t gzip_offset
+                 = (uint64_t)UINT32_TO_LITTLE_ENDIAN (buf.ie[2])
+                 | (((uint64_t)UINT32_TO_LITTLE_ENDIAN(buf.ie[3]))<<32);
+          if (lseek (reader->compressed_data_fd, gzip_offset, SEEK_SET)
+              != (int64_t) gzip_offset)
+            {
+              e = dsk_error_new ("error seeking to offset %llu", gzip_offset);
+              goto got_error;
+            }
+        }
+      reader->compressed_length = compressed_length;
+      if (!read_from_fd (reader->compressed_data_fd,
+                         compressed_length, reader->compressed_data,
+                         &e))
+        {
+          goto got_error;
+        }
+      int zrv;
+      uLongf uncomp_len = reader->uncompressed_alloced;
+      if ((zrv=uncompress (reader->uncompressed_data, &uncomp_len,
+                           reader->compressed_data, compressed_length)) != Z_OK)
+        {
+          if (zrv == Z_DATA_ERROR)
+            e = dsk_error_new ("compressed data was corrupt");
+          else
+            e = dsk_error_new ("error uncompressing data: zrv=%d", zrv);
+          goto got_error;
+        }
+      reader->uncompressed_length = uncomp_len;
+      reader->uncompressed_at = 0;
+      if (!reader_parse_entry (reader, &e))
+        goto got_error;
+      return DSK_TRUE;
+
+got_error:
+      if (reader->error_handler != NULL
+       && !reader->error_handler (e, reader->error_handler_data))
+        {
+          /* Propagate error */
+          if (error)
+            *error = e;
+          else
+            dsk_error_unref (e);
+          return DSK_FALSE;
+        }
+      dsk_error_unref (e);
+      must_seek = DSK_TRUE;
+    }
+  reader->base.at_eof = DSK_TRUE;
+  return DSK_TRUE;
+}
+
+DskTableFileReader *
+dsk_table_file_reader_new (DskTableFileOptions *options,
+                           DskError           **error)
+{
+  Reader *rv;
+  int compressed_data_fd, index0_fd;
+  DskTableFileMetadata metadata;
+
+  if (!dsk_table_file_metadata_parse (options, &metadata, error))
+    return NULL;
+
+  if (options->openat_fd < 0)
+    compressed_data_fd = open (options->base_filename, O_RDONLY);
+  else
+    compressed_data_fd = openat (options->openat_fd, options->base_filename, O_RDONLY);
+  if (compressed_data_fd < 0)
+    {
+      dsk_set_error (error, "%s(): error reading %s: %s",
+                     options->openat_fd < 0 ? "open" : "openat", 
+                     options->base_filename,
+                     strerror (errno));
+      return NULL;
+    }
+
+  unsigned baselen;
+  char *fname;
+  baselen = strlen (options->base_filename);
+  fname = dsk_malloc (baselen + 10);
+  strcpy (fname, options->base_filename);
+  strcpy (fname + baselen, ".000i");
+  if (options->openat_fd < 0)
+    index0_fd = open (fname, O_RDONLY);
+  else
+    index0_fd = openat (options->openat_fd, fname, O_RDONLY);
+  if (index0_fd < 0)
+    {
+      dsk_set_error (error, "%s(): error reading %s: %s",
+                     options->openat_fd < 0 ? "open" : "openat", 
+                     fname,
+                     strerror (errno));
+      close (compressed_data_fd);
+      dsk_free (fname);
+      return NULL;
+    }
+  dsk_free (fname);
+
+
+  rv = dsk_malloc (sizeof (Reader) + metadata.max_uncompressed_size
+                   + metadata.max_compressed_size);
+  rv->compressed_data = (uint8_t*)(rv+1);
+  rv->uncompressed_data = rv->compressed_data + metadata.max_compressed_size;
+  rv->compressed_alloced = metadata.max_compressed_size;
+  rv->uncompressed_alloced = metadata.max_uncompressed_size;
+  rv->compressed_data_fd = compressed_data_fd;
+  rv->index0_fd = index0_fd;
+  rv->base.at_eof = DSK_FALSE;
+  if (!read_next_slab (rv, error))
+    {
+      dsk_table_file_reader_destroy (&rv->base);
+      return NULL;
+    }
+  return &rv->base;
+}
+
+dsk_boolean
+dsk_table_file_reader_advance  (DskTableFileReader *reader,
+                                DskError          **error)
+{
+  Reader *r = (Reader *) reader;
+  DskError *e = NULL;
+  if (r->uncompressed_at >= r->uncompressed_length)
+    return read_next_slab (r, error);
+  else if (reader_parse_entry (r, &e))
+    return DSK_TRUE;
+  else
+    {
+      if (r->error_handler != NULL
+          && !r->error_handler (e, r->error_handler_data))
+        {
+          if (error)
+            *error = e;
+          else
+            dsk_error_unref (e);
+          return DSK_FALSE;
+        }
+      else
+        {
+          dsk_error_unref (e);
+          return read_next_slab (r, error);
+        }
+    }
+}
+
+void
+dsk_table_file_reader_destroy (DskTableFileReader *reader)
+{
+  Reader *r = (Reader *) reader;
+  if (r->compressed_data_fd >= 0)
+    close (r->compressed_data_fd);
+  if (r->index0_fd >= 0)
+    close (r->index0_fd);
+  dsk_free (r);
+}
+
 
 /* --- Searcher --- */
 typedef struct _SeekerIndex SeekerIndex;
@@ -1086,7 +1177,6 @@ struct _DskTableFileSeeker
 
   unsigned uncompressed_alloced;
   uint8_t *uncompressed_data;
-  unsigned uncompressed_len;
 
   IndexCacheEntry *index_cache_table[INDEX_CACHE_TABLE_SIZE];
   unsigned index_cache_occupancy;
@@ -1150,6 +1240,7 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
           dsk_free (filename_buf);
           return NULL;
         }
+      dsk_warning ("index level %u: size=%llu", i,(uint64_t)stat_buf.st_size);
       if (stat_buf.st_size % index_entry_size != 0)
         {
           dsk_set_error (error, "index at %s was not a multiple of %u bytes",
@@ -1190,6 +1281,7 @@ DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
   rv->n_index_levels = metadata.n_index_levels;
   rv->index_levels = index_levels;
   rv->compressed_data_fd = compressed_data_fd;
+  rv->fanout = metadata.fanout;
   return rv;
 }
 
@@ -1348,6 +1440,7 @@ force_cache_entry (DskTableFileSeeker *seeker,
 {
   unsigned bin = SEEKER_GET_BIN_FROM_OFFSET (seeker, compressed_offset);
   IndexCacheEntry *entry = seeker->index_cache_table[bin];
+  dsk_warning ("force_cache_entry: offset=%llu, len=%u", compressed_offset,compressed_length);
   while (entry != NULL)
     {
       if (entry->offset == compressed_offset)
@@ -1395,10 +1488,11 @@ retry_pread:
 
   /* uncompress */
   z_stream stream;
-  memset (&stream, 0, sizeof (stream));
+  pre_init_zstream (&stream);
   stream.next_in = seeker->compressed_data;
   stream.avail_in = compressed_length;
 
+  dsk_warning ("compressed_length=%u, uncompressed_alloced=%u", compressed_length, seeker->uncompressed_alloced);
   if (seeker->uncompressed_alloced < compressed_length)
     {
       unsigned new_size = seeker->uncompressed_alloced
@@ -1415,31 +1509,37 @@ retry_pread:
     dsk_die ("inflateInit2 failed");
   unsigned uncompressed_len;
 do_inflate:
-  zrv = inflate (&stream, Z_FINISH);
-  if (zrv == Z_OK)
+  dsk_warning ("next_in=%p, avail_in=%u; next_out=%p, uncompressed_alloced=%u", stream.next_in,stream.avail_in,stream.next_out,stream.avail_out);
+  zrv = inflate (&stream, 0);
+  if (zrv == Z_STREAM_END
+      || (zrv == Z_OK && stream.avail_in == 0 && stream.avail_out > 0))
+    {
+      uncompressed_len = stream.next_out - seeker->uncompressed_data;
+      dsk_warning ("done: uncompressed_len=%u",uncompressed_len);
+      inflateEnd (&stream);
+    }
+  else if (zrv == Z_OK)
     {
       /* resize output buffer */
       uncompressed_len = stream.next_out - seeker->uncompressed_data;
       seeker->uncompressed_alloced *= 2;
       seeker->uncompressed_data = dsk_realloc (seeker->uncompressed_data, seeker->uncompressed_alloced);
-      stream.next_out = seeker->uncompressed_data + seeker->uncompressed_len;
+      stream.next_out = seeker->uncompressed_data + uncompressed_len;
       stream.avail_out = (seeker->uncompressed_data + seeker->uncompressed_alloced) - stream.next_out;
 
       goto do_inflate;
     }
-  else if (zrv == Z_STREAM_END)
-    {
-      uncompressed_len = stream.next_out - seeker->uncompressed_data;
-      inflateEnd (&stream);
-    }
   else
     {
-      dsk_set_error (error, "error inflating compressed data: %s", stream.msg);
+      dsk_set_error (error,
+                     "error inflating compressed data: %s (zrv=%d)",
+                     stream.msg, zrv);
       inflateEnd (&stream);
       return DSK_FALSE;
     }
 
   /* scan for keys */
+  dsk_warning ("force_cache_entry: uncompressed_len=%u, seeker->fanout=%u", uncompressed_len,seeker->fanout);
   IndexKeyValue *keys = alloca (seeker->fanout * sizeof (IndexKeyValue));
   unsigned i;
   unsigned dec_len = uncompressed_len;
@@ -1460,6 +1560,7 @@ do_inflate:
       dec_len -= 8;
       kv[0] = UINT32_TO_LITTLE_ENDIAN (kv[0]);
       kv[1] = UINT32_TO_LITTLE_ENDIAN (kv[1]);
+      dsk_warning ("key/value sizes %u/%u; remaining decompressed %u",kv[0],kv[1],dec_len);
       if (kv[0] + kv[1] < kv[0])
         {
           /* overflow */
@@ -1478,15 +1579,18 @@ do_inflate:
       keys[i].key_data = dec_at;
       dec_at += kv[0];
       keys[i].value_length = kv[1];
-      keys[i].key_data = dec_at;
+      keys[i].value_data = dec_at;
       dec_at += kv[1];
       total_kv_size += kv[0] + kv[1];
+      dec_len -= (kv[0] + kv[1]);
     }
+  dsk_warning ("force_cache_entry: n_uncompressed=%u", i);
   entry = dsk_malloc (sizeof (IndexCacheEntry)
                       + sizeof (IndexKeyValue) * i
                       + total_kv_size);
   entry->n_uncompressed = i;
   entry->uncompressed = (IndexKeyValue*)(entry+1);
+  entry->offset = compressed_offset;
   uint8_t *copy_at;
   copy_at = (uint8_t*)(entry->uncompressed + i);
   for (i = 0; i < entry->n_uncompressed; i++)
@@ -1523,13 +1627,14 @@ bsearch_cache_entry (IndexCacheEntry *cache_entry,
                      const uint8_t  **value_data_out)
 {
   unsigned start = 0, count = cache_entry->n_uncompressed;
+  dsk_warning ("bsearch_cache_entry: count=%u", count);
   while (count > 2)
     {
       unsigned mid = start + count / 2;
       if (func (cache_entry->uncompressed[mid].key_length,
                 cache_entry->uncompressed[mid].key_data,
                 func_data))
-        count = count / 2 + 1;
+        count = mid - start + 1;
       else
         {
           count = start + count - mid;
@@ -1569,6 +1674,7 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
                                   DskError             **error)
 {
   IndexCacheEntry *cache_entry;
+  dsk_warning ("seeker: n_index_levels=%u", seeker->n_index_levels);
   /* Only happens for empty files. */
   if (seeker->n_index_levels == 0)
     return DSK_FALSE;
@@ -1579,11 +1685,14 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
   uint64_t count = seeker->index_levels[seeker->n_index_levels - 1].count;
   for (layer = seeker->n_index_levels - 1; layer != 0; layer--)
     {
+      dsk_warning ("dsk_table_file_seeker_find: index_level=%u", layer);
       while (count > 2)
         {
           uint64_t mid = first + count / 2;
           if (!seeker_get_nonzero_index_key (seeker, layer, mid, error))
             return DSK_FALSE;
+          dsk_warning ("  ... first=%llu, count=%llu, key=%.*s",
+                       first, count, seeker->index_key_length, seeker->index_key_data);
           if ((*func) (seeker->index_key_length,
                        seeker->index_key_data,
                        func_data))
@@ -1656,6 +1765,7 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
     }
   else if (count == 1)
     {
+      dsk_warning ("seeker_get_zero_index_key: %llu", first);
       if (!seeker_get_zero_index_key (seeker, first,
                                       &compressed_len, &compressed_offset,
                                       error))
@@ -1715,7 +1825,7 @@ search_compressed_chunk:
       goto search_compressed_chunk;
     }
 
-  return DSK_TRUE;
+  return DSK_FALSE;
 }
  
 #if 0

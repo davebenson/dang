@@ -19,6 +19,10 @@ typedef struct _DskTableFileWriter DskTableFileWriter;
 typedef struct _DskTableFileReader DskTableFileReader;
 typedef struct _DskTableFileSeeker DskTableFileSeeker;
 
+/* Return TRUE to ignore the error, and FALSE to pass the error back
+   to the caller. */
+typedef dsk_boolean (*DskTableErrorHandler) (DskError *error,
+                                             void     *data);
 /* --- Writer --- */
 DskTableFileWriter *dsk_table_file_writer_new (DskTableFileOptions *options,
                                                DskError           **error);
