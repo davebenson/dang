@@ -1619,8 +1619,9 @@ do_inflate:
 
 static dsk_boolean
 bsearch_cache_entry (IndexCacheEntry *cache_entry,
-                     DskTableSeekerTestFunc func,
+                     DskTableSeekerFindFunc func,
                      void            *func_data,
+                     DskTableFileFindMode   mode,
                      unsigned        *key_len_out,
                      const uint8_t  **key_data_out,
                      unsigned        *value_len_out,
@@ -1631,10 +1632,30 @@ bsearch_cache_entry (IndexCacheEntry *cache_entry,
   while (count > 2)
     {
       unsigned mid = start + count / 2;
-      if (func (cache_entry->uncompressed[mid].key_length,
-                cache_entry->uncompressed[mid].key_data,
-                func_data))
-        count = mid - start + 1;
+      int rv = func (cache_entry->uncompressed[mid].key_length,
+                     cache_entry->uncompressed[mid].key_data,
+                     func_data);
+      if (rv > 0)
+        {
+          count = mid - start;
+        }
+      else if (rv == 0)
+        {
+          switch (mode)
+            {
+            case DSK_TABLE_FILE_FIND_FIRST:
+              ...
+              break;
+            case DSK_TABLE_FILE_FIND_LAST:
+              ...
+              break;
+            case DSK_TABLE_FILE_FIND_ANY:
+              start = mid;
+              goto return_start;
+            default:
+              dsk_assert (DSK_FALSE);
+            }
+        }
       else
         {
           count = start + count - mid;
@@ -1643,29 +1664,31 @@ bsearch_cache_entry (IndexCacheEntry *cache_entry,
     }
   while (count > 0)
     {
-      if (func (cache_entry->uncompressed[start].key_length,
-                cache_entry->uncompressed[start].key_data,
-                func_data))
-        {
-          if (key_len_out)
-            *key_len_out = cache_entry->uncompressed[start].key_length;
-          if (key_data_out)
-            *key_data_out = cache_entry->uncompressed[start].key_data;
-          if (value_len_out)
-            *value_len_out = cache_entry->uncompressed[start].value_length;
-          if (value_data_out)
-            *value_data_out = cache_entry->uncompressed[start].value_data;
-          return DSK_TRUE;
-        }
+      int rv = func (cache_entry->uncompressed[start].key_length,
+                     cache_entry->uncompressed[start].key_data,
+                     func_data);
+      if (rv == 0)
+        goto return_start;
       start++;
       count--;
     }
   return DSK_FALSE;
+
+return_start:
+  if (key_len_out)
+    *key_len_out = cache_entry->uncompressed[start].key_length;
+  if (key_data_out)
+    *key_data_out = cache_entry->uncompressed[start].key_data;
+  if (value_len_out)
+    *value_len_out = cache_entry->uncompressed[start].value_length;
+  if (value_data_out)
+    *value_data_out = cache_entry->uncompressed[start].value_data;
+  return DSK_TRUE;
 }
 
 dsk_boolean
-dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
-                                  DskTableSeekerTestFunc func,
+dsk_table_file_seeker_find_full  (DskTableFileSeeker    *seeker,
+                                  DskTableSeekerFindFunc func,
                                   void                  *func_data,
                                   unsigned              *key_len_out,
                                   const uint8_t        **key_data_out,
@@ -1693,10 +1716,15 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
             return DSK_FALSE;
           dsk_warning ("  ... first=%llu, count=%llu, key=%.*s",
                        first, count, seeker->index_key_length, seeker->index_key_data);
-          if ((*func) (seeker->index_key_length,
-                       seeker->index_key_data,
-                       func_data))
+          int rv = (*func) (seeker->index_key_length,
+                            seeker->index_key_data,
+                            func_data);
+          if (rv > 0)
             count = count / 2 + 1;
+          else if (rv == 0)
+            {
+              ...
+            }
           else
             {
               count = (first + count) - mid;
@@ -1721,13 +1749,18 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
           dsk_assert (count==2);
           if (!seeker_get_nonzero_index_key (seeker, layer, first+1, error))
             return DSK_FALSE;
-          if (!(*func) (seeker->index_key_length,
-                        seeker->index_key_data,
-                        func_data))
+          int rv = (*func) (seeker->index_key_length,
+                            seeker->index_key_data,
+                            func_data);
+          if (rv < 0)
             {
               /* the correct result must be in the second set */
               first++;
               count--;
+            }
+          else if (rv == 0)
+            {
+              ...
             }
         }
 
@@ -1748,9 +1781,10 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
                                       error))
         return DSK_FALSE;
 
-      if ((*func) (seeker->index_key_length,
+      int rv = (*func) (seeker->index_key_length,
                    seeker->index_key_data,
-                   func_data))
+                   func_data);
+      if (rv >= 0)
         count = count / 2 + 1;
       else
         {
@@ -1806,7 +1840,7 @@ search_compressed_chunk:
 
   /* search in cache_entry */
   if (bsearch_cache_entry (cache_entry, 
-                           func, func_data,
+                           func, func_data, mode,
                            key_len_out, key_data_out,
                            value_len_out, value_data_out))
     return DSK_TRUE;

@@ -59,10 +59,20 @@ void        dsk_table_file_reader_destroy     (DskTableFileReader *reader);
 DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
                                                DskError           **error);
 
-/* Returns whether this key is in the set. */
-typedef dsk_boolean (*DskTableSeekerTestFunc) (unsigned           key_len,
-                                               const uint8_t     *key_data,
-                                               void              *user_data);
+/* Returns:
+     -1 if the key is before the range we are searching for.
+      0 if the key is in the range we are searching for.
+     +1 if the key is after the range we are searching for.
+ */
+typedef int  (*DskTableSeekerFindFunc) (unsigned           key_len,
+                                        const uint8_t     *key_data,
+                                        void              *user_data);
+typedef enum
+{
+  DSK_TABLE_FILE_FIND_FIRST,
+  DSK_TABLE_FILE_FIND_ANY,
+  DSK_TABLE_FILE_FIND_LAST
+} DskTableFileFindMode;
 
 /* The comparison function should return TRUE if the value
    is greater than or equal to some threshold determined by func_data.
@@ -73,18 +83,27 @@ typedef dsk_boolean (*DskTableSeekerTestFunc) (unsigned           key_len,
        (in which case *error will be set)
  */
 dsk_boolean
-dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
-                                  DskTableSeekerTestFunc func,
+dsk_table_file_seeker_find_full  (DskTableFileSeeker    *seeker,
+                                  DskTableSeekerFindFunc func,
                                   void                  *func_data,
+                                  DskTableFileFindMode   mode,
                                   unsigned              *key_len_out,
                                   const uint8_t        **key_data_out,
                                   unsigned              *value_len_out,
                                   const uint8_t        **value_data_out,
                                   DskError             **error);
+dsk_boolean
+dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
+                                  unsigned               key_len,
+                                  const uint8_t         *key_data,
+                                  unsigned              *value_len_out,
+                                  const uint8_t        **value_data_out,
+                                  DskError             **error);
+ 
  
 DskTableFileReader *
 dsk_table_file_seeker_find_reader(DskTableFileSeeker    *seeker,
-                                  DskTableSeekerTestFunc func,
+                                  DskTableSeekerFindFunc func,
                                   void                  *func_data,
                                   DskError             **error);
  
