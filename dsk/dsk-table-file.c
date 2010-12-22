@@ -1644,10 +1644,11 @@ bsearch_cache_entry (IndexCacheEntry *cache_entry,
           switch (mode)
             {
             case DSK_TABLE_FILE_FIND_FIRST:
-              ...
+              count = count / 2 - 1;
               break;
             case DSK_TABLE_FILE_FIND_LAST:
-              ...
+              count = start + count - mid;
+              start = mid;
               break;
             case DSK_TABLE_FILE_FIND_ANY:
               start = mid;
@@ -1687,9 +1688,10 @@ return_start:
 }
 
 dsk_boolean
-dsk_table_file_seeker_find_full  (DskTableFileSeeker    *seeker,
+dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
                                   DskTableSeekerFindFunc func,
                                   void                  *func_data,
+                                  DskTableFileFindMode   mode,
                                   unsigned              *key_len_out,
                                   const uint8_t        **key_data_out,
                                   unsigned              *value_len_out,
@@ -1723,7 +1725,21 @@ dsk_table_file_seeker_find_full  (DskTableFileSeeker    *seeker,
             count = count / 2 + 1;
           else if (rv == 0)
             {
-              ...
+              switch (mode)
+                {
+                case DSK_TABLE_FILE_FIND_FIRST:
+                  count = count / 2 - 1;
+                  break;
+                case DSK_TABLE_FILE_FIND_LAST:
+                  count = first + count - mid;
+                  first = mid;
+                  break;
+                case DSK_TABLE_FILE_FIND_ANY:
+                  first = mid;
+                  goto return_start;
+                default:
+                  dsk_assert (DSK_FALSE);
+                }
             }
           else
             {
@@ -1747,21 +1763,30 @@ dsk_table_file_seeker_find_full  (DskTableFileSeeker    *seeker,
       else
         {
           dsk_assert (count==2);
-          if (!seeker_get_nonzero_index_key (seeker, layer, first+1, error))
-            return DSK_FALSE;
-          int rv = (*func) (seeker->index_key_length,
+          int rv;
+          switch (mode)
+            {
+            case DSK_TABLE_FILE_FIND_FIRST:
+              if (!seeker_get_nonzero_index_key (seeker, layer, first+1, error))
+                return DSK_FALSE;
+              rv = (*func) (seeker->index_key_length,
                             seeker->index_key_data,
                             func_data);
-          if (rv < 0)
-            {
-              /* the correct result must be in the second set */
-              first++;
-              count--;
-            }
-          else if (rv == 0)
-            {
-              ...
-            }
+              if (rv < 0)
+                {
+                  /* the correct result must be in the second set */
+                  first++;
+                  count--;
+                }
+              else if (rv == 0)
+                {
+                  ...
+                }
+              else /* rv > 0 */
+                {
+                  ...
+                }
+              break;
         }
 
       /* prepare for next level */
@@ -1811,9 +1836,10 @@ dsk_table_file_seeker_find_full  (DskTableFileSeeker    *seeker,
                                       &compressed_len, &compressed_offset,
                                       error))
         return DSK_FALSE;
-      if (!(*func) (seeker->index_key_length,
+      rv = (*func) (seeker->index_key_length,
                     seeker->index_key_data,
-                    func_data))
+                    func_data);
+      if (rv <= 0)
         {
           /* the correct result must be in the second set */
           first++;
