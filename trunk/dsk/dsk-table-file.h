@@ -83,19 +83,12 @@ typedef enum
        (in which case *error will be set)
  */
 dsk_boolean
-dsk_table_file_seeker_find_full  (DskTableFileSeeker    *seeker,
+dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
                                   DskTableSeekerFindFunc func,
                                   void                  *func_data,
                                   DskTableFileFindMode   mode,
                                   unsigned              *key_len_out,
                                   const uint8_t        **key_data_out,
-                                  unsigned              *value_len_out,
-                                  const uint8_t        **value_data_out,
-                                  DskError             **error);
-dsk_boolean
-dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
-                                  unsigned               key_len,
-                                  const uint8_t         *key_data,
                                   unsigned              *value_len_out,
                                   const uint8_t        **value_data_out,
                                   DskError             **error);
