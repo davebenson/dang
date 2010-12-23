@@ -69,7 +69,10 @@ struct _IndexWriter
   uint64_t heap_buf_written;
   uint32_t index_buf[INDEX_WRITER_INDEX_BUF_COUNT];
   unsigned index_buf_used;
-  unsigned entries_left;
+
+  /* this is equivalent to overall_index/(fanout**level) % fanout */
+  unsigned index;
+
   IndexWriter *up;
 };
 
@@ -84,7 +87,7 @@ struct _DskTableFileWriter
   uint64_t out_buf_file_offset;
 
   unsigned fanout;
-  unsigned entries_until_flush;
+  unsigned index_mod_fanout;
   dsk_boolean is_first;
   dsk_boolean is_closed;
   int compressed_data_fd;
@@ -209,7 +212,7 @@ alloc_index_level (DskTableFileWriter *writer,
   (*out)->heap_buf_used = 0;
   (*out)->heap_buf_written = 0;
   (*out)->index_buf_used = 0;
-  (*out)->entries_left = writer->fanout;
+  (*out)->index = 0;
   (*out)->up = NULL;
   return DSK_TRUE;
 }
@@ -228,7 +231,7 @@ DskTableFileWriter *dsk_table_file_writer_new (DskTableFileOptions *options,
   writer->basefilename_len = strlen (options->base_filename);
   writer->basefilename = dsk_malloc (writer->basefilename_len + 30);
   strcpy (writer->basefilename, options->base_filename);
-  writer->entries_until_flush = 0;
+  writer->index_mod_fanout = 0;
   writer->is_first = DSK_TRUE;
   writer->fanout = options->index_fanout;
   writer->openat_fd = options->openat_fd;
