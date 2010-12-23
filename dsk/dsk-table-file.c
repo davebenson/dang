@@ -1644,7 +1644,7 @@ bsearch_cache_entry (IndexCacheEntry *cache_entry,
           switch (mode)
             {
             case DSK_TABLE_FILE_FIND_FIRST:
-              count = count / 2 - 1;
+              count = mid + 1 - start;
               break;
             case DSK_TABLE_FILE_FIND_LAST:
               count = start + count - mid;
@@ -1708,6 +1708,8 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
   unsigned layer;
   uint64_t first = 0;
   uint64_t count = seeker->index_levels[seeker->n_index_levels - 1].count;
+  unsigned compressed_len;
+  uint64_t compressed_offset;
   for (layer = seeker->n_index_levels - 1; layer != 0; layer--)
     {
       dsk_warning ("dsk_table_file_seeker_find: index_level=%u", layer);
@@ -1728,15 +1730,27 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
               switch (mode)
                 {
                 case DSK_TABLE_FILE_FIND_FIRST:
-                  count = count / 2 - 1;
+                  count = mid + 1 - first;
                   break;
                 case DSK_TABLE_FILE_FIND_LAST:
                   count = first + count - mid;
                   first = mid;
                   break;
                 case DSK_TABLE_FILE_FIND_ANY:
-                  first = mid;
-                  goto return_start;
+                  /* Calculate index in level0 heap */
+                  {
+                    unsigned i;
+                    for (i = 0; i < layer; i++)
+                      mid *= seeker->fanout;
+                  }
+
+                  /* Load compressed_len/compressed_offset for level0 index */
+                  if (!seeker_get_zero_index_key (seeker, mid,
+                                                  &compressed_len,
+                                                  &compressed_offset,
+                                                  error))
+                    return DSK_FALSE;
+                  goto search_compressed_chunk;
                 default:
                   dsk_assert (DSK_FALSE);
                 }
@@ -1763,30 +1777,34 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
       else
         {
           dsk_assert (count==2);
-          int rv;
-          switch (mode)
-            {
-            case DSK_TABLE_FILE_FIND_FIRST:
-              if (!seeker_get_nonzero_index_key (seeker, layer, first+1, error))
-                return DSK_FALSE;
-              rv = (*func) (seeker->index_key_length,
+          /* count downward if mode==LAST */
+          if (mode == DSK_TABLE_FILE_FIND_LAST)
+            first++;
+          if (!seeker_get_nonzero_index_key (seeker, layer, first+1, error))
+            return DSK_FALSE;
+          int rv = (*func) (seeker->index_key_length,
                             seeker->index_key_data,
                             func_data);
-              if (rv < 0)
+          if (rv < 0)
+            {
+              /* the correct result must be in the second set */
+              if (mode == DSK_TABLE_FILE_FIND_LAST)
                 {
-                  /* the correct result must be in the second set */
-                  first++;
-                  count--;
+                  /* not found */
+                  ... ???
                 }
-              else if (rv == 0)
-                {
-                  ...
-                }
-              else /* rv > 0 */
-                {
-                  ...
-                }
-              break;
+              else
+                first++;
+              count--;
+            }
+          else if (rv == 0)
+            {
+              ...
+            }
+          else /* rv > 0 */
+            {
+              ...
+            }
         }
 
       /* prepare for next level */
@@ -1795,8 +1813,6 @@ dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
     }
 
   /* handle layer 0 bsearch */
-  unsigned compressed_len;
-  uint64_t compressed_offset;
   while (count > 2)
     {
       uint64_t mid = first + count / 2;
