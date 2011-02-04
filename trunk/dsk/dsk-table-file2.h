@@ -14,6 +14,14 @@ struct _DskTableFileWriter
 
 struct _DskTableFileReader
 {
+  /* Readonly public data */
+  dsk_boolean at_eof;
+  unsigned key_length;
+  unsigned value_length;
+  const uint8_t *key_data;
+  const uint8_t *value_data;
+
+  /* Virtual functions */
   dsk_boolean (*advance)     (DskTableFileReader *reader,
                               DskError          **error);
   void        (*destroy)     (DskTableFileReader *reader);
@@ -80,11 +88,11 @@ struct _DskTableFileInterface
                                      DskError               **error);
   DskTableFileReader *(*new_reader) (DskTableFileInterface   *iface,
                                      int                      openat_fd,
-                                     const char              *base_filenam,
+                                     const char              *base_filename,
                                      DskError               **error);
   DskTableFileSeeker *(*new_seeker) (DskTableFileInterface   *iface,
                                      int                      openat_fd,
-                                     const char              *base_filenam,
+                                     const char              *base_filename,
                                      DskError               **error);
   void                (*destroy)    (DskTableFileInterface   *iface);
 };
@@ -95,6 +103,8 @@ extern DskTableFileInterface dsk_table_file_interface_default;
 DskTableFileInterface *dsk_table_file_interface_new (DskTableFileCompressor *,
                                                      unsigned    n_index_levels,
                                                      const unsigned *fanouts);
+
+extern DskTableFileInterface dsk_table_file_interface_trivial;
 
 struct _DskTableFileCompressor
 {
