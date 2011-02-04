@@ -265,6 +265,46 @@ do_return_reader_copy:
 }
 
 /* === Seeker === */
+static inline dsk_boolean
+check_index_entry_lengths (const IndexEntry *ie)
+{
+  return ie->key_length < (1<<30)
+      && ie->value_length < (1<<30);
+}
+
+static inline dsk_boolean
+read_index_entry (DskTableFileSeeker *seeker,
+                  uint64_t            index,
+                  IndexEntry         *out,
+                  DskError          **error)
+{
+  ssize_t nread;
+  nread = dsk_table_helper_pread (seeker->index_fd, &ie,
+                                  SIZEOF_INDEX_ENTRY,
+                                  index * SIZEOF_INDEX_ENTRY);
+  if (nread < 0)
+    {
+      dsk_set_error (error, "error reading index entry %llu: %s",
+                     index, strerror (errno));
+      return DSK_FALSE;
+    }
+  if (nread < (int) SIZEOF_INDEX_ENTRY)
+    {
+      dsk_set_error (error, "too short reading index entry %llu", index);
+      return DSK_FALSE;
+    }
+  ie.heap_offset = UINT64_FROM_LE (ie.heap_offset);
+  ie.key_length = UINT32_FROM_LE (ie.key_length);
+  ie.value_length = UINT32_FROM_LE (ie.value_length);
+
+  if (!check_index_entry_lengths (&ie))
+    {
+      dsk_set_error (error, "corrupted index entry %llu", index);
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
 static dsk_boolean 
 table_file_trivial_seeker__find  (DskTableFileSeeker    *seeker,
                                   DskTableSeekerFindFunc func,
@@ -276,6 +316,8 @@ table_file_trivial_seeker__find  (DskTableFileSeeker    *seeker,
                                   const uint8_t        **value_data_out,
                                   DskError             **error)
 {
+  TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
+  uint64_t start = 0, n = s->count;
   ...
 }
 
@@ -298,7 +340,43 @@ table_file_trivial_seeker__index (DskTableFileSeeker    *seeker,
                                   const void           **value_data_out,
                                   DskError             **error)
 {
-  ...
+  IndexEntry ie;
+  if (!read_index_entry (seeker, index, &ie, error))
+    return DSK_FALSE;
+  kv_len = ie.key_length + ie.value_length;
+  if (seeker->slab_alloced < kv_len)
+    {
+      unsigned new_size = seeker->slab_alloced;
+      if (new_size == 0)
+        new_size = 32;
+      while (new_size < kv_len)
+        new_size *= 2;
+      seeker->slab_alloced = new_size;
+      dsk_free (seeker->slab);
+      seeker->slab = dsk_malloc (new_size);
+    }
+  if (kv_len > 0)
+    {
+      nread = dsk_table_helper_pread (seeker->heap_fd, seeker->slab,
+                                      kv_len, ie.heap_offset);
+      if (nread < 0)
+        {
+          dsk_set_error (error, "error reading heap entry %llu: %s",
+                         index, strerror (errno));
+          return DSK_FALSE;
+        }
+      if (nread < (int) kv_len)
+        {
+          dsk_set_error (error, "too short reading heap entry %llu (got %u of %u bytes)",
+                         index, (unsigned) nread, kv_len);
+          return DSK_FALSE;
+        }
+    }
+  *key_len_out = ie.key_length;
+  *key_data_out = seeker->slab;
+  *value_len_out = ie.value_length;
+  *value_data_out = seeker->slab + ie.key_length;
+  return DSK_TRUE;
 }
 
 static DskTableFileReader * 
