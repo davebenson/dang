@@ -305,6 +305,89 @@ read_index_entry (DskTableFileSeeker *seeker,
   return DSK_TRUE;
 }
 
+static dsk_boolean
+run_cmp (TableFileTrivialSeeker *s,
+         DskTableSeekerFindFunc func,
+         uint64_t               index,
+         void                  *func_data,
+         int                   *cmp_rv_out,
+         DskError             **error)
+{
+  ...
+}
+
+static dsk_boolean
+find_index (DskTableFileSeeker    *seeker,
+            DskTableSeekerFindFunc func,
+            void                  *func_data,
+            DskTableFileFindMode   mode,
+            uint64_t              *index_out,
+            DskError             **error)
+{
+  TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
+  uint64_t start = 0, n = s->count;
+  while (count > 0)
+    {
+      int cmp_rv;
+      uint64_t mid = start + n / 2;
+      if (!run_cmp (s, func, func_data, mid, &cmp_rv, error))
+        return DSK_FALSE;
+      if (cmp_rv < 0)
+        {
+          n = mid - start;
+        }
+      else if (cmp_rv > 0)
+        {
+          n = (start + n) - (mid + 1);
+          start = mid + 1;
+        }
+      else /* cmp_rv == 0 */
+        {
+          switch (mode)
+            {
+            case DSK_TABLE_FILE_FIND_FIRST:
+              {
+                n = mid + 1 - start;
+
+                /* bsearch, knowing that (start+n-1) is in
+                   the range of elements to return. */
+                while (n > 1)
+                  {
+                    mid2 = start + n / 2;
+                    if (!run_cmp (s, func, func_data, mid2, &cmp_rv, error))
+                      return DSK_FALSE;
+                    dsk_assert (cmp_rv <= 0);
+                    if (cmp_rv == 0)
+                      {
+                        n = mid2 + 1 - start;
+                      }
+                    else
+                      {
+                        n = (start + n) - (mid2 + 1);
+                        start = mid2 + 1;
+                      }
+                  }
+                *index_out = start;
+                return DSK_TRUE;
+              }
+
+            case DSK_TABLE_FILE_FIND_ANY:
+              {
+                *index_out = mid;
+                return DSK_TRUE;
+              }
+            case DSK_TABLE_FILE_FIND_LAST:
+              {
+                ...
+              }
+            }
+        }
+    }
+
+  /* not found. */
+  return DSK_FALSE;
+}
+
 static dsk_boolean 
 table_file_trivial_seeker__find  (DskTableFileSeeker    *seeker,
                                   DskTableSeekerFindFunc func,
@@ -316,9 +399,16 @@ table_file_trivial_seeker__find  (DskTableFileSeeker    *seeker,
                                   const uint8_t        **value_data_out,
                                   DskError             **error)
 {
-  TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
-  uint64_t start = 0, n = s->count;
-  ...
+  uint64_t index;
+  if (!find_index (seeker, func, func_data, mode, &index, error))
+    return DSK_FALSE;
+
+  if (key_len_out || key_data_out || value_len_out || value_data_out)
+    {
+      /* load key/value */
+      ...
+    }
+  return DSK_TRUE;
 }
 
 
@@ -372,10 +462,14 @@ table_file_trivial_seeker__index (DskTableFileSeeker    *seeker,
           return DSK_FALSE;
         }
     }
-  *key_len_out = ie.key_length;
-  *key_data_out = seeker->slab;
-  *value_len_out = ie.value_length;
-  *value_data_out = seeker->slab + ie.key_length;
+  if (key_len_out != NULL)
+    *key_len_out = ie.key_length;
+  if (key_data_out != NULL)
+    *key_data_out = seeker->slab;
+  if (value_len_out != NULL)
+    *value_len_out = ie.value_length;
+  if (value_data_out != NULL)
+    *value_data_out = seeker->slab + ie.key_length;
   return DSK_TRUE;
 }
 
