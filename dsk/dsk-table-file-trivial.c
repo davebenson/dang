@@ -311,6 +311,7 @@ run_cmp (TableFileTrivialSeeker *s,
          uint64_t               index,
          void                  *func_data,
          int                   *cmp_rv_out,
+         IndexEntry            *ie_out,
          DskError             **error)
 {
   ...
@@ -378,7 +379,31 @@ find_index (DskTableFileSeeker    *seeker,
               }
             case DSK_TABLE_FILE_FIND_LAST:
               {
-                ...
+                n = start + n - mid;
+                start = mid;
+
+                /* bsearch, knowing that start is in
+                   the range of elements to return. */
+                while (n > 1)
+                  {
+                    mid2 = start + n / 2;
+                    if (!run_cmp (s, func, func_data, mid2, &cmp_rv, error))
+                      return DSK_FALSE;
+                    dsk_assert (cmp_rv <= 0);
+                    if (cmp_rv == 0)
+                      {
+                        /* possible return value is the range
+                           starting at mid2. */
+                        n = start + n - mid2;
+                        start = mid2;
+                      }
+                    else
+                      {
+                        n = mid2 - start;
+                      }
+                  }
+                *index_out = start;
+                return DSK_TRUE;
               }
             }
         }
