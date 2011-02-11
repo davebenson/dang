@@ -2,6 +2,8 @@
 #include <endian.h>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <string.h>
 
 #include "dsk-table-helper.h"
@@ -16,6 +18,10 @@
 #error unknown endianness
 #endif
 
+/* synonyms provided for clarity */
+#define UINT64_FROM_LE UINT64_TO_LE
+#define UINT32_FROM_LE UINT32_TO_LE
+
 /* NOTE: we assume that this structure can be fwritten on little-endian
    architectures.  on big-endian, swaps are required.
    in all cases, the data must be packed in the order given. */
@@ -26,6 +32,7 @@ struct _IndexEntry
   uint32_t key_length;
   uint32_t value_length;
 };
+#define SIZEOF_INDEX_ENTRY sizeof(IndexEntry)
 
 
 /* === Writer === */
@@ -118,6 +125,7 @@ table_file_trivial__new_writer (DskTableFileInterface   *iface,
                                 const char              *base_filename,
                                 DskError               **error)
 {
+  DSK_UNUSED (iface);
   TableFileTrivialWriter wr =
   {
     {
@@ -155,6 +163,9 @@ struct _TableFileTrivialReader
 {
   DskTableFileReader base_instance;
   FILE *index_fp, *heap_fp;
+  uint64_t next_heap_offset;
+  unsigned slab_alloced;
+  uint8_t *slab;
 };
 
 static dsk_boolean
@@ -162,24 +173,28 @@ read_next_index_entry (TableFileTrivialReader *reader,
                        DskError              **error)
 {
   IndexEntry ie;
-  nread = fread (&ie, 1, sizeof (IndexEntry), reader.index_fp);
+  size_t nread;
+  nread = fread (&ie, 1, sizeof (IndexEntry), reader->index_fp);
   if (nread == 0)
     {
       /* at EOF */
-      reader.base_instance.at_eof = DSK_TRUE;
-      goto do_return_reader_copy;
+      reader->base_instance.at_eof = DSK_TRUE;
+      return DSK_TRUE;
     }
-  else if (nread < 0)
+  else if (nread < sizeof (IndexEntry))
     {
-      /* actual error */
-      dsk_set_error (error, "error reading index file: %s",
-                     strerror (errno));
-      return DSK_FALSE;
-    }
-  else if (nread < (int) sizeof (IndexEntry))
-    {
-      /* file truncated */
-      dsk_set_error (error, "index file truncated (partial record encountered)");
+      if (ferror (reader->index_fp))
+        {
+          /* actual error */
+          dsk_set_error (error, "error reading index file: %s",
+                         strerror (errno));
+        }
+      else
+        {
+          /* file truncated */
+          dsk_set_error (error,
+                         "index file truncated (partial record encountered)");
+        }
       return DSK_FALSE;
     }
   ie.heap_offset = UINT64_FROM_LE (ie.heap_offset);
@@ -197,6 +212,8 @@ read_next_index_entry (TableFileTrivialReader *reader,
   if (reader->slab_alloced < kv_len)
     {
       unsigned new_alloced = reader->slab_alloced;
+      if (new_alloced == 0)
+        new_alloced = 16;
       while (new_alloced < kv_len)
         new_alloced *= 2;
       reader->slab = dsk_realloc (reader->slab, new_alloced);
@@ -211,6 +228,7 @@ read_next_index_entry (TableFileTrivialReader *reader,
   reader->base_instance.value_length = ie.value_length;
   reader->base_instance.key_data = reader->slab;
   reader->base_instance.value_data = reader->slab + ie.key_length;
+  reader->next_heap_offset += kv_len;
   return DSK_TRUE;
 }
 
@@ -235,8 +253,9 @@ static DskTableFileReader *
 table_file_trivial__new_reader (DskTableFileInterface   *iface,
                                 int                      openat_fd,
                                 const char              *base_filename,
-                                DskError               **error);
+                                DskError               **error)
 {
+  DSK_UNUSED (iface);
   TableFileTrivialReader reader = {
     {
       DSK_FALSE, 0, 0, NULL, NULL,
@@ -244,12 +263,13 @@ table_file_trivial__new_reader (DskTableFileInterface   *iface,
       table_file_trivial_reader__advance,
       table_file_trivial_reader__destroy
     },
-    NULL, NULL
+    NULL, NULL, 0ULL, 0, NULL
   };
-  fd = dsk_table_helper_openat (openat_fd, base_filename, ".index",
-                                O_RDONLY, 0, error);
+  int fd = dsk_table_helper_openat (openat_fd, base_filename, ".index",
+                                    O_RDONLY, 0, error);
   if (fd < 0)
     return NULL;
+
   reader.index_fp = fdopen (fd, "rb");
   dsk_assert (reader.index_fp != NULL);
   fd = dsk_table_helper_openat (openat_fd, base_filename, ".heap",
@@ -268,11 +288,17 @@ table_file_trivial__new_reader (DskTableFileInterface   *iface,
       fclose (reader.heap_fp);
       return NULL;
     }
-do_return_reader_copy:
   return dsk_memdup (sizeof (reader), &reader);
 }
 
 /* === Seeker === */
+typedef struct _TableFileTrivialSeeker TableFileTrivialSeeker;
+struct _TableFileTrivialSeeker
+{
+  DskTableFileWriter base_instance;
+  int index_fd, heap_fd;
+};
+
 static inline dsk_boolean
 check_index_entry_lengths (const IndexEntry *ie)
 {
@@ -287,7 +313,9 @@ read_index_entry (DskTableFileSeeker *seeker,
                   DskError          **error)
 {
   ssize_t nread;
-  nread = dsk_table_helper_pread (seeker->index_fd, &ie,
+  TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
+  IndexEntry ie;
+  nread = dsk_table_helper_pread (s->index_fd, &ie,
                                   SIZEOF_INDEX_ENTRY,
                                   index * SIZEOF_INDEX_ENTRY);
   if (nread < 0)
@@ -310,6 +338,7 @@ read_index_entry (DskTableFileSeeker *seeker,
       dsk_set_error (error, "corrupted index entry %llu", index);
       return DSK_FALSE;
     }
+  *out = ie;
   return DSK_TRUE;
 }
 
@@ -322,7 +351,23 @@ run_cmp (TableFileTrivialSeeker *s,
          IndexEntry            *ie_out,
          DskError             **error)
 {
-  ...
+  if (!read_index_entry ((DskTableFileSeeker*)s, index, ie_out, error))
+    return DSK_FALSE;
+  if (ie_out->key_length != 0)
+    {
+      if (s->slab_alloced < ie_out->key_length)
+        {
+          ...
+        }
+      ssize_t nread = dsk_table_helper_pread (s->heap_fd, s->slab,
+                                              ie_out->key_length,
+                                              ie_out->heap_offset);
+      if (nread < ie_out->key_length)
+        {
+          ...
+        }
+    }
+  return func (ie_out->key_length, s->slab, func_data);
 }
 
 static dsk_boolean
