@@ -1,63 +1,37 @@
 
-
-typedef struct _DskTableFileOptions DskTableFileOptions;
-struct _DskTableFileOptions
-{
-  unsigned index_fanout;
-  int openat_fd;
-  unsigned gzip_level;
-  const char *base_filename;
-};
-#define DSK_TABLE_FILE_OPTIONS_DEFAULT             \
-{                                                  \
-  16,           /* index_fanout */                 \
-  -1,           /* openat_fd */                    \
-  6,            /* gzip_level */                   \
-  NULL                                             \
-}
 typedef struct _DskTableFileWriter DskTableFileWriter;
 typedef struct _DskTableFileReader DskTableFileReader;
 typedef struct _DskTableFileSeeker DskTableFileSeeker;
+typedef struct _DskTableFileInterface DskTableFileInterface;
+typedef struct _DskTableFileCompressor DskTableFileCompressor;
 
-/* Return TRUE to ignore the error, and FALSE to pass the error back
-   to the caller. */
-typedef dsk_boolean (*DskTableErrorHandler) (DskError *error,
-                                             void     *data);
-/* --- Writer --- */
-DskTableFileWriter *dsk_table_file_writer_new (DskTableFileOptions *options,
-                                               DskError           **error);
-dsk_boolean dsk_table_file_write (DskTableFileWriter *writer,
-                                  unsigned            key_length,
-			          const uint8_t      *key_data,
-                                  unsigned            value_length,
-			          const uint8_t      *value_data,
-			          DskError          **error);
-dsk_boolean dsk_table_file_writer_close   (DskTableFileWriter *writer,
-                                           DskError           **error);
-void        dsk_table_file_writer_destroy (DskTableFileWriter *writer);
+struct _DskTableFileWriter
+{
+  dsk_boolean (*write)  (DskTableFileWriter *writer,
+                         unsigned            key_length,
+                         const uint8_t      *key_data,
+                         unsigned            value_length,
+                         const uint8_t      *value_data,
+                         DskError          **error);
+  dsk_boolean (*close)  (DskTableFileWriter *writer,
+                         DskError          **error);
+  void        (*destroy)(DskTableFileWriter *writer);
+};
 
-/* --- Reader --- */
 struct _DskTableFileReader
 {
+  /* Readonly public data */
   dsk_boolean at_eof;
   unsigned key_length;
   unsigned value_length;
   const uint8_t *key_data;
   const uint8_t *value_data;
 
-  /*< private data follows >*/
+  /* Virtual functions */
+  dsk_boolean (*advance)     (DskTableFileReader *reader,
+                              DskError          **error);
+  void        (*destroy)     (DskTableFileReader *reader);
 };
-DskTableFileReader *dsk_table_file_reader_new (DskTableFileOptions *options,
-                                               DskError           **error);
-
-/* Returns FALSE on EOF or error. */
-dsk_boolean dsk_table_file_reader_advance     (DskTableFileReader *reader,
-			                       DskError          **error);
-void        dsk_table_file_reader_destroy     (DskTableFileReader *reader);
-
-/* --- Searcher --- */
-DskTableFileSeeker *dsk_table_file_seeker_new (DskTableFileOptions *options,
-                                               DskError           **error);
 
 /* Returns:
      -1 if the key is before the range we are searching for.
@@ -74,46 +48,83 @@ typedef enum
   DSK_TABLE_FILE_FIND_LAST
 } DskTableFileFindMode;
 
-/* The comparison function should return TRUE if the value
-   is greater than or equal to some threshold determined by func_data.
-   We return the first element for which the function returns TRUE.
-   This function returns FALSE if:
-     - no matching key is found (in which case *error will not be set)
-     - an error occurs (corrupt data or disk error)
-       (in which case *error will be set)
- */
-dsk_boolean
-dsk_table_file_seeker_find       (DskTableFileSeeker    *seeker,
-                                  DskTableSeekerFindFunc func,
-                                  void                  *func_data,
-                                  DskTableFileFindMode   mode,
-                                  unsigned              *key_len_out,
-                                  const uint8_t        **key_data_out,
-                                  unsigned              *value_len_out,
-                                  const uint8_t        **value_data_out,
-                                  DskError             **error);
+struct _DskTableFileSeeker
+{
+  dsk_boolean (*find)      (DskTableFileSeeker    *seeker,
+                            DskTableSeekerFindFunc func,
+                            void                  *func_data,
+                            DskTableFileFindMode   mode,
+                            unsigned              *key_len_out,
+                            const uint8_t        **key_data_out,
+                            unsigned              *value_len_out,
+                            const uint8_t        **value_data_out,
+                            DskError             **error);
  
  
-DskTableFileReader *
-dsk_table_file_seeker_find_reader(DskTableFileSeeker    *seeker,
-                                  DskTableSeekerFindFunc func,
-                                  void                  *func_data,
-                                  DskError             **error);
+  DskTableFileReader *
+             (*find_reader)(DskTableFileSeeker    *seeker,
+                            DskTableSeekerFindFunc func,
+                            void                  *func_data,
+                            DskError             **error);
  
-dsk_boolean
-dsk_table_file_seeker_index      (DskTableFileSeeker    *seeker,
-                                  uint64_t               index,
-                                  unsigned              *key_len_out,
-                                  const void           **key_data_out,
-                                  unsigned              *value_len_out,
-                                  const void           **value_data_out,
-                                  DskError             **error);
+  dsk_boolean (*index)     (DskTableFileSeeker    *seeker,
+                            uint64_t               index,
+                            unsigned              *key_len_out,
+                            const void           **key_data_out,
+                            unsigned              *value_len_out,
+                            const void           **value_data_out,
+                            DskError             **error);
  
-DskTableFileReader *
-dsk_table_file_seeker_index_reader(DskTableFileSeeker    *seeker,
-                                   uint64_t               index,
-                                   DskError             **error);
+  DskTableFileReader *
+            (*index_reader)(DskTableFileSeeker    *seeker,
+                            uint64_t               index,
+                            DskError             **error);
  
 
-void         dsk_table_file_seeker_destroy    (DskTableFileSeeker    *seeker);
+  void         (*destroy)  (DskTableFileSeeker    *seeker);
 
+};
+
+
+struct _DskTableFileInterface
+{
+  DskTableFileWriter *(*new_writer) (DskTableFileInterface   *iface,
+                                     int                      openat_fd,
+                                     const char              *base_filename,
+                                     DskError               **error);
+  DskTableFileReader *(*new_reader) (DskTableFileInterface   *iface,
+                                     int                      openat_fd,
+                                     const char              *base_filename,
+                                     DskError               **error);
+  DskTableFileSeeker *(*new_seeker) (DskTableFileInterface   *iface,
+                                     int                      openat_fd,
+                                     const char              *base_filename,
+                                     DskError               **error);
+  void                (*destroy)    (DskTableFileInterface   *iface);
+};
+
+  
+extern DskTableFileInterface dsk_table_file_interface_default;
+
+DskTableFileInterface *dsk_table_file_interface_new (DskTableFileCompressor *,
+                                                     unsigned    n_index_levels,
+                                                     const unsigned *fanouts);
+
+extern DskTableFileInterface dsk_table_file_interface_trivial;
+
+struct _DskTableFileCompressor
+{
+  /* Fails iff the output buffer is too short. */
+  dsk_boolean (*compress)   (DskTableFileCompressor *compressor,
+                             unsigned                in_len,
+                             const uint8_t          *in_data,
+                             unsigned               *out_len_inout,
+                             uint8_t                *out_data);
+
+  /* Fails on corrupt data, or if the output buffer is too small. */
+  dsk_boolean (*decompress) (DskTableFileCompressor *compressor,
+                             unsigned                in_len,
+                             const uint8_t          *in_data,
+                             unsigned               *out_len_inout,
+                             uint8_t                *out_data);
+};
