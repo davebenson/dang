@@ -78,7 +78,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-print.o \
 	  dsk-checksum.o \
 	  dsk-file-util.o dsk-pattern.o \
-	  dsk-table-file.o 
+	  dsk-table-file-trivial.o
 	ar cru $@ $^
 
 %.o: %.c

@@ -1,4 +1,10 @@
+#include "dsk.h"
 #include <endian.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+
+#include "dsk-table-helper.h"
 
 #if (BYTE_ORDER == LITTLE_ENDIAN)
 #define UINT64_TO_LE(val)  (val)
@@ -42,8 +48,8 @@ table_file_trivial_writer__write  (DskTableFileWriter *writer,
 {
   TableFileTrivialWriter *wr = (TableFileTrivialWriter *) writer;
   
-  struct IndexEntry ie;
-  ie.heap_offset = UINT64_TO_LE (wr->heap_offset);
+  IndexEntry ie;
+  ie.heap_offset = UINT64_TO_LE (wr->heap_fp_offset);
   ie.key_length = UINT32_TO_LE (key_length);
   ie.value_length = UINT32_TO_LE (value_length);
   if (fwrite (&ie, 16, 1, wr->index_fp) != 1)
@@ -67,7 +73,7 @@ table_file_trivial_writer__write  (DskTableFileWriter *writer,
       return DSK_FALSE;
     }
 
-  wr->heap_offset += key_length + value_length;
+  wr->heap_fp_offset += key_length + value_length;
   return DSK_TRUE;
 }
 
@@ -75,6 +81,7 @@ static dsk_boolean
 table_file_trivial_writer__close  (DskTableFileWriter *writer,
                                    DskError          **error)
 {
+  TableFileTrivialWriter *wr = (TableFileTrivialWriter *) writer;
   if (fclose (wr->index_fp) != 0)
     {
       dsk_set_error (error, "error closing index file: %s",
@@ -120,6 +127,7 @@ table_file_trivial__new_writer (DskTableFileInterface   *iface,
     },
     NULL, NULL, 0ULL
   };
+  int fd;
   fd = dsk_table_helper_openat (openat_fd, base_filename, ".index",
                                 O_CREAT|O_TRUNC|O_WRONLY, 0666,
                                 error);
