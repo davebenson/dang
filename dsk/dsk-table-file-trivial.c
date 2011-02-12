@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <string.h>
 
 #include "dsk-table-helper.h"
@@ -249,13 +251,14 @@ table_file_trivial_reader__destroy (DskTableFileReader *reader)
 }
 
 
+/* Create a new trivial reader, at an arbitrary offset. */
 static DskTableFileReader *
-table_file_trivial__new_reader (DskTableFileInterface   *iface,
-                                int                      openat_fd,
-                                const char              *base_filename,
-                                DskError               **error)
+new_reader  (int                      openat_fd,
+             const char              *base_filename,
+             uint64_t                 index_offset,
+             uint64_t                 heap_offset,
+             DskError               **error)
 {
-  DSK_UNUSED (iface);
   TableFileTrivialReader reader = {
     {
       DSK_FALSE, 0, 0, NULL, NULL,
@@ -270,6 +273,16 @@ table_file_trivial__new_reader (DskTableFileInterface   *iface,
   if (fd < 0)
     return NULL;
 
+  if (index_offset != 0ULL)
+    {
+      if (lseek (fd, index_offset, SEEK_SET) != (off_t) index_offset)
+        {
+          dsk_set_error (error, "error seeking in index file to offset %llu",
+                         index_offset);
+          close (fd);
+          return NULL;
+        }
+    }
   reader.index_fp = fdopen (fd, "rb");
   dsk_assert (reader.index_fp != NULL);
   fd = dsk_table_helper_openat (openat_fd, base_filename, ".heap",
@@ -278,6 +291,17 @@ table_file_trivial__new_reader (DskTableFileInterface   *iface,
     {
       fclose (reader.index_fp);
       return NULL;
+    }
+  if (heap_offset != 0ULL)
+    {
+      if (lseek (fd, heap_offset, SEEK_SET) != (off_t) heap_offset)
+        {
+          dsk_set_error (error, "error seeking in heap file to offset %llu",
+                         heap_offset);
+          close (fd);
+          fclose (reader.index_fp);
+          return NULL;
+        }
     }
   reader.heap_fp = fdopen (fd, "rb");
   dsk_assert (reader.heap_fp != NULL);
@@ -291,12 +315,29 @@ table_file_trivial__new_reader (DskTableFileInterface   *iface,
   return dsk_memdup (sizeof (reader), &reader);
 }
 
+static DskTableFileReader *
+table_file_trivial__new_reader (DskTableFileInterface   *iface,
+                                int                      openat_fd,
+                                const char              *base_filename,
+                                DskError               **error)
+{
+  DSK_UNUSED (iface);
+  return new_reader (openat_fd, base_filename, 0ULL, 0ULL, error);
+}
+
 /* === Seeker === */
 typedef struct _TableFileTrivialSeeker TableFileTrivialSeeker;
 struct _TableFileTrivialSeeker
 {
-  DskTableFileWriter base_instance;
+  DskTableFileSeeker base_instance;
   int index_fd, heap_fd;
+  uint8_t *slab;
+  size_t slab_alloced;
+  uint64_t count;
+
+  /* required to create new readers */
+  int openat_fd;
+  char *base_filename;
 };
 
 static inline dsk_boolean
@@ -342,10 +383,27 @@ read_index_entry (DskTableFileSeeker *seeker,
   return DSK_TRUE;
 }
 
+static void
+seeker_ensure_slab_size (TableFileTrivialSeeker *s,
+                         size_t                  size)
+{
+  if (s->slab_alloced >= size)
+    return;
+  size_t new_size = s->slab_alloced;
+  if (new_size == 0)
+    new_size = 16;
+  else
+    new_size *= 2;
+  while (new_size < size)
+    new_size *= 2;
+  dsk_free (s->slab);
+  s->slab = dsk_malloc (new_size);
+  s->slab_alloced = new_size;
+}
 static dsk_boolean
 run_cmp (TableFileTrivialSeeker *s,
-         DskTableSeekerFindFunc func,
          uint64_t               index,
+         DskTableSeekerFindFunc func,
          void                  *func_data,
          int                   *cmp_rv_out,
          IndexEntry            *ie_out,
@@ -355,19 +413,22 @@ run_cmp (TableFileTrivialSeeker *s,
     return DSK_FALSE;
   if (ie_out->key_length != 0)
     {
-      if (s->slab_alloced < ie_out->key_length)
-        {
-          ...
-        }
+      seeker_ensure_slab_size (s, ie_out->key_length);
       ssize_t nread = dsk_table_helper_pread (s->heap_fd, s->slab,
                                               ie_out->key_length,
                                               ie_out->heap_offset);
-      if (nread < ie_out->key_length)
+      if (nread < (ssize_t) ie_out->key_length)
         {
-          ...
+          if (nread < 0)
+            dsk_set_error (error, "error reading from heap file at offset %llu: %s",
+                           ie_out->heap_offset, strerror (errno));
+          else
+            dsk_set_error (error, "premature EOF reading key from heap file");
+          return DSK_FALSE;
         }
     }
-  return func (ie_out->key_length, s->slab, func_data);
+  *cmp_rv_out = func (ie_out->key_length, s->slab, func_data);
+  return DSK_TRUE;
 }
 
 static dsk_boolean
@@ -376,15 +437,17 @@ find_index (DskTableFileSeeker    *seeker,
             void                  *func_data,
             DskTableFileFindMode   mode,
             uint64_t              *index_out,
+            IndexEntry            *ie_out,
             DskError             **error)
 {
   TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
   uint64_t start = 0, n = s->count;
-  while (count > 0)
+  while (n > 0)
     {
       int cmp_rv;
       uint64_t mid = start + n / 2;
-      if (!run_cmp (s, func, func_data, mid, &cmp_rv, error))
+      IndexEntry ie;
+      if (!run_cmp (s, mid, func, func_data, &cmp_rv, &ie, error))
         return DSK_FALSE;
       if (cmp_rv < 0)
         {
@@ -407,13 +470,15 @@ find_index (DskTableFileSeeker    *seeker,
                    the range of elements to return. */
                 while (n > 1)
                   {
-                    mid2 = start + n / 2;
-                    if (!run_cmp (s, func, func_data, mid2, &cmp_rv, error))
+                    uint64_t mid2 = start + n / 2;
+                    IndexEntry ie2;
+                    if (!run_cmp (s, mid2, func, func_data, &cmp_rv, &ie2, error))
                       return DSK_FALSE;
                     dsk_assert (cmp_rv <= 0);
                     if (cmp_rv == 0)
                       {
                         n = mid2 + 1 - start;
+                        ie = ie2;
                       }
                     else
                       {
@@ -422,12 +487,14 @@ find_index (DskTableFileSeeker    *seeker,
                       }
                   }
                 *index_out = start;
+                *ie_out = ie;
                 return DSK_TRUE;
               }
 
             case DSK_TABLE_FILE_FIND_ANY:
               {
                 *index_out = mid;
+                *ie_out = ie;
                 return DSK_TRUE;
               }
             case DSK_TABLE_FILE_FIND_LAST:
@@ -439,8 +506,9 @@ find_index (DskTableFileSeeker    *seeker,
                    the range of elements to return. */
                 while (n > 1)
                   {
-                    mid2 = start + n / 2;
-                    if (!run_cmp (s, func, func_data, mid2, &cmp_rv, error))
+                    uint64_t mid2 = start + n / 2;
+                    IndexEntry ie2;
+                    if (!run_cmp (s, mid2, func, func_data, &cmp_rv, &ie2, error))
                       return DSK_FALSE;
                     dsk_assert (cmp_rv <= 0);
                     if (cmp_rv == 0)
@@ -449,6 +517,7 @@ find_index (DskTableFileSeeker    *seeker,
                            starting at mid2. */
                         n = start + n - mid2;
                         start = mid2;
+                        ie = ie2;
                       }
                     else
                       {
@@ -456,6 +525,7 @@ find_index (DskTableFileSeeker    *seeker,
                       }
                   }
                 *index_out = start;
+                *ie_out = ie;
                 return DSK_TRUE;
               }
             }
@@ -478,13 +548,39 @@ table_file_trivial_seeker__find  (DskTableFileSeeker    *seeker,
                                   DskError             **error)
 {
   uint64_t index;
-  if (!find_index (seeker, func, func_data, mode, &index, error))
+  IndexEntry ie;
+  TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
+  if (!find_index (seeker, func, func_data, mode, &index, &ie, error))
     return DSK_FALSE;
 
   if (key_len_out || key_data_out || value_len_out || value_data_out)
     {
       /* load key/value */
-      ...
+      unsigned kv_len = ie.key_length + ie.value_length;
+      seeker_ensure_slab_size (s, kv_len);
+      if (kv_len > 0
+       && (key_data_out != NULL || value_data_out != NULL))
+        {
+          ssize_t nread = dsk_table_helper_pread (s->heap_fd, s->slab,
+                                                  kv_len, ie.heap_offset);
+          if (nread < (ssize_t) kv_len)
+            {
+              if (nread < 0)
+                dsk_set_error (error, "error reading from heap file at offset %llu: %s",
+                               ie.heap_offset, strerror (errno));
+              else
+                dsk_set_error (error, "premature EOF reading key/value from heap file");
+              return DSK_FALSE;
+            }
+        }
+      if (key_len_out != NULL)
+        *key_len_out = ie.key_length;
+      if (value_len_out != NULL)
+        *value_len_out = ie.value_length;
+      if (key_data_out != NULL)
+        *key_data_out = s->slab;
+      if (value_data_out != NULL)
+        *value_data_out = s->slab + ie.key_length;
     }
   return DSK_TRUE;
 }
@@ -496,7 +592,15 @@ table_file_trivial_seeker__find_reader(DskTableFileSeeker    *seeker,
                                        void                  *func_data,
                                        DskError             **error)
 {
-  ...
+  uint64_t index;
+  IndexEntry ie;
+  TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
+  if (!find_index (seeker, func, func_data, 
+                   DSK_TABLE_FILE_FIND_FIRST,
+                   &index, &ie, error))
+    return NULL;
+  return new_reader (s->openat_fd, s->base_filename, index * SIZEOF_INDEX_ENTRY,
+                     ie.heap_offset, error);
 }
 
 static dsk_boolean 
@@ -508,24 +612,17 @@ table_file_trivial_seeker__index (DskTableFileSeeker    *seeker,
                                   const void           **value_data_out,
                                   DskError             **error)
 {
+  TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
   IndexEntry ie;
+  unsigned kv_len;
   if (!read_index_entry (seeker, index, &ie, error))
     return DSK_FALSE;
   kv_len = ie.key_length + ie.value_length;
-  if (seeker->slab_alloced < kv_len)
-    {
-      unsigned new_size = seeker->slab_alloced;
-      if (new_size == 0)
-        new_size = 32;
-      while (new_size < kv_len)
-        new_size *= 2;
-      seeker->slab_alloced = new_size;
-      dsk_free (seeker->slab);
-      seeker->slab = dsk_malloc (new_size);
-    }
   if (kv_len > 0)
     {
-      nread = dsk_table_helper_pread (seeker->heap_fd, seeker->slab,
+      ssize_t nread;
+      seeker_ensure_slab_size (s, kv_len);
+      nread = dsk_table_helper_pread (s->heap_fd, s->slab,
                                       kv_len, ie.heap_offset);
       if (nread < 0)
         {
@@ -543,11 +640,11 @@ table_file_trivial_seeker__index (DskTableFileSeeker    *seeker,
   if (key_len_out != NULL)
     *key_len_out = ie.key_length;
   if (key_data_out != NULL)
-    *key_data_out = seeker->slab;
+    *key_data_out = s->slab;
   if (value_len_out != NULL)
     *value_len_out = ie.value_length;
   if (value_data_out != NULL)
-    *value_data_out = seeker->slab + ie.key_length;
+    *value_data_out = s->slab + ie.key_length;
   return DSK_TRUE;
 }
 
@@ -556,23 +653,72 @@ table_file_trivial_seeker__index_reader(DskTableFileSeeker    *seeker,
                                         uint64_t               index,
                                         DskError             **error)
 {
-  ...
+  TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
+  IndexEntry ie;
+  if (!read_index_entry (seeker, index, &ie, error))
+    return DSK_FALSE;
+  return new_reader (s->openat_fd, s->base_filename, index * SIZEOF_INDEX_ENTRY,
+                     ie.heap_offset, error);
 }
 
 
 static void         
 table_file_trivial_seeker__destroy  (DskTableFileSeeker    *seeker)
 {
-  ...
+  TableFileTrivialSeeker *s = (TableFileTrivialSeeker *) seeker;
+  dsk_free (s->slab);
+  close (s->index_fd);
+  close (s->heap_fd);
+  dsk_free (s);
 }
 
 static DskTableFileSeeker *
 table_file_trivial__new_seeker (DskTableFileInterface   *iface,
                                 int                      openat_fd,
                                 const char              *base_filename,
-                                DskError               **error);
+                                DskError               **error)
 {
-  ...
+  DSK_UNUSED (iface);
+  TableFileTrivialSeeker s = {
+    { table_file_trivial_seeker__find,
+      table_file_trivial_seeker__find_reader,
+      table_file_trivial_seeker__index,
+      table_file_trivial_seeker__index_reader,
+      table_file_trivial_seeker__destroy },
+    -1, -1,             /* fds */
+    NULL, 0,            /* slab */
+    0ULL,               /* count */
+    openat_fd,
+    NULL                /* base_filename */
+  };
+  s.index_fd = dsk_table_helper_openat (openat_fd, base_filename, ".index",
+                                    O_RDONLY, 0, error);
+  if (s.index_fd < 0)
+    return NULL;
+  struct stat stat_buf;
+  if (fstat (s.index_fd, &stat_buf) < 0)
+    {
+      dsk_set_error (error, "could not stat index file to find its size");
+      close (s.index_fd);
+      return NULL;
+    }
+  s.count = stat_buf.st_size / SIZEOF_INDEX_ENTRY;
+
+  s.heap_fd = dsk_table_helper_openat (openat_fd, base_filename, ".heap",
+                                       O_RDONLY, 0, error);
+  if (s.heap_fd < 0)
+    {
+      close (s.index_fd);
+      return NULL;
+    }
+
+  TableFileTrivialSeeker *rv;
+  rv = dsk_malloc (sizeof (TableFileTrivialSeeker)
+                    + strlen (base_filename) + 1);
+  *rv = s;
+  rv->base_filename = (char*) (rv + 1);
+  strcpy (rv->base_filename, base_filename);
+  return (DskTableFileSeeker *) rv;
 }
 
 /* No destructor required for the static interface */
