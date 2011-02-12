@@ -41,7 +41,7 @@ struct _DskTableConfig
   void *merge_data;
   dsk_boolean chronological_lookup_merges;
   const char *dir;
-  unsigned gzip_level;		/* 0 == identity */
+  DskTableFileInterface *file_interface;
 };
 
 DskTable   *dsk_table_new          (DskTableConfig *config,
