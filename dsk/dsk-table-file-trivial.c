@@ -11,13 +11,13 @@
 #include "dsk-table-helper.h"
 
 #if (BYTE_ORDER == LITTLE_ENDIAN)
-#define UINT64_TO_LE(val)  (val)
-#define UINT32_TO_LE(val)  (val)
+#  define UINT64_TO_LE(val)  (val)
+#  define UINT32_TO_LE(val)  (val)
 #elif (BYTE_ORDER == BIG_ENDIAN)
-#define UINT64_TO_LE(val)  bswap64(val)
-#define UINT32_TO_LE(val)  bswap32(val)
+#  define UINT64_TO_LE(val)  bswap64(val)
+#  define UINT32_TO_LE(val)  bswap32(val)
 #else
-#error unknown endianness
+#  error unknown endianness
 #endif
 
 /* synonyms provided for clarity */
@@ -449,12 +449,16 @@ find_index (DskTableFileSeeker    *seeker,
       IndexEntry ie;
       if (!run_cmp (s, mid, func, func_data, &cmp_rv, &ie, error))
         return DSK_FALSE;
-      if (cmp_rv < 0)
+      if (cmp_rv > 0)
         {
+          /* mid is after func_data; hence the new interval
+             should be [start,mid-1] */
           n = mid - start;
         }
-      else if (cmp_rv > 0)
+      else if (cmp_rv < 0)
         {
+          /* mid is before func_data; hence the new interval
+             should be [start+1,end] (where end==start+n-1) */
           n = (start + n) - (mid + 1);
           start = mid + 1;
         }
@@ -466,7 +470,7 @@ find_index (DskTableFileSeeker    *seeker,
               {
                 n = mid + 1 - start;
 
-                /* bsearch, knowing that (start+n-1) is in
+                /* bsearch, knowing that (start+n-1)==end is in
                    the range of elements to return. */
                 while (n > 1)
                   {
