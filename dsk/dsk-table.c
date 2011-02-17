@@ -1,3 +1,4 @@
+#include "dsk.h"
 
 typedef struct _DskTable DskTable;
 
@@ -66,7 +67,8 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
       if (errno == ENOENT)
         {
           /* try making directory */
-          ...
+          if (!dsk_mkdir_recursive (rv.dir, 0777, error))
+            return NULL;
 
           rv.dir_fd = open (rv.dir, O_RDONLY);
           if (rv.dir_fd < 0)
@@ -79,13 +81,11 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
   dsk_fd_set_close_on_exec (rv.dir_fd);
   if (flock (rv.dir_fd, LOCK_EX|LOCK_NB) < 0)
     {
-      g_set_error (error, SNAPDB_ERROR_DOMAIN_QUARK,
-                   SNAPDB_ERROR_FILE_LOCK,
-                   "error locking directory %s: %s",
-                   dir, g_strerror (errno));
+      dsk_set_error (error, "error locking directory %s: %s",
+                     dir, g_strerror (errno));
       close (fd);
       dsk_free (rv.dir);
-      return FALSE;
+      return NULL;
     }
   rv.file_interface = options->file_interface;
 
