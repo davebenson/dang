@@ -1,4 +1,21 @@
 #include "dsk.h"
+#include "dsk-table-checkpoint.h"
+
+/* Checkpointing/journalling Algorithm:
+   - start an "async-cp" checkpoint with the cp data,
+     begin sync of all required files
+   - add to journal as needed
+   - when the sync finishes:
+     - sync the checkpoint/journal file,
+       move the checkpoint from async-cp to sync-cp,
+       and sync the directory.
+       (Delete any unused files)
+     - if no or few entries were added to journal,
+       wait for enough to flush the journal,
+       then begin the sync process again.
+     - if a lot of entries were added to the journal,
+       flush immediately to a file and begin syncing again.
+ */
 
 typedef struct _DskTable DskTable;
 
@@ -34,7 +51,8 @@ struct _Merge
 
 struct _PossibleMerge
 {
-  double actual_entry_count_ratio;
+  /* log2(a->entry_count / b->entry_count) * 1024 */
+  int actual_entry_count_ratio_log2_b10;
   File *a, *b;
 };
 
@@ -89,14 +107,22 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
     }
   rv.file_interface = options->file_interface;
 
+  rv.cp_iface = options->checkpoint_interface;
   if (is_new)
     {
       /* create initial empty checkpoint */
+      rv.cp = (*rv.cp_iface->create) (rv.cp_iface,
+                                      fd, "ASYNC-CP",
+                                      0, NULL, error);
+    }
+  else if (was shutdown unexpectedly)
+    {
+      /* open existing checkpoint / journal */
       ...
     }
   else
     {
-      /* open existing checkpoint / journal */
+      /* use ASYNC-CP if available, SYNC-CP if available, or die. */
       ...
     }
 
