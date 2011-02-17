@@ -5,8 +5,38 @@ struct _File
 {
   uint64_t id;
   DskTableFileSeeker *seeker;           /* created on demand */
-  ...
+
+  /* These are the number of items, in the order they were received,
+     ignoring merging. */
+  uint64_t first_entry_index;
+  uint64_t n_entries;
+
+  /* Actual number of entries (post deletion and merging) */
+  uint64_t entry_count;
+
+  /* If this has an active merge job on it. */
+  Merge *merge;
+
+  /* If this doesn't have an active merge job,
+     these are merge job sorted by ratio,
+     then number of elements. */
+  PossibleMerge *prev_merge;
+  PossibleMerge *next_merge;
+
+  File *prev, *next;
 };
+
+struct _Merge
+{
+  File *a, *b;
+};
+
+struct _PossibleMerge
+{
+  double actual_entry_count_ratio;
+  File *a, *b;
+};
+
 
 struct _DskTable
 {
