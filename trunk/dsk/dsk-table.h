@@ -50,7 +50,8 @@ dsk_boolean dsk_table_lookup       (DskTable       *table,
                                     unsigned        key_len,
                                     const uint8_t  *key_data,
                                     unsigned       *value_len_out,
-                                    uint8_t        *value_data_out);
+                                    const uint8_t **value_data_out,
+                                    DskError      **error);
 dsk_boolean dsk_table_insert       (DskTable       *table,
                                     unsigned        key_len,
                                     const uint8_t  *key_data,
