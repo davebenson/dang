@@ -89,14 +89,17 @@ struct _DskTableFileSeeker
 struct _DskTableFileInterface
 {
   DskTableFileWriter *(*new_writer) (DskTableFileInterface   *iface,
+                                     const char              *openat_dir,
                                      int                      openat_fd,
                                      const char              *base_filename,
                                      DskError               **error);
   DskTableFileReader *(*new_reader) (DskTableFileInterface   *iface,
+                                     const char              *openat_dir,
                                      int                      openat_fd,
                                      const char              *base_filename,
                                      DskError               **error);
   DskTableFileSeeker *(*new_seeker) (DskTableFileInterface   *iface,
+                                     const char              *openat_dir,
                                      int                      openat_fd,
                                      const char              *base_filename,
                                      DskError               **error);

@@ -21,7 +21,7 @@ test_simple_write_read (void)
   DskError *error = NULL;
   DskTableFileInterface *iface = &dsk_table_file_interface_trivial;
 
-  DskTableFileWriter *writer = iface->new_writer (iface, test_dir_fd, "base", &error);
+  DskTableFileWriter *writer = iface->new_writer (iface, test_dir, test_dir_fd, "base", &error);
   DskTableFileReader *reader;
   if (writer == NULL)
     dsk_die ("%s", error->message);
@@ -33,7 +33,7 @@ test_simple_write_read (void)
     dsk_die ("error closing writer: %s", error->message);
   writer->destroy (writer);
 
-  reader = iface->new_reader (iface, test_dir_fd, "base", &error);
+  reader = iface->new_reader (iface, test_dir, test_dir_fd, "base", &error);
   if (reader == NULL)
     dsk_die ("error creating reader: %s", error->message);
   dsk_assert (!reader->at_eof);
@@ -266,7 +266,7 @@ test_various_read_write_1 (const char *name,
   else
     fprintf (stderr, ".");
 
-  writer = iface->new_writer (iface, test_dir_fd, "base", &error);
+  writer = iface->new_writer (iface, test_dir, test_dir_fd, "base", &error);
   if (writer == NULL)
     dsk_die ("%s", error->message);
   for (big_i = small_i = 0; big_i < n_write; big_i++)
@@ -284,7 +284,7 @@ test_various_read_write_1 (const char *name,
     dsk_die ("error closing writer: %s", error->message);
   writer->destroy (writer);
 
-  reader = iface->new_reader (iface, test_dir_fd, "base", &error);
+  reader = iface->new_reader (iface, test_dir, test_dir_fd, "base", &error);
   if (reader == NULL)
     dsk_die ("error creating reader: %s", error->message);
   small_i = 0;
@@ -356,7 +356,7 @@ test_various_write_seek_1 (const char *name,
   else
     fprintf (stderr, ".");
 
-  writer = iface->new_writer (iface, test_dir_fd, "base", &error);
+  writer = iface->new_writer (iface, test_dir, test_dir_fd, "base", &error);
   if (writer == NULL)
     dsk_die ("%s", error->message);
   for (i = 0; i < n_entries; i++)
@@ -384,7 +384,7 @@ test_various_write_seek_1 (const char *name,
   step = *p_ptr % n_entries;
 
   /* create seeker */
-  seeker = iface->new_seeker (iface, test_dir_fd, "base", &error);
+  seeker = iface->new_seeker (iface, test_dir, test_dir_fd, "base", &error);
   if (seeker == NULL)
     dsk_die ("error creating seeker from newly finished writer: %s",
              error->message);

@@ -6,13 +6,14 @@ DskJsonValue *parse_value (const char *str)
 {
   DskJsonParser *parser = dsk_json_parser_new ();
   DskError *error = NULL;
+  DskJsonValue *v;
   if (cmdline_verbose)
     dsk_warning ("parsing '%s'", str);
   if (!dsk_json_parser_feed (parser, strlen (str), (const uint8_t *) str, &error))
     dsk_die ("error parsing json (%s): %s", str, error->message);
   if (!dsk_json_parser_finish (parser, &error))
     dsk_die ("error finishing json parser (%s): %s", str, error->message);
-  DskJsonValue *v = dsk_json_parser_pop (parser);
+  v = dsk_json_parser_pop (parser);
   dsk_assert (v != NULL);
   if (dsk_json_parser_pop (parser) != NULL)
     dsk_die ("got two values?");
