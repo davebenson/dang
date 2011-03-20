@@ -168,6 +168,7 @@ void *dsk_malloc0 (size_t);
 void  dsk_free (void *);
 void *dsk_realloc (void *, size_t);
 char *dsk_strdup (const char *str);
+char *dsk_strndup (size_t len, const char *str);
 void *dsk_memdup (size_t, const void *);
 
 /* copy the string starting at 'str', and ending with the last-character

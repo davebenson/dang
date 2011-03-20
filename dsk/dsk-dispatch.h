@@ -128,6 +128,9 @@ struct _DskDispatch
   size_t n_notifies_desired;
   DskFileDescriptorNotify *notifies_desired;
 
+  /* If TRUE, return immediately. */
+  dsk_boolean has_idle;
+
   /* number of milliseconds to wait if no events occur */
   dsk_boolean has_timeout;
   unsigned long timeout_secs;

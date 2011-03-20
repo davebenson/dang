@@ -2,306 +2,90 @@
 #include <stdlib.h>
 #include "dsk.h"
 
-DskJsonParser *
-dsk_json_parser_new (void)
+DskJsonValue *dsk_json_value_new_null   (void)
 {
-  DskJsonParser *parser = g_new (DskJsonParser, 1);
-  parser->lex_state = JSON_LEX_STATE_INIT;
-  parser->str = g_string_new ("");
-  parser->parser = DskJsonParseAlloc (g_malloc);
-  parser->xml_nodes = g_queue_new ();
-  parser->static_syntax_error = NULL;
-  parser->line_no = 1;
-  return parser;
+  DskJsonValue *rv = dsk_malloc (sizeof (DskJsonValue));
+  rv->type = DSK_JSON_VALUE_NULL;
+  return rv;
 }
-
-static gboolean
-add_token                (DskJsonParser *parser,
-                          int           yymajor,
-                          char         *str,
-                          DskError      **error)
+DskJsonValue *dsk_json_value_new_boolean(dsk_boolean    value)
 {
-  DskJsonParse (parser->parser, yymajor, str, parser);
-  if (parser->static_syntax_error)
+  DskJsonValue *rv = dsk_malloc (sizeof (DskJsonValue));
+  rv->type = DSK_JSON_VALUE_BOOLEAN;
+  rv->value.v_boolean = value;
+  return rv;
+}
+/* takes ownership of subvalues, but not of the members array */
+DskJsonValue *dsk_json_value_new_object (unsigned       n_members,
+                                         DskJsonMember *members)
+{
+  unsigned total_str_len = 0;
+  unsigned i;
+  char *str_heap;
+  DskJsonValue *rv;
+  for (i = 0; i < n_members; i++)
+    total_str_len += strlen (members[i].name) + 1;
+  rv = dsk_malloc (sizeof (DskJsonValue)
+                   + sizeof (DskJsonMember) * n_members
+                   + total_str_len);
+  rv->type = DSK_JSON_VALUE_OBJECT;
+  rv->value.v_object.n_members = n_members;
+  rv->value.v_object.members = (DskJsonMember *) (rv + 1);
+  str_heap = (char*)(rv->value.v_object.members + n_members);
+  for (i = 0; i < n_members; i++)
     {
-      dsk_set_error (error,
-                   "syntax error: %s (line %u)",
-                   parser->static_syntax_error, parser->line_no);
-      return FALSE;
+      rv->value.v_object.members[i].value = members[i].value;
+      rv->value.v_object.members[i].name = str_heap;
+      strcpy (str_heap, members[i].name);
+      str_heap = strchr (str_heap, 0) + 1;
     }
-  return TRUE;
+  return rv;
 }
 
-static gboolean
-add_token_copying_str (DskJsonParser *parser,
-                       int           yymajor,
-                       DskError      **error)
+/* takes ownership of subvalues, but not of the values array */
+DskJsonValue *dsk_json_value_new_array  (unsigned       n_values,
+                                         DskJsonValue **values)
 {
-  char *copy = g_malloc (parser->str->len + 1);
-  memcpy (copy, parser->str->str, parser->str->len);
-  copy[parser->str->len] = 0;
-  return add_token (parser, yymajor, copy, error);
+  DskJsonValue *rv;
+  rv = dsk_malloc (sizeof (DskJsonValue)
+                   + sizeof (DskJsonValue *) * n_values);
+  rv->type = DSK_JSON_VALUE_ARRAY;
+  rv->value.v_array.n_values = n_values;
+  rv->value.v_array.values = (DskJsonValue **) (rv + 1);
+  memcpy (rv->value.v_array.values, values, sizeof (DskJsonValue*) * n_values);
+  return rv;
 }
-
-gboolean
-dsk_json_parser_feed(DskJsonParser *parser,
-                    unsigned      n_bytes,
-                    const guint8 *bytes,
-                    DskError      **error)
+DskJsonValue *dsk_json_value_new_string (unsigned       n_bytes,
+                                         char          *str)
 {
-  while (n_bytes > 0)
-    {
-      switch (parser->lex_state)
-        {
-        case JSON_LEX_STATE_INIT:
-          while (n_bytes > 0 && g_ascii_isspace (*bytes))
-            {
-              bytes++;
-              n_bytes--;
-            }
-          if (n_bytes == 0)
-            break;
-          switch (*bytes)
-            {
-            case 't': case 'T':
-              parser->lex_state = JSON_LEX_STATE_TRUE;
-              parser->fixed_n_chars = 1;
-              bytes++;
-              n_bytes--;
-              break;
-            case 'f': case 'F':
-              parser->lex_state = JSON_LEX_STATE_FALSE;
-              parser->fixed_n_chars = 1;
-              bytes++;
-              n_bytes--;
-              break;
-            case 'n': case 'N':
-              parser->lex_state = JSON_LEX_STATE_NULL;
-              parser->fixed_n_chars = 1;
-              bytes++;
-              n_bytes--;
-              break;
-            case '"':
-              parser->lex_state = JSON_LEX_STATE_IN_DQ;
-              g_string_set_size (parser->str, 0);
-              bytes++;
-              n_bytes--;
-              break;
-            case '-': case '+':
-            case '0': case '1': case '2': case '3': case '4': 
-            case '5': case '6': case '7': case '8': case '9': 
-              parser->lex_state = JSON_LEX_STATE_IN_NUMBER;
-              g_string_set_size (parser->str, 1);
-              parser->str->str[0] = *bytes++;
-              n_bytes--;
-              break;
-
-#define WRITE_CHAR_TOKEN_CASE(character, SHORTNAME) \
-            case character: \
-              if (!add_token (parser, UF_JSON_TOKEN_##SHORTNAME, NULL, error)) \
-                return FALSE; \
-              n_bytes--; \
-              bytes++; \
-              break
-            WRITE_CHAR_TOKEN_CASE('{', LBRACE);
-            WRITE_CHAR_TOKEN_CASE('}', RBRACE);
-            WRITE_CHAR_TOKEN_CASE('[', LBRACKET);
-            WRITE_CHAR_TOKEN_CASE(']', RBRACKET);
-            WRITE_CHAR_TOKEN_CASE(',', COMMA);
-            WRITE_CHAR_TOKEN_CASE(':', COLON);
-#undef WRITE_CHAR_TOKEN_CASE
-
-            case '\n':
-              parser->line_no++;
-              n_bytes--;
-              bytes++;
-              break;
-            case '\t': case '\r': case ' ':
-              n_bytes--;
-              bytes++;
-              break;
-            default:
-              dsk_set_error (error,
-                           "unexpected character '%c' (0x%02x) in json (line %u)",
-                           *bytes, *bytes, parser->line_no);
-              return FALSE;
-            }
-          break;
-
-#define WRITE_FIXED_BAREWORD_CASE(SHORTNAME, lc, UC, length) \
-        case JSON_LEX_STATE_##SHORTNAME: \
-          if (parser->fixed_n_chars == length) \
-            { \
-              /* are we at end of string? */ \
-              if (g_ascii_isalnum (*bytes)) \
-                { \
-                  dsk_set_error (error, \
-                               "got %c after '%s' (line %u)", *bytes, lc, \
-                               parser->line_no); \
-                  return FALSE; \
-                } \
-              else \
-                { \
-                  parser->lex_state = JSON_LEX_STATE_INIT; \
-                  if (!add_token (parser, UF_JSON_TOKEN_##SHORTNAME, \
-                                  g_strdup (lc), error)) \
-                    return FALSE; \
-                } \
-            } \
-          else if (*bytes == lc[parser->fixed_n_chars] \
-                || *bytes == UC[parser->fixed_n_chars]) \
-            { \
-              parser->fixed_n_chars += 1; \
-              n_bytes--; \
-              bytes++; \
-            } \
-          else \
-            { \
-              dsk_set_error (error, \
-                           "unexpected character '%c' (parsing %s) (line %u)", \
-                           *bytes, UC, parser->line_no); \
-              return FALSE; \
-            } \
-          break;
-        WRITE_FIXED_BAREWORD_CASE(TRUE, "true", "TRUE", 4);
-        WRITE_FIXED_BAREWORD_CASE(FALSE, "false", "FALSE", 5);
-        WRITE_FIXED_BAREWORD_CASE(NULL, "null", "NULL", 4);
-#undef WRITE_FIXED_BAREWORD_CASE
-
-        case JSON_LEX_STATE_IN_DQ:
-          if (*bytes == '"')
-            {
-              if (!add_token_copying_str (parser, UF_JSON_TOKEN_STRING, error))
-                return FALSE;
-              bytes++;
-              n_bytes--;
-              parser->lex_state = JSON_LEX_STATE_INIT;
-            }
-          else if (*bytes == '\\')
-            {
-              n_bytes--;
-              bytes++;
-              parser->bs_sequence_len = 0;
-              parser->lex_state = JSON_LEX_STATE_IN_DQ_BS;
-            }
-          else
-            {
-              unsigned i;
-              if (*bytes == '\n')
-                parser->line_no++;
-              for (i = 1; i < n_bytes; i++)
-                if (bytes[i] == '"' || bytes[i] == '\\')
-                  break;
-                else if (bytes[i] == '\n')
-                  parser->line_no++;
-              g_string_append_len (parser->str, (char*)bytes, i);
-              n_bytes -= i;
-              bytes += i;
-            }
-          break;
-        case JSON_LEX_STATE_IN_DQ_BS:
-          if (parser->bs_sequence_len == 0)
-            {
-              switch (*bytes)
-                {
-#define WRITE_BS_CHAR_CASE(bschar, cchar) \
-                case bschar: \
-                  g_string_append_c (parser->str, cchar); \
-                  bytes++; \
-                  n_bytes--; \
-                  parser->lex_state = JSON_LEX_STATE_IN_DQ; \
-                  break
-                WRITE_BS_CHAR_CASE('b', '\b');
-                WRITE_BS_CHAR_CASE('f', '\f');
-                WRITE_BS_CHAR_CASE('n', '\n');
-                WRITE_BS_CHAR_CASE('r', '\r');
-                WRITE_BS_CHAR_CASE('t', '\t');
-                WRITE_BS_CHAR_CASE('/', '/');
-                WRITE_BS_CHAR_CASE('\\', '\\');
-#undef WRITE_BS_CHAR_CASE
-                case 'u':
-                  parser->bs_sequence[parser->bs_sequence_len++] = *bytes++;
-                  n_bytes--;
-                  break;
-                default:
-                  dsk_set_error (error,
-                                 "invalid character '%c' after '\\' (line %u)",
-                                 *bytes, parser->line_no);
-                  return FALSE;
-                }
-            }
-          else
-            {
-              /* must be \uxxxx */
-              if (!g_ascii_isxdigit (*bytes))
-                {
-                  dsk_set_error (error,
-                                 "expected 4 hex digits after \\u, got %s (line %u)",
-                                 dsk_ascii_byte_name (*bytes), parser->line_no);
-                  return FALSE;
-                }
-              parser->bs_sequence[parser->bs_sequence_len++] = *bytes++;
-              n_bytes--;
-              if (parser->bs_sequence_len == 5)
-                {
-                  char utf8bdsk[8];
-                  guint value;
-                  parser->bs_sequence[5] = 0;
-                  value = strtoul (parser->bs_sequence + 1, NULL, 16);
-                  g_string_append_len (parser->str,
-                                       utf8bdsk,
-                                       g_unichar_to_utf8 (value, utf8bdsk));
-                  parser->lex_state = JSON_LEX_STATE_IN_DQ;
-                }
-            }
-          break;
-        case JSON_LEX_STATE_IN_NUMBER:
-          if (g_ascii_isdigit (*bytes)
-           || *bytes == '.'
-           || *bytes == 'e'
-           || *bytes == 'E'
-           || *bytes == '+'
-           || *bytes == '-')
-            {
-              g_string_append_c (parser->str, *bytes++);
-              n_bytes--;
-            }
-          else
-            {
-              /* append the number token */
-              if (!add_token_copying_str (parser, UF_JSON_TOKEN_NUMBER, error))
-                return FALSE;
-
-              /* go back to init state (do not consume character) */
-              parser->lex_state = JSON_LEX_STATE_INIT;
-            }
-          break;
-        default:
-          g_error ("unhandled lex state %u", parser->lex_state);
-        }
-    }
-  return TRUE;
+  DskJsonValue *rv;
+  rv = dsk_malloc (sizeof (DskJsonValue) + n_bytes + 1);
+  rv->type = DSK_JSON_VALUE_STRING;
+  rv->value.v_string.length = n_bytes;
+  rv->value.v_string.str = (char*)(rv+1);
+  memcpy (rv->value.v_string.str, str, n_bytes);
+  rv->value.v_string.str[n_bytes] = 0;
+  return rv;
 }
 
-gboolean
-dsk_json_parser_end_parse (DskJsonParser *parser,
-                          DskError      **error)
+DskJsonValue *dsk_json_value_new_number (double         value)
 {
-  return add_token (parser, 0, NULL, error);
+  DskJsonValue *rv;
+  rv = dsk_malloc (sizeof (DskJsonValue));
+  rv->type = DSK_JSON_VALUE_NUMBER;
+  rv->value.v_number = value;
+  return rv;
 }
 
-DskXml *
-dsk_json_parser_pop (DskJsonParser *parser)
+void          dsk_json_value_free       (DskJsonValue  *value)
 {
-  return g_queue_pop_head (parser->xml_nodes);
+  unsigned i;
+  if (value->type == DSK_JSON_VALUE_OBJECT)
+    for (i = 0; i < value->value.v_object.n_members; i++)
+      dsk_json_value_free (value->value.v_object.members[i].value);
+  else if (value->type == DSK_JSON_VALUE_ARRAY)
+    for (i = 0; i < value->value.v_array.n_values; i++)
+      dsk_json_value_free (value->value.v_array.values[i]);
+  dsk_free (value);
 }
 
-void
-dsk_json_parser_free(DskJsonParser *parser)
-{
-  g_list_foreach (parser->xml_nodes->head, (GFunc) dsk_xml_unref, NULL);
-  g_queue_free (parser->xml_nodes);
-  DskJsonParseFree (parser->parser, g_free);
-  g_string_free (parser->str, TRUE);
-  g_free (parser);
-}

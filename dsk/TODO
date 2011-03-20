@@ -283,6 +283,7 @@ _ YAML implementation
 DOCUMENTATION
 *everything needs docs, but just remind ourselves of subtle stuff*
 _ pick a documentation standard
+_ document XML binding language
 
 CODING STANDARDS
 "when in doubt, do NOT abbreviated"
