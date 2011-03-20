@@ -1,5 +1,6 @@
 
-int dsk_table_helper_openat (int openat_fd,
+int dsk_table_helper_openat (const char *openat_dir,
+                             int openat_fd,
                              const char *base_filename,
                              const char *suffix,
                              unsigned    open_flags,
