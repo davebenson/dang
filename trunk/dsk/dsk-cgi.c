@@ -10,6 +10,7 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
   const char *at;
   unsigned n_ampersand = 0;
   unsigned idx;
+  unsigned n_cgi = 0;
   if (*query_string == '?')
     query_string++;
   for (at = query_string; *at; at++)
@@ -18,19 +19,18 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
   /* TODO: need max_cgi_vars for security????? */
   *cgi_variables_out = dsk_malloc (sizeof (DskCgiVariable) * (n_ampersand+1));
   idx = 0;
-  unsigned n_cgi = 0;
   for (at = query_string; *at; )
     {
       const char *start;
+      const char *eq = NULL;
+      unsigned key_len, value_len = 0;
+      char *kv;
       if (*at == '&')
         {
           at++;
           continue;
         }
       start = at;
-      const char *eq;
-      eq = NULL;
-      unsigned key_len, value_len = 0;
       while (*at && *at != '&' && *at != '=')
         at++;
       if (*at == '=')
@@ -68,7 +68,6 @@ dsk_boolean dsk_cgi_parse_query_string (const char *query_string,
       at++;
       key_len = (eq - start);
 
-      char *kv;
       kv = dsk_malloc (key_len + 1 + value_len + 1);
       memcpy (kv, start, key_len);
       kv[key_len] = 0;
@@ -123,6 +122,7 @@ dsk_boolean dsk_cgi_parse_post_data (const char *content_type,
    || strcmp (content_type, "application/x-url-encoded") == 0)
     {
       char *pd_str = dsk_malloc (post_data_length + 2);
+      unsigned i;
       memcpy (pd_str + 1, post_data, post_data_length);
       pd_str[0] = '?';
       pd_str[post_data_length+1] = '\0';
@@ -132,7 +132,6 @@ dsk_boolean dsk_cgi_parse_post_data (const char *content_type,
           dsk_free (pd_str);
           return DSK_FALSE;
         }
-      unsigned i;
       for (i = 0; i < *n_cgi_var_out; i++)
         (*cgi_var_out)[i].is_get = DSK_FALSE;
       dsk_free (pd_str);

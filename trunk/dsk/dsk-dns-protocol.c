@@ -131,6 +131,11 @@ gather_name_length_resource_record (unsigned       length,
   const char *code;
   uint8_t header[10];
   unsigned sublen;
+  DskDnsResourceRecordType type;
+  unsigned rdlength;
+  const uint8_t *rddata;
+  unsigned init_used;
+
   /* owner */
   if (!gather_name_length (length, data, used_inout, &sublen, error))
     return DSK_FALSE;
@@ -142,8 +147,6 @@ gather_name_length_resource_record (unsigned       length,
     }
   memcpy (header, data + *used_inout, 10);
   *used_inout += 10;
-  DskDnsResourceRecordType type;
-  unsigned rdlength;
   type = ((uint16_t)header[0] << 8) | ((uint16_t)header[1] << 0);
   rdlength = ((uint16_t)header[8] << 8)  | ((uint16_t)header[9] << 0);
   if (*used_inout + rdlength > length)
@@ -151,7 +154,6 @@ gather_name_length_resource_record (unsigned       length,
       dsk_set_error (error, "truncated resource-data");
       return DSK_FALSE;
     }
-  const uint8_t *rddata;
   rddata = data + *used_inout;
   switch (type)
     {
@@ -175,7 +177,6 @@ gather_name_length_resource_record (unsigned       length,
       return DSK_FALSE;
     }
 
-  unsigned init_used;
   init_used = *used_inout;
   while (*code)
     {
@@ -440,6 +441,9 @@ dsk_dns_message_parse (unsigned       length,
   unsigned i;
   unsigned total_rr;
   unsigned str_space = 0;
+  unsigned used;
+  DskDnsMessage *message;
+  char *str_heap_at;
   if (length < 12)
     {
       dsk_set_error (error, "dns packet too short (<12 bytes)");
@@ -472,7 +476,6 @@ dsk_dns_message_parse (unsigned       length,
      but that list should be exhaustive and unique,
      b/c strings can only appear in places we recognize.
      distinguish the offset that are used from those that aren't. */
-  unsigned used;
   used = 12;
   for (i = 0; i < header.qdcount; i++)
     {
@@ -491,7 +494,6 @@ dsk_dns_message_parse (unsigned       length,
     }
 
   /* allocate space for the message */
-  DskDnsMessage *message;
   message = dsk_malloc (sizeof (DskDnsMessage)
                         + sizeof (DskDnsQuestion) * header.qdcount
                         + sizeof (DskDnsResourceRecord) * total_rr
@@ -513,7 +515,6 @@ dsk_dns_message_parse (unsigned       length,
   message->rcode = header.rcode;
   message->opcode = header.opcode;
 
-  char *str_heap_at;
   str_heap_at = (char*) (message->additional_rr + message->n_additional_rr);
 
   /* parse the four sections */
@@ -875,6 +876,7 @@ pack_domain_name  (const char     *name,
 
   /* scan up tree until we find one with offset==0;
      or until we run out of components */
+  {
   const char *beg = NULL;
   StrTreeNode *cur = NULL;
   while (name < end)
@@ -894,6 +896,7 @@ pack_domain_name  (const char     *name,
       up = top;
       top = cur->subtree;
     }
+  
 
   if (name < end)
     {
@@ -937,6 +940,7 @@ pack_domain_name  (const char     *name,
         }
       return;
     }
+  }
   write_pointer (data_inout, up->offset);
 }
 
@@ -973,6 +977,8 @@ pack_resource_record (DskDnsResourceRecord *rr,
 {
   uint8_t *generic;
   unsigned rdata_len;
+  uint16_t data[5];
+
   pack_domain_name (rr->owner, data_start, data_inout, top);
 
   /* reserve space for generic part of resource-record */
@@ -1032,7 +1038,6 @@ pack_resource_record (DskDnsResourceRecord *rr,
 
   /* write generic resource-code info */
   rdata_len = *data_inout - generic;
-  uint16_t data[5];
   data[0] = htons (rr->type);
   data[1] = htons (DSK_DNS_CLASS_IN);
   data[2] = htons (rr->time_to_live >> 16);

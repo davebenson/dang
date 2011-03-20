@@ -274,6 +274,7 @@ restart_processing:
             unsigned header_len = xfer->read_info.need_header.checked;
             dsk_boolean has_content;
             DskHttpRequest *request;
+            dsk_boolean empty_content_body;
             request = dsk_http_request_parse_buffer (&ss->incoming_data, header_len, &error);
             if (request == NULL)
               {
@@ -296,7 +297,6 @@ restart_processing:
                                           xfer);
               }
 
-            dsk_boolean empty_content_body;
             empty_content_body = !has_content
                                || (request->content_length == 0LL
                                    && !request->transfer_encoding_chunked);

@@ -123,6 +123,9 @@ transfer_done (DskHttpClientStreamTransfer *xfer)
 static void
 do_shutdown (DskHttpClientStream *stream)
 {
+  DskHttpClientStreamTransfer *xfer_list;
+  dsk_boolean got_cancel;
+
   /* shutdown both sides */
   if (stream->read_trap != NULL)
     {
@@ -150,8 +153,8 @@ do_shutdown (DskHttpClientStream *stream)
     }
 
   /* destroy all pending transfers */
-  DskHttpClientStreamTransfer *xfer_list = stream->first_transfer;
-  dsk_boolean got_cancel = DSK_FALSE;
+  xfer_list = stream->first_transfer;
+  got_cancel = DSK_FALSE;
   stream->first_transfer = stream->last_transfer = NULL;
   stream->outgoing_data_transfer = NULL;
   while (xfer_list != NULL)
@@ -293,6 +296,7 @@ restart_processing:
             unsigned start = xfer->read_info.need_header.checked;
             char peek_buf[2];
             int peek_rv;
+            unsigned header_len;
             if (start == stream->incoming_data.size)
               break;
             if (start == 0)
@@ -333,7 +337,7 @@ restart_processing:
                 goto return_true;
               }
             /* parse header */
-            unsigned header_len = xfer->read_info.need_header.checked;
+            header_len = xfer->read_info.need_header.checked;
             response = dsk_http_response_parse_buffer (&stream->incoming_data, header_len, &error);
             dsk_buffer_discard (&stream->incoming_data, header_len);
             if (response == NULL)
@@ -915,6 +919,7 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
   DskHttpClientStreamTransfer *xfer;
   DskHttpRequest *request;
   DskBuffer compressed_data = DSK_BUFFER_STATIC_INIT;
+  DskOctetSource *post_data;
   if (options->post_data_length >= 0
    && (options->post_data_length == 0 || options->post_data_slab != NULL)
    && options->gzip_compress_post_data)
@@ -975,7 +980,6 @@ dsk_http_client_stream_request (DskHttpClientStream      *stream,
       if (request == NULL)
         return NULL;
     }
-  DskOctetSource *post_data;
   if (options->post_data != NULL)
     {
       if (options->gzip_compress_post_data)

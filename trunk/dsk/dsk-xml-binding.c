@@ -148,6 +148,8 @@ dsk_xml_binding_get_ns         (DskXmlBinding *binding,
         {
           char *contents = dsk_file_get_contents (path, NULL, error);
           DskXmlBindingNamespace *real_ns;
+          NamespaceNode *node;
+          NamespaceNode *conflict;
           if (contents == NULL)
             {
               dsk_free (path);
@@ -164,8 +166,6 @@ dsk_xml_binding_get_ns         (DskXmlBinding *binding,
           dsk_free (path);
 
           /* add to tree */
-          NamespaceNode *node;
-          NamespaceNode *conflict;
           node = dsk_malloc (sizeof (NamespaceNode));
           node->ns = real_ns;
           GSK_RBTREE_INSERT (NAMESPACE_TREE (binding), node, conflict);
@@ -485,9 +485,9 @@ DskXmlBindingType dsk_xml_binding_type_string =
 };
 static dsk_boolean xml_is_whitespace (DskXml *xml)
 {
+  const char *at;
   if (xml->type == DSK_XML_ELEMENT)
     return DSK_FALSE;
-  const char *at;
   at = xml->str;
   while (*at)
     {
@@ -739,6 +739,7 @@ struct_members_to_xml        (DskXmlBindingType *type,
   DskXml **children;
   unsigned n_children = 0;
   unsigned i;
+  DskXml *subxml;
   for (i = 0; i < s->n_members; i++)
     switch (s->members[i].quantity)
       {
@@ -758,7 +759,6 @@ struct_members_to_xml        (DskXmlBindingType *type,
   *nodes_out = dsk_malloc (sizeof (DskXml *) * n_children);
   children = *nodes_out;
   n_children = 0;
-  DskXml *subxml;
   for (i = 0; i < s->n_members; i++)
     switch (s->members[i].quantity)
       {
@@ -1023,6 +1023,7 @@ dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
   unsigned str_size = name ? (strlen (name) + 1) : 0;
   DskXmlBindingTypeStruct *rv;
   char *str_at;
+  unsigned offset = 0;
   for (i = 0; i < n_members; i++)
     str_size += strlen (members[i].name) + 1;
   rv = dsk_malloc0 (sizeof (DskXmlBindingTypeStruct)
@@ -1034,7 +1035,7 @@ dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
   if (name)
     {
       rv->base_type.name = str_at;
-      str_at = stpcpy (str_at, name) + 1;
+      str_at = dsk_stpcpy (str_at, name) + 1;
     }
   rv->base_type.is_struct = 1;
   rv->base_type.ref_count = 1;
@@ -1043,13 +1044,12 @@ dsk_xml_binding_type_struct_new (DskXmlBindingNamespace *ns,
   rv->base_type.to_xml = dsk_xml_binding_struct_to_xml;
   rv->base_type.clear = NULL;
   rv->base_type.finalize_type = struct__finalize_type;
-  unsigned offset = 0;
   for (i = 0; i < n_members; i++)
     {
       DskXmlBindingType *mtype = members[i].type;
       rv->members[i].quantity = members[i].quantity;
       rv->members[i].name = str_at;
-      str_at = stpcpy (str_at, members[i].name) + 1;
+      str_at = dsk_stpcpy (str_at, members[i].name) + 1;
       rv->members[i].type = dsk_xml_binding_type_ref (mtype);
       if (mtype->clear
        || members[i].quantity == DSK_XML_BINDING_REPEATED
@@ -1312,7 +1312,7 @@ dsk_xml_binding_type_union_new (DskXmlBindingNamespace *ns,
   if (name)
     {
       rv->base_type.name = str_at;
-      str_at = stpcpy (str_at, name) + 1;
+      str_at = dsk_stpcpy (str_at, name) + 1;
     }
 
   for (i = 0; i < n_cases; i++)
@@ -1320,7 +1320,7 @@ dsk_xml_binding_type_union_new (DskXmlBindingNamespace *ns,
       rv->cases[i].elide_struct_outer_tag = cases[i].elide_struct_outer_tag;
       rv->cases[i].type = cases[i].type;
       rv->cases[i].name = str_at;
-      str_at = stpcpy (str_at, cases[i].name) + 1;
+      str_at = dsk_stpcpy (str_at, cases[i].name) + 1;
       if (rv->cases[i].type)
         {
           if (cases[i].type->sizeof_instance > sizeof_variant)

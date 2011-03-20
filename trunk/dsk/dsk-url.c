@@ -44,6 +44,9 @@ dsk_boolean  dsk_url_scan  (const char     *url_string,
   int num_slashes;
   const char *at = url_string;
   DskUrlInterpretation interpretation = DSK_URL_INTERPRETATION_UNKNOWN;
+  const char *query_start;
+  const char *frag_start;
+  const char *end_string;
   out->scheme_start = at;
   while (dsk_ascii_isalnum (*at))
     at++;
@@ -186,9 +189,6 @@ dsk_boolean  dsk_url_scan  (const char     *url_string,
       return DSK_FALSE;
     }
 
-  const char *query_start;
-  const char *frag_start;
-  const char *end_string;
 
   if (num_slashes > 0
    && interpretation == DSK_URL_INTERPRETATION_ABSOLUTE)

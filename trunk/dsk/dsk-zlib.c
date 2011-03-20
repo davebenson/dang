@@ -37,6 +37,8 @@ dsk_zlib_compressor_process(DskOctetFilter *filter,
   while (in_length > 0)
     {
       DskBufferFragment *f;
+      uint8_t *out_start;
+      int zrv;
       if (out->last_frag == NULL
        || !fragment_has_empty_space (out->last_frag))
         {
@@ -48,12 +50,10 @@ dsk_zlib_compressor_process(DskOctetFilter *filter,
       compressor->zlib.next_in = (uint8_t*)in_data;
       compressor->zlib.avail_in = in_length;
 
-      uint8_t *out_start;
       f = out->last_frag;
       out_start = f->buf + f->buf_start + f->buf_length;
       compressor->zlib.next_out = out_start;
       compressor->zlib.avail_out = f->buf_max_size - f->buf_start - f->buf_length;
-      int zrv;
       zrv = deflate (&compressor->zlib, Z_NO_FLUSH);
       if (zrv == Z_OK)
         {
@@ -96,6 +96,8 @@ dsk_zlib_compressor_finish (DskOctetFilter *filter,
   for (;;)
     {
       DskBufferFragment *f;
+      uint8_t *out_start;
+      int zrv;
       if (out->last_frag == NULL
        || !fragment_has_empty_space (out->last_frag))
         {
@@ -107,11 +109,9 @@ dsk_zlib_compressor_finish (DskOctetFilter *filter,
       compressor->zlib.next_in = NULL;
       compressor->zlib.avail_in = 0;
       f = out->last_frag;
-      uint8_t *out_start;
       out_start = f->buf + f->buf_start + f->buf_length;
       compressor->zlib.next_out = out_start;
       compressor->zlib.avail_out = f->buf_max_size - f->buf_start - f->buf_length;
-      int zrv;
       zrv = deflate (&compressor->zlib, Z_FINISH);
       if (zrv == Z_OK || zrv == Z_STREAM_END)
         {
@@ -217,6 +217,8 @@ dsk_zlib_decompressor_process(DskOctetFilter *filter,
   while (in_length > 0)
     {
       DskBufferFragment *f;
+      uint8_t *out_start;
+      int zrv;
       if (out->last_frag == NULL
        || !fragment_has_empty_space (out->last_frag))
         {
@@ -225,7 +227,6 @@ dsk_zlib_decompressor_process(DskOctetFilter *filter,
           dsk_buffer_append_empty_fragment (out);
         }
 
-      uint8_t *out_start;
       decompressor->zlib.next_in = (uint8_t *) in_data;
       decompressor->zlib.avail_in = in_length;
 
@@ -233,7 +234,6 @@ dsk_zlib_decompressor_process(DskOctetFilter *filter,
       out_start = f->buf + f->buf_start + f->buf_length;
       decompressor->zlib.next_out = out_start;
       decompressor->zlib.avail_out = f->buf_max_size - f->buf_start - f->buf_length;
-      int zrv;
       zrv = inflate (&decompressor->zlib, Z_NO_FLUSH);
       if (zrv == Z_OK || zrv == Z_STREAM_END)
         {
@@ -288,6 +288,8 @@ dsk_zlib_decompressor_finish (DskOctetFilter *filter,
   for (;;)
     {
       DskBufferFragment *f;
+      uint8_t *out_start;
+      int zrv;
       if (out->last_frag == NULL
        || !fragment_has_empty_space (out->last_frag))
         {
@@ -299,11 +301,9 @@ dsk_zlib_decompressor_finish (DskOctetFilter *filter,
       decompressor->zlib.next_in = NULL;
       decompressor->zlib.avail_in = 0;
       f = out->last_frag;
-      uint8_t *out_start;
       out_start = f->buf + f->buf_start + f->buf_length;
       decompressor->zlib.next_out = out_start;
       decompressor->zlib.avail_out = f->buf_max_size - f->buf_start - f->buf_length;
-      int zrv;
       zrv = inflate (&decompressor->zlib, Z_FINISH);
       if (zrv == Z_OK || zrv == Z_STREAM_END)
         {

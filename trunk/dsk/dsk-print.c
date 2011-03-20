@@ -234,7 +234,7 @@ handle_template_expression (DskPrint *context,
           dsk_set_error (error,
                          "unexpected character %s after '${%.*s' in dsk_print",
                          dsk_ascii_byte_name (*end),
-                         length, start);
+                         (int) length, start);
           return DSK_FALSE;
         }
       *expr_len_out = (end + 1) - expr;
@@ -265,7 +265,7 @@ handle_template_expression (DskPrint *context,
     {
       dsk_set_error (error,
                      "unset variable $%.*s excountered in print template",
-                     length, start);
+                     (int) length, start);
       return DSK_FALSE;
     }
   if (!context->append (result->value_length, (uint8_t*)(result+1),

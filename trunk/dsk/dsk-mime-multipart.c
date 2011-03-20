@@ -147,17 +147,22 @@ process_header_line (DskMimeMultipartDecoder *decoder,
 	  dsk_set_error (error, "content-type expected to contain a '/'");
 	  return DSK_FALSE;
 	}
+
+      {
       const char *content_main_type_start = start;
       const char *content_main_type_end = slash;
       const char *at = slash + 1;
       const char *content_subtype_start = at;
+      const char *content_charset_start = NULL;
+      const char *content_charset_end = NULL;
+      const char *content_subtype_end;
+      unsigned main_len, sub_len, len;
+      char *ct;
 #define IS_SUBTYPE_CHAR(c) dsk_ascii_istoken (c)
 #define IS_SEP_TYPE_CHAR(c) (dsk_ascii_isspace(c) || ((c)==';'))
       while (IS_SUBTYPE_CHAR (*at))
         at++;
-      const char *content_subtype_end = at;
-      const char *content_charset_start = NULL;
-      const char *content_charset_end = NULL;
+      content_subtype_end = at;
       for (;;)
 	{
 	  const char *key_start, *key_end;
@@ -205,13 +210,12 @@ process_header_line (DskMimeMultipartDecoder *decoder,
 	      continue;
 	    }
 	}
-      unsigned main_len = content_main_type_end - content_main_type_start;
-      unsigned sub_len = content_subtype_end - content_subtype_start;
-      unsigned len = main_len + 1 + sub_len + 1;
+      main_len = content_main_type_end - content_main_type_start;
+      sub_len = content_subtype_end - content_subtype_start;
+      len = main_len + 1 + sub_len + 1;
       if (content_charset_start != NULL)
         len += content_charset_end - content_charset_start
              + 1;
-      char *ct;
       ct = dsk_mem_pool_alloc_unaligned (&decoder->header_storage, len);
       memcpy (ct, content_main_type_start, main_len);
       ct[main_len] = '/';
@@ -224,22 +228,25 @@ process_header_line (DskMimeMultipartDecoder *decoder,
         }
       ct[len-1] = 0;
       cur->content_type = ct;
+      }
     }
   else if (dsk_ascii_strncasecmp (line, "content-id:", 11) == 0)
     {
       const char *start = strchr(line, ':') + 1;
+      char *id;
       while (dsk_ascii_isspace (*start))
         start++;
-      char *id = dsk_mem_pool_strdup (&decoder->header_storage, start);
+      id = dsk_mem_pool_strdup (&decoder->header_storage, start);
       dsk_ascii_strchomp (id);
       cur->key = id;
     }
   else if (dsk_ascii_strncasecmp (line, "content-location:", 17) == 0)
     {
       const char *start = strchr(line, ':') + 1;
+      char *location;
       while (dsk_ascii_isspace (*start))
         start++;
-      char *location = dsk_mem_pool_strdup (&decoder->header_storage, start);
+      location = dsk_mem_pool_strdup (&decoder->header_storage, start);
       dsk_ascii_strchomp (location);
       cur->content_location = location;
     }
@@ -273,9 +280,10 @@ process_header_line (DskMimeMultipartDecoder *decoder,
   else if (dsk_ascii_strncasecmp (line, "content-description:", 20) == 0)
     {
       const char *start = strchr(line, ':') + 1;
+      char *description;
       while (dsk_ascii_isspace (*start))
         start++;
-      char *description = dsk_mem_pool_strdup (&decoder->header_storage, start);
+      description = dsk_mem_pool_strdup (&decoder->header_storage, start);
       dsk_ascii_strchomp (description);
       cur->content_description = description;
     }
@@ -315,6 +323,9 @@ static dsk_boolean
 done_with_content_body (DskMimeMultipartDecoder *decoder,
                         DskError               **error)
 {
+  unsigned str_length;
+  char *at, *out;
+  DskCgiVariable cur;
   if (!dsk_octet_filter_finish (decoder->transfer_decoder,
                                 &decoder->cur_buffer,
                                 error))
@@ -324,7 +335,6 @@ done_with_content_body (DskMimeMultipartDecoder *decoder,
     }
 
   /* consolidate string pieces into a single allocation */
-  unsigned str_length;
   str_length = 0;
 #define MAYBE_ADD_FIELD_LENGTH(field) \
   do { if (decoder->cur_piece.field) \
@@ -335,7 +345,6 @@ done_with_content_body (DskMimeMultipartDecoder *decoder,
   MAYBE_ADD_FIELD_LENGTH (content_description);
 #undef MAYBE_ADD_FIELD_LENGTH
   str_length += decoder->cur_buffer.size + 1;
-  char *at, *out;
   at = dsk_malloc (str_length);
   out = at;
 #define MAYBE_SETUP(field)                                          \
@@ -346,7 +355,6 @@ done_with_content_body (DskMimeMultipartDecoder *decoder,
          }                                                          \
        else                                                         \
          cur.field = NULL;             } while(0)
-  DskCgiVariable cur;
   cur.is_get = DSK_FALSE;
   MAYBE_SETUP (key);
   cur.value = out;
@@ -455,10 +463,12 @@ dsk_mime_multipart_decoder_feed  (DskMimeMultipartDecoder *decoder,
     case STATE_READING_HEADER:
       {
         int nl = dsk_buffer_index_of (&decoder->incoming, '\n');
+        char *line_buf;
         if (nl < 0)
           goto return_true;
-        char *line_buf = ((unsigned)nl + 1 > sizeof (tmp_buf))
-                             ? (char*)dsk_malloc (nl+1) : tmp_buf;
+        line_buf = ((unsigned)nl + 1 > sizeof (tmp_buf))
+                 ? (char*)dsk_malloc (nl+1)
+                 : tmp_buf;
         dsk_buffer_read (&decoder->incoming, nl + 1, line_buf);
 
         /* cut-off newline (and possible "CR" character) */
@@ -524,9 +534,10 @@ dsk_mime_multipart_decoder_feed  (DskMimeMultipartDecoder *decoder,
                     int rem = got - decoder->boundary_str_len - 2;
                     const char *at = decoder->boundary_buf + decoder->boundary_str_len + 2;
                     const char *nl = memchr (at, '\n', rem);
+                    unsigned discard;
                     if (nl == NULL)
                       goto return_true;
-                    unsigned discard = nl + 1 - decoder->boundary_buf;
+                    discard = nl + 1 - decoder->boundary_buf;
                     if (at[0] == '-' && at[1] == '-')
                       {
                         dsk_buffer_discard (&decoder->incoming, discard);

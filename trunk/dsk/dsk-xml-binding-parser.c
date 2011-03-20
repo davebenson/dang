@@ -219,6 +219,7 @@ parse_dotted_bareword (ParseContext *context,
                        unsigned     *tokens_used_out,
                        DskError    **error)
 {
+  unsigned comps;
   if (start >= context->n_tokens)
     {
       dsk_set_error (error, "end-of-file expecting bareword (%s:%u)",
@@ -228,13 +229,12 @@ parse_dotted_bareword (ParseContext *context,
   if (!token_type_is_word (context->tokens[start].type))
     {
       dsk_set_error (error, "expected bareword, got '%.*s' (%s:%u)",
-                     context->tokens[start].length,
+                     (int) context->tokens[start].length,
                      context->str + context->tokens[start].start,
                      context->filename,
                      context->tokens[start].line_no);
       return NULL;
     }
-  unsigned comps;
   comps = 1;
   for (;;)
     {
@@ -246,7 +246,7 @@ parse_dotted_bareword (ParseContext *context,
        || !token_type_is_word (context->tokens[start + comps * 2].type))
         {
           dsk_set_error (error, "expected bareword after '.', got '%.*s' (%s:%u)",
-                         context->tokens[start + comps*2].length,
+                         (int) context->tokens[start + comps*2].length,
                          context->str + context->tokens[start + comps*2].start,
                          context->filename,
                          context->tokens[start + comps*2].line_no);
@@ -307,6 +307,8 @@ dotted_bareword_to_type (ParseContext *context,
   else
     {
       const char *last_dot = strrchr (dotted_type_name, '.');
+      unsigned ns_i;
+      DskXmlBindingType *rv;
       if (strchr (dotted_type_name, '.') != last_dot)
         {
           dsk_set_error (error, "namespace qualifier must be a simple bareword (got %.*s) (%s:%u)",
@@ -316,7 +318,6 @@ dotted_bareword_to_type (ParseContext *context,
         }
 
       /* look up namespace in 'as'-qualified 'use'-statements */
-      unsigned ns_i;
       for (ns_i = 0; ns_i < context->n_use_statements; ns_i++)
         if (context->use_statements[ns_i].as != NULL
          && memcmp (context->use_statements[ns_i].as,
@@ -329,7 +330,6 @@ dotted_bareword_to_type (ParseContext *context,
                          context->filename, context->tokens[at].line_no);
           return NULL;
         }
-      DskXmlBindingType *rv;
       rv = dsk_xml_binding_namespace_lookup (context->use_statements[ns_i].ns,
                                              last_dot + 1);
       if (rv == NULL)
@@ -350,10 +350,10 @@ parse_type (ParseContext *context,
 {
   unsigned used;
   unsigned start = *at_inout;
+  DskXmlBindingType *type;
   char *bw = parse_dotted_bareword (context, start, &used, error);
   if (bw == NULL)
     return NULL;
-  DskXmlBindingType *type;
   type = dotted_bareword_to_type (context, bw, start, error);
   dsk_free (bw);
   *at_inout += used;
@@ -389,6 +389,11 @@ parse_member_list (ParseContext *context,
                    DskError    **error)
 {
   unsigned at = lbrace_index;
+  int matching_rbrace;
+  int members_n_tokens;
+  unsigned max_members;
+  unsigned n_members;
+  DskXmlBindingStructMember *members;
   if (context->tokens[at].type != TOKEN_LBRACE)
     {
       dsk_set_error (error, "expected '"LBRACE_STR"' after struct NAME (%s:%u)",
@@ -397,22 +402,20 @@ parse_member_list (ParseContext *context,
     }
 
   /* maximum possible members a set of type/name pairs */
-  int matching_rbrace = find_matching_rbrace (context, lbrace_index);
+  matching_rbrace = find_matching_rbrace (context, lbrace_index);
   if (matching_rbrace < 0)
     {
       dsk_set_error (error, "missing '"RBRACE_STR"' for '"LBRACE_STR"' at %s:%u",
                      context->filename, context->tokens[lbrace_index].line_no);
       return DSK_FALSE;
     }
-  int members_n_tokens = matching_rbrace - (lbrace_index+1);
-  unsigned max_members = members_n_tokens / 2;
+  members_n_tokens = matching_rbrace - (lbrace_index+1);
+  max_members = members_n_tokens / 2;
 
   ++at;         /* skip left-brace */
 
   /* parse each member */
-  unsigned n_members;
   n_members = 0;
-  DskXmlBindingStructMember *members;
   members = dsk_malloc (sizeof(DskXmlBindingStructMember) * max_members);
   while (at < context->n_tokens
       && context->tokens[at].type != TOKEN_RBRACE)
@@ -452,7 +455,8 @@ parse_member_list (ParseContext *context,
           break;
         default:
           dsk_set_error (error, "expected '+', '!', '*' or '?', got %.*s at (%s:%u)",
-                         context->tokens[at].length, context->str + context->tokens[at].start,
+                         (int)context->tokens[at].length,
+                         context->str + context->tokens[at].start,
                          context->filename,
                          context->tokens[at].line_no);
           goto got_error;
@@ -472,7 +476,8 @@ parse_member_list (ParseContext *context,
         {
           dsk_set_error (error, "expected indentifier at %s:%u (got '%.*s')",
                          context->filename, context->tokens[at].line_no,
-                         context->tokens[at].length, context->str + context->tokens[at].start);
+                         (int)context->tokens[at].length,
+                         context->str + context->tokens[at].start);
           goto got_error;
         }
       at++;
@@ -510,6 +515,11 @@ parse_case_list (ParseContext           *context,
                  DskError              **error)
 {
   unsigned at = lbrace_index;
+  int matching_rbrace;
+  unsigned cases_tokens;
+  unsigned max_cases;
+  unsigned n_cases = 0;
+  DskXmlBindingUnionCase *cases;
   if (context->tokens[at].type != TOKEN_LBRACE)
     {
       dsk_set_error (error, "expected '"LBRACE_STR"' after union NAME (%s:%u)",
@@ -518,22 +528,21 @@ parse_case_list (ParseContext           *context,
     }
   at++;
 
-  int matching_rbrace = find_matching_rbrace (context, lbrace_index);
+  matching_rbrace = find_matching_rbrace (context, lbrace_index);
   if (matching_rbrace < 0)
     {
       dsk_set_error (error, "missing '"RBRACE_STR"' for '"LBRACE_STR"' at %s:%u",
                      context->filename, context->tokens[lbrace_index].line_no);
       return DSK_FALSE;
     }
-  unsigned cases_tokens = matching_rbrace - (lbrace_index+1);
-  unsigned max_cases = cases_tokens / 2;
-  DskXmlBindingUnionCase *cases = dsk_malloc (sizeof (DskXmlBindingUnionCase)
-                                              * max_cases);
-  unsigned n_cases = 0;
+  cases_tokens = matching_rbrace - (lbrace_index+1);
+  max_cases = cases_tokens / 2;
+  cases = dsk_malloc (sizeof (DskXmlBindingUnionCase) * max_cases);
 
   while (at < context->n_tokens
       && context->tokens[at].type != TOKEN_RBRACE)
     {
+      DskXmlBindingUnionCase cas;
       if (context->tokens[at].type == TOKEN_SEMICOLON)
         {
           at++;
@@ -548,7 +557,7 @@ parse_case_list (ParseContext           *context,
       if (!token_type_is_word (context->tokens[at].type))
         {
           dsk_set_error (error, "expected bareword for case label, got %.*s (%s:%u)",
-                         context->tokens[at].length,
+                         (int) context->tokens[at].length,
                          context->str + context->tokens[at].start,
                          context->filename,
                          context->tokens[at].line_no);
@@ -557,13 +566,12 @@ parse_case_list (ParseContext           *context,
       if (context->tokens[at+1].type != TOKEN_COLON)
         {
           dsk_set_error (error, "expected ':' for case label, got %.*s (%s:%u)",
-                         context->tokens[at+1].length,
+                         (int) context->tokens[at+1].length,
                          context->str + context->tokens[at+1].start,
                          context->filename,
                          context->tokens[at+1].line_no);
           goto got_error;
         }
-      DskXmlBindingUnionCase cas;
       cas.name = dsk_malloc (context->tokens[at].length + 1);
       memcpy (cas.name, context->str + context->tokens[at].start,
               context->tokens[at].length);
@@ -581,6 +589,7 @@ parse_case_list (ParseContext           *context,
           unsigned tokens_used;
           unsigned n_members;
           DskXmlBindingStructMember *members;
+          DskXmlBindingTypeStruct *stype;
           if (!parse_member_list (context, at + 2, &tokens_used,
                                   &n_members, &members, error))
             {
@@ -588,7 +597,6 @@ parse_case_list (ParseContext           *context,
               dsk_free (cas.name);
               goto got_error;
             }
-          DskXmlBindingTypeStruct *stype;
           stype = dsk_xml_binding_type_struct_new (NULL, NULL,
                                                    n_members, members,
                                                    error);
@@ -651,6 +659,11 @@ parse_file (ParseContext *context,
   unsigned n_tokens = context->n_tokens;
   Token *tokens = context->tokens;
   unsigned n_tokens_used;
+  char *ns_name;
+  unsigned at;
+  unsigned n_ns_types = 0;
+  NewTypeInfo *ns_type_info = NULL;
+
   if (n_tokens == 0 || tokens[0].type != TOKEN_NAMESPACE)
     {
       dsk_set_error (error,
@@ -659,11 +672,9 @@ parse_file (ParseContext *context,
       return DSK_FALSE;
     }
 
-  char *ns_name;
   ns_name = parse_dotted_bareword (context, 1, &n_tokens_used, error);
   if (ns_name == NULL)
     return DSK_FALSE;
-  unsigned at;
   at = 1 + n_tokens_used;
   if (at == n_tokens || tokens[at].type != TOKEN_SEMICOLON)
     {
@@ -675,9 +686,6 @@ parse_file (ParseContext *context,
     }
   at++;         /* skip semicolon */
 
-
-  unsigned n_ns_types = 0;
-  NewTypeInfo *ns_type_info = NULL;
 
   /* parse 'use' statements */
   while (at < n_tokens)
@@ -745,7 +753,8 @@ parse_file (ParseContext *context,
         {
           dsk_set_error (error,
                          "expected 'use', 'struct' or 'union', got '%.*s' (%s:%u)",
-                         tokens[at].length, context->str + tokens[at].start,
+                         (int) tokens[at].length,
+                         context->str + tokens[at].start,
                          context->filename, tokens[at].line_no);
           return DSK_FALSE;
         }
@@ -764,19 +773,19 @@ parse_file (ParseContext *context,
       if (tokens[at].type == TOKEN_STRUCT)
         {
           char *struct_name;
+          unsigned n_members;
+          DskXmlBindingStructMember *members;
+          DskXmlBindingTypeStruct *stype;
           if (at + 1 == n_tokens || !token_type_is_word (tokens[at+1].type))
             {
               dsk_set_error (error, "error parsing name of struct (%s:%u)",
                              context->filename, tokens[at+1].line_no);
               goto error_cleanup;
             }
-          unsigned n_members;
-          DskXmlBindingStructMember *members;
           if (!parse_member_list (context, at + 2, &n_tokens_used,
                                   &n_members, &members, error))
             goto error_cleanup;
           struct_name = make_token_string (context, at+1);
-          DskXmlBindingTypeStruct *stype;
           stype = dsk_xml_binding_type_struct_new (context->ns,
                                                   struct_name,
                                                   n_members, members,
@@ -802,6 +811,8 @@ parse_file (ParseContext *context,
           char *union_name;
           unsigned n_cases;
           DskXmlBindingUnionCase *cases;
+          DskXmlBindingTypeUnion *utype;
+          DskXmlBindingType *type;
           if (at + 1 == n_tokens || !token_type_is_word (tokens[at+1].type))
             {
               dsk_set_error (error, "error parsing name of union (%s:%u)",
@@ -814,9 +825,8 @@ parse_file (ParseContext *context,
               goto error_cleanup;
             }
           union_name = make_token_string (context, at+1);
-          DskXmlBindingTypeUnion *utype;
           utype = dsk_xml_binding_type_union_new (context->ns, union_name, n_cases, cases, error);
-          DskXmlBindingType *type = (DskXmlBindingType *) utype;
+          type = (DskXmlBindingType *) utype;
           dsk_free (union_name);
           free_cases (n_cases, cases);
 
@@ -836,7 +846,8 @@ parse_file (ParseContext *context,
         {
           dsk_set_error (error,
                          "unexpected token '%.*s' (%s:%u) - expected struct or union",
-                         tokens[at].length, context->str + tokens[at].start,
+                         (int) tokens[at].length,
+                         context->str + tokens[at].start,
                          context->filename, tokens[at].line_no);
           goto error_cleanup;
         }
@@ -857,29 +868,34 @@ parse_file (ParseContext *context,
 
   qsort (ns_type_info, n_ns_types, sizeof (NewTypeInfo),
          compare_new_type_info_by_name);
-  unsigned i;
-  for (i = 1; i < n_ns_types; i++)
-    if (strcmp (ns_type_info[i-1].type->name, ns_type_info[i].type->name) == 0)
-      {
-        dsk_set_error (error, "namespace %s defined type %s twice (at least) (%s:%u and %s:%u)",
-                       ns_name, ns_type_info[i].type->name,
-                       context->filename, ns_type_info[i-1].line_no,
-                       context->filename, ns_type_info[i].line_no);
-        goto error_cleanup;
-      }
 
+  {
+    unsigned i;
+    for (i = 1; i < n_ns_types; i++)
+      if (strcmp (ns_type_info[i-1].type->name, ns_type_info[i].type->name) == 0)
+        {
+          dsk_set_error (error, "namespace %s defined type %s twice (at least) (%s:%u and %s:%u)",
+                         ns_name, ns_type_info[i].type->name,
+                         context->filename, ns_type_info[i-1].line_no,
+                         context->filename, ns_type_info[i].line_no);
+          goto error_cleanup;
+        }
+  }
   dsk_free (ns_type_info);
   dsk_free (ns_name);
   return DSK_TRUE;
 
 error_cleanup:
-  dsk_free (ns_name);
-  for (i = 0; i < n_ns_types; i++)
-    dsk_xml_binding_type_unref (ns_type_info[i].type);
-  dsk_free (ns_type_info);
-  for (i = 0; i < context->n_use_statements; i++)
-    dsk_free (context->use_statements[i].as);
-  dsk_free (context->use_statements);
+  {
+    unsigned i;
+    dsk_free (ns_name);
+    for (i = 0; i < n_ns_types; i++)
+      dsk_xml_binding_type_unref (ns_type_info[i].type);
+    dsk_free (ns_type_info);
+    for (i = 0; i < context->n_use_statements; i++)
+      dsk_free (context->use_statements[i].as);
+    dsk_free (context->use_statements);
+  }
   return DSK_FALSE;
 }
 
