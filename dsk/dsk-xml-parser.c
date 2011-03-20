@@ -697,7 +697,7 @@ handle_char_entity (DskXmlParser *parser,
       dsk_set_error (error, "character entity too long (%u bytes)", parser->entity_buf_len);
       return DSK_FALSE;
     }
-  dsk_set_error (error, "unknown character entity (&%.*s;)", parser->entity_buf_len, parser->entity_buf);
+  dsk_set_error (error, "unknown character entity (&%.*s;)", (int) parser->entity_buf_len, parser->entity_buf);
   return DSK_FALSE;
 }
 
@@ -1002,24 +1002,28 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
   ParseState *new_state;
   ParseStateTransition *trans;
   unsigned n_attrs = parser->n_attrs;
+  unsigned str_size; /* space used on the "stack_tag_strs" buffer */
   /* there's 2*n_attrs strings for the attributes
      and 1 additional sentinel marking the end of the array */
   char **attrs = alloca (sizeof (char*) * (n_attrs * 2 + 1));
   NsAbbrevMap *defined_list = NULL;      /* namespace defs in this element */
+  unsigned max_space_needed;
+  StackNode *st;
 
   /* perform UTF-8 and character validation;
      find attribute locations. */
   if (!utf_validate_open_element (parser, attrs, error))
     return DSK_FALSE;
 
-  /* space used on the "stack_tag_strs" buffer */
-  unsigned str_size;
 
   /* do xmlns namespace translation (unless suppressed) */
   if (!parser->config->ignore_ns)
     {
       unsigned i;
       DskXmlParserNamespaceConfig **xlats = alloca (sizeof(void*) * n_attrs);
+      char *attr_slab, *attr_slab_at;
+      char *colon;
+      unsigned n_attrs_out;
       for (i = 0; i < n_attrs; i++)
         {
           char *name = attrs[2*i];
@@ -1107,18 +1111,17 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
           }
 
       /* upperbound on space required for name and attrs */
-      unsigned max_space_needed = parser->buffer.length
-                                + parser->max_ns_expand
-                                + n_attrs * parser->max_ns_attr_expand;
+      max_space_needed = parser->buffer.length
+                       + parser->max_ns_expand
+                       + n_attrs * parser->max_ns_attr_expand;
 
       /* ensure stack_tag_strs can accomodate it */
       simple_buffer_ensure_end_space (&parser->stack_tag_strs, max_space_needed);
-      char *attr_slab = (char*) parser->stack_tag_strs.data
-                      + parser->stack_tag_strs.length;
-      char *attr_slab_at = attr_slab;
+      attr_slab = (char*) parser->stack_tag_strs.data
+                + parser->stack_tag_strs.length;
+      attr_slab_at = attr_slab;
 
       /* get space/new-prefix for element name using namespace config */
-      char *colon;
       
       colon = strchr ((char*)parser->buffer.data, ':');
       if (colon != NULL)
@@ -1149,7 +1152,7 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
       *attr_slab_at++ = 0;
 
       /* rewrite attribute names to use namespace config */
-      unsigned n_attrs_out = 0;
+      n_attrs_out = 0;
       for (i = 0; i < n_attrs; i++)
         {
           /* only passthough non-xmlns attributes */
@@ -1160,11 +1163,12 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
                  which are contiguous in the buffer.  */
               char *start_copy = attrs[2*i];
               char *end_copy = attrs[2*i+2];
+              char *name;
 
               n_attrs_out++;
 
               /* is there a namespace prefix on this attr? */
-              char *name = attrs[2*i];
+              name = attrs[2*i];
               if ((colon=strchr (name, ':')) != NULL)
                 {
                   NsAbbrevMap *abbrev;
@@ -1235,7 +1239,6 @@ static dsk_boolean handle_open_element (DskXmlParser *parser,
       dsk_set_error (error, "tag stack too deep");
       return DSK_FALSE;
     }
-  StackNode *st;
   st = &parser->stack[parser->stack_size++];
   st->name_kv_space = str_size;
   st->n_attrs = n_attrs;
@@ -1255,6 +1258,7 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
                                         DskError    **error)
 {
   StackNode *stack = parser->stack + (parser->stack_size-1);
+  char *end_of_name;
   if (parser->stack_size == 1)
     {
       dsk_set_error (error, "close tag with no open-tag (in outermost context), %s, line %u",
@@ -1264,68 +1268,70 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
     }
   /* do UTF-8 validation (and other checks) */
   parser->n_attrs = 0;
-  char *end_of_name;
   if (!utf_validate_open_element (parser, &end_of_name, error))
     return DSK_FALSE;
 
   /* do xmlns namespace translation (unless suppressed) */
-  char *orig = (char*) parser->buffer.data;
-  char *colon = strchr (orig, ':');
-  char *prefix = NULL;
-  char *suffix = orig;
-  if (colon == NULL)
-    {
-      if (parser->default_ns)
-        prefix = parser->default_ns->translate->prefix;
-    }
-  else
-    {
-      NsAbbrevMap *abbrev;
-      *colon = 0;
-      GSK_RBTREE_LOOKUP_COMPARATOR (GET_NS_ABBREV_TREE (parser), orig, COMPARE_STR_TO_NS_ABBREV_TREE, abbrev);
-      if (abbrev)
-        prefix = abbrev->translate->prefix;
-      suffix = colon + 1;
-    }
-  if (prefix && prefix[0] == 0)
-    prefix = NULL;
+  {
+    char *orig = (char*) parser->buffer.data;
+    char *colon = strchr (orig, ':');
+    char *prefix = NULL;
+    char *suffix = orig;
+    char *stack_end;
+    char *open_name_attrs;
+    if (colon == NULL)
+      {
+        if (parser->default_ns)
+          prefix = parser->default_ns->translate->prefix;
+      }
+    else
+      {
+        NsAbbrevMap *abbrev;
+        *colon = 0;
+        GSK_RBTREE_LOOKUP_COMPARATOR (GET_NS_ABBREV_TREE (parser), orig, COMPARE_STR_TO_NS_ABBREV_TREE, abbrev);
+        if (abbrev)
+          prefix = abbrev->translate->prefix;
+        suffix = colon + 1;
+      }
+    if (prefix && prefix[0] == 0)
+      prefix = NULL;
 
-  /* check that prefix+suffix matches the top of the stack */
-  char *stack_end = (char*) simple_buffer_end_data (&parser->stack_tag_strs);
-  char *open_name_attrs = stack_end - stack->name_kv_space;
-  if (prefix == NULL)
-    {
-      if (strcmp (suffix, open_name_attrs) != 0)
-        {
-          dsk_set_error (error, "close tag mismatch (<%s> versus </%s>, %s, line %u",
-                         open_name_attrs, suffix,
-                         parser->filename ? parser->filename->filename : "string",
-                         parser->line_no);
-          return DSK_FALSE;
-        }
-    }
-  else
-    {
-      char *colon = strchr (open_name_attrs, ':');
-      dsk_boolean bad;
-      if (colon == NULL)
-        bad = DSK_TRUE;
-      else
-        {
-          *colon = 0;
-          bad = strcmp (prefix, open_name_attrs) != 0
-             || strcmp (suffix, colon + 1) != 0;
-          *colon = ':';
-        }
-      if (bad)
-        {
-          dsk_set_error (error, "close tag mismatch (<%s> versus </%s:%s>, %s, line %u",
-                         open_name_attrs, prefix, suffix,
-                         parser->filename ? parser->filename->filename : "string",
-                         parser->line_no);
-          return DSK_FALSE;
-        }
-    }
+    /* check that prefix+suffix matches the top of the stack */
+    stack_end = (char*) simple_buffer_end_data (&parser->stack_tag_strs);
+    open_name_attrs = stack_end - stack->name_kv_space;
+    if (prefix == NULL)
+      {
+        if (strcmp (suffix, open_name_attrs) != 0)
+          {
+            dsk_set_error (error, "close tag mismatch (<%s> versus </%s>, %s, line %u",
+                           open_name_attrs, suffix,
+                           parser->filename ? parser->filename->filename : "string",
+                           parser->line_no);
+            return DSK_FALSE;
+          }
+      }
+    else
+      {
+        char *colon = strchr (open_name_attrs, ':');
+        dsk_boolean bad;
+        if (colon == NULL)
+          bad = DSK_TRUE;
+        else
+          {
+            *colon = 0;
+            bad = strcmp (prefix, open_name_attrs) != 0
+               || strcmp (suffix, colon + 1) != 0;
+            *colon = ':';
+          }
+        if (bad)
+          {
+            dsk_set_error (error, "close tag mismatch (<%s> versus </%s:%s>, %s, line %u",
+                           open_name_attrs, prefix, suffix,
+                           parser->filename ? parser->filename->filename : "string",
+                           parser->line_no);
+            return DSK_FALSE;
+          }
+      }
  
 
   if (stack->needed)
@@ -1392,6 +1398,7 @@ static dsk_boolean handle_close_element (DskXmlParser *parser,
         }
       dsk_free (kill);
     }
+  }
 
   /* pop the stack */
   parser->stack_tag_strs.length -= stack->name_kv_space;

@@ -324,9 +324,10 @@ handle_token (DskJsonParser *parser,
       if (token == JSON_TOKEN_STRING)
         {
           /* add new member; copy string */
+          char *name;
           if (STACK_TOP (parser).n_subs == STACK_TOP (parser).subs_alloced)
             stack_increase_subs_alloced (&STACK_TOP (parser));
-          char *name = dsk_strndup (parser->str_len, parser->str);
+          name = dsk_strndup (parser->str_len, parser->str);
           STACK_TOP (parser).u.members[STACK_TOP (parser).n_subs++].name = name;
 
           parser->parse_state = PARSE_GOT_MEMBER_NAME;
@@ -637,10 +638,12 @@ DskJsonParser *dsk_json_parser_new      (void)
 
 DskJsonValue * dsk_json_parser_pop      (DskJsonParser *parser)
 {
+  DskJsonValue *rv;
+  ValueQueue *q;
   if (parser->queue_head == NULL)
     return NULL;
-  DskJsonValue *rv = parser->queue_head->value;
-  ValueQueue *q = parser->queue_head;
+  rv = parser->queue_head->value;
+  q = parser->queue_head;
   parser->queue_head = q->next;
   if (parser->queue_head == NULL)
     parser->queue_tail = NULL;
@@ -706,6 +709,9 @@ bad_lex_state:
 void           dsk_json_parser_destroy  (DskJsonParser *parser)
 {
   unsigned i, j;
+  DskJsonValue *v;
+  while ((v = dsk_json_parser_pop (parser)) != NULL)
+    dsk_json_value_free (v);
   for (i = 0; i < parser->stack_size; i++)
     {
       switch (parser->stack[i].type)
@@ -729,10 +735,6 @@ void           dsk_json_parser_destroy  (DskJsonParser *parser)
   dsk_free (parser->stack);
 
   dsk_free (parser->str);
-
-  DskJsonValue *v;
-  while ((v = dsk_json_parser_pop (parser)) != NULL)
-    dsk_json_value_free (v);
 
   dsk_free (parser);
 }

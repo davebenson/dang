@@ -23,6 +23,7 @@ char       *dsk_file_get_contents (const char *filename,
   DskBuffer buffer = DSK_BUFFER_STATIC_INIT;
   int fd = open (filename, O_RDONLY | MY_O_BINARY);
   int read_rv;
+  char *rv;
   if (fd < 0)
     {
       dsk_set_error (error, "error opening %s: %s",
@@ -41,7 +42,6 @@ char       *dsk_file_get_contents (const char *filename,
     }
   if (size_out)
     *size_out = buffer.size;
-  char *rv;
   rv = dsk_malloc (buffer.size + 1);
   rv[buffer.size] = 0;
   dsk_buffer_read (&buffer, buffer.size, rv);
@@ -173,13 +173,13 @@ dsk_boolean dsk_rm_rf   (const char *dir_or_file, DskError    **error)
           /* scan directory, removing contents recursively */
           DIR *dir = opendir (dir_or_file);
           unsigned flen = strlen (dir_or_file);
+          struct dirent *dirent;
           if (dir == NULL)
             {
               dsk_set_error (error, "error opening %s: %s",
                              dir_or_file, strerror (errno));
               return DSK_FALSE;
             }
-          struct dirent *dirent;
           while ((dirent = readdir (dir)) != NULL)
             {
               const char *base = dirent->d_name;

@@ -242,6 +242,10 @@ match_tester_standard_destroy (MatchTester *tester)
 static MatchTester *
 create_tester (MatchTestList *list)
 {
+  unsigned max_run_length, n_unique_types;
+  MatchTestList *at;
+  MatchTesterStandard *tester;
+  DskPatternEntry *patterns;
   if (list == NULL)
     return NULL;
 #define GET_MATCH_TEST_LIST(list) MatchTestList*, list, prev
@@ -254,8 +258,8 @@ create_tester (MatchTestList *list)
 
   /* Count the number of unique types,
      and the max count of any given type. */
-  unsigned max_run_length = 0, n_unique_types = 0;
-  MatchTestList *at;
+  max_run_length = 0;
+  n_unique_types = 0;
   for (at = list; at; )
     {
       MatchTestList *run_end = at->prev;
@@ -271,19 +275,18 @@ create_tester (MatchTestList *list)
       at = run_end;
     }
 
-  MatchTesterStandard *tester;
   tester = dsk_malloc (sizeof (MatchTesterStandard)
                        + sizeof (MatchTypeAndPattern) * (n_unique_types-1));
   tester->base.test = match_tester_standard_test;
   tester->base.destroy = match_tester_standard_destroy;
   tester->n_types = n_unique_types;
-  DskPatternEntry *patterns;
   patterns = alloca (sizeof (DskPatternEntry) * max_run_length);
   n_unique_types = 0;
   for (at = list; at; )
     {
       MatchTestList *run_end = at;
       unsigned run_length = 0;
+      DskError *error = NULL;
       while (run_end && run_end->match_type == at->match_type)
         {
           patterns[run_length].pattern = run_end->pattern_str;
@@ -291,7 +294,6 @@ create_tester (MatchTestList *list)
           run_length++;
           run_end = run_end->prev;
         }
-      DskError *error = NULL;
       tester->types[n_unique_types].test = dsk_pattern_compile (run_length, patterns, &error);
       if (tester->types[n_unique_types].test == NULL)
         {
@@ -449,13 +451,17 @@ respond_error (DskHttpServerRequest *request,
   RealServerRequest *rreq = (RealServerRequest *) request;
   DskHttpServerStreamResponseOptions resp_options = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
   DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
+  DskBuffer content_buffer = DSK_BUFFER_STATIC_INIT;
+  DskPrint *print;
+  uint8_t *content_data;
+  DskError *error = NULL;
+
   resp_options.header_options = &header_options;
   header_options.status_code = status;
   header_options.content_type = "text/html/UTF-8";
 
   /* compute content */
-  DskBuffer content_buffer = DSK_BUFFER_STATIC_INIT;
-  DskPrint *print = dsk_print_new_buffer (&content_buffer);
+  print = dsk_print_new_buffer (&content_buffer);
   dsk_print_set_string (print, "status_message", dsk_http_status_get_message (status));
   dsk_print_set_uint (print, "status_code", status);
   dsk_print_set_string (print, "message", message);
@@ -471,13 +477,12 @@ respond_error (DskHttpServerRequest *request,
                     "</body>"
                     "</html>");
   dsk_print_free (print);
-  uint8_t *content_data = dsk_malloc (content_buffer.size);
+  content_data = dsk_malloc (content_buffer.size);
   resp_options.content_body = content_data;
   resp_options.content_length = content_buffer.size;
   dsk_buffer_read (&content_buffer, content_buffer.size, content_data);
 
   /* Respond */
-  DskError *error = NULL;
   if (!dsk_http_server_stream_respond (request->transfer, &resp_options, &error))
     {
       dsk_warning ("error responding with error (original error='%s'; second error='%s')",
@@ -495,6 +500,11 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
                                                DskHttpServerResponseOptions *options)
 {
   RealServerRequest *rreq = (RealServerRequest *) request;
+  DskHttpServerStreamResponseOptions soptions = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
+  DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
+  dsk_boolean must_unref_content_stream = DSK_FALSE;
+  DskError *error = NULL;
+
   dsk_assert (rreq->state == REQUEST_HANDLING_INVOKING
           ||  rreq->state == REQUEST_HANDLING_WAITING);
   dsk_assert (rreq->waiting_for_response);
@@ -502,11 +512,8 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
   rreq->waiting_for_response = DSK_FALSE;
 
   /* Transform options */
-  DskHttpServerStreamResponseOptions soptions = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
-  DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
   soptions.header_options = &header_options;
   
-  dsk_boolean must_unref_content_stream = DSK_FALSE;
   soptions.content_length = options->content_length;
   soptions.content_body = options->content_body;
   soptions.content_stream = options->source;
@@ -514,24 +521,26 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
     {
       /* XXX: need a function for this */
       int fd = open (options->source_filename, O_RDONLY);
+      struct stat stat_buf;
+      DskOctetStreamFdSource *fdsource;
       if (fd < 0)
         {
           /* construct error message */
           int open_errno = errno;
           DskBuffer content_buffer = DSK_BUFFER_STATIC_INIT;
           DskPrint *print = dsk_print_new_buffer (&content_buffer);
+          char *error_message;
           dsk_print_set_string (print, "filename", options->source_filename);
           dsk_print_set_string (print, "error_message", strerror (open_errno));
           dsk_print (print, "error opening $filename: $error_message");
           dsk_print_free (print);
-          char *error_message = dsk_buffer_clear_to_string (&content_buffer);
+          error_message = dsk_buffer_clear_to_string (&content_buffer);
 
           /* serve response */
           dsk_http_server_request_respond_error (request, 404, error_message);
           dsk_free (error_message);
           return;
         }
-      struct stat stat_buf;
       if (fstat (fd, &stat_buf) < 0)
         {
           dsk_warning ("error calling fstat: %s", strerror (errno));
@@ -542,8 +551,6 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
           if (S_ISREG (stat_buf.st_mode))
             soptions.content_length = stat_buf.st_mode;
         }
-      DskError *error = NULL;
-      DskOctetStreamFdSource *fdsource;
       if (!dsk_octet_stream_new_fd (fd,
                                     DSK_FILE_DESCRIPTOR_IS_READABLE
                                     |DSK_FILE_DESCRIPTOR_IS_NOT_WRITABLE,
@@ -567,7 +574,6 @@ void dsk_http_server_request_respond          (DskHttpServerRequest *request,
   header_options.content_charset = options->content_charset;
 
   /* Do lower-level response */
-  DskError *error = NULL;
   if (!dsk_http_server_stream_respond (request->transfer, &soptions, &error))
     {
       dsk_warning ("dsk_http_server_stream_respond failed: %s", error->message);
@@ -632,6 +638,11 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
   DskHttpServerStreamResponseOptions resp_options = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
   DskHttpResponseOptions header_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
   RealServerRequest *rreq = (RealServerRequest *) request;
+  DskBuffer content_buffer = DSK_BUFFER_STATIC_INIT;
+  DskPrint *print;
+  uint8_t *content_data;
+  DskError *error = NULL;
+
   dsk_assert (rreq->waiting_for_response);
   if (!(300 <= status && status <= 399))
     {
@@ -646,8 +657,7 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
   header_options.location = (char*)location;
 
   /* use dsk_print to format content body */
-  DskBuffer content_buffer = DSK_BUFFER_STATIC_INIT;
-  DskPrint *print = dsk_print_new_buffer (&content_buffer);
+  print = dsk_print_new_buffer (&content_buffer);
   dsk_print_set_uint (print, "status_code", status);
   dsk_print_set_string (print, "location", location);
   dsk_print_set_filtered_string (print, "location_html_escaped", location,
@@ -658,12 +668,11 @@ void dsk_http_server_request_redirect         (DskHttpServerRequest *request,
   dsk_print_free (print);
 
   resp_options.content_length = content_buffer.size;
-  uint8_t *content_data = dsk_malloc (content_buffer.size);
+  content_data = dsk_malloc (content_buffer.size);
   dsk_buffer_read (&content_buffer, content_buffer.size, content_data);
   resp_options.content_body = content_data;
   header_options.content_type = "text/html/UTF-8";
 
-  DskError *error = NULL;
   if (!dsk_http_server_stream_respond (request->transfer, &resp_options, &error))
     {
       dsk_warning ("error making redirect respond: %s", error->message);
@@ -1129,6 +1138,8 @@ handle_listener_ready (DskOctetListener *listener,
   DskOctetSource *source;
   DskOctetSink *sink;
   DskError *error = NULL;
+  DskHttpServerStream *http_stream;
+  ServerStream *sstream;
   switch (dsk_octet_listener_accept (listener, NULL, &source, &sink, &error))
     {
     case DSK_IO_RESULT_ERROR:
@@ -1146,11 +1157,9 @@ handle_listener_ready (DskOctetListener *listener,
       return DSK_FALSE;
     }
 
-  DskHttpServerStream *http_stream;
-
   http_stream = dsk_http_server_stream_new (sink, source,
                                             &bind_info->server_stream_options);
-  ServerStream *sstream = dsk_malloc (sizeof (ServerStream));
+  sstream = dsk_malloc (sizeof (ServerStream));
   sstream->bind_info = bind_info;
   GSK_LIST_APPEND (GET_BIND_INFO_STREAM_LIST (bind_info), sstream);
   sstream->http_stream = http_stream;

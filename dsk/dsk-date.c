@@ -348,6 +348,7 @@ void        dsk_unixtime_to_date (int64_t  unixtime,
   unsigned secs_since_midnight = unixtime % 86400;
   unsigned year;
   int64_t delta;
+  dsk_boolean first_is_leap = DSK_FALSE;
 
   /* --- figure out the year --- */
   /* This is actually the hard part, b/c of leap years being so random.
@@ -385,7 +386,6 @@ void        dsk_unixtime_to_date (int64_t  unixtime,
 
   /* the first hundred year period is 100*365+25 days;
      the next three are 100*365+24 days */
-  dsk_boolean first_is_leap = DSK_FALSE;
   if (delta < 100*365+25)
     {
       first_is_leap = DSK_TRUE;

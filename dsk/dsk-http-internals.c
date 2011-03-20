@@ -9,6 +9,8 @@ _dsk_http_scan_for_end_of_header (DskBuffer *buffer,
   unsigned start = *checked_inout;
   DskBufferFragment *fragment;
   unsigned frag_offset;
+  unsigned state;
+  uint8_t *at;
   fragment = dsk_buffer_find_fragment (buffer, start, &frag_offset);
   if (fragment == NULL)
     return DSK_FALSE;           /* no new data */
@@ -17,8 +19,8 @@ _dsk_http_scan_for_end_of_header (DskBuffer *buffer,
      state 1:  \n
      state 2:  \n \r
    */
-  unsigned state = (permit_empty && *checked_inout == 0) ? 1 : 0;
-  uint8_t *at = fragment->buf + (start - frag_offset) + fragment->buf_start;
+  state = (permit_empty && *checked_inout == 0) ? 1 : 0;
+  at = fragment->buf + (start - frag_offset) + fragment->buf_start;
   while (fragment != NULL)
     {
       uint8_t *end = fragment->buf + fragment->buf_start + fragment->buf_length;

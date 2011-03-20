@@ -119,6 +119,7 @@ dsk_octet_filter_chain_new_take_list(DskOctetFilter *first, ...)
 {
   va_list args;
   unsigned n_filters;
+  DskOctetFilter **filters;
 
   if (first)
     {
@@ -131,7 +132,6 @@ dsk_octet_filter_chain_new_take_list(DskOctetFilter *first, ...)
   else
     n_filters = 0;
 
-  DskOctetFilter **filters;
   filters = alloca (sizeof (DskOctetFilter *) * n_filters);
   if (first)
     {

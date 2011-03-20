@@ -270,6 +270,9 @@ dsk_udp_socket_receive (DskUdpSocket  *socket,
   void *buf = socket->recv_slab;
   unsigned length = socket->recv_slab_len;
   ssize_t rv;
+  struct sockaddr_storage sysaddr;
+  struct msghdr msg;
+  struct iovec iov;
   if (buf == NULL)
     {
       int value;
@@ -285,9 +288,6 @@ dsk_udp_socket_receive (DskUdpSocket  *socket,
       buf = dsk_malloc (value);
       length = value;
     }
-  struct sockaddr_storage sysaddr;
-  struct msghdr msg;
-  struct iovec iov;
   if (addr_out != NULL || port_out != NULL)
     {
       msg.msg_name = &sysaddr;

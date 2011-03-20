@@ -53,9 +53,9 @@ normalize_whitespace (char *inout)
 {
   const char *in = inout;
   char *out = inout;
+  dsk_boolean allow_space = DSK_FALSE;
   while (dsk_ascii_isspace (*in))
     in++;
-  dsk_boolean allow_space = DSK_FALSE;
   while (in == out)
     {
       if (dsk_ascii_isspace (*in))
@@ -108,6 +108,10 @@ parse_info_init (ParseInfo *pi,
                  char      *scratch_pad,
                  DskError **error)
 {
+  unsigned n_newlines;
+  unsigned i;
+  char *at;
+  unsigned n_kv;
   if (header_len < 4)
     {
       dsk_set_error (error, "HTTP header too short");
@@ -132,9 +136,6 @@ parse_info_init (ParseInfo *pi,
   pi->slab[header_len] = 0;
 
   /* count newlines */
-  unsigned n_newlines;
-  unsigned i;
-  char *at;
   n_newlines = 0;
   at = pi->slab;
   for (i = 0; i < header_len; i++)
@@ -172,13 +173,13 @@ parse_info_init (ParseInfo *pi,
       goto FAIL;
     }
 
-  unsigned n_kv;
   n_kv = 0;
   while (*at != 0)
     {
       static uint8_t ident_chartable[64] = {
 #include "dsk-http-ident-chartable.inc"
       };
+      char *end;
       /* note key location */
       pi->kv_pairs[n_kv*2] = at;
 
@@ -212,7 +213,7 @@ parse_info_init (ParseInfo *pi,
       pi->kv_pairs[n_kv*2+1] = at;
       n_kv++;
 
-      char *end = NULL;
+      end = NULL;
     scan_value_end_line:
       /* skip to cr-nl */
       while (*at != '\r' && *at != '\n')
@@ -590,6 +591,7 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
   char *tmp;
   DskHttpRequestOptions options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
   DskHttpRequest *rv;
+  unsigned i;
 #define DEFAULT_INIT_N_MISC_HEADERS             8       /* must be power-of-two */
   char *misc_header_padding[DEFAULT_INIT_N_MISC_HEADERS*2];
   options.unparsed_headers = misc_header_padding;
@@ -729,7 +731,6 @@ dsk_http_request_parse_buffer  (DskBuffer *buffer,
     goto FAIL;
 
   /* parse key-value pairs */
-  unsigned i;
   for (i = 0; i < pi.n_kv_pairs; i++)
     {
       /* name has already been lowercased */
@@ -806,6 +807,7 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
   DskHttpResponseOptions options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
   DskHttpResponse *rv;
   char *misc_header_padding[DEFAULT_INIT_N_MISC_HEADERS*2];
+  unsigned i;
   options.unparsed_headers = misc_header_padding;
   options.parsed = DSK_TRUE;
   
@@ -840,7 +842,6 @@ dsk_http_response_parse_buffer  (DskBuffer *buffer,
                       + dsk_ascii_digit_value(at[2]);
 
   /* parse key-value pairs */
-  unsigned i;
   for (i = 0; i < pi.n_kv_pairs; i++)
     {
       /* name has already been lowercased */

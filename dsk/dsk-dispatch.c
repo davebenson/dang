@@ -690,7 +690,6 @@ dsk_dispatch_run (DskDispatch *dispatch)
   struct pollfd *fds;
   void *to_free = NULL, *to_free2 = NULL;
   size_t n_events;
-  RealDispatch *d = (RealDispatch *) dispatch;
   unsigned i;
   int timeout;
   DskFileDescriptorNotify *events;
@@ -1154,6 +1153,7 @@ dsk_dispatch_add_child    (DskDispatch       *dispatch,
 {
   RealDispatch *d = (RealDispatch *) dispatch;
   DskDispatchChild *conflict;
+  DskDispatchChild *child;
   if (d->child_sig_handler == NULL)
     d->child_sig_handler = dsk_dispatch_add_signal (dispatch,
                                                     SIGCHLD,
@@ -1166,7 +1166,6 @@ dsk_dispatch_add_child    (DskDispatch       *dispatch,
   
 
   /* add child to child tree */
-  DskDispatchChild *child;
   child = dsk_malloc (sizeof (DskDispatchChild));
   child->dispatch = d;
   child->process_id = process_id;

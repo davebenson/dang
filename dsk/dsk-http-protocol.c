@@ -268,6 +268,10 @@ dsk_http_request_new (DskHttpRequestOptions *options,
   unsigned n_fixups = 0;
   StrFixup fixups[MAX_STR_FIXUPS];
   DskHttpRequest *request = dsk_object_new (&dsk_http_request_class);
+  unsigned unparsed_headers_start;
+  char *slab;
+  char *aligned_at;
+  char *str_slab;
 
   request->verb = options->verb;
 
@@ -334,7 +338,6 @@ dsk_http_request_new (DskHttpRequestOptions *options,
     }
   request->content_encoding_gzip = options->content_encoding_gzip ? 1 : 0;
 
-  unsigned unparsed_headers_start;
   unparsed_headers_start
     = phase1_handle_unparsed_headers (options->n_unparsed_headers,
                                   options->unparsed_headers ? options->unparsed_headers
@@ -342,9 +345,6 @@ dsk_http_request_new (DskHttpRequestOptions *options,
                                   &str_alloc, &aligned_alloc);
 
   /* allocate memory */
-  char *slab;
-  char *aligned_at;
-  char *str_slab;
   slab = dsk_malloc (aligned_alloc + str_alloc);
   aligned_at = slab;
   str_slab = slab + aligned_alloc;
@@ -395,6 +395,10 @@ dsk_http_response_new (DskHttpResponseOptions *options,
   unsigned n_fixups = 0;
   StrFixup fixups[MAX_STR_FIXUPS];
   DskHttpResponse *response = dsk_object_new (&dsk_http_response_class);
+  unsigned unparsed_headers_start;
+  char *slab;
+  char *aligned_at;
+  char *str_slab;
 
 
   /* ---- Pass 1:  compute memory needed ---- */
@@ -469,16 +473,12 @@ dsk_http_response_new (DskHttpResponseOptions *options,
 
   response->content_encoding_gzip = options->content_encoding_gzip ? 1 : 0;
 
-  unsigned unparsed_headers_start;
   unparsed_headers_start
     = phase1_handle_unparsed_headers (options->n_unparsed_headers,
                                   options->unparsed_headers,
                                   &str_alloc, &aligned_alloc);
 
   /* allocate memory */
-  char *slab;
-  char *aligned_at;
-  char *str_slab;
   slab = dsk_malloc (aligned_alloc + str_alloc);
   aligned_at = slab;
   str_slab = slab + aligned_alloc;

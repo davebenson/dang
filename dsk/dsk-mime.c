@@ -125,6 +125,8 @@ dsk_boolean dsk_parse_mime_content_disposition_header (const char *line,
                                                        DskMimeContentDisposition *out,
                                                        DskError **error)
 {
+  DskMimeKeyValueInplace kvs[32];
+  unsigned n, i;
   SKIP_WS (line);
   memset (out, 0, sizeof (DskMimeContentDisposition));
   if (dsk_ascii_strncasecmp (line, "inline", 6) == 0)
@@ -149,8 +151,6 @@ dsk_boolean dsk_parse_mime_content_disposition_header (const char *line,
       line++;
       SKIP_WS (line);
     }
-  DskMimeKeyValueInplace kvs[32];
-  unsigned n, i;
   if (!dsk_mime_key_values_scan (line, DSK_N_ELEMENTS (kvs), kvs, &n, error))
     return DSK_FALSE;
 #define KEY_IS(kv, str) ((kv).key_end - (kv).key_start == strlen (str) \

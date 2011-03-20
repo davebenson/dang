@@ -352,13 +352,13 @@ next_packet:
         case DSK_IO_RESULT_SUCCESS:
           /* verify address matches id */
           {
+            unsigned id;
             if (length < 12)
               {
                 dsk_warning ("DNS system: message far too short");
                 dsk_free (data);
                 goto next_packet;
               }
-            unsigned id;
             id = (data[0] << 8) | (data[1]);
             if (id >= n_resolv_conf_ns)
               {
@@ -909,6 +909,8 @@ begin_dns_request (DskDnsCacheEntry *entry)
   unsigned dns_index = next_nameserver_index++;
   DskDnsMessage message;
   DskDnsQuestion question;
+  DskError *error = NULL;
+
   if (next_nameserver_index == n_resolv_conf_ns)
     next_nameserver_index = 0;
 
@@ -933,7 +935,6 @@ begin_dns_request (DskDnsCacheEntry *entry)
   question.name = entry->name;
   question.query_type = entry->is_ipv6 ? DSK_DNS_RR_HOST_ADDRESS_IPV6 : DSK_DNS_RR_HOST_ADDRESS;
   question.query_class = DSK_DNS_CLASS_IN;
-  DskError *error = NULL;
   job->message = dsk_dns_message_serialize (&message, &job->message_len);
   job->timer = dsk_dispatch_add_timer_millis (dsk_dispatch_default (),
                                               retry_schedule[0],

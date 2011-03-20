@@ -97,7 +97,7 @@ compare_char_class_to_single (const struct CharClass *a,
   const uint8_t *A = a->set;
   unsigned i;
   unsigned v;
-  for (i = 0; i < b/8; i++)
+  for (i = 0; i < b/8U; i++)
     if (A[i] > 0)
       return 1;
   v = 1 << (b%8);
@@ -526,6 +526,7 @@ parse_pattern (unsigned      pattern_index,
         /* find matching rparen (or error) */
         struct Token *rparen = token->next;
         int balance = 1;
+        struct Pattern *subpattern;
         while (rparen)
           {
             if (rparen->type == TOKEN_LPAREN)
@@ -547,7 +548,6 @@ parse_pattern (unsigned      pattern_index,
 
         /* recurse */
         rparen->prev->next = NULL;
-        struct Pattern *subpattern;
         subpattern = parse_pattern (pattern_index, token->next, pool, error);
         if (subpattern == NULL)
           return NULL;
@@ -571,6 +571,7 @@ parse_pattern (unsigned      pattern_index,
      || token->type == TOKEN_STAR
      || token->type == TOKEN_PLUS)
       {
+        struct Pattern *new_pattern;
         if (token->prev == NULL || token->prev->type != TOKEN_PATTERN)
           {
             dsk_set_error (error, "'%c' must be precede by pattern",
@@ -579,7 +580,7 @@ parse_pattern (unsigned      pattern_index,
                            : '+');
             return NULL;
           }
-        struct Pattern *new_pattern = dsk_mem_pool_alloc (pool, sizeof (struct Pattern));
+        new_pattern = dsk_mem_pool_alloc (pool, sizeof (struct Pattern));
         switch (token->type)
           {
           case TOKEN_QUESTION_MARK:
@@ -617,13 +618,14 @@ parse_pattern (unsigned      pattern_index,
         {
           /* concat */
           struct Pattern *new_pattern = dsk_mem_pool_alloc (pool, sizeof (struct Pattern));
+          struct Token *kill;
           new_pattern->type = PATTERN_CONCAT;
           new_pattern->info.concat.a = token->pattern;
           new_pattern->info.concat.b = token->next->pattern;
           token->pattern = new_pattern;
 
           /* remove token->next */
-          struct Token *kill = token->next;
+          kill = token->next;
           token->next = kill->next;
           if (kill->next)
             kill->next->prev = token;
