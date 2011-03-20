@@ -525,10 +525,11 @@ static void render_anon_structures_in_unions (DskPrint *ctx,
     if (ns->types[i]->is_union)
       {
         unsigned j;
+	DskXmlBindingTypeUnion *u;
 	dsk_print_push (ctx);
 	set_typenames (ctx, ns->types[i]);
 
-	DskXmlBindingTypeUnion *u = (DskXmlBindingTypeUnion*)ns->types[i];
+        u = (DskXmlBindingTypeUnion*)ns->types[i];
 
 	for (j = 0; j < u->n_cases; j++)
 	  if (u->cases[j].elide_struct_outer_tag)

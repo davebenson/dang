@@ -57,6 +57,7 @@ restart:
                 {
                   /* make pattern */
                   DskError *error = NULL;
+                  unsigned i;
                   if (pattern)
                     dsk_pattern_free (pattern);
                   pattern = dsk_pattern_compile (n_entries, entries, &error);
@@ -65,7 +66,6 @@ restart:
                       dsk_die ("error compiling pattern %s:%u: %s",
                                filename, pat_line, error->message);
                     }
-                  unsigned i;
                   for (i = 0; i < n_entries; i++)
                     dsk_free ((char*) entries[i].pattern);
                   goto restart;

@@ -140,11 +140,12 @@ do_request (DskHttpClientStream *http_client_stream,
       {
         const char *in = request_options->request_options->path;
         DskBuffer path = DSK_BUFFER_STATIC_INIT;
+        DskOctetFilter *urlenc;
         if (mode == 1)
           dsk_buffer_append_string (&path, "/internal-redirect?path=");
         else
           dsk_buffer_append_string (&path, "/sleep-internal-redirect?path=");
-        DskOctetFilter *urlenc = dsk_url_encoder_new ();
+        urlenc = dsk_url_encoder_new ();
         dsk_octet_filter_process (urlenc, &path, strlen (in), (uint8_t*)in, NULL);
         dsk_octet_filter_finish (urlenc, &path, NULL);
         dsk_object_unref (urlenc);
@@ -206,14 +207,15 @@ test_simple_http_server (void)
     dsk_die ("error binding: %s", error->message);
 
   /* use a client-stream to fetch hello.txt */
+  {
   DskClientStreamOptions cs_options = DSK_CLIENT_STREAM_OPTIONS_DEFAULT;
   DskHttpClientStreamOptions http_client_stream_options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
   DskHttpClientStreamRequestOptions request_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
   DskHttpRequestOptions req_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
+  int mode;
   request_options.request_options = &req_options;
   cs_options.path = "tests/sockets/http-server.socket";
 
-  int mode;
   for (mode = 0; mode < 3; mode++)
     {
       /* mode 0: simple path
@@ -222,6 +224,8 @@ test_simple_http_server (void)
 
       /* Allocate a testing http_client_stream */
       DskHttpClientStream *http_client_stream;
+      DskHttpClientStreamTransfer *xfer;
+      char content_buf[6];
       {
         DskOctetSink *client_sink;
         DskOctetSource *client_source;
@@ -233,7 +237,6 @@ test_simple_http_server (void)
         dsk_object_unref (client_sink);
         dsk_object_unref (client_source);
       }
-      DskHttpClientStreamTransfer *xfer;
       {
       SimpleRequestInfo sri = SIMPLE_REQUEST_INFO_INIT;
       req_options.path = "/hello.txt";
@@ -243,7 +246,6 @@ test_simple_http_server (void)
       while (!sri.done)
         dsk_main_run_once ();
       dsk_assert (sri.content_buffer.size == 6);
-      char content_buf[6];
       dsk_buffer_read (&sri.content_buffer, 6, content_buf);
       dsk_assert (memcmp (content_buf, "hello\n", 6) == 0);
       dsk_assert (sri.status_code == 200);
@@ -270,8 +272,8 @@ test_simple_http_server (void)
       /* use a client-stream to fetch /add else to get a 404 */
       {
       SimpleRequestInfo sri = SIMPLE_REQUEST_INFO_INIT;
-      req_options.path = "/add?a=10&b=32";
       char *str;
+      req_options.path = "/add?a=10&b=32";
       request_options.funcs = &simple_client_stream_funcs;
       request_options.user_data = &sri;
       xfer = do_request (http_client_stream, &request_options, mode);
@@ -288,6 +290,7 @@ test_simple_http_server (void)
       }
       dsk_object_unref (http_client_stream);
     }
+  }
 
   dsk_object_unref (server);
 }

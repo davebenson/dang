@@ -74,11 +74,11 @@ test_simple_connection_close (void)
   DskHttpRequestOptions request_options = DSK_HTTP_REQUEST_OPTIONS_DEFAULT;
   DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
   DskError *error = NULL;
+  DskHttpClientStream *client;
+  DskHttpServerStream *server;
   dsk_octet_pipe_new (0, &sink1, &source1);
   dsk_octet_pipe_new (0, &sink2, &source2);
 
-  DskHttpClientStream *client;
-  DskHttpServerStream *server;
   client = dsk_http_client_stream_new (sink1, source2, &client_options);
   server = dsk_http_server_stream_new (sink2, source1, &server_options);
   dsk_object_unref (sink1);
@@ -96,6 +96,7 @@ test_simple_connection_close (void)
     dsk_main_run_once ();
 
   /* server respond */
+  {
   DskHttpServerStreamResponseOptions response_options = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
   DskHttpResponseOptions response_hdr_options = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
   response_options.header_options = &response_hdr_options;
@@ -103,6 +104,7 @@ test_simple_connection_close (void)
   response_options.content_body = (const void *) "hi mom\n";
   if (!dsk_http_server_stream_respond (server_xfer, &response_options, &error))
     dsk_die ("dsk_http_server_respond failed: %s", error->message);
+  }
 
   /* client wait for response complete */
   while (!client_request_data.content_complete)

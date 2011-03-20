@@ -20,6 +20,7 @@ int dsk_table_helper_openat (int openat_fd,
   unsigned suffix_len = strlen (suffix);
   char slab[1024];
   char *buf;
+  int fd;
   if (base_fname_len + suffix_len < sizeof (slab) - 1)
     buf = slab;
   else
@@ -27,7 +28,7 @@ int dsk_table_helper_openat (int openat_fd,
   memcpy (buf + 0, base_filename, base_fname_len);
   memcpy (buf + base_fname_len, suffix, suffix_len + 1);
 
-  int fd = openat (openat_fd, buf, open_flags, open_mode);
+  fd = openat (openat_fd, buf, open_flags, open_mode);
   if (fd < 0)
     {
       dsk_set_error (error, "error running openat %s%s: %s",

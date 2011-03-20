@@ -216,9 +216,11 @@ write_then_read (unsigned write_len,
 {
   unsigned n_written = 0;
   dsk_boolean timer_expired = DSK_FALSE;
+  DskDispatchTimer *timer;
+  DskBuffer readbuf = DSK_BUFFER_STATIC_INIT;
   if (cmdline_debug_client)
     dsk_warning ("write_then_read: trying to write %u bytes; timeout=%u millis", write_len, time_millis);
-  DskDispatchTimer *timer = dsk_main_add_timer_millis (time_millis, handle_timeout, &timer_expired);
+  timer = dsk_main_add_timer_millis (time_millis, handle_timeout, &timer_expired);
 
   /* write data */
   while (!timer_expired && n_written < write_len)
@@ -250,7 +252,6 @@ write_then_read (unsigned write_len,
     }
 
   /* read til EOF */
-  DskBuffer readbuf = DSK_BUFFER_STATIC_INIT;
   while (!timer_expired)
     {
       DskHookTrap *trap;

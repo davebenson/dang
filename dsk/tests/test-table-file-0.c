@@ -22,6 +22,7 @@ test_simple_write_read (void)
   DskTableFileInterface *iface = &dsk_table_file_interface_trivial;
 
   DskTableFileWriter *writer = iface->new_writer (iface, test_dir_fd, "base", &error);
+  DskTableFileReader *reader;
   if (writer == NULL)
     dsk_die ("%s", error->message);
   if (!writer->write (writer, 1, (uint8_t*) "a", 1, (uint8_t*) "A", &error)
@@ -32,7 +33,7 @@ test_simple_write_read (void)
     dsk_die ("error closing writer: %s", error->message);
   writer->destroy (writer);
 
-  DskTableFileReader *reader = iface->new_reader (iface, test_dir_fd, "base", &error);
+  reader = iface->new_reader (iface, test_dir_fd, "base", &error);
   if (reader == NULL)
     dsk_die ("error creating reader: %s", error->message);
   dsk_assert (!reader->at_eof);
@@ -257,13 +258,15 @@ test_various_read_write_1 (const char *name,
   DskTableFileInterface *iface = &dsk_table_file_interface_trivial;
   uint64_t big_i;               /* index from 0..n_write-1 */
   uint32_t small_i;             /* index from 0..n_entries-1 */
+  DskTableFileWriter *writer;
+  DskTableFileReader *reader;
 
   if (cmdline_verbose)
     fprintf (stderr, "running dataset %s [%llu]\n", name, n_write);
   else
     fprintf (stderr, ".");
 
-  DskTableFileWriter *writer = iface->new_writer (iface, test_dir_fd, "base", &error);
+  writer = iface->new_writer (iface, test_dir_fd, "base", &error);
   if (writer == NULL)
     dsk_die ("%s", error->message);
   for (big_i = small_i = 0; big_i < n_write; big_i++)
@@ -281,7 +284,7 @@ test_various_read_write_1 (const char *name,
     dsk_die ("error closing writer: %s", error->message);
   writer->destroy (writer);
 
-  DskTableFileReader *reader = iface->new_reader (iface, test_dir_fd, "base", &error);
+  reader = iface->new_reader (iface, test_dir_fd, "base", &error);
   if (reader == NULL)
     dsk_die ("error creating reader: %s", error->message);
   small_i = 0;
@@ -328,8 +331,8 @@ str_test_func (unsigned len,
                void *func_data)
 {
   unsigned func_data_len = strlen (func_data);
-  dsk_warning ("comparing test key %s with %.*s", (char*)func_data, len, data);
   int rv = memcmp (data, func_data, DSK_MIN (len, func_data_len));
+  //dsk_warning ("comparing test key %s with %.*s", (char*)func_data, len, data);
   if (rv == 0)
     rv = (len < func_data_len) ? -1 : (len > func_data_len) ? 1 : 0;
   return rv;
@@ -345,13 +348,15 @@ test_various_write_seek_1 (const char *name,
   DskError *error = NULL;
   unsigned i;
   DskTableFileInterface *iface = &dsk_table_file_interface_trivial;
+  DskTableFileWriter *writer;
+  DskTableFileSeeker *seeker;
 
   if (cmdline_verbose)
     fprintf (stderr, "running dataset %s [%u]\n", name, n_entries);
   else
     fprintf (stderr, ".");
 
-  DskTableFileWriter *writer = iface->new_writer (iface, test_dir_fd, "base", &error);
+  writer = iface->new_writer (iface, test_dir_fd, "base", &error);
   if (writer == NULL)
     dsk_die ("%s", error->message);
   for (i = 0; i < n_entries; i++)
@@ -370,21 +375,23 @@ test_various_write_seek_1 (const char *name,
   /* --- now test seeker --- */
 
   /* pick the step size. */
+  {
   static unsigned prime_table[] = { 29, 31, 37, 41, 43, 47, 53, 59, 61, 67 };
   unsigned *p_ptr = prime_table + DSK_N_ELEMENTS (prime_table) - 1;
+  unsigned max_test, n_test, test_i, step;
   while (n_entries % *p_ptr == 0)
     p_ptr--;
-  unsigned step = *p_ptr % n_entries;
+  step = *p_ptr % n_entries;
 
   /* create seeker */
-  DskTableFileSeeker *seeker = iface->new_seeker (iface, test_dir_fd, "base", &error);
+  seeker = iface->new_seeker (iface, test_dir_fd, "base", &error);
   if (seeker == NULL)
     dsk_die ("error creating seeker from newly finished writer: %s",
              error->message);
 
-  unsigned max_test = cmdline_slow ? 100000 : 1000;
-  unsigned n_test = DSK_MIN (n_entries, max_test);
-  unsigned test_i = step;
+  max_test = cmdline_slow ? 100000 : 1000;
+  n_test = DSK_MIN (n_entries, max_test);
+  test_i = step;
   for (i = 0; i < n_test; i++)
     {
       unsigned key_len, value_len;
@@ -405,7 +412,7 @@ test_various_write_seek_1 (const char *name,
             dsk_die ("not found doing find that should have succeeded");
         }
       dsk_warning ("test=%s, got result %.*s", entries[test_i].key,
-                   key_len, key_data);
+                   (int) key_len, key_data);
       dsk_assert (key_len == strlen (entries[test_i].key));
       dsk_assert (value_len == strlen (entries[test_i].value));
       dsk_assert (memcmp (key_data, entries[test_i].key, key_len) == 0);
@@ -444,6 +451,7 @@ test_various_write_seek_1 (const char *name,
 
 
   seeker->destroy (seeker);
+  }
 }
 
 static TestEntry write_seek__odd_letters_to_cap[] = {
@@ -580,6 +588,7 @@ static struct
 int main(int argc, char **argv)
 {
   unsigned i;
+  char test_dir_buf[256];
 
   dsk_cmdline_init ("test table internals (the 'file' abstraction)",
                     "Test Table Internals",
@@ -592,7 +601,6 @@ int main(int argc, char **argv)
                            &cmdline_keep_testdir);
   dsk_cmdline_process_args (&argc, &argv);
 
-  char test_dir_buf[256];
   snprintf (test_dir_buf, sizeof (test_dir_buf),
             "test-table-file-%u-%u", (unsigned)time(NULL), (unsigned)getpid());
   test_dir = test_dir_buf;

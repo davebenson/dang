@@ -147,6 +147,7 @@ test_simple (dsk_boolean byte_by_byte)
       DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
       DskHttpClientStreamTransfer *xfer;
       DskHttpClientStreamFuncs request_funcs_0;
+      const char *content;
       DskError *error = NULL;
       fprintf (stderr, ".");
       memset (&request_funcs_0, 0, sizeof (request_funcs_0));
@@ -172,7 +173,7 @@ test_simple (dsk_boolean byte_by_byte)
       while (!is_http_request_complete (&request_data.sink->buffer, NULL))
         dsk_main_run_once ();
 
-      const char *content = response_content_versions[iter];
+      content = response_content_versions[iter];
 
       /* write response */
       if (byte_by_byte)
@@ -231,6 +232,8 @@ test_transfer_encoding_chunked (void)
       DskHttpClientStreamFuncs request_funcs_0;
       DskError *error = NULL;
       const char *content;
+      DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
+      unsigned pass;
       switch (iter)
         {
         case 0:
@@ -277,13 +280,11 @@ test_transfer_encoding_chunked (void)
                                            &options);
       req_options.host = "localhost";
       req_options.full_path = "/hello.txt";
-      DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
       cr_options.request_options = &req_options;
       cr_options.funcs = &request_funcs_0;
       cr_options.user_data = &request_data;
 
       /* write response */
-      unsigned pass;
       for (pass = 0; pass < 2; pass++)
         {
           fprintf (stderr, ".");
@@ -356,6 +357,9 @@ test_simple_post (void)
   DskHttpClientStreamTransfer *xfer;
   DskHttpClientStreamFuncs request_funcs_0;
   DskError *error = NULL;
+  DskMemorySource *post_data;
+  const char *post_data_str = "this is some POST data\n";
+  unsigned len;
   memset (&request_funcs_0, 0, sizeof (request_funcs_0));
   request_funcs_0.handle_response = request_data__handle_response;
   request_funcs_0.handle_content_complete = request_data__handle_content_complete;
@@ -366,12 +370,10 @@ test_simple_post (void)
   stream = dsk_http_client_stream_new (DSK_OCTET_SINK (request_data.sink),
                                        DSK_OCTET_SOURCE (request_data.source),
                                        &options);
-  const char *post_data_str = "this is some POST data\n";
   req_options.verb = DSK_HTTP_VERB_POST;
   req_options.host = "localhost";
   req_options.full_path = "/hello.txt";
   req_options.content_length = strlen (post_data_str);
-  DskMemorySource *post_data;
   post_data = dsk_memory_source_new ();
   dsk_buffer_append_string (&post_data->buffer, post_data_str);
   dsk_memory_source_done_adding (post_data);
@@ -386,7 +388,6 @@ test_simple_post (void)
   dsk_object_unref (post_data);
 
   /* read data from sink; pluck off POST Data */
-  unsigned len;
   while (!is_http_request_complete (&request_data.sink->buffer, &len))
     dsk_main_run_once ();
   dsk_buffer_discard (&request_data.sink->buffer, len);
@@ -400,6 +401,7 @@ test_simple_post (void)
   }
 
   /* write response */
+  {
   static const char *content = 
                             "HTTP/1.1 200 OK\r\n"
                             "Date: Mon, 17 May 2010 22:50:08 GMT\r\n"
@@ -410,6 +412,7 @@ test_simple_post (void)
                             "hi mom\n";
   dsk_buffer_append_string (&request_data.source->buffer, content);
   dsk_memory_source_added_data (request_data.source);
+  }
 
   while (request_data.response_header == NULL)
     dsk_main_run_once ();
@@ -482,6 +485,10 @@ test_transfer_encoding_chunked_post (void)
       DskError *error = NULL;
       RequestData request_data = REQUEST_DATA_DEFAULT;
       PostInfo post_info;
+      const char *post_data_str = "this is some POST data\n";
+      DskMemorySource *post_data;
+      unsigned len;
+      const char *expected;
       memset (&request_funcs_0, 0, sizeof (request_funcs_0));
       request_funcs_0.handle_response = request_data__handle_response;
       request_funcs_0.handle_content_complete = request_data__handle_content_complete;
@@ -492,11 +499,9 @@ test_transfer_encoding_chunked_post (void)
       stream = dsk_http_client_stream_new (DSK_OCTET_SINK (request_data.sink),
                                            DSK_OCTET_SOURCE (request_data.source),
                                            &options);
-      const char *post_data_str = "this is some POST data\n";
       req_options.verb = DSK_HTTP_VERB_POST;
       req_options.host = "localhost";
       req_options.full_path = "/hello.txt";
-      DskMemorySource *post_data;
       post_data = dsk_memory_source_new ();
       fprintf (stderr, ".");
       if (iter == 0)
@@ -533,11 +538,10 @@ test_transfer_encoding_chunked_post (void)
         }
 
       /* read data from sink; pluck off POST Data */
-      unsigned len;
       while (!is_http_request_complete (&request_data.sink->buffer, &len))
         dsk_main_run_once ();
       dsk_buffer_discard (&request_data.sink->buffer, len);
-      const char *expected = iter == 3
+      expected = iter == 3
                    ? "1\r\nt\r\n" /* a bunch of 1-byte chunks */
                      "1\r\nh\r\n"
                      "1\r\ni\r\n"
@@ -573,6 +577,7 @@ test_transfer_encoding_chunked_post (void)
       }
 
       /* write response */
+      {
       static const char *content = 
                                 "HTTP/1.1 200 OK\r\n"
                                 "Date: Mon, 17 May 2010 22:50:08 GMT\r\n"
@@ -583,6 +588,7 @@ test_transfer_encoding_chunked_post (void)
                                 "hi mom\n";
       dsk_buffer_append_string (&request_data.source->buffer, content);
       dsk_memory_source_added_data (request_data.source);
+      }
 
       while (request_data.response_header == NULL)
         dsk_main_run_once ();
@@ -637,6 +643,7 @@ test_keepalive_full (dsk_boolean add_postcontent_newlines)
       DskMemorySource *source;
       DskMemorySink *sink;
       DskHttpClientStreamOptions options = DSK_HTTP_CLIENT_STREAM_OPTIONS_DEFAULT;
+      DskError *error = NULL;
 
       source = dsk_memory_source_new ();
       sink = dsk_memory_sink_new ();
@@ -646,7 +653,6 @@ test_keepalive_full (dsk_boolean add_postcontent_newlines)
                                            &options);
       request_data_default.source = source;
       request_data_default.sink = sink;
-      DskError *error = NULL;
       if (debug)
         fprintf (stderr, "[");
       else
@@ -1030,6 +1036,7 @@ test_gzip_download (void)
           while (!is_http_request_complete (&request_data.sink->buffer, NULL))
             dsk_main_run_once ();
 
+          {
           const char *content = response_content_versions[iter].data;
           unsigned len = response_content_versions[iter].length;
 
@@ -1052,6 +1059,7 @@ test_gzip_download (void)
               dsk_buffer_append (&request_data.source->buffer, len, content);
               dsk_memory_source_added_data (request_data.source);
             }
+          }
 
           while (request_data.response_header == NULL)
             dsk_main_run_once ();
@@ -1098,6 +1106,7 @@ test_pre_gzipped_post_data_0 (void)
   DskHttpClientStreamTransfer *xfer;
   DskHttpClientStreamFuncs request_funcs_0;
   DskError *error = NULL;
+  unsigned req_hdr_len;
   unsigned gzipped_post_len = sizeof (this_is_post_data__gzipped) - 1;
   fprintf (stderr, ".");
   memset (&request_funcs_0, 0, sizeof (request_funcs_0));
@@ -1124,7 +1133,6 @@ test_pre_gzipped_post_data_0 (void)
     dsk_die ("dsk_http_client_stream_request failed: %s", error->message);
 
   /* read data from sink */
-  unsigned req_hdr_len;
   while (!is_http_request_complete (&request_data.sink->buffer, &req_hdr_len))
     dsk_main_run_once ();
 
@@ -1193,6 +1201,9 @@ test_pre_gzipped_post_data_1 (void)
   unsigned gzipped_post_len = sizeof (this_is_post_data__gzipped) - 1;
   char buf[64];
   int index;
+  DskMemorySource *post_data;
+  unsigned req_hdr_len;
+  unsigned n_written, n_read;
 
   fprintf (stderr, ".");
   memset (&request_funcs_0, 0, sizeof (request_funcs_0));
@@ -1211,7 +1222,6 @@ test_pre_gzipped_post_data_1 (void)
   cr_options.request_options = &req_options;
   cr_options.funcs = &request_funcs_0;
   cr_options.user_data = &request_data;
-  DskMemorySource *post_data;
   post_data = dsk_memory_source_new ();
   cr_options.post_data = DSK_OCTET_SOURCE (post_data);
   cr_options.post_data_is_gzipped = DSK_TRUE;
@@ -1220,7 +1230,6 @@ test_pre_gzipped_post_data_1 (void)
     dsk_die ("dsk_http_client_stream_request failed: %s", error->message);
 
   /* read data from sink */
-  unsigned req_hdr_len;
   while (!is_http_request_complete (&request_data.sink->buffer, &req_hdr_len))
     dsk_main_run_once ();
 
@@ -1234,7 +1243,6 @@ test_pre_gzipped_post_data_1 (void)
     dsk_free (hdr);
   }
 
-  unsigned n_written, n_read;
   for (n_written = 0; n_written < gzipped_post_len; n_written++)
     {
       dsk_buffer_append_byte (&post_data->buffer,
@@ -1435,6 +1443,7 @@ test_bad_gzip (void)
           while (!is_http_request_complete (&request_data.sink->buffer, NULL))
             dsk_main_run_once ();
 
+          {
           const char *content = response_content_versions[iter].data;
           unsigned len = response_content_versions[iter].length;
 
@@ -1458,6 +1467,7 @@ test_bad_gzip (void)
               dsk_buffer_append (&request_data.source->buffer, len, content);
               dsk_memory_source_added_data (request_data.source);
             }
+          }
 
           while (request_data.response_header == NULL)
             dsk_main_run_once ();
@@ -1544,6 +1554,7 @@ test_transport_errors_reading (void)
       while (!is_http_request_complete (&request_data.sink->buffer, NULL))
         dsk_main_run_once ();
 
+      {
       const char *content = response_content_versions[iter];
 
       /* write response */
@@ -1551,6 +1562,7 @@ test_transport_errors_reading (void)
       dsk_memory_source_added_data (request_data.source);
       dsk_memory_source_take_error (request_data.source,
                                     dsk_error_new ("simulated test error"));
+      }
 
       while (!request_data.destroyed)
         dsk_main_run_once ();
@@ -1698,6 +1710,7 @@ test_head_simple (dsk_boolean byte_by_byte)
       while (!is_http_request_complete (&request_data.sink->buffer, NULL))
         dsk_main_run_once ();
 
+      {
       const char *content = response_content_versions[iter];
 
       /* write response */
@@ -1717,6 +1730,7 @@ test_head_simple (dsk_boolean byte_by_byte)
           dsk_buffer_append_string (&request_data.source->buffer, content);
           dsk_memory_source_added_data (request_data.source);
         }
+      }
 
       while (request_data.response_header == NULL)
         dsk_main_run_once ();
@@ -1748,6 +1762,8 @@ test_head_transfer_encoding_chunked (void)
       DskHttpClientStreamFuncs request_funcs_0;
       DskError *error = NULL;
       const char *content;
+      DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
+      unsigned pass;
       switch (iter)
         {
         case 0:
@@ -1785,13 +1801,11 @@ test_head_transfer_encoding_chunked (void)
       req_options.verb = DSK_HTTP_VERB_HEAD;
       req_options.host = "localhost";
       req_options.full_path = "/hello.txt";
-      DskHttpClientStreamRequestOptions cr_options = DSK_HTTP_CLIENT_STREAM_REQUEST_OPTIONS_DEFAULT;
       cr_options.request_options = &req_options;
       cr_options.funcs = &request_funcs_0;
       cr_options.user_data = &request_data;
 
       /* write response */
-      unsigned pass;
       for (pass = 0; pass < 2; pass++)
         {
           fprintf (stderr, ".");

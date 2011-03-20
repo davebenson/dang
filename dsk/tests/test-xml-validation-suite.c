@@ -58,6 +58,7 @@ int main(int argc, char **argv)
   unsigned n_failed_valid = 0;
   unsigned n_failed_invalid = 0;
   dsk_boolean print_failure_descriptions = DSK_FALSE;
+  DskXmlParserConfig *config;
 
   dsk_cmdline_init ("standard xml conformance test",
                     "Run some standard conformance test on our XML parser",
@@ -71,7 +72,7 @@ int main(int argc, char **argv)
   dsk_cmdline_process_args (&argc, &argv);
 
 
-  DskXmlParserConfig *config = dsk_xml_parser_config_new (DSK_XML_PARSER_IGNORE_NS,
+  config = dsk_xml_parser_config_new (DSK_XML_PARSER_IGNORE_NS,
                                                           0, NULL,
                                                           1, &star,
                                                           NULL);

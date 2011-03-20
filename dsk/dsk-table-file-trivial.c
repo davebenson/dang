@@ -127,7 +127,6 @@ table_file_trivial__new_writer (DskTableFileInterface   *iface,
                                 const char              *base_filename,
                                 DskError               **error)
 {
-  DSK_UNUSED (iface);
   TableFileTrivialWriter wr =
   {
     {
@@ -138,6 +137,7 @@ table_file_trivial__new_writer (DskTableFileInterface   *iface,
     NULL, NULL, 0ULL
   };
   int fd;
+  DSK_UNUSED (iface);
   fd = dsk_table_helper_openat (openat_fd, base_filename, ".index",
                                 O_CREAT|O_TRUNC|O_WRONLY, 0666,
                                 error);
@@ -176,6 +176,7 @@ read_next_index_entry (TableFileTrivialReader *reader,
 {
   IndexEntry ie;
   size_t nread;
+  unsigned kv_len;
   nread = fread (&ie, 1, sizeof (IndexEntry), reader->index_fp);
   if (nread == 0)
     {
@@ -210,7 +211,7 @@ read_next_index_entry (TableFileTrivialReader *reader,
       return DSK_FALSE;
     }
 
-  unsigned kv_len = ie.key_length + ie.value_length;
+  kv_len = ie.key_length + ie.value_length;
   if (reader->slab_alloced < kv_len)
     {
       unsigned new_alloced = reader->slab_alloced;
@@ -387,9 +388,10 @@ static void
 seeker_ensure_slab_size (TableFileTrivialSeeker *s,
                          size_t                  size)
 {
+  size_t new_size;
   if (s->slab_alloced >= size)
     return;
-  size_t new_size = s->slab_alloced;
+  new_size = s->slab_alloced;
   if (new_size == 0)
     new_size = 16;
   else
@@ -413,10 +415,11 @@ run_cmp (TableFileTrivialSeeker *s,
     return DSK_FALSE;
   if (ie_out->key_length != 0)
     {
+      ssize_t nread;
       seeker_ensure_slab_size (s, ie_out->key_length);
-      ssize_t nread = dsk_table_helper_pread (s->heap_fd, s->slab,
-                                              ie_out->key_length,
-                                              ie_out->heap_offset);
+      nread = dsk_table_helper_pread (s->heap_fd, s->slab,
+                                      ie_out->key_length,
+                                      ie_out->heap_offset);
       if (nread < (ssize_t) ie_out->key_length)
         {
           if (nread < 0)
@@ -682,7 +685,6 @@ table_file_trivial__new_seeker (DskTableFileInterface   *iface,
                                 const char              *base_filename,
                                 DskError               **error)
 {
-  DSK_UNUSED (iface);
   TableFileTrivialSeeker s = {
     { table_file_trivial_seeker__find,
       table_file_trivial_seeker__find_reader,
@@ -695,11 +697,13 @@ table_file_trivial__new_seeker (DskTableFileInterface   *iface,
     openat_fd,
     NULL                /* base_filename */
   };
+  struct stat stat_buf;
+  TableFileTrivialSeeker *rv;
+  DSK_UNUSED (iface);
   s.index_fd = dsk_table_helper_openat (openat_fd, base_filename, ".index",
                                     O_RDONLY, 0, error);
   if (s.index_fd < 0)
     return NULL;
-  struct stat stat_buf;
   if (fstat (s.index_fd, &stat_buf) < 0)
     {
       dsk_set_error (error, "could not stat index file to find its size");
@@ -716,7 +720,6 @@ table_file_trivial__new_seeker (DskTableFileInterface   *iface,
       return NULL;
     }
 
-  TableFileTrivialSeeker *rv;
   rv = dsk_malloc (sizeof (TableFileTrivialSeeker)
                     + strlen (base_filename) + 1);
   *rv = s;

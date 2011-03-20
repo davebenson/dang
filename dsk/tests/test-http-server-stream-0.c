@@ -60,6 +60,10 @@ test_simple (void)
             = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
           DskHttpServerStreamResponseOptions stream_resp_opts
             = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
+          dsk_boolean got_notify;
+          DskHttpServerStreamTransfer *xfer;
+          DskMemorySource *content_source = NULL;
+          char *line;
           csink->max_buffer_size = 128*1024;
           if (cmdline_verbose)
             dsk_warning ("request style: %s; writing data mode: %s; response style: %s",
@@ -91,7 +95,6 @@ test_simple (void)
               //dsk_memory_source_done_adding (csource);
             }
           /* wait til we receive the request */
-          dsk_boolean got_notify;
           got_notify = DSK_FALSE;
           dsk_hook_trap (&stream->request_available,
                          set_boolean_true,
@@ -99,7 +102,6 @@ test_simple (void)
                          NULL);
           while (!got_notify)
             dsk_main_run_once ();
-          DskHttpServerStreamTransfer *xfer;
           xfer = dsk_http_server_stream_get_request (stream);
           dsk_assert (xfer != NULL);
           dsk_assert (dsk_http_server_stream_get_request (stream) == NULL);
@@ -121,7 +123,6 @@ test_simple (void)
               break;
             }
 
-          DskMemorySource *content_source = NULL;
 
           /* send a response */
           switch (resp_iter)
@@ -175,7 +176,6 @@ test_simple (void)
             dsk_main_run_once ();
 
           /* analyse response (header+body) */
-          char *line;
           line = dsk_buffer_read_line (&csink->buffer);
           dsk_assert (line != NULL);
           dsk_assert (strncmp (line, "HTTP/1.", 7) == 0);
@@ -257,6 +257,14 @@ test_response_keepalive (void)
                                                &server_opts);
           for (rep = 0; rep < 20; rep++)
             {
+              dsk_boolean got_notify;
+              DskHttpServerStreamTransfer *xfer;
+              DskMemorySource *content_source = NULL;
+              char *line;
+              dsk_boolean in_header;
+              dsk_boolean chunked;
+              int content_length;
+
               if (cmdline_verbose)
                 fprintf (stderr, ".");
               if (iter == 0)
@@ -281,7 +289,6 @@ test_response_keepalive (void)
                   //dsk_memory_source_done_adding (csource);
                 }
               /* wait til we receive the request */
-              dsk_boolean got_notify;
               got_notify = DSK_FALSE;
               dsk_hook_trap (&stream->request_available,
                              set_boolean_true,
@@ -289,7 +296,6 @@ test_response_keepalive (void)
                              NULL);
               while (!got_notify)
                 dsk_main_run_once ();
-              DskHttpServerStreamTransfer *xfer;
               xfer = dsk_http_server_stream_get_request (stream);
               dsk_assert (xfer != NULL);
               dsk_assert (dsk_http_server_stream_get_request (stream) == NULL);
@@ -304,8 +310,6 @@ test_response_keepalive (void)
                   dsk_assert (xfer->request->content_length == -1LL);
                   break;
                 }
-
-              DskMemorySource *content_source = NULL;
 
               /* send a response */
               switch (resp_iter)
@@ -355,7 +359,6 @@ test_response_keepalive (void)
                 }
 
               /* analyse response (header+body) */
-              char *line;
               line = read_line_blocking (&csink->buffer);
               dsk_assert (line != NULL);
               dsk_assert (strncmp (line, "HTTP/1.", 7) == 0);
@@ -364,13 +367,14 @@ test_response_keepalive (void)
               dsk_assert (strncmp (line+9, "200", 3) == 0);
               dsk_assert (line[12] == 0 || dsk_ascii_isspace (line[12]));
               dsk_free (line);
-              dsk_boolean in_header = DSK_TRUE;
-              dsk_boolean chunked = DSK_FALSE;
-              int content_length = -1;
+              in_header = DSK_TRUE;
+              chunked = DSK_FALSE;
+              content_length = -1;
               while (in_header)
                 {
+                  char *cr;
                   line = read_line_blocking (&csink->buffer);
-                  char *cr = strchr (line, '\r');
+                  cr = strchr (line, '\r');
                   if (cr)
                     *cr = 0;
                   if (line[0] == 0)
@@ -398,9 +402,10 @@ test_response_keepalive (void)
                   DskBuffer content = DSK_BUFFER_STATIC_INIT;
                   for (;;)
                     {
+                      unsigned chunk_len;
                       line = read_line_blocking (&csink->buffer);
                       dsk_assert (dsk_ascii_isxdigit (*line));
-                      unsigned chunk_len = strtoul (line, NULL, 16);
+                      chunk_len = strtoul (line, NULL, 16);
                       dsk_free (line);
                       while (csink->buffer.size < chunk_len)
                         dsk_main_run_once ();
@@ -465,6 +470,9 @@ test_pipelining (void)
             = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
           DskHttpServerStreamResponseOptions stream_resp_opts
             = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
+          dsk_boolean got_notify;
+          DskHttpServerStreamTransfer *xfer;
+          unsigned reqno;
           csink->max_buffer_size = 128*1024;
           if (cmdline_verbose)
             dsk_warning ("request style: %s; writing data mode: %s; response style: %s",
@@ -496,7 +504,6 @@ test_pipelining (void)
               //dsk_memory_source_done_adding (csource);
             }
           /* wait til we receive the request */
-          dsk_boolean got_notify;
           got_notify = DSK_FALSE;
           dsk_hook_trap (&stream->request_available,
                          set_boolean_true,
@@ -504,10 +511,9 @@ test_pipelining (void)
                          NULL);
           while (!got_notify)
             dsk_main_run_once ();
-          DskHttpServerStreamTransfer *xfer;
-          unsigned reqno;
           for (reqno = 0; reqno < 2; reqno++)
             {
+              DskMemorySource *content_source = NULL;
               xfer = dsk_http_server_stream_get_request (stream);
               dsk_assert (xfer != NULL);
 
@@ -521,7 +527,6 @@ test_pipelining (void)
                   break;
                 }
 
-              DskMemorySource *content_source = NULL;
 
               /* send a response */
               switch (resp_iter)
@@ -614,8 +619,9 @@ test_pipelining (void)
                   char buf[7];
                   for (;;)
                     {
+                      unsigned len;
                       line = dsk_buffer_read_line (&csink->buffer);
-                      unsigned len = strtoul (line, NULL, 16);
+                      len = strtoul (line, NULL, 16);
                       dsk_free (line);
                       if (len == 0)
                         {
@@ -710,6 +716,12 @@ test_simple_post (void)
           = DSK_HTTP_RESPONSE_OPTIONS_DEFAULT;
         DskHttpServerStreamResponseOptions stream_resp_opts
           = DSK_HTTP_SERVER_STREAM_RESPONSE_OPTIONS_DEFAULT;
+        dsk_boolean got_notify;
+        DskHttpServerStreamTransfer *xfer;
+        DskOctetSource *post_data;
+        dsk_boolean done;
+        DskBuffer buffer = DSK_BUFFER_STATIC_INIT;
+        char *line;
         csink->max_buffer_size = 128*1024;
         if (cmdline_verbose)
           dsk_warning ("request style: %s; writing data mode: %s",
@@ -741,7 +753,6 @@ test_simple_post (void)
             //dsk_memory_source_done_adding (csource);
           }
         /* wait til we receive the request */
-        dsk_boolean got_notify;
         got_notify = DSK_FALSE;
         dsk_hook_trap (&stream->request_available,
                        set_boolean_true,
@@ -749,7 +760,6 @@ test_simple_post (void)
                        NULL);
         while (!got_notify)
           dsk_main_run_once ();
-        DskHttpServerStreamTransfer *xfer;
         xfer = dsk_http_server_stream_get_request (stream);
         dsk_assert (xfer != NULL);
         dsk_assert (dsk_http_server_stream_get_request (stream) == NULL);
@@ -773,10 +783,8 @@ test_simple_post (void)
             break;
           }
 
-        DskOctetSource *post_data;
         post_data = dsk_object_ref (xfer->post_data);
-        dsk_boolean done = DSK_FALSE;
-        DskBuffer buffer = DSK_BUFFER_STATIC_INIT;
+        done = DSK_FALSE;
         while (!done)
           {
             switch (dsk_octet_source_read_buffer (post_data, &buffer, &error))
@@ -812,7 +820,6 @@ test_simple_post (void)
           dsk_main_run_once ();
 
         /* analyse response (header+body) */
-        char *line;
         line = dsk_buffer_read_line (&csink->buffer);
         dsk_assert (line != NULL);
         dsk_assert (strncmp (line, "HTTP/1.", 7) == 0);
