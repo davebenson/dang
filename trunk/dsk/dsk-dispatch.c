@@ -619,6 +619,7 @@ dsk_dispatch_dispatch (DskDispatch *dispatch,
       idle->next = d->recycled_idles;
       d->recycled_idles = idle;
     }
+  d->base.has_idle = DSK_FALSE;
 
   /* handle timers */
   gettimeofday (&tv, NULL);
@@ -705,26 +706,22 @@ dsk_dispatch_run (DskDispatch *dispatch)
     }
 
   /* compute timeout */
-  if (d->first_idle != NULL)
-    {
-      timeout = 0;
-    }
-  else if (d->timer_tree == NULL)
+  if (dispatch->has_idle)
+    timeout = 0;
+  else if (!dispatch->has_timeout)
     timeout = -1;
   else
     {
-      DskDispatchTimer *min_timer;
-      GSK_RBTREE_FIRST (GET_TIMER_TREE (d), min_timer);
       struct timeval tv;
       gettimeofday (&tv, NULL);
-      if (min_timer->timeout_secs < (unsigned long) tv.tv_sec
-       || (min_timer->timeout_secs == (unsigned long) tv.tv_sec
-        && min_timer->timeout_usecs <= (unsigned) tv.tv_usec))
+      if (dispatch->timeout_secs < (unsigned long) tv.tv_sec
+       || (dispatch->timeout_secs == (unsigned long) tv.tv_sec
+        && dispatch->timeout_usecs <= (unsigned) tv.tv_usec))
         timeout = 0;
       else
         {
-          int du = min_timer->timeout_usecs - tv.tv_usec;
-          int ds = min_timer->timeout_secs - tv.tv_sec;
+          int du = dispatch->timeout_usecs - tv.tv_usec;
+          int ds = dispatch->timeout_secs - tv.tv_sec;
           if (du < 0)
             {
               du += 1000000;
@@ -930,6 +927,9 @@ dsk_dispatch_add_idle (DskDispatch        *dispatch,
   rv->func = func;
   rv->func_data = func_data;
   rv->dispatch = d;
+
+  d->base.has_idle = DSK_TRUE;
+
   return rv;
 }
 
@@ -942,7 +942,10 @@ dsk_dispatch_remove_idle (DskDispatchIdle *idle)
       GSK_LIST_REMOVE (GET_IDLE_LIST (d), idle);
       idle->next = d->recycled_idles;
       d->recycled_idles = idle;
+      if (d->first_idle == NULL)
+        d->base.has_idle = DSK_FALSE;
     }
+
 }
 
 static void

@@ -48,8 +48,11 @@ void dsk_print_set_template_string (DskPrint    *context,
 void dsk_print_set_buffer          (DskPrint    *context,
                                     const char  *variable_name,
                                     DskBuffer   *buffer);
-void dsk_print_push (DskPrint *context);
-void dsk_print_pop  (DskPrint *context);
+
+/* Somewhat like Local Variables:  Pop will undo all variable assignments
+   since the last call to push. */
+void dsk_print_push                (DskPrint *context);
+void dsk_print_pop                 (DskPrint *context);
 
 void dsk_print                     (DskPrint    *context,
                                     const char  *template_string);
@@ -58,16 +61,16 @@ void dsk_print                     (DskPrint    *context,
 /* Making a context of variables that can be popped in one quick go;
    these take ownership of the filter */
 void dsk_print_set_filtered_string   (DskPrint    *context,
-                                    const char  *variable_name,
-			            const char  *raw_string,
-                                    DskOctetFilter *filter);
+                                      const char  *variable_name,
+			              const char  *raw_string,
+                                      DskOctetFilter *filter);
 void dsk_print_set_filtered_binary   (DskPrint    *context,
-                                    const char  *variable_name,
-                                    size_t       raw_string_length,
-			            const char  *raw_string,
-                                    DskOctetFilter *filter);
+                                      const char  *variable_name,
+                                      size_t       raw_string_length,
+			              const char  *raw_string,
+                                      DskOctetFilter *filter);
 void dsk_print_set_filtered_buffer   (DskPrint    *context,
-                                    const char  *variable_name,
-			            const DskBuffer *buffer,
-                                    DskOctetFilter *filter);
+                                      const char  *variable_name,
+			              const DskBuffer *buffer,
+                                      DskOctetFilter *filter);
 
