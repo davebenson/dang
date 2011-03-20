@@ -518,6 +518,9 @@ parse_pattern (unsigned      pattern_index,
                DskMemPool   *pool,
                DskError    **error)
 {
+  dsk_boolean last_was_alter;
+  dsk_boolean accept_empty;
+
   /* Handle parens */
   struct Token *token;
   for (token = token_list; token; token = token->next)
@@ -637,9 +640,9 @@ parse_pattern (unsigned      pattern_index,
   /* At this point we consist of nothing but alternations and
      patterns.  Scan through, discarding TOKEN_ALTER,
      and keeping track of whether the empty pattern matches */
-  dsk_boolean last_was_alter = DSK_TRUE;/* trick the empty pattern detector
-                                           into triggering on initial '|' */
-  dsk_boolean accept_empty = DSK_FALSE;
+  last_was_alter = DSK_TRUE;     /* trick the empty pattern detector
+                                    into triggering on initial '|' */
+  accept_empty = DSK_FALSE;
   for (token = token_list; token; token = token->next)
     if (token->type == TOKEN_ALTER)
       {
@@ -690,10 +693,12 @@ parse_pattern (unsigned      pattern_index,
       token_list->pattern = new_pattern;
 
       /* remove token->next */
-      struct Token *kill = token_list->next;
-      token_list->next = kill->next;
-      if (kill->next)
-        kill->next->prev = token_list;
+      {
+        struct Token *kill = token_list->next;
+        token_list->next = kill->next;
+        if (kill->next)
+          kill->next->prev = token_list;
+      }
     }
 
   /* Return value consists of merely a single token-list. */
@@ -813,13 +818,13 @@ compare_transitions_by_state (const struct NFA_Transition *a,
 static void
 uniq_transitions (struct NFA_State *state, DskMemPool *pool)
 {
+  struct NFA_Transition *trans;
   /* sort transitions */
 #define COMPARE_TRANSITIONS(a,b, rv) rv = compare_transitions_by_state(a,b)
   GSK_STACK_SORT (NFA_STATE_GET_TRANSITION_STACK (state), COMPARE_TRANSITIONS);
 #undef COMPARE_TRANSITIONS
 
   /* remove dups */
-  struct NFA_Transition *trans;
   if (state->transitions != NULL)
     for (trans = state->transitions; trans->next_in_state != NULL; )
       {
@@ -1219,6 +1224,11 @@ force_dfa (struct DFA_TreeNode **p_tree,
            const DskPatternEntry*entries)
 {
   unsigned i, o;
+  struct DFA_TreeNode *tree_node;
+  dsk_boolean is_match;
+  unsigned match_index;
+  struct DFA_TreeNode *conflict;
+
   if (n_nfa_states == 0)
     return NULL;
 
@@ -1237,7 +1247,6 @@ force_dfa (struct DFA_TreeNode **p_tree,
   //...
 #endif
 
-  struct DFA_TreeNode *tree_node;
 
 #define COMPARE_NFA_SUBSET(a,b, rv)                            \
   COMPARE_NFA_STATES_TO_DFA_TREE(n_nfa_states, nfa_states, b, rv)
@@ -1251,8 +1260,8 @@ force_dfa (struct DFA_TreeNode **p_tree,
   memcpy (tree_node->states, nfa_states, sizeof (struct NFA_State *) * n_nfa_states);
   tree_node->n_nfa = n_nfa_states;
   tree_node->state = dsk_mem_pool_alloc0 (final_pool, sizeof (struct DFA_State));
-  dsk_boolean is_match = DSK_FALSE;
-  unsigned match_index = 0;
+  is_match = DSK_FALSE;
+  match_index = 0;
   for (i = 0; i < n_nfa_states; i++)
     if (nfa_states[i]->is_match)
       {
@@ -1271,7 +1280,6 @@ force_dfa (struct DFA_TreeNode **p_tree,
     }
 
   /* add tree node to tree */
-  struct DFA_TreeNode *conflict;
   GSK_RBTREE_INSERT (GET_NFA_SUBSET_TREE (*p_tree), tree_node, conflict);
   dsk_assert (conflict == NULL);
 
@@ -1333,11 +1341,22 @@ DskPattern *dsk_pattern_compile (unsigned n_entries,
   DskMemPool mem_pool = DSK_MEM_POOL_STATIC_INIT;
   unsigned i;
   struct NFA_State **init_states;
+  unsigned n_nfa_states;
+  struct DFA_TreeNode *tree = NULL;
+  DskMemPool final_pool = DSK_MEM_POOL_STATIC_INIT;
+  DskMemPool tree_pool = DSK_MEM_POOL_STATIC_INIT;
+  struct DFA_State *init_dfa;
+  struct DFA_TreeNode *skeletal_list = NULL;
+  unsigned nfa_state_pad_size = 16;
+  struct NFA_State **nfa_state_pad;
+  DskPattern *rv;
+
   init_states = dsk_mem_pool_alloc (&mem_pool, sizeof (struct NFA_State *) * n_entries);
   for (i = 0; i < n_entries; i++)
     {
       struct Token *tokens;
       struct Pattern *pattern;
+      struct NFA_State *final_state, *init_state;
       if (!tokenize (entries[i].pattern, &tokens, &mem_pool, error))
         {
           dsk_add_error_prefix (error, "tokenizing pattern %u", i);
@@ -1359,7 +1378,6 @@ DskPattern *dsk_pattern_compile (unsigned n_entries,
       dsk_warning ("tree for pattern %u", i);
       dump_pattern (pattern, 0);
 #endif
-      struct NFA_State *final_state, *init_state;
       final_state = dsk_mem_pool_alloc (&mem_pool, sizeof (struct NFA_State));
       final_state->pattern = NULL;
       final_state->transitions = NULL;
@@ -1383,7 +1401,7 @@ DskPattern *dsk_pattern_compile (unsigned n_entries,
       init_states[i] = init_state;
     }
 
-  unsigned n_nfa_states = 0;
+  n_nfa_states = 0;
   for (i = 0; i < n_entries; i++)
     {
       nfa_state_tree_foreach (init_states[i], count_nfa_states_one, &n_nfa_states);
@@ -1448,38 +1466,35 @@ DskPattern *dsk_pattern_compile (unsigned n_entries,
       To avoid a huge stack, we don't use actual recursion
       but merely put skeletal DFA nodes onto a worklist.
     */
-  struct DFA_TreeNode *tree = NULL;
-  DskMemPool final_pool;
-  DskMemPool tree_pool = DSK_MEM_POOL_STATIC_INIT;
   //size_t estimated_nfa_size = sizeof (struct DFA_State) * n_nfa_states * 2;
   //void *slab = dsk_malloc (estimated_nfa_size);
   //dsk_mem_pool_init_buf (&regex_pool, estimated_nfa_size, slab);
   dsk_mem_pool_init (&final_pool);
 
   /* TRUMP: will need to pass in state-trumping info */
-  struct DFA_State *init_dfa;
-  struct DFA_TreeNode *skeletal_list = NULL;
   init_dfa = force_dfa (&tree, &tree_pool, /* The tree and its allocator */
                         &skeletal_list,    /* list of skeletal DFA_Nodes */
                         &final_pool,       /* Allocator for DFA_Nodes */
                         n_entries, init_states,
                         entries);
 
-  unsigned nfa_state_pad_size = 16;
-  struct NFA_State **nfa_state_pad;
   nfa_state_pad = dsk_malloc (sizeof (struct NFA_State *) * nfa_state_pad_size);
 
   while (skeletal_list != NULL)
     {
-      /* Remove from skeletal_list */
-      struct DFA_TreeNode *to_flesh_out = skeletal_list;
-      skeletal_list = skeletal_list->next_skeletal;
 
       /* TODO: optimize this for a lot of common cases:
           '.', single-chars, single-case */
       struct DFA_State *char_nodes[256];
 
       struct DFA_State_Range ranges[256];     /* need fewer, i think */
+      unsigned n_ranges;
+      unsigned o = 0;
+
+      /* Remove from skeletal_list */
+      struct DFA_TreeNode *to_flesh_out = skeletal_list;
+      skeletal_list = skeletal_list->next_skeletal;
+
       for (i = 1; i < 256; i++)
         {
           unsigned n_nfa_states = 0;
@@ -1507,7 +1522,6 @@ DskPattern *dsk_pattern_compile (unsigned n_entries,
 
 
       /* Compress char_nodes into a sequence of ranges */
-      unsigned n_ranges;
       n_ranges = 0;
       for (i = 1; i < 256;    )
         if (char_nodes[i] != NULL)
@@ -1524,21 +1538,20 @@ DskPattern *dsk_pattern_compile (unsigned n_entries,
           }
         else
           i++;
-      unsigned o = 0;
       for (i = 0; i < n_ranges; )
         {
           if (ranges[i].n == 1 && i + 1 < n_ranges && ranges[i+1].n == 1
            && ranges[i+1].start == ranges[i].start + 1)
             {
+              struct DFA_State **nonconstant;
               unsigned n = 1;
+              unsigned j;
               while (i + n < n_ranges && ranges[i+n].n == 1
                      && ranges[i+n].start == ranges[i].start + n)
                 n++;
               
               dsk_assert (n >= 2);
-              struct DFA_State **nonconstant;
               nonconstant = dsk_mem_pool_alloc (&final_pool, sizeof (struct DFA_State *) * n);
-              unsigned j;
               for (j = 0; j < n; j++)
                 nonconstant[j] = ranges[i+j].info.constant;
               ranges[o].is_constant = 0;
@@ -1568,7 +1581,7 @@ DskPattern *dsk_pattern_compile (unsigned n_entries,
   dsk_mem_pool_clear (&tree_pool);
   dsk_free (nfa_state_pad);
 
-  DskPattern *rv = dsk_malloc (sizeof (DskPattern));
+  rv = dsk_malloc (sizeof (DskPattern));
   rv->state_pool = final_pool;
   rv->init_state = init_dfa;
   return rv;

@@ -64,6 +64,8 @@ load_valid_xml (const char *str,
       DskXmlParser *parser = dsk_xml_parser_new (config, NULL);
       const char *str_at = str;
       unsigned rem = str_length;
+      DskXml *xml;
+      DskXml *second_xml;
       dsk_assert (parser);
       //dsk_warning ("starting with new pattern");
       while (rem != 0)
@@ -78,9 +80,9 @@ load_valid_xml (const char *str,
               str_at += use;
             }
         }
-      DskXml *xml = dsk_xml_parser_pop (parser, NULL);
+      xml = dsk_xml_parser_pop (parser, NULL);
       dsk_assert (xml != NULL);
-      DskXml *second_xml = dsk_xml_parser_pop (parser, NULL);
+      second_xml = dsk_xml_parser_pop (parser, NULL);
       dsk_assert (second_xml == NULL);
       if (start_pattern == patterns)
         rv = xml;
@@ -105,12 +107,13 @@ test_simple_0 (void)
 {
   char *empty = "*";
   DskError *error = NULL;
+  DskXml *xml;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  DskXml *xml = load_valid_xml ("<abc>tmp</abc>", config);
+  xml = load_valid_xml ("<abc>tmp</abc>", config);
   dsk_assert (xml->type == DSK_XML_ELEMENT);
   dsk_assert (strcmp (xml->str, "abc") == 0);
   dsk_assert (xml->n_children == 1);
@@ -128,12 +131,12 @@ test_simple_attrs_0 (void)
                                     "<abc a='b'>tmp</abc>"};
 
   DskError *error = NULL;
+  unsigned i;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  unsigned i;
   for (i = 0; i < 2; i++)
     {
       DskXml *xml;
@@ -156,12 +159,12 @@ test_simple_attrs_1 (void)
                                     "<abc a='b' cc=\"dd\">tmp</abc>"};
 
   DskError *error = NULL;
+  unsigned i;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  unsigned i;
   for (i = 0; i < 2; i++)
     {
       DskXml *xml;
@@ -186,12 +189,12 @@ test_simple_attrs_2 (void)
                                     "<abc a='b' cc=\"d  d\">tmp</abc>"};
 
   DskError *error = NULL;
+  unsigned i;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  unsigned i;
   for (i = 0; i < 2; i++)
     {
       DskXml *xml;
@@ -213,12 +216,12 @@ test_simple_tree (void)
 {
   char *empty = "*";
   DskError *error = NULL;
+  DskXml *xml;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  DskXml *xml;
   xml = load_valid_xml ("<abc><a><b>cc</b><b>dd</b></a><foo>q</foo></abc>", config);
 
   dsk_assert (is_element (xml, "abc"));
@@ -248,12 +251,12 @@ test_simple_comment (void)
   };
 
   DskError *error = NULL;
+  unsigned i;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  unsigned i;
   for (i = 0; i < sizeof(xml_texts)/sizeof(xml_texts[0]); i++)
     {
       DskXml *xml;
@@ -287,12 +290,12 @@ test_simple_comment_handling (void)
   };
 
   DskError *error = NULL;
+  unsigned i;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (DSK_XML_PARSER_INCLUDE_COMMENTS, 0, NULL,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  unsigned i;
   for (i = 0; i < sizeof(xml_texts)/sizeof(xml_texts[0]); i++)
     {
       DskXml *xml;
@@ -359,12 +362,12 @@ test_empty_element (void)
                                     "<abc a='b' cc=\"dd\" ></abc>"};
 
   DskError *error = NULL;
+  unsigned i;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  unsigned i;
   for (i = 0; i < 3; i++)
     {
       DskXml *xml;
@@ -386,11 +389,6 @@ test_standard_char_entities (void)
 {
   char *empty = "*";
   DskError *error = NULL;
-  DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
-                                                          1, &empty,
-                                                          &error);
-  if (config == NULL)
-    dsk_die ("error creating parser-config: %s", error->message);
   static struct {
     const char *xml_str;
     const char *center_str;
@@ -403,6 +401,11 @@ test_standard_char_entities (void)
     { "<abc>what&apos;s up?</abc>", "what's up?" },
   };
   unsigned i;
+  DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 0, NULL,
+                                                          1, &empty,
+                                                          &error);
+  if (config == NULL)
+    dsk_die ("error creating parser-config: %s", error->message);
   for (i = 0; i < DSK_N_ELEMENTS (xml_char_tests); i++)
     {
       DskXml *xml = load_valid_xml (xml_char_tests[i].xml_str, config);
@@ -545,12 +548,12 @@ static void test_ns_simple_0 (void)
   };
 
   DskError *error = NULL;
+  unsigned i;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 1, ns_config,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  unsigned i;
   for (i = 0; i < sizeof(xml_texts)/sizeof(xml_texts[0]); i++)
     {
       DskXml *xml;
@@ -580,12 +583,12 @@ static void test_ns_simple_1 (void)
   };
 
   DskError *error = NULL;
+  unsigned i;
   DskXmlParserConfig *config = dsk_xml_parser_config_new (0, 2, ns_config,
                                                           1, &empty,
                                                           &error);
   if (config == NULL)
     dsk_die ("error creating parser-config: %s", error->message);
-  unsigned i;
   for (i = 0; i < sizeof(xml_texts)/sizeof(xml_texts[0]); i++)
     {
       DskXml *xml;

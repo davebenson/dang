@@ -145,8 +145,8 @@ DSK_CMDLINE_CALLBACK_DECLARE(handle_c_quote)
 }
 DSK_CMDLINE_CALLBACK_DECLARE(handle_c_unquote)
 {
-  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (error);
   dsk_boolean remove_quotes = DSK_TRUE;
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data); DSK_UNUSED (error);
   if (arg_value)
     {
       uint8_t flags[2];
@@ -292,8 +292,8 @@ parse_byte_spec (const char *spec, uint8_t *out, DskError **error)
 
 DSK_CMDLINE_CALLBACK_DECLARE(handle_byte_doubler)
 {
-  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data);
   uint8_t byte;
+  DSK_UNUSED (arg_name); DSK_UNUSED (callback_data);
 
   /* parse byte */
   if (!parse_byte_spec (arg_value, &byte, error))
@@ -341,6 +341,8 @@ int main(int argc, char **argv)
 {
   DskError *error = NULL;
   DskOctetFilter *filter;
+  DskBuffer in = DSK_BUFFER_STATIC_INIT;
+  DskBuffer out = DSK_BUFFER_STATIC_INIT;
   dsk_cmdline_init ("run various filters",
                     "Run a chain of DskOctetFilters, mostly useful for testing.\n",
                     NULL, 0);
@@ -387,8 +389,6 @@ int main(int argc, char **argv)
                         handle_xml_escape, NULL);
   dsk_cmdline_process_args (&argc, &argv);
 
-  DskBuffer in = DSK_BUFFER_STATIC_INIT;
-  DskBuffer out = DSK_BUFFER_STATIC_INIT;
 
   filter = dsk_octet_filter_chain_new_take (n_filters, filters);
   for (;;)

@@ -59,6 +59,7 @@ int main(int argc, char **argv)
 {
   char buf[8192];
   int lineno = 0;
+  FILE *fp;
 
   dsk_cmdline_init ("test octet filters",
                     "Test the various Octet Filters",
@@ -69,7 +70,7 @@ int main(int argc, char **argv)
                            (char**) &cmdline_filename);
   dsk_cmdline_process_args (&argc, &argv);
 
-  FILE *fp = fopen (cmdline_filename, "r");
+  fp = fopen (cmdline_filename, "r");
   if (fp == NULL)
     dsk_die ("error opening %s: %s", cmdline_filename, strerror (errno));
   while (fgets (buf, sizeof (buf), fp) != NULL)
@@ -77,6 +78,18 @@ int main(int argc, char **argv)
       const char *at = buf;
       char *nl = strchr (buf, '\n');
       unsigned test_lineno = ++lineno;
+      unsigned input_len;
+      uint8_t *input_data;
+      unsigned filter_len;
+      uint8_t *filter_data;
+      unsigned output_len;
+      uint8_t *output_data;
+      DskOctetFilter *filter;
+      DskBuffer output_buffer;
+      unsigned i;
+      DskError *error = NULL;
+      uint8_t *tmp;
+
       while (dsk_ascii_isspace (*at))
 	at++;
       if (*at == 0 || *at == '#')
@@ -85,8 +98,6 @@ int main(int argc, char **argv)
         *nl = 0;
       if (strncmp (at, "input=", 6) != 0)
         dsk_die ("expected 'input='");
-      unsigned input_len;
-      uint8_t *input_data;
       dequote (at+6, lineno, &input_len, &input_data);
 
       ++lineno;
@@ -97,8 +108,6 @@ int main(int argc, char **argv)
       nl = strchr (buf, '\n');
       if (nl)
         *nl = 0;
-      unsigned filter_len;
-      uint8_t *filter_data;
       dequote (at+7, lineno, &filter_len, &filter_data);
 
       ++lineno;
@@ -109,15 +118,7 @@ int main(int argc, char **argv)
       nl = strchr (buf, '\n');
       if (nl)
         *nl = 0;
-      unsigned output_len;
-      uint8_t *output_data;
       dequote (at+7, lineno, &output_len, &output_data);
-
-      DskOctetFilter *filter;
-      DskBuffer output_buffer;
-      unsigned i;
-      DskError *error = NULL;
-      uint8_t *tmp;
 
       /* feed data in byte-by-byte */
       filter = create_filter ((char*) filter_data);
