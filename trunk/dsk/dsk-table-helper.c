@@ -1,5 +1,6 @@
 #define _ATFILE_SOURCE
 #define _XOPEN_SOURCE 700
+#define _ATFILE_SOURCE
 
 #include <sys/stat.h>
 #include <string.h>

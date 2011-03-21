@@ -399,6 +399,8 @@ dsk_json_parser_feed     (DskJsonParser *parser,
         case JSON_LEX_STATE_INIT:
           while (n_bytes > 0 && dsk_ascii_isspace (*bytes))
             {
+              if (*bytes == '\n')
+                parser->line_no++;
               bytes++;
               n_bytes--;
             }
@@ -562,6 +564,7 @@ dsk_json_parser_feed     (DskJsonParser *parser,
                 WRITE_BS_CHAR_CASE('r', '\r');
                 WRITE_BS_CHAR_CASE('t', '\t');
                 WRITE_BS_CHAR_CASE('/', '/');
+                WRITE_BS_CHAR_CASE('"', '"');
                 WRITE_BS_CHAR_CASE('\\', '\\');
 #undef WRITE_BS_CHAR_CASE
                 case 'u':
