@@ -14,6 +14,8 @@
 #include <sys/file.h>
 #include "dsk-table-helper.h"
 
+/* AUDIT: n_entries versus entry_count (make sure we have it right all over) */
+
 #define DSK_TABLE_CPDATA_MAGIC   0xf423514e
 
 /* Checkpointing/journalling Algorithm:
@@ -108,7 +110,10 @@ struct _DskTable
   int dir_fd;
   DskTableFileInterface *file_interface;
   DskTableCheckpointInterface *cp_interface;
+
   DskTableCheckpoint *cp;
+  unsigned cp_n_entries;
+  unsigned cp_flush_period;
 
   DskTableBuffer merge_buffers[2];
   uint64_t next_id;
@@ -203,18 +208,14 @@ set_node_value (DskTable      *table,
   node->value_length = length;
 }
 
-static dsk_boolean
-handle_checkpoint_replay_element (unsigned            key_length,
-                                  const uint8_t      *key_data,
-                                  unsigned            value_length,
-                                  const uint8_t      *value_data,
-                                  void               *replay_data,
-                                  DskError          **error)
+static void
+add_to_tree (DskTable           *table,
+             unsigned            key_length,
+             const uint8_t      *key_data,
+             unsigned            value_length,
+             const uint8_t      *value_data)
 {
-  DskTable *table = replay_data;
   TreeNode *node = lookup_tree_node (table, key_length, key_data);
-
-  (void) error;
 
   if (node == NULL)
     {
@@ -264,6 +265,19 @@ handle_checkpoint_replay_element (unsigned            key_length,
           break;
         }
     }
+}
+static dsk_boolean
+handle_checkpoint_replay_element (unsigned            key_length,
+                                  const uint8_t      *key_data,
+                                  unsigned            value_length,
+                                  const uint8_t      *value_data,
+                                  void               *replay_data,
+                                  DskError          **error)
+{
+  DskTable *table = replay_data;
+  DSK_UNUSED (error);
+  add_to_tree (table, key_length, key_data, value_length, value_data);
+  table->cp_n_entries += 1;
   return DSK_TRUE;
 }
 
@@ -454,7 +468,9 @@ maybe_start_merge_jobs (DskTable *table,
       if (best == NULL)
         return DSK_TRUE;
 
-      ...
+      /* TODO: make this tunable */
+      if (best->actual_entry_count_ratio_log2_b10 > 1024)
+        break;
 
       if (start_merge_job (table, best, error) == NULL)
         return DSK_FALSE;
@@ -504,6 +520,8 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
   rv.file_interface = config->file_interface;
 
   rv.cp_interface = config->cp_interface;
+  rv.cp_n_entries = 0;
+  rv.cp_flush_period = 1024;
   if (is_new)
     {
       /* create initial empty checkpoint */
@@ -559,7 +577,11 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
   {
     DskTable *table;
     table = dsk_memdup (sizeof (rv), &rv);
-    maybe_start_merge_jobs (table);
+    if (!maybe_start_merge_jobs (table, error))
+      {
+        dsk_table_destroy (table);
+        return NULL;
+      }
     return table;
   }
 
@@ -577,63 +599,51 @@ cp_open_failed:
   return NULL;
 }
 
-
-/* *res_index_inout is -1 if no result has been located yet.
-   it may be 0 or 1 depending on which merge_buffer has the result.
+/* Returns:
+     -1 if the key is before the range we are searching for.
+      0 if the key is in the range we are searching for.
+     +1 if the key is after the range we are searching for.
  */
-static dsk_boolean
-do_file_lookup (DskTable    *table,
-                File        *file,
-                unsigned     key_length,
-                const uint8_t *key_data,
-                int         *res_index_inout,
-                dsk_boolean *is_done_out,
-                dsk_boolean  is_final,
-                DskError   **error)
+typedef struct _FindInfo FindInfo;
+struct _FindInfo
 {
-  DskError *e = NULL;
-  unsigned value_len;
-  const uint8_t *value_data;
-  if (file->seeker == NULL)
-    {
-      DskTableFileInterface *iface = table->file_interface;
-      set_table_file_basename (table, file->id);
-      file->seeker = iface->new_seeker (iface,
-                                        table->dir, table->dir_fd,
-                                        table->basename,
-                                        error);
-      if (file->seeker == NULL)
-        return DSK_FALSE;
-    }
-  if (!seeker->find (seeker, seeker_find_function, table,
-                     DSK_TABLE_FILE_FIND_ANY,
-                     NULL, NULL, &value_len, &value_data,
-                     &e))
-    {
-      if (e)
-        {
-          if (error)
-            *error = e;
-          else
-            dsk_error_unref (e);
-          return DSK_FALSE;
-        }
-      return DSK_TRUE;
-    }
+  DskTable *table;
+  unsigned search_length;
+  const uint8_t *search_data;
+};
 
+static int seeker_find_function (unsigned           key_len,
+                                 const uint8_t     *key_data,
+                                 void              *user_data)
+{
+  FindInfo *info = user_data;
+  DskTable *table = info->table;
+  return table->compare (key_len, key_data, info->search_length, info->search_data, table->compare_data);
+}
+
+static void
+lookup_do_merge_or_set (DskTable *table,
+                        unsigned     key_length,
+                        const uint8_t *key_data,
+                        unsigned     value_length,
+                        const uint8_t *value_data,
+                        int      *res_index_inout,
+                        dsk_boolean *is_done_out,
+                        dsk_boolean  is_final)
+{
   if (*res_index_inout < 0)
     {
       *res_index_inout = 0;
       memcpy (dsk_table_buffer_set_size (&table->merge_buffers[0],
-                                         value_len),
+                                         value_length),
               value_data,
-              value_len);
+              value_length);
     }
   else
     {
-      unsigned a_len = value_len;
+      unsigned a_len = value_length;
       const uint8_t *a_data = value_data;
-      DskTableMergeBuffer *res = &table->merge_buffers[*res_index_inout];
+      DskTableBuffer *res = &table->merge_buffers[*res_index_inout];
       unsigned b_len = res->length;
       const uint8_t *b_data = res->data;
       dsk_boolean is_correct;
@@ -666,21 +676,92 @@ do_file_lookup (DskTable    *table,
         case DSK_TABLE_MERGE_RETURN_BUFFER_FINAL:
           *res_index_inout = 1 - *res_index_inout;
           *is_done_out = DSK_TRUE;
-          return DSK_TRUE;
+          return;
         case DSK_TABLE_MERGE_RETURN_BUFFER:
           *res_index_inout = 1 - *res_index_inout;
-          return DSK_TRUE;
+          return;
         case DSK_TABLE_MERGE_DROP:
           *res_index_inout = -1;
-          return DSK_TRUE;
+          return;
         }
       if (!is_correct)
         {
-          memcpy (dsk_table_buffer_set_size (res, value_len),
-                  value_data, value_len);
+          memcpy (dsk_table_buffer_set_size (res, value_length),
+                  value_data, value_length);
         }
     }
+}
+
+/* *res_index_inout is -1 if no result has been located yet.
+   it may be 0 or 1 depending on which merge_buffer has the result.
+ */
+static dsk_boolean
+do_file_lookup (DskTable    *table,
+                File        *file,
+                unsigned     key_length,
+                const uint8_t *key_data,
+                int         *res_index_inout,
+                dsk_boolean *is_done_out,
+                dsk_boolean  is_final,
+                DskError   **error)
+{
+  DskError *e = NULL;
+  unsigned value_length;
+  const uint8_t *value_data;
+  DskTableFileSeeker *seeker;
+  FindInfo find_info = { table, key_length, key_data };
+  if (file->seeker == NULL)
+    {
+      DskTableFileInterface *iface = table->file_interface;
+      set_table_file_basename (table, file->id);
+      file->seeker = iface->new_seeker (iface,
+                                        table->dir, table->dir_fd,
+                                        table->basename,
+                                        error);
+      if (file->seeker == NULL)
+        return DSK_FALSE;
+    }
+  seeker = file->seeker;
+  if (!seeker->find (seeker, seeker_find_function, &find_info,
+                     DSK_TABLE_FILE_FIND_ANY,
+                     NULL, NULL, &value_length, &value_data,
+                     &e))
+    {
+      if (e)
+        {
+          if (error)
+            *error = e;
+          else
+            dsk_error_unref (e);
+          return DSK_FALSE;
+        }
+      return DSK_TRUE;
+    }
+
+  lookup_do_merge_or_set (table,
+                          key_length, key_data,
+                          value_length, value_data,
+                          res_index_inout, is_done_out, is_final);
   return DSK_TRUE;
+}
+
+static void
+do_tree_lookup (DskTable *table,
+                unsigned        key_length,
+                const uint8_t  *key_data,
+                int      *res_index_inout,
+                dsk_boolean *is_done_out,
+                dsk_boolean  is_final)
+{
+  TreeNode *node = lookup_tree_node (table, key_length, key_data);
+  if (node == NULL)
+    return;
+
+  lookup_do_merge_or_set (table,
+                          key_length, key_data,
+                          node->value_length,
+                          (const uint8_t*)(node+1) + node->key_length,
+                          res_index_inout, is_done_out, is_final);
 }
 
 dsk_boolean
@@ -699,20 +780,26 @@ dsk_table_lookup       (DskTable       *table,
       File *file = table->oldest_file;
       while (!is_done && file != NULL)
         {
-          if (!do_file_lookup (table, file, &res_index, &is_done, DSK_FALSE, error))
+          if (!do_file_lookup (table, file,
+                               key_len, key_data,
+                               &res_index, &is_done, DSK_FALSE,
+                               error))
             return DSK_FALSE;
           file = file->next;
         }
       if (!is_done)
-        do_tree_lookup (table, &res_index, &is_done, error);
+        do_tree_lookup (table, key_len, key_data, &res_index, &is_done, DSK_TRUE);
     }
   else
     {
       File *file = table->newest_file;
-      do_tree_lookup (table, &res_index, &is_done, error);
+      do_tree_lookup (table, key_len, key_data, &res_index, &is_done, DSK_FALSE);
       while (!is_done && file != NULL)
         {
-          if (!do_file_lookup (table, file, &res_index, &is_done, file->prev == NULL, error))
+          if (!do_file_lookup (table, file,
+                               key_len, key_data,
+                               &res_index, &is_done, file->prev == NULL,
+                               error))
             return DSK_FALSE;
           file = file->prev;
         }
@@ -728,20 +815,25 @@ dsk_table_lookup       (DskTable       *table,
 
 dsk_boolean
 dsk_table_insert       (DskTable       *table,
-                        unsigned        key_len,
+                        unsigned        key_length,
                         const uint8_t  *key_data,
-                        unsigned        value_len,
+                        unsigned        value_length,
                         const uint8_t  *value_data,
                         DskError      **error)
 {
   /* add to tree */
-  add_to_tree (table, key_len, key_data, value_length, value_data);
+  add_to_tree (table, key_length, key_data, value_length, value_data);
 
   /* add to checkpoint */
-  ...
+  if (!table->cp->add (table->cp,
+                       key_length, key_data,
+                       value_length, value_data,
+                       error))
+    return DSK_FALSE;
+  table->cp_n_entries++;
 
   /* maybe flush tree, creating new checkpoint */
-  if (table->cp_n_entries == table->flush_period)
+  if (table->cp_n_entries >= table->cp_flush_period)
     {
       /* write tree to disk */
       ...
@@ -778,6 +870,11 @@ dsk_table_insert       (DskTable       *table,
       n_processed++;
     }
   return DSK_TRUE;
+}
+
+DskTableReader *dsk_table_new_reader (DskTable    *table)
+{
+  ...
 }
 
 void        dsk_table_destroy      (DskTable       *table)
