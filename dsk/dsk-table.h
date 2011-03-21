@@ -1,11 +1,18 @@
 
-typedef struct _DskTableMergeBuffer DskTableMergeBuffer;
-struct _DskTableMergeBuffer
+typedef struct _DskTableCheckpointInterface DskTableCheckpointInterface;
+typedef struct _DskTableFileInterface DskTableFileInterface;
+typedef struct _DskTable DskTable;
+
+typedef struct _DskTableBuffer DskTableBuffer;
+struct _DskTableBuffer
 {
-  unsigned len;
+  unsigned length;
   uint8_t *data;
   unsigned alloced;
 };
+DSK_INLINE_FUNC uint8_t *
+dsk_table_buffer_set_size (DskTableBuffer *buffer,
+                           unsigned        length);
 
 typedef enum
 {
@@ -24,7 +31,7 @@ typedef DskTableMergeResult (*DskTableMergeFunc)  (unsigned       key_len,
                                                    const uint8_t *a_data,
                                                    unsigned       b_len,
                                                    const uint8_t *b_data,
-						   DskTableMergeBuffer *buffer,
+						   DskTableBuffer *buffer,
 						   dsk_boolean    complete,
 						   void          *merge_data);
 typedef int                 (*DskTableCompareFunc)(unsigned       key_a_len,
@@ -33,6 +40,7 @@ typedef int                 (*DskTableCompareFunc)(unsigned       key_a_len,
                                                    const uint8_t *key_b_data,
 						   void          *compare_data);
   
+typedef struct _DskTableConfig DskTableConfig;
 struct _DskTableConfig
 {
   DskTableCompareFunc compare;
@@ -42,6 +50,7 @@ struct _DskTableConfig
   dsk_boolean chronological_lookup_merges;
   const char *dir;
   DskTableFileInterface *file_interface;
+  DskTableCheckpointInterface *cp_interface;
 };
 
 DskTable   *dsk_table_new          (DskTableConfig *config,
@@ -61,5 +70,39 @@ dsk_boolean dsk_table_insert       (DskTable       *table,
 void        dsk_table_destroy      (DskTable       *table);
 void        dsk_table_destroy_erase(DskTable       *table);
 
+typedef struct _DskTableReader DskTableReader;
+struct _DskTableReader
+{
+  /* Readonly public data */
+  dsk_boolean at_eof;
+  unsigned key_length;
+  unsigned value_length;
+  const uint8_t *key_data;
+  const uint8_t *value_data;
+
+  /* Virtual functions */
+  dsk_boolean (*advance)     (DskTableReader *reader,
+                              DskError      **error);
+  void        (*destroy)     (DskTableReader *reader);
+};
+
 DskTableReader  *dsk_table_dump    (DskTable       *table);
 //DskTableReader  *dsk_table_dump_range    (DskTable       *table, ...);
+
+#if DSK_CAN_INLINE || defined(DSK_IMPLEMENT_INLINES)
+DSK_INLINE_FUNC uint8_t *
+dsk_table_buffer_set_size (DskTableBuffer *buffer,
+                           unsigned        length)
+{
+  if (buffer->alloced < length)
+    {
+      unsigned alloced = buffer->alloced == 0 ? 16 : (buffer->alloced * 2);
+      while (alloced < length)
+        alloced *= 2;
+      buffer->data = dsk_realloc (buffer->data, alloced);
+      buffer->alloced = alloced;
+    }
+  buffer->length = length;
+  return buffer->data;
+}
+#endif

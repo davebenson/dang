@@ -1,8 +1,6 @@
 
 typedef struct _DskTableFileWriter DskTableFileWriter;
-typedef struct _DskTableFileReader DskTableFileReader;
 typedef struct _DskTableFileSeeker DskTableFileSeeker;
-typedef struct _DskTableFileInterface DskTableFileInterface;
 typedef struct _DskTableFileCompressor DskTableFileCompressor;
 
 struct _DskTableFileWriter
@@ -16,21 +14,6 @@ struct _DskTableFileWriter
   dsk_boolean (*close)  (DskTableFileWriter *writer,
                          DskError          **error);
   void        (*destroy)(DskTableFileWriter *writer);
-};
-
-struct _DskTableFileReader
-{
-  /* Readonly public data */
-  dsk_boolean at_eof;
-  unsigned key_length;
-  unsigned value_length;
-  const uint8_t *key_data;
-  const uint8_t *value_data;
-
-  /* Virtual functions */
-  dsk_boolean (*advance)     (DskTableFileReader *reader,
-                              DskError          **error);
-  void        (*destroy)     (DskTableFileReader *reader);
 };
 
 /* Returns:
@@ -61,7 +44,7 @@ struct _DskTableFileSeeker
                             DskError             **error);
  
  
-  DskTableFileReader *
+  DskTableReader *
              (*find_reader)(DskTableFileSeeker    *seeker,
                             DskTableSeekerFindFunc func,
                             void                  *func_data,
@@ -75,7 +58,7 @@ struct _DskTableFileSeeker
                             const void           **value_data_out,
                             DskError             **error);
  
-  DskTableFileReader *
+  DskTableReader *
             (*index_reader)(DskTableFileSeeker    *seeker,
                             uint64_t               index,
                             DskError             **error);
@@ -93,7 +76,7 @@ struct _DskTableFileInterface
                                      int                      openat_fd,
                                      const char              *base_filename,
                                      DskError               **error);
-  DskTableFileReader *(*new_reader) (DskTableFileInterface   *iface,
+  DskTableReader     *(*new_reader) (DskTableFileInterface   *iface,
                                      const char              *openat_dir,
                                      int                      openat_fd,
                                      const char              *base_filename,
