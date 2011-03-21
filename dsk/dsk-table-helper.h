@@ -6,6 +6,11 @@ int dsk_table_helper_openat (const char *openat_dir,
                              unsigned    open_flags,
                              unsigned    open_mode,
                              DskError  **error);
+int dsk_table_helper_renameat (const char *openat_dir,
+                               int openat_fd,
+                               const char *old_name,
+                               const char *new_name,
+                               DskError  **error);
 int dsk_table_helper_pread  (int fd,
                              void *buf,
                              size_t len,

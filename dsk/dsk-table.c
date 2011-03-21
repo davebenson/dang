@@ -112,6 +112,7 @@ struct _DskTable
   DskTableCheckpointInterface *cp_interface;
 
   DskTableCheckpoint *cp;
+  uint64_t cp_first_entry_index;
   unsigned cp_n_entries;
   unsigned cp_flush_period;
 
@@ -129,6 +130,7 @@ struct _DskTable
 
   /* small in-memory tree for fast lookups on the most recent values */
   TreeNode *small_tree;
+  unsigned tree_size;
 
   PossibleMerge *possible_merge_tree;
 
@@ -228,6 +230,7 @@ add_to_tree (DskTable           *table,
       node->value_length = value_length;
       node->value_alloced = value_alloced;
       GSK_RBTREE_INSERT (GET_SMALL_TREE (), node, conflict);
+      table->tree_size += 1;
       dsk_assert (conflict == NULL);
     }
   else
@@ -261,6 +264,7 @@ add_to_tree (DskTable           *table,
 
         case DSK_TABLE_MERGE_DROP:
           GSK_RBTREE_REMOVE (GET_SMALL_TREE (), node);
+          table->tree_size -= 1;
           dsk_free (node);
           break;
         }
@@ -406,6 +410,62 @@ parse_checkpoint_data (DskTable *table,
 }
 
 static void
+write_uint32_le (uint8_t *data, uint32_t value)
+{
+#if BYTE_ORDER == LITTLE_ENDIAN
+  memcpy (data, &value, 4);
+#else
+  data[0] = value;
+  data[1] = value >> 8;
+  data[2] = value >> 16;
+  data[3] = value >> 24;
+#endif
+}
+static void
+write_uint64_le (uint8_t *data, uint64_t value)
+{
+#if BYTE_ORDER == LITTLE_ENDIAN
+  memcpy (data, &value, 8);
+#else
+  uint32_t lo = value;
+  uint32_t hi = (value>>32);
+  write_uint32_le (data, lo);
+  write_uint32_le (data+4, hi);
+#endif
+}
+
+static void
+make_checkpoint_state (DskTable *table, 
+                       unsigned *cp_data_len_out, 
+                       uint8_t **cp_data_out)
+{
+  File *file;
+  unsigned n_files = 0;
+  unsigned size;
+  uint8_t *cp;
+  uint8_t *at;
+  for (file = table->oldest_file; file != NULL; file = file->next)
+    n_files++;
+
+  size = 8 + 32 * n_files;
+  cp = dsk_malloc (size);
+  write_uint32_le (cp + 0, DSK_TABLE_CPDATA_MAGIC);
+  write_uint32_le (cp + 4, 0);          /* version */
+  at = cp + 8;
+  for (file = table->oldest_file; file != NULL; file = file->next)
+    {
+      write_uint64_le (at, file->id);
+      write_uint64_le (at + 8, file->first_entry_index);
+      write_uint64_le (at + 16, file->n_entries);
+      write_uint64_le (at + 24, file->entry_count);
+      at += 32;
+    }
+  *cp_data_len_out = size;
+  *cp_data_out = cp;
+}
+
+
+static void
 kill_possible_merge (DskTable *table,
                      PossibleMerge *possible)
 {
@@ -521,6 +581,7 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
 
   rv.cp_interface = config->cp_interface;
   rv.cp_n_entries = 0;
+  rv.cp_first_entry_index = 0;
   rv.cp_flush_period = 1024;
   if (is_new)
     {
@@ -571,6 +632,8 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
           for (file = rv.oldest_file; file->next != NULL; file = file->next)
             create_possible_merge (&rv, file);
         }
+      if (rv.newest_file)
+        rv.cp_first_entry_index = rv.newest_file->first_entry_index + rv.newest_file->n_entries;
     }
 
   /* Stuff which requires having the real Table pointer */
@@ -813,6 +876,27 @@ dsk_table_lookup       (DskTable       *table,
   return DSK_TRUE;
 }
 
+static dsk_boolean
+dump_tree_to_writer (DskTableFileWriter *writer,
+                     TreeNode           *at,
+                     DskError          **error)
+{
+  const uint8_t *key = (const uint8_t *) (at + 1);
+  if (at->left)
+    {
+      if (!dump_tree_to_writer (writer, at->left, error))
+        return DSK_FALSE;
+    }
+  if (!writer->write(writer, at->key_length, key, at->value_length, key + at->key_length, error))
+    return DSK_FALSE;
+  if (at->right)
+    {
+      if (!dump_tree_to_writer (writer, at->right, error))
+        return DSK_FALSE;
+    }
+  return DSK_TRUE;
+}
+
 dsk_boolean
 dsk_table_insert       (DskTable       *table,
                         unsigned        key_length,
@@ -836,18 +920,68 @@ dsk_table_insert       (DskTable       *table,
   if (table->cp_n_entries >= table->cp_flush_period)
     {
       /* write tree to disk */
-      ...
+      DskTableFileWriter *writer;
+      uint64_t id = table->next_id++;
+      File *file;
+      DskTableCheckpoint *new_cp;
+      unsigned cp_data_len;
+      uint8_t *cp_data;
+      set_table_file_basename (table, id);
+      writer = table->file_interface->new_writer (table->file_interface,
+                                                  table->dir, table->dir_fd,
+                                                  table->basename, error);
+      if (writer == NULL)
+        return DSK_FALSE;
+      if (!dump_tree_to_writer (writer, table->small_tree, error))
+        {
+          writer->destroy (writer);
+          return DSK_FALSE;
+        }
+      if (!writer->close (writer, error))
+        {
+          writer->destroy (writer);
+          return DSK_FALSE;
+        }
+      writer->destroy (writer);
+      file = dsk_malloc (sizeof (File));
+      file->id = id;
+      file->seeker = NULL;
+      file->first_entry_index = table->cp_first_entry_index;
+      file->n_entries = table->cp_n_entries;
+      file->entry_count = table->tree_size;
+      file->merge = NULL;
+      file->prev_merge = file->next_merge = NULL;
+      GSK_LIST_APPEND (GET_FILE_LIST (), file);
+      if (file->prev)
+        create_possible_merge (table, file->prev);
+
+      free_small_tree_recursive (table->small_tree);
+      table->small_tree = NULL;
+      table->tree_size = 0;
+      table->cp_first_entry_index += table->cp_n_entries;
+      table->cp_n_entries = 0;
 
       /* create new checkpoint */
-      ...
+      make_checkpoint_state (table, &cp_data_len, &cp_data);
+      new_cp = table->cp_interface->create (table->cp_interface,
+                                            table->dir, table->dir_fd,
+                                            "NEW_CP",
+                                            cp_data_len, cp_data,
+                                            error);
+      if (new_cp == NULL)
+        {
+          return DSK_FALSE;
+        }
 
       /* destroy old checkpoint */
-      ...
+      table->cp->destroy (table->cp);
+      table->cp = new_cp;
 
       /* move new checkpoint into place (atomic) */
-      ...
-
-      table->cp_n_entries = 0;
+      if (!dsk_table_helper_renameat (table->dir, table->dir_fd, "NEW_CP", "CP", error))
+        {
+          ...
+        }
     }
 
   /* work on any running merge jobs */
