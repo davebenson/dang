@@ -25,18 +25,18 @@ typedef enum
   DSK_TABLE_MERGE_DROP
 } DskTableMergeResult;
 
-typedef DskTableMergeResult (*DskTableMergeFunc)  (unsigned       key_len,
+typedef DskTableMergeResult (*DskTableMergeFunc)  (unsigned       key_length,
                                                    const uint8_t *key_data,
-                                                   unsigned       a_len,
+                                                   unsigned       a_length,
                                                    const uint8_t *a_data,
-                                                   unsigned       b_len,
+                                                   unsigned       b_length,
                                                    const uint8_t *b_data,
 						   DskTableBuffer *buffer,
 						   dsk_boolean    complete,
 						   void          *merge_data);
-typedef int                 (*DskTableCompareFunc)(unsigned       key_a_len,
+typedef int                 (*DskTableCompareFunc)(unsigned       key_a_length,
                                                    const uint8_t *key_a_data,
-                                                   unsigned       key_b_len,
+                                                   unsigned       key_b_length,
                                                    const uint8_t *key_b_data,
 						   void          *compare_data);
   
@@ -56,15 +56,15 @@ struct _DskTableConfig
 DskTable   *dsk_table_new          (DskTableConfig *config,
                                     DskError      **error);
 dsk_boolean dsk_table_lookup       (DskTable       *table,
-                                    unsigned        key_len,
+                                    unsigned        key_length,
                                     const uint8_t  *key_data,
                                     unsigned       *value_len_out,
                                     const uint8_t **value_data_out,
                                     DskError      **error);
 dsk_boolean dsk_table_insert       (DskTable       *table,
-                                    unsigned        key_len,
+                                    unsigned        key_length,
                                     const uint8_t  *key_data,
-                                    unsigned        value_len,
+                                    unsigned        value_length,
                                     const uint8_t  *value_data,
                                     DskError      **error);
 void        dsk_table_destroy      (DskTable       *table);
