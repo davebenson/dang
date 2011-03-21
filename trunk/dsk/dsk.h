@@ -65,6 +65,7 @@
 
 #include "dsk-config.h"
 
+#include "dsk-table.h"
 #include "dsk-table-file.h"
 
 #undef _dsk_inline_assert

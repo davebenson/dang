@@ -1,12 +1,25 @@
-struct _DskTableCheckpointIface
+typedef struct _DskTableCheckpoint DskTableCheckpoint;
+
+typedef dsk_boolean
+         (*DskTableCheckpointReplayFunc) (unsigned            key_length,
+                                          const uint8_t      *key_data,
+                                          unsigned            value_length,
+                                          const uint8_t      *value_data,
+                                          void               *replay_data,
+                                          DskError          **error);
+
+struct _DskTableCheckpointInterface
 {
-  DskTableCheckpoint *(*create)  (DskTableCheckpointIface *iface,
+  DskTableCheckpoint *(*create)  (DskTableCheckpointInterface *iface,
+                                  const char         *openat_dir,
                                   int                 openat_fd,
                                   const char         *basename,
                                   unsigned            cp_data_len,
                                   const uint8_t      *cp_data,
                                   DskError          **error);
-  DskTableCheckpoint *(*open)    (int                 openat_fd,
+  DskTableCheckpoint *(*open)    (DskTableCheckpointInterface *iface,
+                                  const char         *openat_dir,
+                                  int                 openat_fd,
                                   const char         *basename,
                                   unsigned           *cp_data_len_out,
                                   uint8_t           **cp_data_out,
