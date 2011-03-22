@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 
@@ -21,15 +22,17 @@ int dsk_table_helper_openat (const char *openat_dir,
 {
   unsigned base_fname_len = strlen (base_filename);
   unsigned suffix_len = strlen (suffix);
-  unsigned openat_dir_len = strlen (openat_dir);
   char slab[1024];
   char *buf;
   int fd;
-#if !defined(__USE_ATFILE)
+#if defined(__USE_ATFILE)
+  DSK_UNUSED (openat_dir);
+#else
+  unsigned openat_dir_len = strlen (openat_dir);
   DSK_UNUSED (openat_fd);
   base_fname_len += openat_dir_len + 1;
 #endif
-if (base_fname_len + suffix_len < sizeof (slab) - 1)
+  if (base_fname_len + suffix_len < sizeof (slab) - 1)
     buf = slab;
   else
     buf = dsk_malloc (base_fname_len + suffix_len + 1);
@@ -61,6 +64,56 @@ if (base_fname_len + suffix_len < sizeof (slab) - 1)
   if (buf != slab)
     dsk_free (buf);
   return fd;
+}
+
+int dsk_table_helper_renameat (const char *openat_dir,
+                               int openat_fd,
+                               const char *old_name,
+                               const char *new_name,
+                               DskError  **error)
+{
+#if defined(__USE_ATFILE)
+  DSK_UNUSED (openat_dir);
+  if (renameat (openat_fd, old_name, openat_fd, new_name) < 0)
+    {
+      dsk_set_error (error, "error renameat()ing file: %s -> %s: %s",
+                     old_name, new_name, strerror (errno));
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+
+#else
+  unsigned base_old_len = strlen (old_name);
+  unsigned base_new_len = strlen (new_name);
+  unsigned openat_dir_len = strlen (openat_dir);
+  char old_slab[1024], new_slab[1024];
+  char *old_buf, *new_buf;
+  dsk_boolean rv = DSK_TRUE;
+  DSK_UNUSED (openat_fd);
+  if (openat_dir_len + base_new_len + 2 > sizeof (new_slab))
+    new_buf = dsk_malloc (openat_dir_len + base_new_len + 2);
+  else
+    new_buf = new_slab;
+  snprintf (new_buf, openat_dir_len + base_new_len + 2, "%s/%s",
+            openat_dir, new_name);
+  if (openat_dir_len + base_old_len + 2 > sizeof (old_slab))
+    old_buf = dsk_malloc (openat_dir_len + base_old_len + 2);
+  else
+    old_buf = old_slab;
+  snprintf (old_buf, openat_dir_len + base_old_len + 2, "%s/%s",
+            openat_dir, old_name);
+  if (rename (old_buf, new_buf) < 0)
+    {
+      dsk_set_error (error, "error rename()ing file: %s -> %s: %s",
+                     old_buf, new_buf, strerror (errno));
+      rv = DSK_FALSE;
+    }
+  if (new_buf != new_slab)
+    dsk_free (new_slab);
+  if (old_buf != old_slab)
+    dsk_free (old_slab);
+  return rv;
+#endif
 }
 
 int dsk_table_helper_pread  (int fd,

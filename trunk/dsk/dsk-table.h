@@ -51,6 +51,15 @@ struct _DskTableConfig
   DskTableFileInterface *file_interface;
   DskTableCheckpointInterface *cp_interface;
 };
+#define DSK_TABLE_CONFIG_DEFAULT                                       \
+{                                                                      \
+  NULL, NULL,           /* standard comparator */                      \
+  NULL, NULL,           /* standard replacement merge */               \
+  DSK_FALSE,            /* anti-chronological lookups */               \
+  NULL,                 /* directory: mandatory */                     \
+  NULL,                 /* default to trivial table-file */            \
+  NULL                  /* default to trivial checkpoint interface */  \
+}
 
 DskTable   *dsk_table_new          (DskTableConfig *config,
                                     DskError      **error);
