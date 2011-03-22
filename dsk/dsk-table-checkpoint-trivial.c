@@ -324,7 +324,7 @@ table_checkpoint_trivial__open   (DskTableCheckpointInterface *iface,
                      cp_data_len, (unsigned) stat_buf.st_size);
       goto error_cleanup;
     }
-  while (* (uint32_t*) at != 0xffffffff)
+  while (* (uint32_t*) (mmapped+at) != 0xffffffff)
     {
       uint32_t key_len, value_len;
       uint32_t kv_len, kvp_len;
@@ -333,8 +333,8 @@ table_checkpoint_trivial__open   (DskTableCheckpointInterface *iface,
           dsk_set_error (error, "checkpoint entry header too long");
           goto error_cleanup;
         }
-      key_len = UINT32_FROM_LE (((uint32_t *) at)[0]);
-      value_len = UINT32_FROM_LE (((uint32_t *) at)[1]);
+      key_len = UINT32_FROM_LE (((uint32_t *) (mmapped+at))[0]);
+      value_len = UINT32_FROM_LE (((uint32_t *) (mmapped+at))[1]);
       kv_len = key_len + value_len;
       if (kv_len < key_len)
         {
@@ -355,7 +355,7 @@ table_checkpoint_trivial__open   (DskTableCheckpointInterface *iface,
             dsk_set_error (error, "replay handler returned false but didn't set error");
           goto error_cleanup;
         }
-      at += kvp_len;
+      at += 8 + kvp_len;
     }
 
   /* copy cp_data */

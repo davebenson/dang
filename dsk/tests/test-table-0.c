@@ -161,6 +161,7 @@ test_table_simple (unsigned         rand_test_size,
   unsigned *order;
   unsigned i;
   unsigned insert_iter;
+  char *dir;
 
   DskTable *table;
   DskTableConfig config = DSK_TABLE_CONFIG_DEFAULT;
@@ -230,12 +231,46 @@ test_table_simple (unsigned         rand_test_size,
   reader->destroy (reader);
   fprintf(stderr, ".");
 
+  dir = dsk_strdup (dsk_table_peek_dir (table));
+  config.dir = dir;
+  dsk_table_destroy (table);
+  table = dsk_table_new (&config, &error);
+  if (table == NULL)
+    dsk_die ("error opening table: %s", error->message);
+
+  reader = dsk_table_new_reader (table, &error);
+  if (reader == NULL)
+    dsk_die ("error dumping table: %s", error->message);
+  for (i = 0; i < rand_test_size; i++)
+    {
+      KeyValue kv = kvs[i];
+      unsigned kl = strlen (kv.key);
+      unsigned vl = strlen (kv.value);
+#if 0
+      dsk_warning ("dump: entry %u; expected %s,%s; got %.*s,%.*s",
+                   i, kv.key, kv.value,
+                   (int) reader->key_length, (char*) reader->key_data,
+                   (int) reader->value_length, (char*) reader->value_data);
+#endif
+      dsk_assert (!reader->at_eof);
+      dsk_assert (reader->key_length == kl);
+      dsk_assert (reader->value_length == vl);
+      dsk_assert (memcmp (reader->key_data, kv.key, kl) == 0);
+      dsk_assert (memcmp (reader->value_data, kv.value, vl) == 0);
+      assert_or_error (reader->advance (reader, &error));
+    }
+  dsk_assert (reader->at_eof);
+  reader->destroy (reader);
+  fprintf(stderr, ".");
+
+
   for (i = 0; i < rand_test_size; i++)
     destruct_key_value (kvs + i);
   dsk_free (kvs);
   dsk_free (order);
 
   dsk_table_destroy_erase (table);
+  dsk_free (dir);
 }
 static void
 test_table_simple_small_sorted (void)

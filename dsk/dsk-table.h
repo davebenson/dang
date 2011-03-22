@@ -78,6 +78,8 @@ dsk_boolean dsk_table_insert       (DskTable       *table,
 void        dsk_table_destroy      (DskTable       *table);
 void        dsk_table_destroy_erase(DskTable       *table);
 
+const char *dsk_table_peek_dir     (DskTable       *table);
+
 typedef struct _DskTableReader DskTableReader;
 struct _DskTableReader
 {
