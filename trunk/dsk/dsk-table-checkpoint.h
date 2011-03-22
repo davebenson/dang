@@ -44,3 +44,5 @@ struct _DskTableCheckpoint
   void        (*destroy)(DskTableCheckpoint *cp);
 };
 
+
+extern DskTableCheckpointInterface dsk_table_checkpoint_trivial;

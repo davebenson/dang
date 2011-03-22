@@ -66,11 +66,11 @@ int dsk_table_helper_openat (const char *openat_dir,
   return fd;
 }
 
-int dsk_table_helper_renameat (const char *openat_dir,
-                               int openat_fd,
-                               const char *old_name,
-                               const char *new_name,
-                               DskError  **error)
+dsk_boolean dsk_table_helper_renameat (const char *openat_dir,
+                                       int openat_fd,
+                                       const char *old_name,
+                                       const char *new_name,
+                                       DskError  **error)
 {
 #if defined(__USE_ATFILE)
   DSK_UNUSED (openat_dir);
@@ -113,6 +113,43 @@ int dsk_table_helper_renameat (const char *openat_dir,
   if (old_buf != old_slab)
     dsk_free (old_slab);
   return rv;
+#endif
+}
+
+dsk_boolean
+dsk_table_helper_unlinkat (const char *openat_dir,
+                           int openat_fd,
+                           const char *to_delete,
+                           DskError  **error)
+{
+#if defined(__USE_ATFILE)
+  DSK_UNUSED (openat_dir);
+  if (unlinkat (openat_fd, to_delete, 0) < 0)
+    {
+      dsk_set_error (error, "error unlinking(at) file: %s: %s",
+                     to_delete, strerror (errno));
+      return DSK_FALSE;
+    }
+  return DSK_TRUE;
+#else
+  char buf[1024];
+  unsigned base_new_len = strlen (to_delete);
+  unsigned openat_dir_len = strlen (openat_dir);
+  unsigned needed = base_new_len + 1 + openat_dir_len + 1;
+  char *fname = needed <= sizeof (buf) ? buf : dsk_malloc (needed);
+  snprintf (fname, needed, "%s/%s", openat_dir, to_delete);
+  
+  if (unlink (fname, new_name) < 0)
+    {
+      dsk_set_error (error, "error unlinking %s: %s",
+                     fname, strerror (errno));
+      if (fname != buf)
+        dsk_free (fname);
+      return DSK_FALSE;
+    }
+  if (fname != buf)
+    dsk_free (fname);
+  return DSK_TRUE;
 #endif
 }
 

@@ -328,6 +328,9 @@ create_possible_merge (DskTable *table,
   pm->actual_entry_count_ratio_log2_b10 = lg2_10;
   pm->a = a;
   pm->b = b;
+  dsk_assert (a->next_merge == NULL);
+  dsk_assert (b->prev_merge == NULL);
+  a->next_merge = b->prev_merge = pm;
   GSK_RBTREE_INSERT (GET_POSSIBLE_MERGE_TREE (), pm, conflict);
 }
 
@@ -685,7 +688,10 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
   else
     rv.file_interface = config->file_interface;
 
-  rv.cp_interface = config->cp_interface;
+  if (config->cp_interface == NULL)
+    rv.cp_interface = &dsk_table_checkpoint_trivial;
+  else
+    rv.cp_interface = config->cp_interface;
   rv.cp_n_entries = 0;
   rv.cp_first_entry_index = 0;
   rv.cp_flush_period = 1024;
@@ -694,8 +700,12 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
       /* create initial empty checkpoint */
       rv.cp = (*rv.cp_interface->create) (rv.cp_interface,
                                           rv.dir, rv.dir_fd, "ASYNC-CP",
-                                          0, NULL, error);
+                                          0, NULL, 
+                                          NULL,    /* no prior checkpoint */
+                                          error);
       rv.next_id = 1;
+      if (rv.cp == NULL)
+        goto cp_open_failed;
     }
   else
     {
@@ -1282,6 +1292,7 @@ dsk_table_insert       (DskTable       *table,
                                             table->dir, table->dir_fd,
                                             "NEW_CP",
                                             cp_data_len, cp_data,
+                                            table->cp,
                                             error);
       if (new_cp == NULL)
         {
@@ -1620,7 +1631,14 @@ dsk_table_destroy      (DskTable       *table)
 void
 dsk_table_destroy_erase(DskTable       *table)
 {
-  /* TODO: erase */
+  struct stat stat_buf, stat_buf2;
+  if (stat (table->dir, &stat_buf) >= 0
+   && fstat (table->dir_fd, &stat_buf2) >= 0
+   && stat_buf.st_dev == stat_buf2.st_dev
+   && stat_buf.st_ino == stat_buf2.st_ino)
+    {
+      (void) dsk_remove_dir_recursive (table->dir, NULL);
+    }
   dsk_table_destroy (table);
 }
 
