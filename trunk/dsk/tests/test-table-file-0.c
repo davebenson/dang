@@ -626,9 +626,9 @@ int main(int argc, char **argv)
     }
   else
     {
-//      DskError *error = NULL;
-//      if (!dsk_remove_dir_recursive (test_dir, &error))
-//        dsk_die ("error removing directory %s: %s", test_dir, error->message);
+      DskError *error = NULL;
+      if (!dsk_remove_dir_recursive (test_dir, &error))
+        dsk_die ("error removing directory %s: %s", test_dir, error->message);
     }
   dsk_cleanup ();
   return 0;
