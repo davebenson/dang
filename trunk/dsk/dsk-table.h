@@ -21,8 +21,7 @@ typedef enum
   DSK_TABLE_MERGE_RETURN_B_FINAL,
   DSK_TABLE_MERGE_RETURN_B,
   DSK_TABLE_MERGE_RETURN_BUFFER_FINAL,
-  DSK_TABLE_MERGE_RETURN_BUFFER,
-  DSK_TABLE_MERGE_DROP
+  DSK_TABLE_MERGE_RETURN_BUFFER
 } DskTableMergeResult;
 
 typedef DskTableMergeResult (*DskTableMergeFunc)  (unsigned       key_length,
@@ -88,6 +87,12 @@ struct _DskTableReader
 
 DskTableReader  *dsk_table_dump    (DskTable       *table);
 //DskTableReader  *dsk_table_dump_range    (DskTable       *table, ...);
+
+
+/* internals */
+DskTableReader *dsk_table_reader_new_merge2 (DskTable       *table,
+                                             DskTableReader *a,
+                                             DskTableReader *b);
 
 #if DSK_CAN_INLINE || defined(DSK_IMPLEMENT_INLINES)
 DSK_INLINE_FUNC uint8_t *
