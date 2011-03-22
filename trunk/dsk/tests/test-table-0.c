@@ -165,6 +165,7 @@ test_table_simple (unsigned         rand_test_size,
 
   DskTable *table;
   DskTableConfig config = DSK_TABLE_CONFIG_DEFAULT;
+  DskTableReader *reader;
   table = dsk_table_new (&config, &error);
   if (table == NULL)
     dsk_die ("error creating default table: %s", error->message);
@@ -205,7 +206,6 @@ test_table_simple (unsigned         rand_test_size,
     }
   fprintf(stderr, ".");
 
-  DskTableReader *reader;
   reader = dsk_table_new_reader (table, &error);
   if (reader == NULL)
     dsk_die ("error dumping table: %s", error->message);

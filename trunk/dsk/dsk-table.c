@@ -709,6 +709,8 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
     }
   else
     {
+      unsigned cp_data_len;
+      uint8_t *cp_data;
       {
         int alive_fd = dsk_table_helper_openat (rv.dir, rv.dir_fd,
                                                 "ALIVE", "",
@@ -720,8 +722,6 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
             alive_fd = -1;
           }
       }
-      unsigned cp_data_len;
-      uint8_t *cp_data;
 
       rv.cp = (*rv.cp_interface->open) (rv.cp_interface,
                                         rv.dir, rv.dir_fd,

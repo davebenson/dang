@@ -273,6 +273,7 @@ table_checkpoint_trivial__open   (DskTableCheckpointInterface *iface,
   void *mmapped = NULL;
   TrivialTableCheckpoint *rv;
   unsigned version, cp_data_len;
+  unsigned at;
 
   DSK_UNUSED (iface);
 
@@ -316,7 +317,6 @@ table_checkpoint_trivial__open   (DskTableCheckpointInterface *iface,
   cp_data_len = UINT32_FROM_LE (((uint32_t*)mmapped)[2]);
 
   /* replay */
-  unsigned at;
   at = 12 + (cp_data_len + 3) / 4 * 4;
   if (at + 4 > stat_buf.st_size)
     {
