@@ -86,6 +86,11 @@ struct _DskTableFileInterface
                                      int                      openat_fd,
                                      const char              *base_filename,
                                      DskError               **error);
+  dsk_boolean         (*delete_file)(DskTableFileInterface   *iface,
+                                     const char              *openat_dir,
+                                     int                      openat_fd,
+                                     const char              *base_filename,
+                                     DskError               **error);
   void                (*destroy)    (DskTableFileInterface   *iface);
 };
 
