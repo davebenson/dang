@@ -74,14 +74,12 @@ redo_sort:
         {
           if (strcmp (kv[o].key, kv[i].key) != 0)
             kv[++o] = kv[i];
+          else
+            destruct_key_value (kv + i);
           i++;
         }
-      i = o + 1;
       for (i = o + 1; i < n; i++)
-        {
-          destruct_key_value (kv + i);
-          generate_random_key_value (kv + i);
-        }
+        generate_random_key_value (kv + i);
       goto redo_sort;
     }
 }
@@ -129,17 +127,13 @@ generate_ordering (unsigned rand_test_size,
 }
 
 static void
-test_table_simple (unsigned rand_test_size,
-                     RandTestOrdering ordering)
+test_table_trivial (void)
 {
   DskTable *table;
   DskTableConfig config = DSK_TABLE_CONFIG_DEFAULT;
   unsigned value_len;
   const uint8_t *value_data;
   DskError *error = NULL;
-  KeyValue *kvs;
-  unsigned *order;
-  unsigned i;
   table = dsk_table_new (&config, &error);
   if (table == NULL)
     dsk_die ("error creating default table: %s", error->message);
@@ -155,20 +149,46 @@ test_table_simple (unsigned rand_test_size,
   dsk_assert (value_len == 1);
   dsk_assert (value_data[0] == 'z');
 
+  dsk_table_destroy_erase (table);
+}
+static void
+test_table_simple (unsigned         rand_test_size,
+                   RandTestOrdering ordering,
+                   unsigned         insert_count)
+{
+  DskError *error = NULL;
+  KeyValue *kvs;
+  unsigned *order;
+  unsigned i;
+  unsigned insert_iter;
+
+  DskTable *table;
+  DskTableConfig config = DSK_TABLE_CONFIG_DEFAULT;
+  table = dsk_table_new (&config, &error);
+  if (table == NULL)
+    dsk_die ("error creating default table: %s", error->message);
+
+  fprintf(stderr, ".");
   kvs = dsk_malloc (sizeof (KeyValue) * rand_test_size);
   generate_random_key_values (rand_test_size, kvs);
   order = generate_ordering (rand_test_size, ordering);
+  fprintf(stderr, ".");
 
-  for (i = 0; i < rand_test_size; i++)
+  for (insert_iter = 0; insert_iter < insert_count; insert_iter++)
     {
-      KeyValue kv = kvs[order[i]];
-      unsigned kl = strlen (kv.key);
-      unsigned vl = strlen (kv.value);
-      assert_or_error (dsk_table_insert (table, 
-                                         kl, (uint8_t*) (kv.key),
-                                         vl, (uint8_t*) (kv.value),
-                                         &error));
+      for (i = 0; i < rand_test_size; i++)
+        {
+          KeyValue kv = kvs[order[i]];
+          unsigned kl = strlen (kv.key);
+          unsigned vl = strlen (kv.value);
+          //dsk_warning ("adding %s => %s", kv.key, kv.value);
+          assert_or_error (dsk_table_insert (table, 
+                                             kl, (uint8_t*) (kv.key),
+                                             vl, (uint8_t*) (kv.value),
+                                             &error));
+        }
     }
+  fprintf(stderr, ".");
   for (i = 0; i < rand_test_size; i++)
     {
       KeyValue kv = kvs[i];
@@ -182,6 +202,34 @@ test_table_simple (unsigned rand_test_size,
       dsk_assert (vl == strlen (kv.value));
       dsk_assert (memcmp (kv.value, value, vl) == 0);
     }
+  fprintf(stderr, ".");
+
+  DskTableReader *reader;
+  reader = dsk_table_new_reader (table, &error);
+  if (reader == NULL)
+    dsk_die ("error dumping table: %s", error->message);
+  for (i = 0; i < rand_test_size; i++)
+    {
+      KeyValue kv = kvs[i];
+      unsigned kl = strlen (kv.key);
+      unsigned vl = strlen (kv.value);
+#if 0
+      dsk_warning ("dump: entry %u; expected %s,%s; got %.*s,%.*s",
+                   i, kv.key, kv.value,
+                   (int) reader->key_length, (char*) reader->key_data,
+                   (int) reader->value_length, (char*) reader->value_data);
+#endif
+      dsk_assert (!reader->at_eof);
+      dsk_assert (reader->key_length == kl);
+      dsk_assert (reader->value_length == vl);
+      dsk_assert (memcmp (reader->key_data, kv.key, kl) == 0);
+      dsk_assert (memcmp (reader->value_data, kv.value, vl) == 0);
+      assert_or_error (reader->advance (reader, &error));
+    }
+  dsk_assert (reader->at_eof);
+  reader->destroy (reader);
+  fprintf(stderr, ".");
+
   for (i = 0; i < rand_test_size; i++)
     destruct_key_value (kvs + i);
   dsk_free (kvs);
@@ -192,63 +240,134 @@ test_table_simple (unsigned rand_test_size,
 static void
 test_table_simple_small_sorted (void)
 {
-  test_table_simple (200, RAND_TEST_ORDERING_SORTED);
+  test_table_simple (200, RAND_TEST_ORDERING_SORTED, 1);
 }
 static void
 test_table_simple_small_reversed (void)
 {
-  test_table_simple (200, RAND_TEST_ORDERING_REVERSED);
+  test_table_simple (200, RAND_TEST_ORDERING_REVERSED, 1);
 }
 static void
 test_table_simple_small_random (void)
 {
-  test_table_simple (200, RAND_TEST_ORDERING_RANDOM);
+  test_table_simple (200, RAND_TEST_ORDERING_RANDOM, 1);
 }
 static void
 test_table_simple_medium_sorted (void)
 {
-  test_table_simple (20000, RAND_TEST_ORDERING_SORTED);
+  test_table_simple (5000, RAND_TEST_ORDERING_SORTED, 1);
 }
 static void
 test_table_simple_medium_reversed (void)
 {
-  test_table_simple (20000, RAND_TEST_ORDERING_REVERSED);
+  test_table_simple (5000, RAND_TEST_ORDERING_REVERSED, 1);
 }
 static void
 test_table_simple_medium_random (void)
 {
-  test_table_simple (20000, RAND_TEST_ORDERING_RANDOM);
+  test_table_simple (5000, RAND_TEST_ORDERING_RANDOM, 1);
+}
+static void
+test_table_simple_large_sorted (void)
+{
+  test_table_simple (20000, RAND_TEST_ORDERING_SORTED, 1);
+}
+static void
+test_table_simple_large_reversed (void)
+{
+  test_table_simple (20000, RAND_TEST_ORDERING_REVERSED, 1);
+}
+static void
+test_table_simple_large_random (void)
+{
+  test_table_simple (20000, RAND_TEST_ORDERING_RANDOM, 1);
+}
+static void
+test_table_simple_medium_double_sorted (void)
+{
+  test_table_simple (2500, RAND_TEST_ORDERING_SORTED, 2);
+}
+static void
+test_table_simple_medium_double_reversed (void)
+{
+  test_table_simple (2500, RAND_TEST_ORDERING_REVERSED, 2);
+}
+static void
+test_table_simple_medium_double_random (void)
+{
+  test_table_simple (2500, RAND_TEST_ORDERING_RANDOM, 2);
 }
 
 
 static struct 
 {
   const char *name;
+  const char *flags;
   void (*test)(void);
 } tests[] =
 {
-  { "simple small, sorted-input database test", test_table_simple_small_sorted },
-  { "simple small, reversed-input database test", test_table_simple_small_reversed },
-  { "simple small, random-input database test", test_table_simple_small_random },
-  { "simple medium, sorted-input database test", test_table_simple_medium_sorted },
-  { "simple medium, reversed-input database test", test_table_simple_medium_reversed },
-  { "simple medium, random-input database test", test_table_simple_medium_random },
+  { "trivial database test",
+    "",
+    test_table_trivial },
+  { "simple small, sorted-input database test",
+    "",
+    test_table_simple_small_sorted },
+  { "simple small, reversed-input database test",
+    "",
+    test_table_simple_small_reversed },
+  { "simple small, random-input database test",
+    "",
+    test_table_simple_small_random },
+  { "simple medium, sorted-input database test",
+    "",
+    test_table_simple_medium_sorted },
+  { "simple medium, reversed-input database test",
+    "",
+    test_table_simple_medium_reversed },
+  { "simple medium, random-input database test",
+    "",
+    test_table_simple_medium_random },
+  { "simple large, sorted-input database test",
+    "large",
+    test_table_simple_large_sorted },
+  { "simple large, reversed-input database test",
+    "large",
+    test_table_simple_large_reversed },
+  { "simple large, random-input database test",
+    "large",
+    test_table_simple_large_random },
+  { "simple medium, sorted-input, repeated, database test",
+    "",
+    test_table_simple_medium_double_sorted },
+  { "simple medium, reversed-input, repeated, database test",
+    "",
+    test_table_simple_medium_double_reversed },
+  { "simple medium, random-input, repeated, database test",
+    "",
+    test_table_simple_medium_double_random },
 };
 
 int main(int argc, char **argv)
 {
   unsigned i;
+  dsk_boolean large = DSK_FALSE;
 
   dsk_cmdline_init ("test DskTable",
                     "Test DskTable, our small persistent key-value table",
                     NULL, 0);
   dsk_cmdline_add_boolean ("verbose", "extra logging", NULL, 0,
                            &cmdline_verbose);
+  dsk_cmdline_add_boolean ("large", "enable large tests", NULL, 0, &large);
   dsk_cmdline_process_args (&argc, &argv);
 
   for (i = 0; i < DSK_N_ELEMENTS (tests); i++)
     {
       fprintf (stderr, "Test: %s... ", tests[i].name);
+      if (strstr (tests[i].flags, "large") != NULL && !large)
+        {
+          fprintf (stderr, " skipping (add --large).\n");
+          continue;
+        }
       tests[i].test ();
       fprintf (stderr, " done.\n");
     }

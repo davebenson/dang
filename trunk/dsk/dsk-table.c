@@ -1294,6 +1294,7 @@ dsk_table_insert       (DskTable       *table,
                                             cp_data_len, cp_data,
                                             table->cp,
                                             error);
+      dsk_free (cp_data);
       if (new_cp == NULL)
         {
           return DSK_FALSE;
@@ -1497,6 +1498,7 @@ dsk_table_new_reader (DskTable    *table,
       {
         DskTableFileInterface *iface = table->file_interface;
         planner[n].est_entry_count = file->entry_count;
+        set_table_file_basename (table, file->id);
         planner[n].reader = iface->new_reader (iface,
                                                table->dir, table->dir_fd,
                                                table->basename, error);
@@ -1543,6 +1545,7 @@ dsk_table_new_reader (DskTable    *table,
         }
 
       /* merge best_i and best_i+1 */
+
       planner[best_i].reader
         = dsk_table_reader_new_merge2 (table,
                                        planner[best_i].reader,
@@ -1598,7 +1601,7 @@ free_possible_merge_tree_recursive (PossibleMerge *pm)
   if (pm->left)
     free_possible_merge_tree_recursive (pm->left);
   if (pm->right)
-    free_possible_merge_tree_recursive (pm->left);
+    free_possible_merge_tree_recursive (pm->right);
   dsk_free (pm);
 }
 
@@ -1624,6 +1627,8 @@ dsk_table_destroy      (DskTable       *table)
     free_possible_merge_tree_recursive (table->possible_merge_tree);
   if (table->dir_fd)
     close (table->dir_fd);
+  dsk_free (table->merge_buffers[0].data);
+  dsk_free (table->merge_buffers[1].data);
   dsk_free (table->dir);
   dsk_free (table);
 }
@@ -1806,6 +1811,7 @@ dsk_table_reader_new_merge2 (DskTable *table,
   merge2 = dsk_malloc (sizeof (TableReaderMerge2));
   merge2->base.advance = merge2_advance;
   merge2->base.destroy = merge2_destroy;
+  merge2->base.at_eof = DSK_FALSE;
   merge2->table = table;
   merge2->a = a;
   merge2->b = b;

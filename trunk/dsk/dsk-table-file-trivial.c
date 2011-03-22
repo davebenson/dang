@@ -20,6 +20,9 @@
 #  error unknown endianness
 #endif
 
+#define FREAD  fread_unlocked
+#define FWRITE fwrite_unlocked
+
 /* synonyms provided for clarity */
 #define UINT64_FROM_LE UINT64_TO_LE
 #define UINT32_FROM_LE UINT32_TO_LE
@@ -61,21 +64,21 @@ table_file_trivial_writer__write  (DskTableFileWriter *writer,
   ie.heap_offset = UINT64_TO_LE (wr->heap_fp_offset);
   ie.key_length = UINT32_TO_LE (key_length);
   ie.value_length = UINT32_TO_LE (value_length);
-  if (fwrite (&ie, 16, 1, wr->index_fp) != 1)
+  if (FWRITE (&ie, 16, 1, wr->index_fp) != 1)
     {
       dsk_set_error (error, "error writing entry to index file: %s",
                      strerror (errno));
       return DSK_FALSE;
     }
   if (key_length != 0
-   && fwrite (key_data, key_length, 1, wr->heap_fp) != 1)
+   && FWRITE (key_data, key_length, 1, wr->heap_fp) != 1)
     {
       dsk_set_error (error, "error writing key to heap file: %s",
                      strerror (errno));
       return DSK_FALSE;
     }
   if (value_length != 0
-   && fwrite (value_data, value_length, 1, wr->heap_fp) != 1)
+   && FWRITE (value_data, value_length, 1, wr->heap_fp) != 1)
     {
       dsk_set_error (error, "error writing value to heap file: %s",
                      strerror (errno));
@@ -178,7 +181,7 @@ read_next_index_entry (TableFileTrivialReader *reader,
   IndexEntry ie;
   size_t nread;
   unsigned kv_len;
-  nread = fread (&ie, 1, sizeof (IndexEntry), reader->index_fp);
+  nread = FREAD (&ie, 1, sizeof (IndexEntry), reader->index_fp);
   if (nread == 0)
     {
       /* at EOF */
@@ -223,7 +226,7 @@ read_next_index_entry (TableFileTrivialReader *reader,
       reader->slab = dsk_realloc (reader->slab, new_alloced);
       reader->slab_alloced = new_alloced;
     }
-  if (kv_len != 0 && fread (reader->slab, kv_len, 1, reader->heap_fp) != 1)
+  if (kv_len != 0 && FREAD (reader->slab, kv_len, 1, reader->heap_fp) != 1)
     {
       dsk_set_error (error, "error reading key/value from heap file");
       return DSK_FALSE;
@@ -249,6 +252,7 @@ table_file_trivial_reader__destroy (DskTableReader     *reader)
   TableFileTrivialReader *t = (TableFileTrivialReader *) reader;
   fclose (t->index_fp);
   fclose (t->heap_fp);
+  dsk_free (t->slab);
   dsk_free (t);
 }
 
