@@ -138,8 +138,9 @@ dsk_table_helper_unlinkat (const char *openat_dir,
   unsigned needed = base_new_len + 1 + openat_dir_len + 1;
   char *fname = needed <= sizeof (buf) ? buf : dsk_malloc (needed);
   snprintf (fname, needed, "%s/%s", openat_dir, to_delete);
+  DSK_UNUSED (openat_fd);
   
-  if (unlink (fname, new_name) < 0)
+  if (unlink (fname) < 0)
     {
       dsk_set_error (error, "error unlinking %s: %s",
                      fname, strerror (errno));
