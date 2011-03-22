@@ -325,10 +325,13 @@ handle_token (DskJsonParser *parser,
         {
           /* add new member; copy string */
           char *name;
+          DskJsonMember *member;
           if (STACK_TOP (parser).n_subs == STACK_TOP (parser).subs_alloced)
             stack_increase_subs_alloced (&STACK_TOP (parser));
           name = dsk_strndup (parser->str_len, parser->str);
-          STACK_TOP (parser).u.members[STACK_TOP (parser).n_subs++].name = name;
+          member = &STACK_TOP (parser).u.members[STACK_TOP (parser).n_subs++];
+          member->name = name;
+          member->value = NULL;
 
           parser->parse_state = PARSE_GOT_MEMBER_NAME;
         }

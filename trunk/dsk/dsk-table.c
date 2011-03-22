@@ -64,16 +64,21 @@ struct _File
   PossibleMerge *prev_merge;
   PossibleMerge *next_merge;
 
+  dsk_boolean used_by_last_checkpoint;
+
   File *prev, *next;
 };
 
 struct _Merge
 {
   File *a, *b;
+  DskTableReader *a_reader;
+  DskTableReader *b_reader;
   uint64_t out_id;
-  DskTableFileWriter *out;
+  DskTableFileWriter *writer;
   uint64_t entries_written;
   uint64_t inputs_remaining;
+  dsk_boolean is_complete;
 
   Merge *next;
 };
@@ -131,6 +136,10 @@ struct _DskTable
   /* small in-memory tree for fast lookups on the most recent values */
   TreeNode *small_tree;
   unsigned tree_size;
+
+  /* stack of defunct files (those referenced by a checkpoint,
+     but otherwise not needed); linked together by their next pointer. */
+  File *defunct_files;
 
   PossibleMerge *possible_merge_tree;
 
@@ -402,6 +411,7 @@ parse_checkpoint_data (DskTable *table,
       file->merge = NULL;
       file->prev_merge = NULL;
       file->next_merge = NULL;
+      file->used_by_last_checkpoint = DSK_TRUE;
       GSK_LIST_APPEND (GET_FILE_LIST (), file);
       if (file->id >= table->next_id)
         table->next_id = file->id + 1;
@@ -494,12 +504,16 @@ start_merge_job (DskTable *table,
   merge->b = possible->b;
   merge->out_id = table->next_id++;
   set_table_file_basename (table, merge->out_id);
-  merge->out = table->file_interface->new_writer (table->file_interface,
-                                                  table->dir, table->dir_fd,
-                                                  table->basename,
-                                                  error);
+  merge->writer = table->file_interface->new_writer (table->file_interface,
+                                                     table->dir, table->dir_fd,
+                                                     table->basename,
+                                                     error);
   merge->entries_written = 0;
   merge->inputs_remaining = merge->a->entry_count + merge->b->entry_count;
+
+  /* TODO: it is also complete if all preceding files are of 0 length.
+     Not sure if it is worth checking for that. */
+  merge->is_complete = merge->a->first_entry_index == 0ULL;
 
   /* insert sorted */
   p_next = &table->running_merges;
@@ -897,6 +911,210 @@ dump_tree_to_writer (DskTableFileWriter *writer,
   return DSK_TRUE;
 }
 
+static dsk_boolean
+merge_passthrough (Merge *merge,
+                   DskTableReader *reader,
+                   DskError **error)
+{
+  /* pass-through b_reader data */
+  if (!merge->writer->write (merge->writer,
+                             reader->key_length,
+                             reader->key_data,
+                             reader->value_length,
+                             reader->value_data,
+                             error))
+    return DSK_FALSE;
+  merge->entries_written += 1;
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+delete_file (DskTable *table,
+             uint64_t  id,
+             DskError **error)
+{
+  set_table_file_basename (table, id);
+  return table->file_interface->delete_file (table->file_interface,
+                                             table->dir, table->dir_fd,
+                                             table->basename,
+                                             error);
+}
+
+static dsk_boolean
+merge_job_finished (DskTable  *table,
+                    Merge     *merge,
+                    DskError **error)
+{
+  File *new;
+  unsigned i;
+  /* close writer */
+  if (!merge->writer->close (merge->writer, error))
+    {
+      return DSK_FALSE;
+    }
+
+  /* make new File */
+  new = dsk_malloc (sizeof (File));
+  new->id = merge->out_id;
+  new->seeker = NULL;
+  new->first_entry_index = merge->a->first_entry_index;
+  new->n_entries = merge->a->n_entries + merge->b->n_entries;
+  new->entry_count = merge->entries_written;
+  new->merge = NULL;
+  new->prev_merge = new->next_merge = NULL;
+  new->used_by_last_checkpoint = DSK_FALSE;
+  new->prev = merge->a->prev;
+  new->next = merge->b->next;
+  if (new->prev == NULL)
+    table->oldest_file = new;
+  else
+    new->prev->next = new;
+  if (new->next == NULL)
+    table->newest_file = new;
+  else
+    new->next->prev = new;
+
+  /* for each old file:
+     - if it is used by the last checkpoint,
+       add File to "defunct" list.
+     - otherwise, delete it.
+   */
+  for (i = 0; i < 2; i++)
+    {
+      File *f = i ? merge->b : merge->a;
+      if (f->seeker != NULL)
+        {
+          f->seeker->destroy (f->seeker);
+          f->seeker = NULL;
+        }
+      if (f->used_by_last_checkpoint)
+        {
+          /* file must not be deleted but is defunct */
+          f->next = table->defunct_files;
+          table->defunct_files = f;
+        }
+      else
+        {
+          /* file should be deleted */
+          /* TODO: currently we ignore errors deleting,
+             but what if that is masking programming bugs. */
+          delete_file (table, f->id, NULL);
+          if (f->seeker)
+            f->seeker->destroy (f->seeker);
+          dsk_free (f);
+        }
+    }
+
+  /* deal with new possible merge jobs */
+  if (new->prev->merge == NULL)
+    create_possible_merge (table, new->prev);
+  if (new->next->merge == NULL)
+    create_possible_merge (table, new);
+
+  /* maybe time to start another merge job running */
+  if (!maybe_start_merge_jobs (table, error))
+    return DSK_FALSE;
+
+  return DSK_TRUE;
+}
+
+static dsk_boolean
+run_first_merge_job (DskTable *table,
+                     DskError **error)
+{
+  Merge *merge = table->running_merges;
+  if (merge->a_reader->at_eof)
+    {
+      if (merge->b_reader->at_eof)
+        {
+          /* done */
+          if (!merge_job_finished (table, merge, error))
+            return DSK_FALSE;
+        }
+      else
+        {
+          if (!merge_passthrough (merge, merge->b_reader, error))
+            return DSK_FALSE;
+        }
+    }
+  else
+    {
+      if (merge->b_reader->at_eof)
+        {
+          if (!merge_passthrough (merge, merge->a_reader, error))
+            return DSK_FALSE;
+        }
+      else
+        {
+          int cmp = table->compare (merge->a_reader->key_length,
+                                    merge->a_reader->key_data,
+                                    merge->b_reader->key_length,
+                                    merge->b_reader->key_data,
+                                    table->compare_data);
+          if (cmp < 0)
+            {
+              if (!merge_passthrough (merge, merge->a_reader, error))
+                return DSK_FALSE;
+              merge->inputs_remaining -= 1;
+              if (!merge->b_reader->advance (merge->a_reader, error))
+                return DSK_FALSE;
+            }
+          else if (cmp > 0)
+            {
+              if (!merge_passthrough (merge, merge->b_reader, error))
+                return DSK_FALSE;
+              merge->inputs_remaining -= 1;
+              if (!merge->b_reader->advance (merge->b_reader, error))
+                return DSK_FALSE;
+            }
+          else
+            {
+              /* do actual merge */
+              switch (table->merge (merge->a_reader->key_length,
+                                    merge->a_reader->key_data,
+                                    merge->a_reader->value_length,
+                                    merge->a_reader->value_data,
+                                    merge->b_reader->value_length,
+                                    merge->b_reader->value_data,
+                                    table->merge_buffers,
+                                    merge->is_complete,
+                                    table->merge_data))
+                {
+                case DSK_TABLE_MERGE_RETURN_A_FINAL:
+                case DSK_TABLE_MERGE_RETURN_A:
+                  if (!merge_passthrough (merge, merge->a_reader, error))
+                    return DSK_FALSE;
+                  break;
+                case DSK_TABLE_MERGE_RETURN_B_FINAL:
+                case DSK_TABLE_MERGE_RETURN_B:
+                  if (!merge_passthrough (merge, merge->b_reader, error))
+                    return DSK_FALSE;
+                  break;
+                case DSK_TABLE_MERGE_RETURN_BUFFER_FINAL:
+                case DSK_TABLE_MERGE_RETURN_BUFFER:
+                  if (!merge->writer->write (merge->writer,
+                                             merge->a_reader->key_length,
+                                             merge->a_reader->key_data,
+                                             table->merge_buffers[0].length,
+                                             table->merge_buffers[0].data,
+                                             error))
+                    return DSK_FALSE;
+                  merge->entries_written += 1;
+                  break;
+                case DSK_TABLE_MERGE_DROP:
+                  break;
+                }
+
+              merge->inputs_remaining -= 2;
+              if (!merge->a_reader->advance (merge->a_reader, error)
+               || !merge->b_reader->advance (merge->b_reader, error))
+                return DSK_FALSE;
+            }
+        }
+    }
+  return DSK_TRUE;
+}
+
 dsk_boolean
 dsk_table_insert       (DskTable       *table,
                         unsigned        key_length,
@@ -951,6 +1169,7 @@ dsk_table_insert       (DskTable       *table,
       file->entry_count = table->tree_size;
       file->merge = NULL;
       file->prev_merge = file->next_merge = NULL;
+      file->used_by_last_checkpoint = DSK_FALSE;
       GSK_LIST_APPEND (GET_FILE_LIST (), file);
       if (file->prev)
         create_possible_merge (table, file->prev);
@@ -980,29 +1199,47 @@ dsk_table_insert       (DskTable       *table,
       /* move new checkpoint into place (atomic) */
       if (!dsk_table_helper_renameat (table->dir, table->dir_fd, "NEW_CP", "CP", error))
         {
-          ...
+          return DSK_FALSE;
+        }
+
+      /* delete any defunct files */
+      while (table->defunct_files != NULL)
+        {
+          File *f = table->defunct_files;
+          table->defunct_files = f->next;
+
+          /* delete f */
+
+          /* TODO: currently we ignore errors deleting,
+             but what if that is masking programming bugs. */
+          delete_file (table, f->id, NULL);
+          dsk_free (f);
         }
     }
 
   /* work on any running merge jobs */
+  {
+  unsigned n_processed;
   n_processed = 0;
-  while (n_processed < 512 && table->file != NULL)
+  while (n_processed < 512 && table->running_merges != NULL)
     {
       if (!run_first_merge_job (table, error))
-        return DSK_FALSE
+        return DSK_FALSE;
       n_processed++;
     }
 
   /* start more jobs */
-  maybe_start_merge_jobs (table);
+  if (!maybe_start_merge_jobs (table, error))
+    return DSK_FALSE;
 
   /* do more work, if there's something to do */
-  while (n_processed < 512 && table->file != NULL)
+  while (n_processed < 512 && table->running_merges != NULL)
     {
       if (!run_first_merge_job (table, error))
-        return DSK_FALSE
+        return DSK_FALSE;
       n_processed++;
     }
+  }
   return DSK_TRUE;
 }
 
