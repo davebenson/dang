@@ -94,7 +94,8 @@ struct _DskTableReader
   void        (*destroy)     (DskTableReader *reader);
 };
 
-DskTableReader  *dsk_table_dump    (DskTable       *table);
+DskTableReader  *dsk_table_new_reader(DskTable       *table,
+                                      DskError      **error);
 //DskTableReader  *dsk_table_dump_range    (DskTable       *table, ...);
 
 
