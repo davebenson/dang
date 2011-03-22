@@ -295,3 +295,23 @@ dsk_boolean dsk_mkdir_recursive (const char *dir,
   return DSK_TRUE;
 #undef SCAN_THROUGH_SLASHES
 }
+
+static const char default_tmpdir[] = "/tmp";
+static char *tmp_dir = NULL;
+
+const char *dsk_get_tmp_dir (void)
+{
+  if (tmp_dir == NULL)
+    {
+      /* Use strdup in case someone calls setenv().
+         TODO: need a cleanup hook for this... */
+      tmp_dir = dsk_strdup (getenv ("TMPDIR"));
+      if (tmp_dir == NULL)
+        tmp_dir = dsk_strdup (getenv ("TMP"));
+      if (tmp_dir == NULL)
+        tmp_dir = dsk_strdup (getenv ("TEMP"));
+      if (tmp_dir == NULL)
+        tmp_dir = (char *) "/tmp";
+    }
+  return tmp_dir;
+}

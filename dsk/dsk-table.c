@@ -12,6 +12,7 @@
 #include <limits.h>
 #include <math.h>
 #include <sys/file.h>
+#include <sys/time.h>    /* gettimeofday() for making tmp filename */
 #include "dsk-table-helper.h"
 
 /* AUDIT: n_entries versus entry_count (make sure we have it right all over) */
@@ -568,6 +569,55 @@ maybe_start_merge_jobs (DskTable *table,
     }
   return DSK_TRUE;
 }
+static DskTableMergeResult
+dsk_table_std_merge (unsigned       key_length,
+                     const uint8_t *key_data,
+                     unsigned       a_length,
+                     const uint8_t *a_data,
+                     unsigned       b_length,
+                     const uint8_t *b_data,
+                     DskTableBuffer *buffer,
+                     dsk_boolean    complete,
+                     void          *merge_data)
+{
+  DSK_UNUSED (key_length);
+  DSK_UNUSED (key_data);
+  DSK_UNUSED (a_length);
+  DSK_UNUSED (a_data);
+  DSK_UNUSED (b_length);
+  DSK_UNUSED (b_data);
+  DSK_UNUSED (buffer);
+  DSK_UNUSED (complete);
+  DSK_UNUSED (merge_data);
+
+  return DSK_TABLE_MERGE_RETURN_B_FINAL;
+}
+
+static int
+dsk_table_std_compare (unsigned       key_a_length,
+                       const uint8_t *key_a_data,
+                       unsigned       key_b_length,
+                       const uint8_t *key_b_data,
+                       void          *compare_data)
+{
+  int rv;
+  DSK_UNUSED (compare_data);
+  if (key_a_length < key_b_length)
+    {
+      rv = memcmp (key_a_data, key_b_data, key_a_length);
+      if (rv == 0)
+        rv = -1;
+    }
+  else if (key_a_length > key_b_length)
+    {
+      rv = memcmp (key_a_data, key_b_data, key_b_length);
+      if (rv == 0)
+        rv = 1;
+    }
+  else
+    rv = memcmp (key_a_data, key_b_data, key_a_length);
+  return rv;
+}
 
 DskTable   *dsk_table_new          (DskTableConfig *config,
                                     DskError      **error)
@@ -577,10 +627,32 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
   memset (&rv, 0, sizeof (rv));
   rv.compare = config->compare;
   rv.compare_data = config->compare_data;
+  if (rv.compare == NULL)
+    rv.compare = dsk_table_std_compare;
   rv.merge = config->merge;
   rv.merge_data = config->merge_data;
+  if (rv.merge == NULL)
+    rv.merge = dsk_table_std_merge;
   rv.chronological_lookup_merges = config->chronological_lookup_merges;
-  rv.dir = dsk_strdup (config->dir);
+  if (config->dir == NULL)
+    {
+      const char *tmp = dsk_get_tmp_dir ();
+      unsigned tmp_len = strlen (tmp);
+      struct timeval tv;
+      unsigned pid = getpid ();
+
+      /* tmpdir will "table-", time in microseconds (10+6 digits);
+         "-", process-id  ==> 34 chars or less  */
+      unsigned alloc = tmp_len + 40;
+      rv.dir = dsk_malloc (alloc);
+      gettimeofday (&tv, NULL);
+      snprintf (rv.dir, alloc,
+                "%s/table-%lu%06u-%u",
+                tmp, (unsigned long)(tv.tv_sec), (unsigned)(tv.tv_usec),
+                pid);
+    }
+  else
+    rv.dir = dsk_strdup (config->dir);
   rv.dir_fd = open (rv.dir, O_RDONLY);
   rv.max_merge_jobs = 16;
   if (rv.dir_fd < 0)
@@ -608,7 +680,10 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
       dsk_free (rv.dir);
       return NULL;
     }
-  rv.file_interface = config->file_interface;
+  if (config->file_interface == NULL)
+    rv.file_interface = &dsk_table_file_interface_trivial;
+  else
+    rv.file_interface = config->file_interface;
 
   rv.cp_interface = config->cp_interface;
   rv.cp_n_entries = 0;

@@ -16,6 +16,7 @@ struct _DskTableCheckpointInterface
                                   const char         *basename,
                                   unsigned            cp_data_len,
                                   const uint8_t      *cp_data,
+                                  DskTableCheckpoint *prior,  /* optional */
                                   DskError          **error);
   DskTableCheckpoint *(*open)    (DskTableCheckpointInterface *iface,
                                   const char         *openat_dir,
@@ -42,3 +43,4 @@ struct _DskTableCheckpoint
 		         DskError          **error);
   void        (*destroy)(DskTableCheckpoint *cp);
 };
+

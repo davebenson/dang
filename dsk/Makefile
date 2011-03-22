@@ -22,6 +22,7 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-xml-validation-suite \
 		tests/test-xml-binding-0 \
 		tests/test-table-file-0 \
+		tests/test-table-0 \
 		tests/test-json-0
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
            programs/dsk-octet-filter programs/dsk-make-xml-binding
@@ -42,7 +43,7 @@ CC_FLAGS =  -W -Wall -g -O0 -DDSK_DEBUG=1 -D_FILE_OFFSET_BITS=64 $(EXTRA_CFLAGS)
 LINK_FLAGS = -g -lz $(EXTRA_LDFLAGS)
 
 tests/%: tests/%.c libdsk.a
-	gcc $(CC_FLAGS) $(LINK_FLAGS) -o $@ $^
+	gcc $(CC_FLAGS) $(LINK_FLAGS) -o $@ $^ -lm
 programs/%: programs/%.c libdsk.a
 	gcc $(CC_FLAGS) $(LINK_FLAGS) -o $@ $^
 libdsk.a: dsk-inlines.o \
@@ -80,7 +81,10 @@ libdsk.a: dsk-inlines.o \
 	  dsk-print.o \
 	  dsk-checksum.o \
 	  dsk-file-util.o dsk-pattern.o \
-	  dsk-table-file-trivial.o dsk-table-helper.o dsk-table.o 
+	  dsk-table-file-trivial.o \
+	  dsk-table-checkpoint-trivial.o \
+	  dsk-table-helper.o \
+	  dsk-table.o 
 	ar cru $@ $^
 
 %.o: %.c
