@@ -699,7 +699,7 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
     {
       /* create initial empty checkpoint */
       rv.cp = (*rv.cp_interface->create) (rv.cp_interface,
-                                          rv.dir, rv.dir_fd, "ASYNC-CP",
+                                          rv.dir, rv.dir_fd, "CP",
                                           0, NULL, 
                                           NULL,    /* no prior checkpoint */
                                           error);
@@ -725,7 +725,7 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
 
       rv.cp = (*rv.cp_interface->open) (rv.cp_interface,
                                         rv.dir, rv.dir_fd,
-                                        "ASYNC-CP",
+                                        "CP",
                                         &cp_data_len, &cp_data,
                                         handle_checkpoint_replay_element, &rv,
                                         error);
@@ -737,9 +737,11 @@ DskTable   *dsk_table_new          (DskTableConfig *config,
         {
           if (!parse_checkpoint_data (&rv, cp_data_len, cp_data, error))
             {
+              dsk_free (cp_data);
               goto cp_open_failed;
             }
         }
+      dsk_free (cp_data);
 
       /* create possible merge jobs */
       if (rv.oldest_file != NULL)
@@ -776,6 +778,11 @@ cp_open_failed:
   if (rv.small_tree != NULL)
     free_small_tree_recursive (rv.small_tree);
   return NULL;
+}
+
+const char *dsk_table_peek_dir     (DskTable       *table)
+{
+  return table->dir;
 }
 
 /* Returns:
