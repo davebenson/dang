@@ -28,6 +28,13 @@ PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
            programs/dsk-octet-filter programs/dsk-make-xml-binding
 all: $(BUILT_SOURCES) $(PROGRAMS) build-tests
 
+install: all
+	@if test -z "$(PREFIX)"; then echo "you must specify PREFIX" 1>&2 ; exit 1; fi
+	mkdir -p "$(PREFIX)/include/dsk"
+	install -m 644 dsk-*.h "$(PREFIX)/include/dsk"
+	mkdir -p "$(PREFIX)/lib"
+	install -m 644 libdsk.a "$(PREFIX)/lib"
+
 build-tests: test-build-dependencies $(TEST_PROGRAMS)
 
 EXTRA_PROGRAMS = programs/make-validation-test-data
