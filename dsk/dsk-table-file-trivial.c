@@ -164,7 +164,7 @@ table_file_trivial__new_writer (DskTableFileInterface   *iface,
 typedef struct _TableFileTrivialReader TableFileTrivialReader;
 struct _TableFileTrivialReader
 {
-  DskTableFileReader base_instance;
+  DskTableReader base_instance;
   FILE *index_fp, *heap_fp;
   uint64_t next_heap_offset;
   unsigned slab_alloced;
@@ -237,14 +237,14 @@ read_next_index_entry (TableFileTrivialReader *reader,
 }
 
 static dsk_boolean
-table_file_trivial_reader__advance (DskTableFileReader *reader,
+table_file_trivial_reader__advance (DskTableReader     *reader,
                                     DskError          **error)
 {
   return read_next_index_entry ((TableFileTrivialReader *) reader, error);
 }
 
 static void
-table_file_trivial_reader__destroy (DskTableFileReader *reader)
+table_file_trivial_reader__destroy (DskTableReader     *reader)
 {
   TableFileTrivialReader *t = (TableFileTrivialReader *) reader;
   fclose (t->index_fp);
@@ -254,7 +254,7 @@ table_file_trivial_reader__destroy (DskTableFileReader *reader)
 
 
 /* Create a new trivial reader, at an arbitrary offset. */
-static DskTableFileReader *
+static DskTableReader     *
 new_reader  (const char              *openat_dir,
              int                      openat_fd,
              const char              *base_filename,
@@ -319,7 +319,7 @@ new_reader  (const char              *openat_dir,
   return dsk_memdup (sizeof (reader), &reader);
 }
 
-static DskTableFileReader *
+static DskTableReader     *
 table_file_trivial__new_reader (DskTableFileInterface   *iface,
                                 const char              *openat_dir,
                                 int                      openat_fd,
@@ -598,7 +598,7 @@ table_file_trivial_seeker__find  (DskTableFileSeeker    *seeker,
 }
 
 
-static DskTableFileReader * 
+static DskTableReader     * 
 table_file_trivial_seeker__find_reader(DskTableFileSeeker    *seeker,
                                        DskTableSeekerFindFunc func,
                                        void                  *func_data,
@@ -661,7 +661,7 @@ table_file_trivial_seeker__index (DskTableFileSeeker    *seeker,
   return DSK_TRUE;
 }
 
-static DskTableFileReader * 
+static DskTableReader     * 
 table_file_trivial_seeker__index_reader(DskTableFileSeeker    *seeker,
                                         uint64_t               index,
                                         DskError             **error)
@@ -737,6 +737,33 @@ table_file_trivial__new_seeker (DskTableFileInterface   *iface,
   return (DskTableFileSeeker *) rv;
 }
 
+static dsk_boolean
+table_file_trivial__delete_file (DskTableFileInterface *iface,
+                                 const char              *openat_dir,
+                                 int                      openat_fd,
+                                 const char              *base_filename,
+                                 DskError               **error)
+{
+  static const char *suffixes[] = { "heap", "index" };
+  unsigned i;
+  unsigned base_len = strlen (base_filename);
+  char *fname = dsk_malloc (base_len + 10);
+  DSK_UNUSED (iface);
+  memcpy (fname, base_filename, base_len);
+  fname[base_len] = '.';
+  for (i = 0; i < DSK_N_ELEMENTS (suffixes); i++)
+    {
+      strcpy (fname + base_len + 1, suffixes[i]);
+      if (!dsk_table_helper_unlinkat (openat_dir, openat_fd, fname, error))
+        {
+          dsk_free (fname);
+          return DSK_FALSE;
+        }
+    }
+  dsk_free (fname);
+  return DSK_TRUE;
+}
+
 /* No destructor required for the static interface */
 #define table_file_trivial__destroy  NULL
 
@@ -745,5 +772,6 @@ DskTableFileInterface dsk_table_file_interface_trivial =
   table_file_trivial__new_writer,
   table_file_trivial__new_reader,
   table_file_trivial__new_seeker,
+  table_file_trivial__delete_file,
   table_file_trivial__destroy,
 };
