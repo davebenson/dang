@@ -271,11 +271,13 @@ add_to_tree (DskTable           *table,
                           table->merge_buffers[0].data);
           break;
 
+#if 0
         case DSK_TABLE_MERGE_DROP:
           GSK_RBTREE_REMOVE (GET_SMALL_TREE (), node);
           table->tree_size -= 1;
           dsk_free (node);
           break;
+#endif
         }
     }
 }
@@ -493,6 +495,7 @@ start_merge_job (DskTable *table,
 {
   Merge *merge;
   Merge **p_next;
+  DskTableFileInterface *file_iface = table->file_interface;
 
   if (possible->a->prev_merge)
     kill_possible_merge (table, possible->a->prev_merge);
@@ -500,14 +503,28 @@ start_merge_job (DskTable *table,
     kill_possible_merge (table, possible->b->next_merge);
 
   merge = dsk_malloc (sizeof (Merge));
+
+  /* setup info about input 'a' */
   merge->a = possible->a;
+  set_table_file_basename (table, merge->a->id);
+  merge->a_reader = file_iface->new_reader (file_iface,
+                                            table->dir, table->dir_fd,
+                                            table->basename, error);
+
+  /* setup info about input 'b' */
   merge->b = possible->b;
+  set_table_file_basename (table, merge->b->id);
+  merge->b_reader = file_iface->new_reader (file_iface,
+                                            table->dir, table->dir_fd,
+                                            table->basename, error);
+
+  /* setup info about output */
   merge->out_id = table->next_id++;
   set_table_file_basename (table, merge->out_id);
-  merge->writer = table->file_interface->new_writer (table->file_interface,
-                                                     table->dir, table->dir_fd,
-                                                     table->basename,
-                                                     error);
+  merge->writer = file_iface->new_writer (file_iface,
+                                          table->dir, table->dir_fd,
+                                          table->basename, error);
+
   merge->entries_written = 0;
   merge->inputs_remaining = merge->a->entry_count + merge->b->entry_count;
 
@@ -515,7 +532,7 @@ start_merge_job (DskTable *table,
      Not sure if it is worth checking for that. */
   merge->is_complete = merge->a->first_entry_index == 0ULL;
 
-  /* insert sorted */
+  /* insert sorted into list of running merges */
   p_next = &table->running_merges;
   while (*p_next != NULL
       && merge->inputs_remaining > (*p_next)->inputs_remaining)
@@ -757,9 +774,11 @@ lookup_do_merge_or_set (DskTable *table,
         case DSK_TABLE_MERGE_RETURN_BUFFER:
           *res_index_inout = 1 - *res_index_inout;
           return;
+#if 0
         case DSK_TABLE_MERGE_DROP:
           *res_index_inout = -1;
           return;
+#endif
         }
       if (!is_correct)
         {
@@ -1101,8 +1120,10 @@ run_first_merge_job (DskTable *table,
                     return DSK_FALSE;
                   merge->entries_written += 1;
                   break;
+#if 0
                 case DSK_TABLE_MERGE_DROP:
                   break;
+#endif
                 }
 
               merge->inputs_remaining -= 2;
@@ -1243,17 +1264,464 @@ dsk_table_insert       (DskTable       *table,
   return DSK_TRUE;
 }
 
-DskTableReader *dsk_table_new_reader (DskTable    *table)
+/* create a Reader corresponding to the small tree. */
+typedef struct _SmallTreeReader SmallTreeReader;
+struct _SmallTreeReader
 {
-  ...
+  DskTableReader base;
+  unsigned remaining;
+  unsigned *kv_len_pairs;
+  const uint8_t *kv_data;
+};
+
+static unsigned
+get_data_size_recursive (TreeNode *node)
+{
+  return (node->left ? get_data_size_recursive (node->left) : 0)
+       + node->key_length + node->value_length
+       + (node->right ? get_data_size_recursive (node->right) : 0);
+}
+static void
+small_tree_reader_init_recursive (TreeNode *tree,
+                                  unsigned **kv_len_pairs_inout,
+                                  uint8_t **kv_data_inout)
+{
+  if (tree->left)
+    small_tree_reader_init_recursive (tree->left, kv_len_pairs_inout, kv_data_inout);
+  memcpy (*kv_data_inout, 
+          ((uint8_t*)(tree+1)),
+          tree->key_length + tree->value_length);
+  *kv_data_inout += tree->key_length + tree->value_length;
+  (*kv_len_pairs_inout)[0] = tree->key_length;
+  (*kv_len_pairs_inout)[1] = tree->value_length;
+  (*kv_len_pairs_inout) += 2;
+  if (tree->right)
+    small_tree_reader_init_recursive (tree->right, kv_len_pairs_inout, kv_data_inout);
 }
 
-void        dsk_table_destroy      (DskTable       *table)
+static dsk_boolean
+small_tree_reader_advance (DskTableReader *reader,
+                           DskError      **error)
 {
-  ...
+  SmallTreeReader *s = (SmallTreeReader *) reader;
+  DSK_UNUSED (error);
+  if (s->remaining <= 1)
+    {
+      s->remaining = 0;
+      reader->at_eof = DSK_TRUE;
+      return DSK_TRUE;
+    }
+  s->remaining -= 1;
+  s->kv_data += s->kv_len_pairs[0] + s->kv_len_pairs[1];
+  s->kv_len_pairs += 2;
+  reader->key_length = s->kv_len_pairs[0];
+  reader->value_length = s->kv_len_pairs[1];
+  reader->key_data = s->kv_data;
+  reader->value_data = s->kv_data + s->kv_len_pairs[0];
+  return DSK_TRUE;
 }
 
-void        dsk_table_destroy_erase(DskTable       *table)
+static DskTableReader *
+make_small_tree_reader (DskTable *table)
 {
-  ...
+  unsigned data_size = get_data_size_recursive (table->small_tree);
+  unsigned size = table->tree_size * 8;
+  SmallTreeReader misc_fields =
+  {
+    {
+      DSK_FALSE,        /* never empty at this point */
+      0,0,NULL,NULL,    /* filled in below */
+      small_tree_reader_advance,
+      (void (*)(DskTableReader*)) dsk_free
+    },
+    table->tree_size,
+    NULL,
+    NULL
+  };
+  SmallTreeReader *rv = dsk_malloc (sizeof(SmallTreeReader)
+                                    + size
+                                    + data_size);
+  unsigned *kv_len_pairs = (unsigned*)(rv+1);
+  uint8_t *kv_data = (uint8_t *) (kv_len_pairs + table->tree_size * 2);
+  *rv = misc_fields;
+  rv->kv_len_pairs = kv_len_pairs;
+  rv->kv_data = kv_data;
+  small_tree_reader_init_recursive (table->small_tree,
+                                    &kv_len_pairs, &kv_data);
+  rv->base.key_length = rv->kv_len_pairs[0];
+  rv->base.value_length = rv->kv_len_pairs[1];
+  rv->base.key_data = rv->kv_data;
+  rv->base.value_data = rv->kv_data + rv->kv_len_pairs[0];
+  return &rv->base;
 }
+
+static dsk_boolean empty_advance (DskTableReader *reader,
+                                  DskError      **error)
+{
+  DSK_UNUSED (reader);
+  DSK_UNUSED (error);
+  return DSK_TRUE;
+}
+static void empty_destroy (DskTableReader *reader)
+{
+  DSK_UNUSED (reader);
+}
+static DskTableReader *
+make_empty_reader (void)
+{
+  static DskTableReader empty =
+    {
+      DSK_TRUE,         /* always at EOF */
+      0,0,NULL,NULL,    /* unused */
+      empty_advance,
+      empty_destroy
+    };
+  return &empty;
+}
+
+typedef struct _ReaderPlanNode ReaderPlanNode;
+struct _ReaderPlanNode
+{
+  DskTableReader *reader;
+  uint64_t est_entry_count;
+};
+
+DskTableReader *
+dsk_table_new_reader (DskTable    *table,
+                      DskError   **error)
+{
+  /* Create an array of readers */
+  ReaderPlanNode *planner;
+  unsigned n;
+  File *file;
+
+  /* Figure out the size of the planner (must match the next sections) */
+  n = 0;
+  for (file = table->oldest_file; file; file = file->next)
+    if (file->entry_count > 0)
+      n++;
+  if (table->small_tree != NULL)
+    n++;
+
+  /* Initialize the planner from the Files. */
+  planner = alloca (sizeof (ReaderPlanNode) * n);
+  n = 0;
+  for (file = table->oldest_file; file; file = file->next)
+    if (file->entry_count > 0)
+      {
+        DskTableFileInterface *iface = table->file_interface;
+        planner[n].est_entry_count = file->entry_count;
+        planner[n].reader = iface->new_reader (iface,
+                                               table->dir, table->dir_fd,
+                                               table->basename, error);
+        if (planner[n].reader == NULL)
+          {
+            unsigned i;
+            for (i = 0; i < n; i++)
+              planner[i].reader->destroy (planner[i].reader);
+            return NULL;
+          }
+        n++;
+      }
+
+  /* Create a planner entry for the tree */
+  if (table->small_tree)
+    {
+      planner[n].est_entry_count = table->tree_size;
+      planner[n].reader = make_small_tree_reader (table);
+      n++;
+    }
+
+  /* Merge together readers with the least ratio a/b. */
+  /* XXX: this could obviously be done way
+     more efficiently (probably O(n log n) instead of O(n^2));
+     given that the n is typically less than 10, and near plausibly more that 20.
+
+     Another point is that we could advance the merge jobs
+     when the reader gets to that point.  */
+  while (n > 1)
+    {
+      /* find the pair with the least a/b ratio */
+      unsigned i;
+      unsigned best_i;
+      unsigned least_ab;
+      for (i = 0; i + 1 < n; i++)
+        {
+          double ab = (double) planner[i].est_entry_count
+                    / (double) planner[i+1].est_entry_count;
+          if (i == 0 || ab < least_ab)
+            {
+              best_i = i;
+              least_ab = ab;
+            }
+        }
+
+      /* merge best_i and best_i+1 */
+      planner[best_i].reader
+        = dsk_table_reader_new_merge2 (table,
+                                       planner[best_i].reader,
+                                       planner[best_i+1].reader);
+      if (planner[best_i].reader == NULL)
+        {
+          for (i = 0; i < best_i; i++)
+            planner[i].reader->destroy (planner[i].reader);
+          for (i = best_i + 2; i < n; i++)
+            planner[i].reader->destroy (planner[i].reader);
+          return NULL;
+        }
+
+      /* NOTE: other estimators might work better,
+         but it is critical that the estimate never be 0,
+         lest you get a divide-by-zero error above. */
+      planner[best_i].est_entry_count
+        = planner[best_i].est_entry_count
+        + planner[best_i+1].est_entry_count;
+
+      /* Remove best_i+1 from the array */
+      memmove (planner + best_i + 1,
+               planner + best_i + 2,
+               (n - (best_i + 2)) * sizeof (ReaderPlanNode));
+      n--;
+    }
+  if (n == 0)
+    {
+      return make_empty_reader ();
+    }
+  else
+    {
+      return planner[0].reader;
+    }
+}
+
+static void
+destroy_file_list (File *file)
+{
+  while (file != NULL)
+    {
+      File *next = file->next;
+      if (file->seeker)
+        file->seeker->destroy (file->seeker);
+      dsk_free (file);
+      file = next;
+    }
+}
+
+static void
+free_possible_merge_tree_recursive (PossibleMerge *pm)
+{
+  if (pm->left)
+    free_possible_merge_tree_recursive (pm->left);
+  if (pm->right)
+    free_possible_merge_tree_recursive (pm->left);
+  dsk_free (pm);
+}
+
+void
+dsk_table_destroy      (DskTable       *table)
+{
+  table->cp->close (table->cp, NULL);
+  table->cp->destroy (table->cp);
+  destroy_file_list (table->oldest_file);
+  free_small_tree_recursive (table->small_tree);
+  while (table->running_merges)
+    {
+      Merge *merge = table->running_merges;
+      table->running_merges = merge->next;
+
+      merge->a_reader->destroy (merge->a_reader);
+      merge->b_reader->destroy (merge->b_reader);
+      merge->writer->destroy (merge->writer);
+      dsk_free (merge);
+    }
+  destroy_file_list (table->defunct_files);
+  if (table->possible_merge_tree)
+    free_possible_merge_tree_recursive (table->possible_merge_tree);
+  if (table->dir_fd)
+    close (table->dir_fd);
+  dsk_free (table->dir);
+  dsk_free (table);
+}
+
+void
+dsk_table_destroy_erase(DskTable       *table)
+{
+  /* TODO: erase */
+  dsk_table_destroy (table);
+}
+
+/* --- dsk_table_reader_new_merge2 --- */
+typedef struct _TableReaderMerge2 TableReaderMerge2;
+typedef enum
+{
+  TABLE_READER_MERGE2_A,
+  TABLE_READER_MERGE2_B,
+  TABLE_READER_MERGE2_BOTH,
+  TABLE_READER_MERGE2_EOF
+} TableReaderMerge2State;
+
+struct _TableReaderMerge2
+{
+  DskTableReader base;
+  DskTable       *table;
+  DskTableReader *a;
+  DskTableReader *b;
+  DskTableBuffer buffer;
+  TableReaderMerge2State state;
+};
+static void
+merge2_copy_kv_data (DskTableReader *dst,
+                     DskTableReader *src)
+{
+  dst->key_length = src->key_length;
+  dst->key_data = src->key_data;
+  dst->value_length = src->value_length;
+  dst->value_data = src->value_data;
+}
+
+static void
+merge2_setup_output (TableReaderMerge2 *merge2)
+{
+  DskTableReader *a = merge2->a;
+  DskTableReader *b = merge2->b;
+  DskTable *table = merge2->table;
+  int cmp;
+
+  /* compare a,b; possibly merge */
+  cmp = table->compare (a->key_length, a->key_data,
+                        b->key_length, b->key_data,
+                        table->compare_data);
+  if (cmp < 0)
+    {
+      merge2->state = TABLE_READER_MERGE2_A;
+      merge2_copy_kv_data (&merge2->base, a);
+    }
+  else if (cmp > 0)
+    {
+      merge2->state = TABLE_READER_MERGE2_B;
+      merge2_copy_kv_data (&merge2->base, b);
+    }
+  else
+    {
+      merge2->state = TABLE_READER_MERGE2_BOTH;
+      switch (table->merge (merge2->a->key_length,
+                            merge2->a->key_data,
+                            merge2->a->value_length,
+                            merge2->a->value_data,
+                            merge2->b->value_length,
+                            merge2->b->value_data,
+                            &merge2->buffer,
+                            DSK_FALSE,          /* complete? */
+                            table->merge_data))
+        {
+        case DSK_TABLE_MERGE_RETURN_A_FINAL:
+        case DSK_TABLE_MERGE_RETURN_A:
+          merge2_copy_kv_data (&merge2->base, a);
+          break;
+        case DSK_TABLE_MERGE_RETURN_B_FINAL:
+        case DSK_TABLE_MERGE_RETURN_B:
+          merge2_copy_kv_data (&merge2->base, b);
+          break;
+        case DSK_TABLE_MERGE_RETURN_BUFFER_FINAL:
+        case DSK_TABLE_MERGE_RETURN_BUFFER:
+          merge2->base.key_length = a->key_length;
+          merge2->base.key_data = a->key_data;
+          merge2->base.value_length = merge2->buffer.length;
+          merge2->base.value_data = merge2->buffer.data;
+          break;
+        }
+    }
+}
+
+static dsk_boolean
+merge2_advance (DskTableReader *reader,
+                DskError      **error)
+{
+  TableReaderMerge2 *merge2 = (TableReaderMerge2 *) reader;
+  switch (merge2->state)
+    {
+    case TABLE_READER_MERGE2_A:
+      if (!merge2->a->advance (merge2->a, error))
+        return DSK_FALSE;
+      break;
+    case TABLE_READER_MERGE2_B:
+      if (!merge2->b->advance (merge2->b, error))
+        return DSK_FALSE;
+      break;
+    case TABLE_READER_MERGE2_BOTH:
+      if (!merge2->a->advance (merge2->a, error)
+       || !merge2->b->advance (merge2->b, error))
+        return DSK_FALSE;
+      break;
+    case TABLE_READER_MERGE2_EOF:
+      return DSK_TRUE;
+    }
+
+  if (merge2->a->at_eof && merge2->b->at_eof)
+    {
+      merge2->base.at_eof = DSK_TRUE;
+      merge2->state = TABLE_READER_MERGE2_EOF;
+    }
+  else if (merge2->a->at_eof)
+    {
+      merge2_copy_kv_data (&merge2->base, merge2->b);
+      merge2->state = TABLE_READER_MERGE2_B;
+    }
+  else if (merge2->b->at_eof)
+    {
+      merge2_copy_kv_data (&merge2->base, merge2->a);
+      merge2->state = TABLE_READER_MERGE2_A;
+    }
+  else
+    merge2_setup_output (merge2);
+  return DSK_TRUE;
+}
+
+static void
+merge2_destroy (DskTableReader *reader)
+{
+  TableReaderMerge2 *merge2 = (TableReaderMerge2 *) reader;
+  merge2->a->destroy (merge2->a);
+  merge2->b->destroy (merge2->b);
+  dsk_free (merge2->buffer.data);
+  dsk_free (merge2);
+}
+
+DskTableReader *
+dsk_table_reader_new_merge2 (DskTable *table,
+                             DskTableReader *a,
+                             DskTableReader *b)
+{
+  TableReaderMerge2 *merge2;
+
+  /* dispense with some trivial cases */
+  if (a->at_eof && b->at_eof)
+    {
+      a->destroy (a);
+      return b;
+    }
+  else if (a->at_eof)
+    {
+      a->destroy (a);
+      return b;
+    }
+  else if (b->at_eof)
+    {
+      b->destroy (b);
+      return a;
+    }
+
+  merge2 = dsk_malloc (sizeof (TableReaderMerge2));
+  merge2->base.advance = merge2_advance;
+  merge2->base.destroy = merge2_destroy;
+  merge2->table = table;
+  merge2->a = a;
+  merge2->b = b;
+  merge2->buffer.length = 0;
+  merge2->buffer.data = NULL;
+  merge2->buffer.alloced = 0;
+
+  merge2_setup_output (merge2);
+
+  return &merge2->base;
+}
+

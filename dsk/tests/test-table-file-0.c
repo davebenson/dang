@@ -22,7 +22,7 @@ test_simple_write_read (void)
   DskTableFileInterface *iface = &dsk_table_file_interface_trivial;
 
   DskTableFileWriter *writer = iface->new_writer (iface, test_dir, test_dir_fd, "base", &error);
-  DskTableFileReader *reader;
+  DskTableReader *reader;
   if (writer == NULL)
     dsk_die ("%s", error->message);
   if (!writer->write (writer, 1, (uint8_t*) "a", 1, (uint8_t*) "A", &error)
@@ -259,7 +259,7 @@ test_various_read_write_1 (const char *name,
   uint64_t big_i;               /* index from 0..n_write-1 */
   uint32_t small_i;             /* index from 0..n_entries-1 */
   DskTableFileWriter *writer;
-  DskTableFileReader *reader;
+  DskTableReader *reader;
 
   if (cmdline_verbose)
     fprintf (stderr, "running dataset %s [%llu]\n", name, n_write);
