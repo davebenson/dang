@@ -98,3 +98,26 @@ void      dsk_add_error_prefix (DskError   **error,
   (*error)->message = new_message;
 }
 
+void      dsk_add_error_suffix (DskError   **error,
+                                const char  *format,
+                                ...)
+{
+  char buf[512];
+  DskError *rv;
+  va_list args;
+  char *new_message;
+  if (error == NULL)
+    return;
+  dsk_assert (*error != NULL);
+  va_start (args, format);
+  vsnprintf (buf, sizeof (buf), format, args);
+  va_end (args);
+  buf[sizeof(buf) - 1] = 0;
+  rv = dsk_object_new (&dsk_error_class);
+  new_message = dsk_malloc (strlen (buf) + strlen ((*error)->message) + 1);
+  strcpy (new_message, (*error)->message);
+  strcat (new_message, buf);
+  dsk_free ((*error)->message);
+  (*error)->message = new_message;
+}
+
