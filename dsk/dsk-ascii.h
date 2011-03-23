@@ -10,12 +10,18 @@ extern unsigned char dsk_ascii_chartable[256];
 #define dsk_ascii_is_minus_or_underscore(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 32)
 #define dsk_ascii_ispunct(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 64)
 
+/* used to decide if an ascii character can be jammed into a C-quoted
+   (or JSON-quoted) string without quoting. */
+#define dsk_ascii_is_no_cquoting_required(c) \
+                              (dsk_ascii_chartable[(unsigned char)(c)] & 128)
+
 /* isalpha = isupper || is_lower */
 #define dsk_ascii_isalpha(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 6)
 /* isalnum = isupper || is_lower || is_digit */
 #define dsk_ascii_isalnum(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 14)
 /* istoken = isupper || is_lower || is_digit || is_minus_or_underscore */
 #define dsk_ascii_istoken(c)  (dsk_ascii_chartable[(unsigned char)(c)] & 46)
+
 
 int dsk_ascii_xdigit_value (int c);
 int dsk_ascii_digit_value (int c);

@@ -66,5 +66,17 @@ DskJsonValue *dsk_json_value_new_number (double         value);
 void          dsk_json_value_free       (DskJsonValue  *value);
 
 /* --- writing --- */
-void          dsk_json_value_to_buffer  (DskJsonValue  *value,
-                                         DskBuffer     *out);
+
+/* generalized target for output */
+typedef void (*DskJsonAppendFunc) (unsigned      length,
+                                   const void   *data,
+                                   void         *append_data);
+
+/* if indent == -1, no decorative spaces are added */
+void    dsk_json_value_serialize  (const DskJsonValue  *value,
+                                   int                  indent,
+                                   DskJsonAppendFunc    append_func,
+                                   void                *append_data);
+void    dsk_json_value_to_buffer  (const DskJsonValue  *value,
+                                   int                  indent,
+                                   DskBuffer           *out);

@@ -733,9 +733,9 @@ test_keepalive_full (dsk_boolean add_postcontent_newlines)
                 req_options.full_path = "/hello.txt";
                 cr_options.request_options = &req_options;
                 cr_options.funcs = &request_funcs_0;
+                post_data = dsk_memory_source_new ();
                 cr_options.post_data = DSK_OCTET_SOURCE (post_data);
                 cr_options.user_data = rd;
-                post_data = dsk_memory_source_new ();
                 dsk_buffer_append_string (&post_data->buffer, pd_str);
                 xfer = dsk_http_client_stream_request (stream, &cr_options, &error);
                 dsk_assert (xfer != NULL);
