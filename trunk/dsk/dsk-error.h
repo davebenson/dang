@@ -26,5 +26,8 @@ void      dsk_set_error        (DskError  **error,
 void      dsk_add_error_prefix (DskError  **error,
                                 const char *format,
                                 ...) DSK_GNUC_PRINTF(2,3);
+void      dsk_add_error_suffix (DskError  **error,
+                                const char *format,
+                                ...) DSK_GNUC_PRINTF(2,3);
 DskError *dsk_error_ref        (DskError   *error);
 void      dsk_error_unref      (DskError   *error);

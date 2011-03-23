@@ -50,6 +50,8 @@
 
 #include "dsk-json.h"
 
+#include "dsk-ctoken.h"
+
 #include "dsk-zlib.h"
 #include "dsk-octet-filter-misc.h"
 #include "dsk-base64.h"

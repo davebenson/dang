@@ -23,7 +23,8 @@ TEST_PROGRAMS = tests/test-dns-protocol tests/test-client-server-0 \
 		tests/test-xml-binding-0 \
 		tests/test-table-file-0 \
 		tests/test-table-0 \
-		tests/test-json-0
+		tests/test-json-0 \
+		tests/test-ctoken
 PROGRAMS = programs/dsk-dns-lookup programs/dsk-netcat programs/dsk-host \
            programs/dsk-octet-filter programs/dsk-make-xml-binding
 all: $(BUILT_SOURCES) $(PROGRAMS) build-tests
@@ -75,6 +76,7 @@ libdsk.a: dsk-inlines.o \
 	  dsk-xml-binding.o \
 	  dsk-xml-binding-parser.o \
 	  dsk-json.o dsk-json-parser.o dsk-json-output.o \
+	  dsk-ctoken.o \
 	  dsk-zlib.o \
 	  dsk-base64.o dsk-base64-encoder.o dsk-base64-decoder.o \
 	  dsk-c-quoter.o dsk-c-unquoter.o \
