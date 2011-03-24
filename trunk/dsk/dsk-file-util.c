@@ -113,11 +113,6 @@ retry_stat:
   return S_ISDIR (stat_buf.st_mode);
 }
 
-/* TODO: actually, this should be TRUE for all known versions
-   of linux... that would speed up rm_rf by eliminating an
-   extra lstat(2) call. */
-#define UNLINK_DIR_RETURNS_EISDIR       DSK_FALSE
-
 static dsk_boolean
 safe_unlink (const char *dir_or_file,
              const char **failed_op_out,
