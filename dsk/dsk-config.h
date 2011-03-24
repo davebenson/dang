@@ -9,3 +9,10 @@
 
 #define DSK_IS_LITTLE_ENDIAN    1
 #define DSK_IS_BIG_ENDIAN    (!DSK_IS_LITTLE_ENDIAN)
+
+
+/* TODO: actually, this should be TRUE for all known versions
+   of linux... that would speed up rm_rf by eliminating an
+   extra lstat(2) call. */
+#define UNLINK_DIR_RETURNS_EISDIR       DSK_FALSE
+
