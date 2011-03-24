@@ -196,7 +196,7 @@ dsk_boolean dsk_rm_rf   (const char *dir_or_file, DskError    **error)
               strcpy (fname, dir_or_file);
               fname[flen] = '/';
               strcpy (fname + flen + 1, base);
-              if (!dsk_remove_dir_recursive (fname, error))
+              if (!dsk_rm_rf (fname, error))
                 {
                   dsk_free (fname);
                   closedir (dir);
