@@ -234,6 +234,7 @@ DskDispatch *dsk_dispatch_new (void)
 #endif
   rv->timer_tree = NULL;
   rv->first_idle = rv->last_idle = NULL;
+  rv->base.has_idle = DSK_FALSE;
   rv->recycled_idles = NULL;
   rv->recycled_timeouts = NULL;
 
@@ -944,7 +945,6 @@ dsk_dispatch_remove_idle (DskDispatchIdle *idle)
       if (d->first_idle == NULL)
         d->base.has_idle = DSK_FALSE;
     }
-
 }
 
 static void
