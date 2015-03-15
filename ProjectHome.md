@@ -1,0 +1,1 @@
+An imperative programming language with higher-order functions and inferred types.
